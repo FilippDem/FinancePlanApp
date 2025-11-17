@@ -654,6 +654,89 @@ class Child:
 
 
 @dataclass
+class FamilyExpenseTemplate:
+    name: str
+    state: str  # State for location-based defaults
+    spending_category: str  # Frugal, Moderate, Luxury
+    annual_expenses: Dict[str, float]  # Category -> Annual Amount
+
+    def to_dict(self):
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(**data)
+
+    @staticmethod
+    def get_default_templates():
+        """Get default family expense templates by state and spending category."""
+        templates = {}
+
+        # Define expense categories
+        categories = [
+            "Groceries",
+            "Utilities",
+            "Home Maintenance",
+            "Insurance",
+            "Transportation",
+            "Entertainment",
+            "Dining Out",
+            "Travel/Vacation",
+            "Personal Care",
+            "Miscellaneous"
+        ]
+
+        # Define spending levels
+        spending_levels = {
+            "Frugal": 0.7,      # 70% of moderate
+            "Moderate": 1.0,    # 100% baseline
+            "Luxury": 1.5       # 150% of moderate
+        }
+
+        # State-specific cost of living multipliers (relative to national average)
+        state_multipliers = {
+            "California": 1.3,
+            "New York": 1.25,
+            "Washington": 1.15,
+            "Texas": 0.95,
+            "Florida": 1.0,
+            "National Average": 1.0
+        }
+
+        # Base moderate expenses (national average)
+        base_moderate = {
+            "Groceries": 12000,
+            "Utilities": 4800,
+            "Home Maintenance": 6000,
+            "Insurance": 8000,
+            "Transportation": 10000,
+            "Entertainment": 4000,
+            "Dining Out": 6000,
+            "Travel/Vacation": 5000,
+            "Personal Care": 3000,
+            "Miscellaneous": 5000
+        }
+
+        # Generate templates for each state and spending level
+        for state, state_mult in state_multipliers.items():
+            for level, level_mult in spending_levels.items():
+                template_name = f"{state} - {level}"
+                annual_expenses = {}
+
+                for category, base_amount in base_moderate.items():
+                    annual_expenses[category] = base_amount * state_mult * level_mult
+
+                templates[template_name] = FamilyExpenseTemplate(
+                    name=template_name,
+                    state=state,
+                    spending_category=level,
+                    annual_expenses=annual_expenses
+                )
+
+        return templates
+
+
+@dataclass
 class MajorPurchase:
     name: str
     year: int
@@ -831,7 +914,8 @@ class FinancialPlanner:
                  current_net_worth: float,
                  yearly_expenses: float,
                  major_purchases: List[MajorPurchase] = None,
-                 child_templates: List[ChildTemplate] = None):
+                 child_templates: List[ChildTemplate] = None,
+                 family_expense_templates: List[FamilyExpenseTemplate] = None):
         logger.debug("Initializing FinancialPlanner")
         self.persons = persons
         self.children = children or []
@@ -843,6 +927,7 @@ class FinancialPlanner:
         self.household_expenses = {}
         self.major_purchases = major_purchases or []
         self.child_templates = child_templates or []
+        self.family_expense_templates = family_expense_templates or []
         self.healthcare_expenses = yearly_expenses * 0.12  # Estimate healthcare as 12% of total expenses
         logger.debug(f"Created planner with {len(persons)} persons, {len(children)} children")
 
@@ -857,6 +942,7 @@ class FinancialPlanner:
                 'household_expenses': self.household_expenses,
                 'major_purchases': [p.to_dict() for p in self.major_purchases],
                 'child_templates': [t.to_dict() for t in self.child_templates],
+                'family_expense_templates': [t.to_dict() for t in self.family_expense_templates],
                 'healthcare_expenses': self.healthcare_expenses
             }
         except Exception as e:
@@ -870,6 +956,7 @@ class FinancialPlanner:
             children = [Child.from_dict(c) for c in data['children']]
             major_purchases = [MajorPurchase.from_dict(p) for p in data['major_purchases']]
             child_templates = [ChildTemplate.from_dict(t) for t in data['child_templates']]
+            family_expense_templates = [FamilyExpenseTemplate.from_dict(t) for t in data.get('family_expense_templates', [])]
 
             planner = cls(
                 persons=persons,
@@ -878,7 +965,8 @@ class FinancialPlanner:
                 current_net_worth=data['current_net_worth'],
                 yearly_expenses=data['yearly_expenses'],
                 major_purchases=major_purchases,
-                child_templates=child_templates
+                child_templates=child_templates,
+                family_expense_templates=family_expense_templates
             )
             planner.household_expenses = data.get('household_expenses', {})
             planner.healthcare_expenses = data.get('healthcare_expenses', planner.yearly_expenses * 0.12)
