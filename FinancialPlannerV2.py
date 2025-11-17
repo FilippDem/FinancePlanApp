@@ -743,6 +743,8 @@ class MajorPurchase:
     amount: float
     financing_years: int = 0
     interest_rate: float = 0.0
+    asset_type: str = "Expense"  # "Expense", "Real Estate", "Vehicle", "Investment"
+    appreciation_rate: float = 0.0  # Annual appreciation rate (e.g., 0.03 for 3%)
 
     def to_dict(self):
         return asdict(self)
@@ -929,6 +931,15 @@ class FinancialPlanner:
         self.child_templates = child_templates or []
         self.family_expense_templates = family_expense_templates or []
         self.healthcare_expenses = yearly_expenses * 0.12  # Estimate healthcare as 12% of total expenses
+
+        # Portfolio allocation (percentages, should sum to 100%)
+        self.portfolio_allocation = {
+            'Stocks': 60.0,
+            'Bonds': 30.0,
+            'Cash': 5.0,
+            'Real Estate': 5.0,
+            'Other': 0.0
+        }
         logger.debug(f"Created planner with {len(persons)} persons, {len(children)} children")
 
     def to_dict(self):
@@ -943,7 +954,8 @@ class FinancialPlanner:
                 'major_purchases': [p.to_dict() for p in self.major_purchases],
                 'child_templates': [t.to_dict() for t in self.child_templates],
                 'family_expense_templates': [t.to_dict() for t in self.family_expense_templates],
-                'healthcare_expenses': self.healthcare_expenses
+                'healthcare_expenses': self.healthcare_expenses,
+                'portfolio_allocation': self.portfolio_allocation
             }
         except Exception as e:
             logger.error(f"Error in to_dict: {e}")
@@ -970,6 +982,13 @@ class FinancialPlanner:
             )
             planner.household_expenses = data.get('household_expenses', {})
             planner.healthcare_expenses = data.get('healthcare_expenses', planner.yearly_expenses * 0.12)
+            planner.portfolio_allocation = data.get('portfolio_allocation', {
+                'Stocks': 60.0,
+                'Bonds': 30.0,
+                'Cash': 5.0,
+                'Real Estate': 5.0,
+                'Other': 0.0
+            })
             return planner
         except Exception as e:
             logger.error(f"Error in from_dict: {e}")
@@ -1133,6 +1152,22 @@ class FinancialPlanner:
 
         return total_expense
 
+    def _calculate_asset_values(self, year: int) -> Dict[str, float]:
+        """Calculate current values of appreciating assets."""
+        asset_values = {}
+        total_assets = 0
+
+        for purchase in self.major_purchases:
+            # Only track appreciating assets (not expenses)
+            if purchase.asset_type != "Expense" and year >= purchase.year:
+                years_held = year - purchase.year
+                current_value = purchase.amount * ((1 + purchase.appreciation_rate) ** years_held)
+                asset_values[f"{purchase.name} ({purchase.asset_type})"] = current_value
+                total_assets += current_value
+
+        asset_values["Total Assets"] = total_assets
+        return asset_values
+
     def _calculate_total_expenses(self, year: int, expense_growth_rate: float, inflation_rate: float,
                                   healthcare_inflation_rate: float) -> float:
         """Calculate total expenses including children and major purchases."""
@@ -1188,6 +1223,9 @@ class FinancialPlanner:
                 net_change = total_income - total_expenses + investment_return
                 net_worth += net_change
 
+                # Calculate asset values (appreciating assets)
+                asset_values = self._calculate_asset_values(year)
+
                 # Store results
                 results.append({
                     'year': year,
@@ -1196,7 +1234,8 @@ class FinancialPlanner:
                     'investment_return': investment_return,
                     'net_change': net_change,
                     'net_worth': net_worth,
-                    'income_details': income_details
+                    'income_details': income_details,
+                    'asset_values': asset_values
                 })
 
             logger.debug(f"Projection completed with {len(results)} years of data")
@@ -1558,6 +1597,60 @@ class FinancialPlannerGUI(QMainWindow):
 
         ss_group.setLayout(ss_layout)
         layout.addWidget(ss_group)
+
+        # Add Portfolio Allocation section
+        portfolio_group = QGroupBox("Portfolio Allocation")
+        portfolio_layout = QFormLayout()
+
+        # Create input fields for each asset class
+        self.stocks_allocation_input = QDoubleSpinBox()
+        self.stocks_allocation_input.setRange(0, 100)
+        self.stocks_allocation_input.setSuffix("%")
+        self.stocks_allocation_input.setValue(self.planner.portfolio_allocation.get('Stocks', 60.0))
+
+        self.bonds_allocation_input = QDoubleSpinBox()
+        self.bonds_allocation_input.setRange(0, 100)
+        self.bonds_allocation_input.setSuffix("%")
+        self.bonds_allocation_input.setValue(self.planner.portfolio_allocation.get('Bonds', 30.0))
+
+        self.cash_allocation_input = QDoubleSpinBox()
+        self.cash_allocation_input.setRange(0, 100)
+        self.cash_allocation_input.setSuffix("%")
+        self.cash_allocation_input.setValue(self.planner.portfolio_allocation.get('Cash', 5.0))
+
+        self.realestate_allocation_input = QDoubleSpinBox()
+        self.realestate_allocation_input.setRange(0, 100)
+        self.realestate_allocation_input.setSuffix("%")
+        self.realestate_allocation_input.setValue(self.planner.portfolio_allocation.get('Real Estate', 5.0))
+
+        self.other_allocation_input = QDoubleSpinBox()
+        self.other_allocation_input.setRange(0, 100)
+        self.other_allocation_input.setSuffix("%")
+        self.other_allocation_input.setValue(self.planner.portfolio_allocation.get('Other', 0.0))
+
+        # Total label
+        self.allocation_total_label = QLabel("Total: 100.0%")
+        self.allocation_total_label.setStyleSheet("font-weight: bold;")
+
+        portfolio_layout.addRow("Stocks:", self.stocks_allocation_input)
+        portfolio_layout.addRow("Bonds:", self.bonds_allocation_input)
+        portfolio_layout.addRow("Cash:", self.cash_allocation_input)
+        portfolio_layout.addRow("Real Estate:", self.realestate_allocation_input)
+        portfolio_layout.addRow("Other:", self.other_allocation_input)
+        portfolio_layout.addRow("", self.allocation_total_label)
+
+        # Connect inputs to update total
+        for input_widget in [self.stocks_allocation_input, self.bonds_allocation_input,
+                            self.cash_allocation_input, self.realestate_allocation_input,
+                            self.other_allocation_input]:
+            input_widget.valueChanged.connect(self.update_allocation_total)
+
+        update_portfolio_btn = QPushButton("Update Portfolio Allocation")
+        update_portfolio_btn.clicked.connect(self.update_portfolio_allocation)
+        portfolio_layout.addRow(update_portfolio_btn)
+
+        portfolio_group.setLayout(portfolio_layout)
+        layout.addWidget(portfolio_group)
 
         # Add instructions section
         instructions_group = QGroupBox("Instructions and Tab Guide")
@@ -2240,9 +2333,20 @@ class FinancialPlannerGUI(QMainWindow):
         self.interest_rate_input.setSuffix("%")
         self.interest_rate_input.setDecimals(2)
 
+        self.asset_type_input = QComboBox()
+        self.asset_type_input.addItems(["Expense", "Real Estate", "Vehicle", "Investment"])
+
+        self.appreciation_rate_input = QDoubleSpinBox()
+        self.appreciation_rate_input.setRange(-20, 20)
+        self.appreciation_rate_input.setSuffix("% /year")
+        self.appreciation_rate_input.setDecimals(2)
+        self.appreciation_rate_input.setValue(0)
+
         add_purchase_layout.addRow("Name:", self.purchase_name_input)
         add_purchase_layout.addRow("Year:", self.purchase_year_input)
         add_purchase_layout.addRow("Amount:", self.purchase_amount_input)
+        add_purchase_layout.addRow("Asset Type:", self.asset_type_input)
+        add_purchase_layout.addRow("Appreciation Rate:", self.appreciation_rate_input)
         add_purchase_layout.addRow("Financing Years (0 for cash):", self.financing_years_input)
         add_purchase_layout.addRow("Interest Rate:", self.interest_rate_input)
 
@@ -2255,9 +2359,9 @@ class FinancialPlannerGUI(QMainWindow):
 
         # Purchases table
         self.purchases_table = QTableWidget()
-        self.purchases_table.setColumnCount(6)
+        self.purchases_table.setColumnCount(8)
         self.purchases_table.setHorizontalHeaderLabels([
-            "Name", "Year", "Amount", "Financing Years", "Interest Rate", "Action"
+            "Name", "Year", "Amount", "Type", "Appreciation", "Financing Years", "Interest Rate", "Action"
         ])
         layout.addWidget(self.purchases_table)
 
@@ -2418,6 +2522,23 @@ class FinancialPlannerGUI(QMainWindow):
             self.mc_canvas = FigureCanvasQTAgg(self.mc_figure)
             layout.addWidget(self.mc_canvas)
 
+            # Add detailed breakdown section
+            breakdown_group = QGroupBox("Detailed Breakdown")
+            breakdown_group.setCheckable(True)
+            breakdown_group.setChecked(False)  # Collapsed by default
+            breakdown_layout = QVBoxLayout()
+
+            # Table for statistics
+            self.mc_breakdown_table = QTableWidget()
+            self.mc_breakdown_table.setColumnCount(6)
+            self.mc_breakdown_table.setHorizontalHeaderLabels([
+                "Metric", "10th %ile", "25th %ile", "Median", "75th %ile", "90th %ile"
+            ])
+            breakdown_layout.addWidget(self.mc_breakdown_table)
+
+            breakdown_group.setLayout(breakdown_layout)
+            layout.addWidget(breakdown_group)
+
             logger.debug("Monte Carlo tab setup complete")
             return tab
         except Exception as e:
@@ -2508,6 +2629,8 @@ class FinancialPlannerGUI(QMainWindow):
             amount = self.purchase_amount_input.value()
             financing_years = self.financing_years_input.value()
             interest_rate = self.interest_rate_input.value() / 100  # Convert from percentage
+            asset_type = self.asset_type_input.currentText()
+            appreciation_rate = self.appreciation_rate_input.value() / 100  # Convert from percentage
 
             if not name:
                 QMessageBox.warning(self, "Warning", "Purchase name is required")
@@ -2519,7 +2642,9 @@ class FinancialPlannerGUI(QMainWindow):
                 year=year,
                 amount=amount,
                 financing_years=financing_years,
-                interest_rate=interest_rate
+                interest_rate=interest_rate,
+                asset_type=asset_type,
+                appreciation_rate=appreciation_rate
             )
 
             self.planner.major_purchases.append(purchase)
@@ -2528,7 +2653,7 @@ class FinancialPlannerGUI(QMainWindow):
             self.refresh_purchases_table()
             self.clear_purchase_inputs()
 
-            logger.debug(f"Added purchase: {name}, ${amount}")
+            logger.debug(f"Added purchase: {name}, ${amount}, type: {asset_type}")
         except Exception as e:
             logger.error(f"Error adding purchase: {e}")
             QMessageBox.warning(self, "Error", f"Failed to add purchase: {str(e)}")
@@ -2539,6 +2664,8 @@ class FinancialPlannerGUI(QMainWindow):
         self.purchase_amount_input.setValue(0)
         self.financing_years_input.setValue(0)
         self.interest_rate_input.setValue(0)
+        self.asset_type_input.setCurrentIndex(0)
+        self.appreciation_rate_input.setValue(0)
 
     def refresh_purchases_table(self):
         """Refresh the purchases table with current data."""
@@ -2554,13 +2681,15 @@ class FinancialPlannerGUI(QMainWindow):
                 self.purchases_table.setItem(row, 0, QTableWidgetItem(purchase.name))
                 self.purchases_table.setItem(row, 1, QTableWidgetItem(str(purchase.year)))
                 self.purchases_table.setItem(row, 2, QTableWidgetItem(format_currency(purchase.amount)))
-                self.purchases_table.setItem(row, 3, QTableWidgetItem(str(purchase.financing_years)))
-                self.purchases_table.setItem(row, 4, QTableWidgetItem(f"{purchase.interest_rate * 100:.2f}%"))
+                self.purchases_table.setItem(row, 3, QTableWidgetItem(purchase.asset_type))
+                self.purchases_table.setItem(row, 4, QTableWidgetItem(f"{purchase.appreciation_rate * 100:.2f}%"))
+                self.purchases_table.setItem(row, 5, QTableWidgetItem(str(purchase.financing_years)))
+                self.purchases_table.setItem(row, 6, QTableWidgetItem(f"{purchase.interest_rate * 100:.2f}%"))
 
                 # Add delete button
                 delete_btn = QPushButton("Delete")
                 delete_btn.clicked.connect(lambda checked, p=purchase: self.delete_purchase(p))
-                self.purchases_table.setCellWidget(row, 5, delete_btn)
+                self.purchases_table.setCellWidget(row, 7, delete_btn)
         except Exception as e:
             logger.error(f"Error refreshing purchases table: {e}")
 
@@ -2726,6 +2855,56 @@ class FinancialPlannerGUI(QMainWindow):
         except Exception as e:
             logger.error(f"Error updating SS settings: {e}")
             QMessageBox.warning(self, "Error", f"Failed to update Social Security settings: {str(e)}")
+
+    def update_allocation_total(self):
+        """Update the total allocation percentage display."""
+        try:
+            total = (self.stocks_allocation_input.value() +
+                    self.bonds_allocation_input.value() +
+                    self.cash_allocation_input.value() +
+                    self.realestate_allocation_input.value() +
+                    self.other_allocation_input.value())
+
+            self.allocation_total_label.setText(f"Total: {total:.1f}%")
+
+            # Change color based on whether it equals 100%
+            if abs(total - 100.0) < 0.01:  # Allow for floating point precision
+                self.allocation_total_label.setStyleSheet("font-weight: bold; color: green;")
+            else:
+                self.allocation_total_label.setStyleSheet("font-weight: bold; color: red;")
+        except Exception as e:
+            logger.error(f"Error updating allocation total: {e}")
+
+    def update_portfolio_allocation(self):
+        """Update the portfolio allocation in the planner."""
+        try:
+            # Get values
+            total = (self.stocks_allocation_input.value() +
+                    self.bonds_allocation_input.value() +
+                    self.cash_allocation_input.value() +
+                    self.realestate_allocation_input.value() +
+                    self.other_allocation_input.value())
+
+            # Validate that total equals 100%
+            if abs(total - 100.0) > 0.01:
+                QMessageBox.warning(self, "Warning",
+                                  f"Portfolio allocation must sum to 100%. Current total: {total:.1f}%")
+                return
+
+            # Update planner
+            self.planner.portfolio_allocation = {
+                'Stocks': self.stocks_allocation_input.value(),
+                'Bonds': self.bonds_allocation_input.value(),
+                'Cash': self.cash_allocation_input.value(),
+                'Real Estate': self.realestate_allocation_input.value(),
+                'Other': self.other_allocation_input.value()
+            }
+
+            QMessageBox.information(self, "Success", "Portfolio allocation updated")
+            logger.debug(f"Updated portfolio allocation: {self.planner.portfolio_allocation}")
+        except Exception as e:
+            logger.error(f"Error updating portfolio allocation: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to update portfolio allocation: {str(e)}")
 
     def get_scenarios_directory(self):
         """Get or create the scenarios directory."""
@@ -3007,6 +3186,63 @@ class FinancialPlannerGUI(QMainWindow):
             logger.error(traceback.format_exc())
             QMessageBox.warning(self, "Error", f"Failed to run projection: {str(e)}")
 
+    def populate_mc_breakdown_table(self, simulation_results, normalize_inflation, inflation_rate, current_year):
+        """Populate the Monte Carlo detailed breakdown table with percentile statistics."""
+        try:
+            import numpy as np
+
+            # Clear existing rows
+            self.mc_breakdown_table.setRowCount(0)
+
+            # Extract ending net worth from all simulations
+            ending_net_worths = []
+            min_net_worths = []
+            max_net_worths = []
+
+            for result in simulation_results['results']:
+                years = [r['year'] for r in result]
+                net_worth_values = [r['net_worth'] for r in result]
+
+                # Apply inflation normalization if enabled
+                if normalize_inflation:
+                    net_worth_values = [nw / ((1 + inflation_rate) ** (year - current_year))
+                                      for year, nw in zip(years, net_worth_values)]
+
+                ending_net_worths.append(net_worth_values[-1])
+                min_net_worths.append(min(net_worth_values))
+                max_net_worths.append(max(net_worth_values))
+
+            # Calculate percentiles
+            metrics = {
+                "Ending Net Worth": ending_net_worths,
+                "Minimum Net Worth": min_net_worths,
+                "Maximum Net Worth": max_net_worths
+            }
+
+            for metric_name, values in metrics.items():
+                row = self.mc_breakdown_table.rowCount()
+                self.mc_breakdown_table.insertRow(row)
+
+                p10 = np.percentile(values, 10)
+                p25 = np.percentile(values, 25)
+                p50 = np.percentile(values, 50)
+                p75 = np.percentile(values, 75)
+                p90 = np.percentile(values, 90)
+
+                self.mc_breakdown_table.setItem(row, 0, QTableWidgetItem(metric_name))
+                self.mc_breakdown_table.setItem(row, 1, QTableWidgetItem(format_currency(p10)))
+                self.mc_breakdown_table.setItem(row, 2, QTableWidgetItem(format_currency(p25)))
+                self.mc_breakdown_table.setItem(row, 3, QTableWidgetItem(format_currency(p50)))
+                self.mc_breakdown_table.setItem(row, 4, QTableWidgetItem(format_currency(p75)))
+                self.mc_breakdown_table.setItem(row, 5, QTableWidgetItem(format_currency(p90)))
+
+            # Resize columns to content
+            self.mc_breakdown_table.resizeColumnsToContents()
+
+            logger.debug("Monte Carlo breakdown table populated")
+        except Exception as e:
+            logger.error(f"Error populating MC breakdown table: {e}")
+
     def run_monte_carlo(self):
         """Run Monte Carlo simulation and display results."""
         progress_msg = None
@@ -3109,6 +3345,11 @@ class FinancialPlannerGUI(QMainWindow):
 
             self.mc_figure.tight_layout()
             self.mc_canvas.draw()
+
+            # Populate detailed breakdown table
+            self.populate_mc_breakdown_table(simulation_results, normalize_inflation,
+                                            scenario_params.get('inflation_rate', 0),
+                                            current_year)
 
             # Force garbage collection to free memory
             gc.collect()
