@@ -3413,14 +3413,14 @@ def healthcare_insurance_tab():
             col1, col2, col3 = st.columns([3, 3, 1])
 
             with col1:
-                insurance.name = st.text_input(f"Plan Name##{idx}", value=insurance.name)
+                insurance.name = st.text_input(f"Plan Name##ins{idx}", value=insurance.name)
                 insurance.type = st.selectbox(
-                    f"Insurance Type##{idx}",
+                    f"Insurance Type##ins{idx}",
                     ["Employer", "Marketplace", "Medicare", "Medicaid"],
-                    index=["Employer", "Marketplace", "Medicare", "Medicaid"].index(insurance.type)
+                    index=["Employer", "Marketplace", "Medicare", "Medicaid"].index(insurance.type) if insurance.type in ["Employer", "Marketplace", "Medicare", "Medicaid"] else 0
                 )
                 insurance.monthly_premium = st.number_input(
-                    f"Monthly Premium##{idx}",
+                    f"Monthly Premium##ins{idx}",
                     min_value=0.0,
                     value=float(insurance.monthly_premium),
                     step=50.0
@@ -3428,21 +3428,21 @@ def healthcare_insurance_tab():
 
             with col2:
                 insurance.annual_deductible = st.number_input(
-                    f"Annual Deductible##{idx}",
+                    f"Annual Deductible##ins{idx}",
                     min_value=0.0,
                     value=float(insurance.annual_deductible),
                     step=100.0
                 )
                 insurance.annual_out_of_pocket_max = st.number_input(
-                    f"Out-of-Pocket Maximum##{idx}",
+                    f"Out-of-Pocket Maximum##ins{idx}",
                     min_value=0.0,
                     value=float(insurance.annual_out_of_pocket_max),
                     step=500.0
                 )
                 insurance.covered_by = st.selectbox(
-                    f"Covered By##{idx}",
+                    f"Covered By##ins{idx}",
                     ["Parent 1", "Parent 2", "Both", "Family"],
-                    index=["Parent 1", "Parent 2", "Both", "Family"].index(insurance.covered_by)
+                    index=["Parent 1", "Parent 2", "Both", "Family"].index(insurance.covered_by) if insurance.covered_by in ["Parent 1", "Parent 2", "Both", "Family"] else 3
                 )
 
             with col3:
@@ -3506,7 +3506,7 @@ def healthcare_insurance_tab():
                 ltc.covered_person = st.selectbox(
                     f"Covered Person##ltc{idx}",
                     ["Parent 1", "Parent 2"],
-                    index=["Parent 1", "Parent 2"].index(ltc.covered_person)
+                    index=["Parent 1", "Parent 2"].index(ltc.covered_person) if ltc.covered_person in ["Parent 1", "Parent 2"] else 0
                 )
                 ltc.monthly_premium = st.number_input(
                     f"Monthly Premium##ltc{idx}",
@@ -3571,11 +3571,21 @@ def debt_management_tab():
     st.subheader("📊 Debt Payoff Strategy")
     col1, col2 = st.columns(2)
     with col1:
+        # Map short form to full form for display
+        strategy_options = ["Avalanche (Highest Interest First)", "Snowball (Smallest Balance First)", "Minimum Payments Only"]
+        strategy_map = {"Avalanche": 0, "Snowball": 1, "Minimum Only": 2}
+        # Handle both short and long forms
+        if "Avalanche" in st.session_state.debt_payoff_strategy:
+            current_index = 0
+        elif "Snowball" in st.session_state.debt_payoff_strategy:
+            current_index = 1
+        else:
+            current_index = 2
+
         st.session_state.debt_payoff_strategy = st.selectbox(
             "Payoff Strategy",
-            ["Avalanche (Highest Interest First)", "Snowball (Smallest Balance First)", "Minimum Payments Only"],
-            index=0 if st.session_state.debt_payoff_strategy == "Avalanche" else
-                  1 if st.session_state.debt_payoff_strategy == "Snowball" else 2
+            strategy_options,
+            index=current_index
         )
     with col2:
         st.session_state.extra_debt_payment = st.number_input(
@@ -3647,7 +3657,7 @@ def debt_management_tab():
                 debt.interest_type = st.selectbox(
                     f"Interest Type##debt{idx}",
                     ["Fixed", "Variable"],
-                    index=["Fixed", "Variable"].index(debt.interest_type)
+                    index=["Fixed", "Variable"].index(debt.interest_type) if debt.interest_type in ["Fixed", "Variable"] else 0
                 )
 
             with col3:
@@ -3911,10 +3921,17 @@ def tax_optimization_tab():
     st.subheader("📊 Current Tax Situation")
     col1, col2, col3 = st.columns(3)
     with col1:
+        tax_brackets = [0.10, 0.12, 0.22, 0.24, 0.32, 0.35, 0.37]
+        try:
+            bracket_index = tax_brackets.index(st.session_state.tax_bracket)
+        except ValueError:
+            # Default to 22% if current bracket is invalid
+            bracket_index = 2
+
         st.session_state.tax_bracket = st.selectbox(
             "Federal Marginal Tax Bracket",
-            [0.10, 0.12, 0.22, 0.24, 0.32, 0.35, 0.37],
-            index=[0.10, 0.12, 0.22, 0.24, 0.32, 0.35, 0.37].index(st.session_state.tax_bracket),
+            tax_brackets,
+            index=bracket_index,
             format_func=lambda x: f"{x*100:.0f}%"
         )
     with col2:
