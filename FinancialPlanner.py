@@ -83,6 +83,7 @@ class ChildTemplate:
     def from_dict(cls, data):
         return cls(**data)
 
+    @staticmethod
     def get_default_expenses():
         """Get default expense values for Washington state"""
         # Create dictionary with default values for all ages 0-18

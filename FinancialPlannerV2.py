@@ -1,368 +1,3 @@
-def setup_tax_burden_tab(self) -> QWidget:
-    """Set up the tax burden visualization tab."""
-    try:
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-
-        # Scenario selection
-        scenario_group = QGroupBox("Tax Projection Settings")
-        scenario_layout = QFormLayout()
-
-        self.tax_scenario_combo = QComboBox()
-        self.tax_scenario_combo.addItems(list(self.planner.scenario_params.scenarios.keys()))
-
-        scenario_layout.addRow("Scenario:", self.tax_scenario_combo)
-
-        run_projection_button = QPushButton("Run Tax Projection")
-        run_projection_button.clicked.connect(self.run_tax_projection)
-        scenario_layout.addRow(run_projection_button)
-
-        scenario_group.setLayout(scenario_layout)
-        layout.addWidget(scenario_group)
-
-        # Canvas for matplotlib figure
-        self.tax_figure = Figure(figsize=(10, 6))
-        self.tax_canvas = FigureCanvasQTAgg(self.tax_figure)
-        layout.addWidget(self.tax_canvas)
-
-        logger.debug("Tax burden tab setup complete")
-        return tab
-    except Exception as e:
-        logger.error(f"Error in setup_tax_burden_tab: {e}")
-        logger.error(traceback.format_exc())
-        # Create a minimal fallback tab
-        error_tab = QWidget()
-        error_layout = QVBoxLayout(error_tab)
-        error_label = QLabel(f"Error setting up Tax Burden tab: {str(e)}")
-        error_layout.addWidget(error_label)
-        return error_tab
-
-
-def run_tax_projection(self):
-    """Run tax projection and display results."""
-    try:
-        logger.debug("Starting tax projection")
-        # Show wait cursor
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-
-        scenario_name = self.tax_scenario_combo.currentText()
-        results = self.planner.calculate_projection(scenario_name)
-
-        # Clear the figure
-        self.tax_figure.clear()
-
-        # Create subplot
-        ax = self.tax_figure.add_subplot(111)
-
-        # Extract data
-        years = [r['year'] for r in results]
-
-        # Extract and calculate tax data
-        tax_data = []
-        income_data = []
-        tax_rate_data = []
-
-        for result in results:
-            year_tax = 0
-            year_gross_income = 0
-
-            for person_name, income_info in result['income_details'].items():
-                year_tax += income_info['tax']
-                year_gross_income += income_info['gross']
-
-            tax_data.append(year_tax)
-            income_data.append(year_gross_income)
-
-            # Calculate effective tax rate (if income > 0)
-            if year_gross_income > 0:
-                tax_rate_data.append((year_tax / year_gross_income) * 100)  # as percentage
-            else:
-                tax_rate_data.append(0)
-
-        # Plot taxes as bars
-        bar_width = 0.35
-        bar1 = ax.bar(years, tax_data, bar_width, label='Total Tax')
-
-        # Add a second y-axis for tax rate percentage
-        ax2 = ax.twinx()
-        line = ax2.plot(years, tax_rate_data, 'r-', label='Effective Tax Rate (%)')
-
-        # Set up labels and formatting
-        ax.set_xlabel('Year')
-        ax.set_ylabel('Tax Amount ($)')
-        ax2.set_ylabel('Effective Tax Rate (%)')
-
-        # Format y-axis with dollar sign and commas
-        ax.get_yaxis().set_major_formatter(
-            matplotlib.ticker.FuncFormatter(lambda x, p: f'${x:,.0f}')
-        )
-
-        # Combine legends
-        lines, labels = ax.get_legend_handles_labels()
-        lines2, labels2 = ax2.get_legend_handles_labels()
-        ax2.legend(lines + lines2, labels + labels2, loc='upper left')
-
-        ax.set_title('Tax Burden Projection')
-        ax.grid(True, alpha=0.3)
-
-        self.tax_figure.tight_layout()
-        self.tax_canvas.draw()
-
-        # Restore normal cursor
-        QApplication.restoreOverrideCursor()
-        logger.debug("Tax projection completed and displayed")
-    except Exception as e:
-        QApplication.restoreOverrideCursor()
-        logger.error(f"Error in tax projection: {e}")
-        logger.error(traceback.format_exc())
-        QMessageBox.warning(self, "Error", f"Failed to run tax projection: {str(e)}")
-
-
-def update_partner(self, partner_id: str):
-    """Update partner information in the planner."""
-    try:
-        name_attr = f"partner_{partner_id.lower()}_name_input"
-        birth_attr = f"partner_{partner_id.lower()}_birth_year_input"
-        income_attr = f"partner_{partner_id.lower()}_base_income_input"
-        growth_attr = f"partner_{partner_id.lower()}_income_growth_input"
-        retirement_attr = f"partner_{partner_id.lower()}_retirement_age_input"
-        death_attr = f"partner_{partner_id.lower()}_death_age_input"
-        filing_attr = f"partner_{partner_id.lower()}_filing_status_input"
-        tax_attr = f"partner_{partner_id.lower()}_state_tax_input"
-        net_worth_attr = f"partner_{partner_id.lower()}_net_worth_input"
-
-        name = getattr(self, name_attr).text()
-        birth_year = getattr(self, birth_attr).value()
-        base_income = getattr(self, income_attr).value()
-        income_growth = getattr(self, growth_attr).value()
-        retirement_age = getattr(self, retirement_attr).value()
-        death_age = getattr(self, death_attr).value()
-        filing_status = getattr(self, filing_attr).currentText()
-        state_tax = getattr(self, tax_attr).value()
-
-        if not name:
-            QMessageBox.warning(self, "Warning", f"Partner {partner_id} name is required")
-            return
-
-        # Create or update the person
-        partner_person = None
-
-        # Check if this partner already exists in persons
-        for person in self.planner.persons:
-            if person.name.startswith(f"Partner {partner_id}:"):
-                partner_person = person
-                break
-
-        if partner_person:
-            # Update existing person
-            partner_person.name = f"Partner {partner_id}: {name}"
-            partner_person.birth_year = birth_year
-            partner_person.base_income = base_income
-            partner_person.income_growth_rate = income_growth
-            partner_person.retirement_age = retirement_age
-            partner_person.death_age = death_age
-            partner_person.filing_status = filing_status
-            partner_person.state_tax_rate = state_tax
-        else:
-            # Create new person for this partner
-            partner_person = Person(
-                name=f"Partner {partner_id}: {name}",
-                birth_year=birth_year,
-                base_income=base_income,
-                income_growth_rate=income_growth,
-                retirement_age=retirement_age,
-                death_age=death_age,
-                filing_status=filing_status,
-                state_tax_rate=state_tax
-            )
-            self.planner.persons.append(partner_person)
-
-        # Update the net worth (combining both partners' net worth)
-        partner_x_net_worth = 0
-        partner_y_net_worth = 0
-
-        if hasattr(self, "partner_x_net_worth_input"):
-            partner_x_net_worth = self.partner_x_net_worth_input.value()
-
-        if hasattr(self, "partner_y_net_worth_input"):
-            partner_y_net_worth = self.partner_y_net_worth_input.value()
-
-        self.planner.current_net_worth = partner_x_net_worth + partner_y_net_worth
-
-        # Show success message
-        QMessageBox.information(
-            self,
-            "Success",
-            f"Partner {partner_id} information updated"
-        )
-
-        logger.debug(f"Updated Partner {partner_id}: {name}")
-
-        # Refresh the tables
-        self.refresh_partner_data(partner_id)
-
-    except Exception as e:
-        logger.error(f"Error updating partner {partner_id}: {e}")
-        QMessageBox.warning(self, "Error", f"Failed to update partner: {str(e)}")
-
-
-def add_partner_income_change(self, partner_id: str):
-    """Add an income change for a partner."""
-    try:
-        year_attr = f"partner_{partner_id.lower()}_income_change_year_input"
-        amount_attr = f"partner_{partner_id.lower()}_income_change_amount_input"
-
-        year = getattr(self, year_attr).value()
-        amount = getattr(self, amount_attr).value()
-
-        # Find the partner person
-        partner_person = None
-        for person in self.planner.persons:
-            if person.name.startswith(f"Partner {partner_id}:"):
-                partner_person = person
-                break
-
-        if not partner_person:
-            QMessageBox.warning(self, "Warning", f"Please update Partner {partner_id} first")
-            return
-
-        # Add the income change
-        partner_person.income_changes[year] = amount
-
-        # Update UI
-        QMessageBox.information(
-            self,
-            "Success",
-            f"Income change added for Partner {partner_id}: ${amount:,.2f} starting in {year}"
-        )
-        getattr(self, amount_attr).setValue(0)
-
-        # Refresh the income changes table
-        self.refresh_partner_income_changes(partner_id)
-
-        logger.debug(f"Added income change for Partner {partner_id}, year: {year}, amount: ${amount}")
-    except Exception as e:
-        logger.error(f"Error adding income change for Partner {partner_id}: {e}")
-        QMessageBox.warning(self, "Error", f"Failed to add income change: {str(e)}")
-
-
-def delete_partner_income_change(self, partner_id: str, year: int):
-    """Remove an income change for a partner."""
-    try:
-        # Find the partner person
-        partner_person = None
-        for person in self.planner.persons:
-            if person.name.startswith(f"Partner {partner_id}:"):
-                partner_person = person
-                break
-
-        if not partner_person or year not in partner_person.income_changes:
-            return
-
-        # Remove the income change
-        del partner_person.income_changes[year]
-
-        # Refresh the table
-        self.refresh_partner_income_changes(partner_id)
-
-        logger.debug(f"Deleted income change for Partner {partner_id}, year: {year}")
-    except Exception as e:
-        logger.error(f"Error deleting income change for Partner {partner_id}: {e}")
-
-
-def refresh_partner_data(self, partner_id: str):
-    """Refresh the partner UI with data from the planner."""
-    try:
-        # Make sure all the required attributes exist
-        name_attr = f"partner_{partner_id.lower()}_name_input"
-        birth_attr = f"partner_{partner_id.lower()}_birth_year_input"
-        income_attr = f"partner_{partner_id.lower()}_base_income_input"
-        growth_attr = f"partner_{partner_id.lower()}_income_growth_input"
-        retirement_attr = f"partner_{partner_id.lower()}_retirement_age_input"
-        death_attr = f"partner_{partner_id.lower()}_death_age_input"
-        filing_attr = f"partner_{partner_id.lower()}_filing_status_input"
-        tax_attr = f"partner_{partner_id.lower()}_state_tax_input"
-
-        # Check if all attributes exist before continuing
-        required_attrs = [name_attr, birth_attr, income_attr, growth_attr,
-                          retirement_attr, death_attr, filing_attr, tax_attr]
-
-        if not all(hasattr(self, attr) for attr in required_attrs):
-            logger.warning(f"Some partner {partner_id} UI elements are not yet initialized")
-            return
-
-        # Find the partner person
-        partner_person = None
-        for person in self.planner.persons:
-            if person.name.startswith(f"Partner {partner_id}:"):
-                partner_person = person
-                break
-
-        if partner_person:
-            # Parse the name (after "Partner X: ")
-            name = partner_person.name.split(": ", 1)[1] if ": " in partner_person.name else ""
-
-            # Update the UI fields
-            getattr(self, name_attr).setText(name)
-            getattr(self, birth_attr).setValue(partner_person.birth_year)
-            getattr(self, income_attr).setValue(partner_person.base_income)
-            getattr(self, growth_attr).setValue(partner_person.income_growth_rate)
-            getattr(self, retirement_attr).setValue(partner_person.retirement_age)
-            getattr(self, death_attr).setValue(partner_person.death_age)
-
-            # Set combo box index by text
-            index = getattr(self, filing_attr).findText(partner_person.filing_status)
-            if index >= 0:
-                getattr(self, filing_attr).setCurrentIndex(index)
-
-            getattr(self, tax_attr).setValue(partner_person.state_tax_rate)
-
-            # Refresh income changes table
-            self.refresh_partner_income_changes(partner_id)
-    except Exception as e:
-        logger.error(f"Error refreshing Partner {partner_id} data: {e}")
-
-
-def refresh_partner_income_changes(self, partner_id: str):
-    """Refresh the income changes table for a partner."""
-    try:
-        table_attr = f"partner_{partner_id.lower()}_income_changes_table"
-
-        # Make sure the table exists
-        if not hasattr(self, table_attr):
-            logger.warning(f"Partner {partner_id} income changes table not initialized")
-            return
-
-        # Clear the table
-        getattr(self, table_attr).setRowCount(0)
-
-        # Find the partner person
-        partner_person = None
-        for person in self.planner.persons:
-            if person.name.startswith(f"Partner {partner_id}:"):
-                partner_person = person
-                break
-
-        if not partner_person:
-            return
-
-        # Populate the table with income changes
-        for year, amount in sorted(partner_person.income_changes.items()):
-            row = getattr(self, table_attr).rowCount()
-            getattr(self, table_attr).insertRow(row)
-
-            getattr(self, table_attr).setItem(row, 0, QTableWidgetItem(str(year)))
-            getattr(self, table_attr).setItem(row, 1, QTableWidgetItem(f"${amount:,.2f}"))
-
-            # Add delete button
-            delete_btn = QPushButton("Delete")
-            delete_btn.clicked.connect(lambda checked, y=year: self.delete_partner_income_change(partner_id, y))
-            getattr(self, table_attr).setCellWidget(row, 2, delete_btn)
-
-    except Exception as e:
-        logger.error(f"Error refreshing income changes for Partner {partner_id}: {e}")
-
-
 import sys
 import traceback
 import logging
@@ -448,6 +83,7 @@ class ChildTemplate:
     def from_dict(cls, data):
         return cls(**data)
 
+    @staticmethod
     def get_default_expenses():
         """Get default expense values for Washington state"""
         # Create dictionary with default values for all ages 0-25
@@ -504,10 +140,8 @@ class ChildTemplate:
                 default_expenses[age]["Healthcare"] = 800  # More doctor visits for infants
             elif age < 5:
                 default_expenses[age]["Healthcare"] = 500  # Toddlers
-            elif age < 19:
-                default_expenses[age]["Healthcare"] = 400  # Children
             else:
-                default_expenses[age]["Healthcare"] = 800  # Young adults (may need own insurance)
+                default_expenses[age]["Healthcare"] = 400  # Older children
 
         # Activities/Sports - increases with age
         for age in range(26):
@@ -520,7 +154,7 @@ class ChildTemplate:
             elif age < 19:
                 default_expenses[age]["Activities/Sports"] = 1500  # Teen sports can be expensive
             else:
-                default_expenses[age]["Activities/Sports"] = 800  # Young adults (less parent-funded)
+                default_expenses[age]["Activities/Sports"] = 1200  # College-age activities
 
         # Entertainment - increases slightly with age
         for age in range(26):
@@ -531,7 +165,7 @@ class ChildTemplate:
             elif age < 19:
                 default_expenses[age]["Entertainment"] = 500
             else:
-                default_expenses[age]["Entertainment"] = 400  # Young adults (less parent-funded)
+                default_expenses[age]["Entertainment"] = 600
 
         # Transportation - increases significantly for teens
         for age in range(26):
@@ -539,10 +173,10 @@ class ChildTemplate:
                 default_expenses[age]["Transportation"] = 200
             elif age < 16:
                 default_expenses[age]["Transportation"] = 300
-            elif age < 21:
+            elif age < 19:
                 default_expenses[age]["Transportation"] = 1000  # Driving age - insurance, gas, etc.
             else:
-                default_expenses[age]["Transportation"] = 500  # Young adults (less parent-funded)
+                default_expenses[age]["Transportation"] = 1200  # College-age transportation
 
         # School Supplies - varies by school age
         for age in range(26):
@@ -557,35 +191,19 @@ class ChildTemplate:
 
         # Gifts/Celebrations - birthdays, holidays, etc.
         for age in range(26):
-            if age < 19:
-                default_expenses[age]["Gifts/Celebrations"] = 300
-            else:
-                default_expenses[age]["Gifts/Celebrations"] = 200  # Less parent-funded
+            default_expenses[age]["Gifts/Celebrations"] = 300
 
         # Miscellaneous - catch-all for other expenses
         for age in range(26):
-            if age < 19:
-                default_expenses[age]["Miscellaneous"] = 200
-            else:
-                default_expenses[age]["Miscellaneous"] = 300  # Young adults have more varied expenses
+            default_expenses[age]["Miscellaneous"] = 200
 
-        # Daycare/Childcare - new category
+        # Daycare/Childcare - handled separately in template, set to 0 here
         for age in range(26):
-            if age < 1:
-                default_expenses[age]["Daycare/Childcare"] = 20376  # Infant daycare ($1,698/mo)
-            elif age < 3:
-                default_expenses[age]["Daycare/Childcare"] = 15720  # Toddler daycare ($1,310/mo)
-            elif age < 5:
-                default_expenses[age]["Daycare/Childcare"] = 15720  # Preschool ($1,310/mo)
-            else:
-                default_expenses[age]["Daycare/Childcare"] = 0  # No daycare after kindergarten
+            default_expenses[age]["Daycare/Childcare"] = 0
 
-        # Education - new category
+        # Education - tuition/fees, set to 0 here as handled by education_fund
         for age in range(26):
-            if age >= 18 and age < 22:
-                default_expenses[age]["Education"] = 75000  # College tuition/room/board
-            else:
-                default_expenses[age]["Education"] = 0
+            default_expenses[age]["Education"] = 0
 
         return default_expenses
 
@@ -2795,6 +2413,372 @@ class FinancialPlannerGUI(QMainWindow):
         except Exception as e:
             logger.error(f"Error showing comparison results: {e}")
             QMessageBox.warning(self, "Error", f"Failed to display comparison results: {str(e)}")
+
+
+    def setup_tax_burden_tab(self) -> QWidget:
+        """Set up the tax burden visualization tab."""
+        try:
+            tab = QWidget()
+            layout = QVBoxLayout(tab)
+
+            # Scenario selection
+            scenario_group = QGroupBox("Tax Projection Settings")
+            scenario_layout = QFormLayout()
+
+            self.tax_scenario_combo = QComboBox()
+            self.tax_scenario_combo.addItems(list(self.planner.scenario_params.scenarios.keys()))
+
+            scenario_layout.addRow("Scenario:", self.tax_scenario_combo)
+
+            run_projection_button = QPushButton("Run Tax Projection")
+            run_projection_button.clicked.connect(self.run_tax_projection)
+            scenario_layout.addRow(run_projection_button)
+
+            scenario_group.setLayout(scenario_layout)
+            layout.addWidget(scenario_group)
+
+            # Canvas for matplotlib figure
+            self.tax_figure = Figure(figsize=(10, 6))
+            self.tax_canvas = FigureCanvasQTAgg(self.tax_figure)
+            layout.addWidget(self.tax_canvas)
+
+            logger.debug("Tax burden tab setup complete")
+            return tab
+        except Exception as e:
+            logger.error(f"Error in setup_tax_burden_tab: {e}")
+            logger.error(traceback.format_exc())
+            # Create a minimal fallback tab
+            error_tab = QWidget()
+            error_layout = QVBoxLayout(error_tab)
+            error_label = QLabel(f"Error setting up Tax Burden tab: {str(e)}")
+            error_layout.addWidget(error_label)
+            return error_tab
+
+
+    def run_tax_projection(self):
+        """Run tax projection and display results."""
+        try:
+            logger.debug("Starting tax projection")
+            # Show wait cursor
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+
+            scenario_name = self.tax_scenario_combo.currentText()
+            results = self.planner.calculate_projection(scenario_name)
+
+            # Clear the figure
+            self.tax_figure.clear()
+
+            # Create subplot
+            ax = self.tax_figure.add_subplot(111)
+
+            # Extract data
+            years = [r['year'] for r in results]
+
+            # Extract and calculate tax data
+            tax_data = []
+            income_data = []
+            tax_rate_data = []
+
+            for result in results:
+                year_tax = 0
+                year_gross_income = 0
+
+                for person_name, income_info in result['income_details'].items():
+                    year_tax += income_info['tax']
+                    year_gross_income += income_info['gross']
+
+                tax_data.append(year_tax)
+                income_data.append(year_gross_income)
+
+                # Calculate effective tax rate (if income > 0)
+                if year_gross_income > 0:
+                    tax_rate_data.append((year_tax / year_gross_income) * 100)  # as percentage
+                else:
+                    tax_rate_data.append(0)
+
+            # Plot taxes as bars
+            bar_width = 0.35
+            bar1 = ax.bar(years, tax_data, bar_width, label='Total Tax')
+
+            # Add a second y-axis for tax rate percentage
+            ax2 = ax.twinx()
+            line = ax2.plot(years, tax_rate_data, 'r-', label='Effective Tax Rate (%)')
+
+            # Set up labels and formatting
+            ax.set_xlabel('Year')
+            ax.set_ylabel('Tax Amount ($)')
+            ax2.set_ylabel('Effective Tax Rate (%)')
+
+            # Format y-axis with dollar sign and commas
+            ax.get_yaxis().set_major_formatter(
+                matplotlib.ticker.FuncFormatter(lambda x, p: f'${x:,.0f}')
+            )
+
+            # Combine legends
+            lines, labels = ax.get_legend_handles_labels()
+            lines2, labels2 = ax2.get_legend_handles_labels()
+            ax2.legend(lines + lines2, labels + labels2, loc='upper left')
+
+            ax.set_title('Tax Burden Projection')
+            ax.grid(True, alpha=0.3)
+
+            self.tax_figure.tight_layout()
+            self.tax_canvas.draw()
+
+            # Restore normal cursor
+            QApplication.restoreOverrideCursor()
+            logger.debug("Tax projection completed and displayed")
+        except Exception as e:
+            QApplication.restoreOverrideCursor()
+            logger.error(f"Error in tax projection: {e}")
+            logger.error(traceback.format_exc())
+            QMessageBox.warning(self, "Error", f"Failed to run tax projection: {str(e)}")
+
+
+    def update_partner(self, partner_id: str):
+        """Update partner information in the planner."""
+        try:
+            name_attr = f"partner_{partner_id.lower()}_name_input"
+            birth_attr = f"partner_{partner_id.lower()}_birth_year_input"
+            income_attr = f"partner_{partner_id.lower()}_base_income_input"
+            growth_attr = f"partner_{partner_id.lower()}_income_growth_input"
+            retirement_attr = f"partner_{partner_id.lower()}_retirement_age_input"
+            death_attr = f"partner_{partner_id.lower()}_death_age_input"
+            filing_attr = f"partner_{partner_id.lower()}_filing_status_input"
+            tax_attr = f"partner_{partner_id.lower()}_state_tax_input"
+            net_worth_attr = f"partner_{partner_id.lower()}_net_worth_input"
+
+            name = getattr(self, name_attr).text()
+            birth_year = getattr(self, birth_attr).value()
+            base_income = getattr(self, income_attr).value()
+            income_growth = getattr(self, growth_attr).value()
+            retirement_age = getattr(self, retirement_attr).value()
+            death_age = getattr(self, death_attr).value()
+            filing_status = getattr(self, filing_attr).currentText()
+            state_tax = getattr(self, tax_attr).value()
+
+            if not name:
+                QMessageBox.warning(self, "Warning", f"Partner {partner_id} name is required")
+                return
+
+            # Create or update the person
+            partner_person = None
+
+            # Check if this partner already exists in persons
+            for person in self.planner.persons:
+                if person.name.startswith(f"Partner {partner_id}:"):
+                    partner_person = person
+                    break
+
+            if partner_person:
+                # Update existing person
+                partner_person.name = f"Partner {partner_id}: {name}"
+                partner_person.birth_year = birth_year
+                partner_person.base_income = base_income
+                partner_person.income_growth_rate = income_growth
+                partner_person.retirement_age = retirement_age
+                partner_person.death_age = death_age
+                partner_person.filing_status = filing_status
+                partner_person.state_tax_rate = state_tax
+            else:
+                # Create new person for this partner
+                partner_person = Person(
+                    name=f"Partner {partner_id}: {name}",
+                    birth_year=birth_year,
+                    base_income=base_income,
+                    income_growth_rate=income_growth,
+                    retirement_age=retirement_age,
+                    death_age=death_age,
+                    filing_status=filing_status,
+                    state_tax_rate=state_tax
+                )
+                self.planner.persons.append(partner_person)
+
+            # Update the net worth (combining both partners' net worth)
+            partner_x_net_worth = 0
+            partner_y_net_worth = 0
+
+            if hasattr(self, "partner_x_net_worth_input"):
+                partner_x_net_worth = self.partner_x_net_worth_input.value()
+
+            if hasattr(self, "partner_y_net_worth_input"):
+                partner_y_net_worth = self.partner_y_net_worth_input.value()
+
+            self.planner.current_net_worth = partner_x_net_worth + partner_y_net_worth
+
+            # Show success message
+            QMessageBox.information(
+                self,
+                "Success",
+                f"Partner {partner_id} information updated"
+            )
+
+            logger.debug(f"Updated Partner {partner_id}: {name}")
+
+            # Refresh the tables
+            self.refresh_partner_data(partner_id)
+
+        except Exception as e:
+            logger.error(f"Error updating partner {partner_id}: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to update partner: {str(e)}")
+
+
+    def add_partner_income_change(self, partner_id: str):
+        """Add an income change for a partner."""
+        try:
+            year_attr = f"partner_{partner_id.lower()}_income_change_year_input"
+            amount_attr = f"partner_{partner_id.lower()}_income_change_amount_input"
+
+            year = getattr(self, year_attr).value()
+            amount = getattr(self, amount_attr).value()
+
+            # Find the partner person
+            partner_person = None
+            for person in self.planner.persons:
+                if person.name.startswith(f"Partner {partner_id}:"):
+                    partner_person = person
+                    break
+
+            if not partner_person:
+                QMessageBox.warning(self, "Warning", f"Please update Partner {partner_id} first")
+                return
+
+            # Add the income change
+            partner_person.income_changes[year] = amount
+
+            # Update UI
+            QMessageBox.information(
+                self,
+                "Success",
+                f"Income change added for Partner {partner_id}: ${amount:,.2f} starting in {year}"
+            )
+            getattr(self, amount_attr).setValue(0)
+
+            # Refresh the income changes table
+            self.refresh_partner_income_changes(partner_id)
+
+            logger.debug(f"Added income change for Partner {partner_id}, year: {year}, amount: ${amount}")
+        except Exception as e:
+            logger.error(f"Error adding income change for Partner {partner_id}: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to add income change: {str(e)}")
+
+
+    def delete_partner_income_change(self, partner_id: str, year: int):
+        """Remove an income change for a partner."""
+        try:
+            # Find the partner person
+            partner_person = None
+            for person in self.planner.persons:
+                if person.name.startswith(f"Partner {partner_id}:"):
+                    partner_person = person
+                    break
+
+            if not partner_person or year not in partner_person.income_changes:
+                return
+
+            # Remove the income change
+            del partner_person.income_changes[year]
+
+            # Refresh the table
+            self.refresh_partner_income_changes(partner_id)
+
+            logger.debug(f"Deleted income change for Partner {partner_id}, year: {year}")
+        except Exception as e:
+            logger.error(f"Error deleting income change for Partner {partner_id}: {e}")
+
+
+    def refresh_partner_data(self, partner_id: str):
+        """Refresh the partner UI with data from the planner."""
+        try:
+            # Make sure all the required attributes exist
+            name_attr = f"partner_{partner_id.lower()}_name_input"
+            birth_attr = f"partner_{partner_id.lower()}_birth_year_input"
+            income_attr = f"partner_{partner_id.lower()}_base_income_input"
+            growth_attr = f"partner_{partner_id.lower()}_income_growth_input"
+            retirement_attr = f"partner_{partner_id.lower()}_retirement_age_input"
+            death_attr = f"partner_{partner_id.lower()}_death_age_input"
+            filing_attr = f"partner_{partner_id.lower()}_filing_status_input"
+            tax_attr = f"partner_{partner_id.lower()}_state_tax_input"
+
+            # Check if all attributes exist before continuing
+            required_attrs = [name_attr, birth_attr, income_attr, growth_attr,
+                              retirement_attr, death_attr, filing_attr, tax_attr]
+
+            if not all(hasattr(self, attr) for attr in required_attrs):
+                logger.warning(f"Some partner {partner_id} UI elements are not yet initialized")
+                return
+
+            # Find the partner person
+            partner_person = None
+            for person in self.planner.persons:
+                if person.name.startswith(f"Partner {partner_id}:"):
+                    partner_person = person
+                    break
+
+            if partner_person:
+                # Parse the name (after "Partner X: ")
+                name = partner_person.name.split(": ", 1)[1] if ": " in partner_person.name else ""
+
+                # Update the UI fields
+                getattr(self, name_attr).setText(name)
+                getattr(self, birth_attr).setValue(partner_person.birth_year)
+                getattr(self, income_attr).setValue(partner_person.base_income)
+                getattr(self, growth_attr).setValue(partner_person.income_growth_rate)
+                getattr(self, retirement_attr).setValue(partner_person.retirement_age)
+                getattr(self, death_attr).setValue(partner_person.death_age)
+
+                # Set combo box index by text
+                index = getattr(self, filing_attr).findText(partner_person.filing_status)
+                if index >= 0:
+                    getattr(self, filing_attr).setCurrentIndex(index)
+
+                getattr(self, tax_attr).setValue(partner_person.state_tax_rate)
+
+                # Refresh income changes table
+                self.refresh_partner_income_changes(partner_id)
+        except Exception as e:
+            logger.error(f"Error refreshing Partner {partner_id} data: {e}")
+
+
+    def refresh_partner_income_changes(self, partner_id: str):
+        """Refresh the income changes table for a partner."""
+        try:
+            table_attr = f"partner_{partner_id.lower()}_income_changes_table"
+
+            # Make sure the table exists
+            if not hasattr(self, table_attr):
+                logger.warning(f"Partner {partner_id} income changes table not initialized")
+                return
+
+            # Clear the table
+            getattr(self, table_attr).setRowCount(0)
+
+            # Find the partner person
+            partner_person = None
+            for person in self.planner.persons:
+                if person.name.startswith(f"Partner {partner_id}:"):
+                    partner_person = person
+                    break
+
+            if not partner_person:
+                return
+
+            # Populate the table with income changes
+            for year, amount in sorted(partner_person.income_changes.items()):
+                row = getattr(self, table_attr).rowCount()
+                getattr(self, table_attr).insertRow(row)
+
+                getattr(self, table_attr).setItem(row, 0, QTableWidgetItem(str(year)))
+                getattr(self, table_attr).setItem(row, 1, QTableWidgetItem(f"${amount:,.2f}"))
+
+                # Add delete button
+                delete_btn = QPushButton("Delete")
+                delete_btn.clicked.connect(lambda checked, y=year: self.delete_partner_income_change(partner_id, y))
+                getattr(self, table_attr).setCellWidget(row, 2, delete_btn)
+
+        except Exception as e:
+            logger.error(f"Error refreshing income changes for Partner {partner_id}: {e}")
+
 
 
 def create_sample_scenario():
