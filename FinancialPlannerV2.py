@@ -130,6 +130,8 @@ def update_partner(self, partner_id: str):
         filing_attr = f"partner_{partner_id.lower()}_filing_status_input"
         tax_attr = f"partner_{partner_id.lower()}_state_tax_input"
         net_worth_attr = f"partner_{partner_id.lower()}_net_worth_input"
+        ss_age_attr = f"partner_{partner_id.lower()}_ss_age_input"
+        ss_benefit_attr = f"partner_{partner_id.lower()}_ss_benefit_input"
 
         name = getattr(self, name_attr).text()
         birth_year = getattr(self, birth_attr).value()
@@ -139,6 +141,8 @@ def update_partner(self, partner_id: str):
         death_age = getattr(self, death_attr).value()
         filing_status = getattr(self, filing_attr).currentText()
         state_tax = getattr(self, tax_attr).value()
+        ss_age = getattr(self, ss_age_attr).value()
+        ss_benefit = getattr(self, ss_benefit_attr).value()
 
         if not name:
             QMessageBox.warning(self, "Warning", f"Partner {partner_id} name is required")
@@ -163,6 +167,8 @@ def update_partner(self, partner_id: str):
             partner_person.death_age = death_age
             partner_person.filing_status = filing_status
             partner_person.state_tax_rate = state_tax
+            partner_person.ss_benefit_age = ss_age
+            partner_person.estimated_ss_benefit = ss_benefit
         else:
             # Create new person for this partner
             partner_person = Person(
@@ -173,7 +179,9 @@ def update_partner(self, partner_id: str):
                 retirement_age=retirement_age,
                 death_age=death_age,
                 filing_status=filing_status,
-                state_tax_rate=state_tax
+                state_tax_rate=state_tax,
+                ss_benefit_age=ss_age,
+                estimated_ss_benefit=ss_benefit
             )
             self.planner.persons.append(partner_person)
 
@@ -233,7 +241,7 @@ def add_partner_income_change(self, partner_id: str):
         QMessageBox.information(
             self,
             "Success",
-            f"Income change added for Partner {partner_id}: ${amount:,.2f} starting in {year}"
+            f"Income change added for Partner {partner_id}: {format_currency(amount)} starting in {year}"
         )
         getattr(self, amount_attr).setValue(0)
 
@@ -282,10 +290,13 @@ def refresh_partner_data(self, partner_id: str):
         death_attr = f"partner_{partner_id.lower()}_death_age_input"
         filing_attr = f"partner_{partner_id.lower()}_filing_status_input"
         tax_attr = f"partner_{partner_id.lower()}_state_tax_input"
+        ss_age_attr = f"partner_{partner_id.lower()}_ss_age_input"
+        ss_benefit_attr = f"partner_{partner_id.lower()}_ss_benefit_input"
 
         # Check if all attributes exist before continuing
         required_attrs = [name_attr, birth_attr, income_attr, growth_attr,
-                          retirement_attr, death_attr, filing_attr, tax_attr]
+                          retirement_attr, death_attr, filing_attr, tax_attr,
+                          ss_age_attr, ss_benefit_attr]
 
         if not all(hasattr(self, attr) for attr in required_attrs):
             logger.warning(f"Some partner {partner_id} UI elements are not yet initialized")
@@ -309,6 +320,8 @@ def refresh_partner_data(self, partner_id: str):
             getattr(self, growth_attr).setValue(partner_person.income_growth_rate)
             getattr(self, retirement_attr).setValue(partner_person.retirement_age)
             getattr(self, death_attr).setValue(partner_person.death_age)
+            getattr(self, ss_age_attr).setValue(partner_person.ss_benefit_age)
+            getattr(self, ss_benefit_attr).setValue(partner_person.estimated_ss_benefit)
 
             # Set combo box index by text
             index = getattr(self, filing_attr).findText(partner_person.filing_status)
@@ -352,7 +365,7 @@ def refresh_partner_income_changes(self, partner_id: str):
             getattr(self, table_attr).insertRow(row)
 
             getattr(self, table_attr).setItem(row, 0, QTableWidgetItem(str(year)))
-            getattr(self, table_attr).setItem(row, 1, QTableWidgetItem(f"${amount:,.2f}"))
+            getattr(self, table_attr).setItem(row, 1, QTableWidgetItem(format_currency(amount)))
 
             # Add delete button
             delete_btn = QPushButton("Delete")
@@ -398,6 +411,32 @@ logging.basicConfig(
 logger = logging.getLogger("FinancialPlanner")
 
 
+# Utility function for formatting dollar amounts
+def format_currency(amount: float, show_cents: bool = False) -> str:
+    """
+    Format dollar amounts without cents and with thousands notation for large values.
+
+    Args:
+        amount: The dollar amount to format
+        show_cents: If True, show cents (for rates/percentages only)
+
+    Returns:
+        Formatted string like "$1.2M", "$450K", or "$1,234"
+    """
+    if abs(amount) >= 1_000_000:
+        # Format in millions
+        return f"${amount / 1_000_000:.1f}M"
+    elif abs(amount) >= 100_000:
+        # Format in thousands for values >= 100K
+        return f"${amount / 1_000:.0f}K"
+    else:
+        # Format with commas, no cents for values < 100K
+        if show_cents:
+            return f"${amount:,.2f}"
+        else:
+            return f"${amount:,.0f}"
+
+
 @dataclass
 class TaxBracket:
     min_income: float
@@ -416,6 +455,8 @@ class Person:
     state_tax_rate: float = 0.0
     income_changes: Dict[int, float] = None
     death_age: int = 100  # Maximum age set to 100
+    ss_benefit_age: int = 67  # Age when Social Security benefits start
+    estimated_ss_benefit: float = 0.0  # Annual estimated Social Security benefit
 
     def __post_init__(self):
         if self.income_changes is None:
@@ -613,12 +654,97 @@ class Child:
 
 
 @dataclass
+class FamilyExpenseTemplate:
+    name: str
+    state: str  # State for location-based defaults
+    spending_category: str  # Frugal, Moderate, Luxury
+    annual_expenses: Dict[str, float]  # Category -> Annual Amount
+
+    def to_dict(self):
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(**data)
+
+    @staticmethod
+    def get_default_templates():
+        """Get default family expense templates by state and spending category."""
+        templates = {}
+
+        # Define expense categories
+        categories = [
+            "Groceries",
+            "Utilities",
+            "Home Maintenance",
+            "Insurance",
+            "Transportation",
+            "Entertainment",
+            "Dining Out",
+            "Travel/Vacation",
+            "Personal Care",
+            "Miscellaneous"
+        ]
+
+        # Define spending levels
+        spending_levels = {
+            "Frugal": 0.7,      # 70% of moderate
+            "Moderate": 1.0,    # 100% baseline
+            "Luxury": 1.5       # 150% of moderate
+        }
+
+        # State-specific cost of living multipliers (relative to national average)
+        state_multipliers = {
+            "California": 1.3,
+            "New York": 1.25,
+            "Washington": 1.15,
+            "Texas": 0.95,
+            "Florida": 1.0,
+            "National Average": 1.0
+        }
+
+        # Base moderate expenses (national average)
+        base_moderate = {
+            "Groceries": 12000,
+            "Utilities": 4800,
+            "Home Maintenance": 6000,
+            "Insurance": 8000,
+            "Transportation": 10000,
+            "Entertainment": 4000,
+            "Dining Out": 6000,
+            "Travel/Vacation": 5000,
+            "Personal Care": 3000,
+            "Miscellaneous": 5000
+        }
+
+        # Generate templates for each state and spending level
+        for state, state_mult in state_multipliers.items():
+            for level, level_mult in spending_levels.items():
+                template_name = f"{state} - {level}"
+                annual_expenses = {}
+
+                for category, base_amount in base_moderate.items():
+                    annual_expenses[category] = base_amount * state_mult * level_mult
+
+                templates[template_name] = FamilyExpenseTemplate(
+                    name=template_name,
+                    state=state,
+                    spending_category=level,
+                    annual_expenses=annual_expenses
+                )
+
+        return templates
+
+
+@dataclass
 class MajorPurchase:
     name: str
     year: int
     amount: float
     financing_years: int = 0
     interest_rate: float = 0.0
+    asset_type: str = "Expense"  # "Expense", "Real Estate", "Vehicle", "Investment"
+    appreciation_rate: float = 0.0  # Annual appreciation rate (e.g., 0.03 for 3%)
 
     def to_dict(self):
         return asdict(self)
@@ -651,6 +777,11 @@ class ScenarioParameters:
                 'healthcare_inflation_rate': 0.04
             }
         }
+
+        # Social Security insolvency settings
+        self.ss_insolvency_enabled = True  # Enable by default
+        self.ss_insolvency_year = 2034  # Projected insolvency year
+        self.ss_shortfall_rate = 0.30  # 30% shortfall (70% of benefits will be paid)
 
 
 class TaxSystem:
@@ -785,7 +916,8 @@ class FinancialPlanner:
                  current_net_worth: float,
                  yearly_expenses: float,
                  major_purchases: List[MajorPurchase] = None,
-                 child_templates: List[ChildTemplate] = None):
+                 child_templates: List[ChildTemplate] = None,
+                 family_expense_templates: List[FamilyExpenseTemplate] = None):
         logger.debug("Initializing FinancialPlanner")
         self.persons = persons
         self.children = children or []
@@ -797,7 +929,17 @@ class FinancialPlanner:
         self.household_expenses = {}
         self.major_purchases = major_purchases or []
         self.child_templates = child_templates or []
+        self.family_expense_templates = family_expense_templates or []
         self.healthcare_expenses = yearly_expenses * 0.12  # Estimate healthcare as 12% of total expenses
+
+        # Portfolio allocation (percentages, should sum to 100%)
+        self.portfolio_allocation = {
+            'Stocks': 60.0,
+            'Bonds': 30.0,
+            'Cash': 5.0,
+            'Real Estate': 5.0,
+            'Other': 0.0
+        }
         logger.debug(f"Created planner with {len(persons)} persons, {len(children)} children")
 
     def to_dict(self):
@@ -811,7 +953,9 @@ class FinancialPlanner:
                 'household_expenses': self.household_expenses,
                 'major_purchases': [p.to_dict() for p in self.major_purchases],
                 'child_templates': [t.to_dict() for t in self.child_templates],
-                'healthcare_expenses': self.healthcare_expenses
+                'family_expense_templates': [t.to_dict() for t in self.family_expense_templates],
+                'healthcare_expenses': self.healthcare_expenses,
+                'portfolio_allocation': self.portfolio_allocation
             }
         except Exception as e:
             logger.error(f"Error in to_dict: {e}")
@@ -824,6 +968,7 @@ class FinancialPlanner:
             children = [Child.from_dict(c) for c in data['children']]
             major_purchases = [MajorPurchase.from_dict(p) for p in data['major_purchases']]
             child_templates = [ChildTemplate.from_dict(t) for t in data['child_templates']]
+            family_expense_templates = [FamilyExpenseTemplate.from_dict(t) for t in data.get('family_expense_templates', [])]
 
             planner = cls(
                 persons=persons,
@@ -832,10 +977,18 @@ class FinancialPlanner:
                 current_net_worth=data['current_net_worth'],
                 yearly_expenses=data['yearly_expenses'],
                 major_purchases=major_purchases,
-                child_templates=child_templates
+                child_templates=child_templates,
+                family_expense_templates=family_expense_templates
             )
             planner.household_expenses = data.get('household_expenses', {})
             planner.healthcare_expenses = data.get('healthcare_expenses', planner.yearly_expenses * 0.12)
+            planner.portfolio_allocation = data.get('portfolio_allocation', {
+                'Stocks': 60.0,
+                'Bonds': 30.0,
+                'Cash': 5.0,
+                'Real Estate': 5.0,
+                'Other': 0.0
+            })
             return planner
         except Exception as e:
             logger.error(f"Error in from_dict: {e}")
@@ -867,6 +1020,26 @@ class FinancialPlanner:
             logger.error(f"Error loading scenario: {e}")
             raise
 
+    def _calculate_ss_benefit(self, person: Person, year: int) -> float:
+        """Calculate Social Security benefit for a person in a given year."""
+        # Check if person is eligible for SS (has reached SS benefit age)
+        person_age = year - person.birth_year
+        if person_age < person.ss_benefit_age:
+            return 0
+
+        # Check if person is alive
+        if person_age > person.death_age:
+            return 0
+
+        # Calculate base benefit
+        benefit = person.estimated_ss_benefit
+
+        # Apply insolvency shortfall if enabled and year is after insolvency year
+        if self.scenario_params.ss_insolvency_enabled and year >= self.scenario_params.ss_insolvency_year:
+            benefit = benefit * (1 - self.scenario_params.ss_shortfall_rate)
+
+        return benefit
+
     def _calculate_gross_income(self, person: Person, year: int, inflation_rate: float) -> float:
         """Calculate gross income before taxes with step changes."""
         # Check if person is alive in this year
@@ -875,7 +1048,8 @@ class FinancialPlanner:
 
         # Check if person is retired in this year
         if year >= person.birth_year + person.retirement_age:
-            return 0
+            # If retired, only include Social Security benefits
+            return self._calculate_ss_benefit(person, year)
 
         # Find the most recent income change before or at the current year
         most_recent_change = None
@@ -978,6 +1152,22 @@ class FinancialPlanner:
 
         return total_expense
 
+    def _calculate_asset_values(self, year: int) -> Dict[str, float]:
+        """Calculate current values of appreciating assets."""
+        asset_values = {}
+        total_assets = 0
+
+        for purchase in self.major_purchases:
+            # Only track appreciating assets (not expenses)
+            if purchase.asset_type != "Expense" and year >= purchase.year:
+                years_held = year - purchase.year
+                current_value = purchase.amount * ((1 + purchase.appreciation_rate) ** years_held)
+                asset_values[f"{purchase.name} ({purchase.asset_type})"] = current_value
+                total_assets += current_value
+
+        asset_values["Total Assets"] = total_assets
+        return asset_values
+
     def _calculate_total_expenses(self, year: int, expense_growth_rate: float, inflation_rate: float,
                                   healthcare_inflation_rate: float) -> float:
         """Calculate total expenses including children and major purchases."""
@@ -1033,6 +1223,9 @@ class FinancialPlanner:
                 net_change = total_income - total_expenses + investment_return
                 net_worth += net_change
 
+                # Calculate asset values (appreciating assets)
+                asset_values = self._calculate_asset_values(year)
+
                 # Store results
                 results.append({
                     'year': year,
@@ -1041,7 +1234,8 @@ class FinancialPlanner:
                     'investment_return': investment_return,
                     'net_change': net_change,
                     'net_worth': net_worth,
-                    'income_details': income_details
+                    'income_details': income_details,
+                    'asset_values': asset_values
                 })
 
             logger.debug(f"Projection completed with {len(results)} years of data")
@@ -1270,7 +1464,7 @@ class FinancialPlannerGUI(QMainWindow):
         try:
             # Basic info tab
             basic_info_tab = self.setup_basic_info_tab()
-            self.tabs.addTab(basic_info_tab, "Basic Info")
+            self.tabs.addTab(basic_info_tab, "Settings and Instructions")
 
             # Partner X tab
             partner_x_tab = self.setup_partner_tab("X")
@@ -1375,6 +1569,192 @@ class FinancialPlannerGUI(QMainWindow):
         scenario_group.setLayout(scenario_layout)
         layout.addWidget(scenario_group)
 
+        # Add Social Security insolvency settings
+        ss_group = QGroupBox("Social Security Insolvency Settings")
+        ss_layout = QFormLayout()
+
+        self.ss_insolvency_enabled = QCheckBox()
+        self.ss_insolvency_enabled.setChecked(self.planner.scenario_params.ss_insolvency_enabled)
+
+        self.ss_insolvency_year_input = QSpinBox()
+        self.ss_insolvency_year_input.setRange(2024, 2100)
+        self.ss_insolvency_year_input.setValue(self.planner.scenario_params.ss_insolvency_year)
+
+        self.ss_shortfall_rate_input = QDoubleSpinBox()
+        self.ss_shortfall_rate_input.setRange(0, 1.0)
+        self.ss_shortfall_rate_input.setSingleStep(0.05)
+        self.ss_shortfall_rate_input.setDecimals(2)
+        self.ss_shortfall_rate_input.setValue(self.planner.scenario_params.ss_shortfall_rate)
+        self.ss_shortfall_rate_input.setSuffix("%")
+
+        ss_layout.addRow("Enable SS Insolvency:", self.ss_insolvency_enabled)
+        ss_layout.addRow("Insolvency Year:", self.ss_insolvency_year_input)
+        ss_layout.addRow("Benefit Shortfall Rate:", self.ss_shortfall_rate_input)
+
+        update_ss_button = QPushButton("Update SS Settings")
+        update_ss_button.clicked.connect(self.update_ss_settings)
+        ss_layout.addRow(update_ss_button)
+
+        ss_group.setLayout(ss_layout)
+        layout.addWidget(ss_group)
+
+        # Add Portfolio Allocation section
+        portfolio_group = QGroupBox("Portfolio Allocation")
+        portfolio_layout = QFormLayout()
+
+        # Create input fields for each asset class
+        self.stocks_allocation_input = QDoubleSpinBox()
+        self.stocks_allocation_input.setRange(0, 100)
+        self.stocks_allocation_input.setSuffix("%")
+        self.stocks_allocation_input.setValue(self.planner.portfolio_allocation.get('Stocks', 60.0))
+
+        self.bonds_allocation_input = QDoubleSpinBox()
+        self.bonds_allocation_input.setRange(0, 100)
+        self.bonds_allocation_input.setSuffix("%")
+        self.bonds_allocation_input.setValue(self.planner.portfolio_allocation.get('Bonds', 30.0))
+
+        self.cash_allocation_input = QDoubleSpinBox()
+        self.cash_allocation_input.setRange(0, 100)
+        self.cash_allocation_input.setSuffix("%")
+        self.cash_allocation_input.setValue(self.planner.portfolio_allocation.get('Cash', 5.0))
+
+        self.realestate_allocation_input = QDoubleSpinBox()
+        self.realestate_allocation_input.setRange(0, 100)
+        self.realestate_allocation_input.setSuffix("%")
+        self.realestate_allocation_input.setValue(self.planner.portfolio_allocation.get('Real Estate', 5.0))
+
+        self.other_allocation_input = QDoubleSpinBox()
+        self.other_allocation_input.setRange(0, 100)
+        self.other_allocation_input.setSuffix("%")
+        self.other_allocation_input.setValue(self.planner.portfolio_allocation.get('Other', 0.0))
+
+        # Total label
+        self.allocation_total_label = QLabel("Total: 100.0%")
+        self.allocation_total_label.setStyleSheet("font-weight: bold;")
+
+        portfolio_layout.addRow("Stocks:", self.stocks_allocation_input)
+        portfolio_layout.addRow("Bonds:", self.bonds_allocation_input)
+        portfolio_layout.addRow("Cash:", self.cash_allocation_input)
+        portfolio_layout.addRow("Real Estate:", self.realestate_allocation_input)
+        portfolio_layout.addRow("Other:", self.other_allocation_input)
+        portfolio_layout.addRow("", self.allocation_total_label)
+
+        # Connect inputs to update total
+        for input_widget in [self.stocks_allocation_input, self.bonds_allocation_input,
+                            self.cash_allocation_input, self.realestate_allocation_input,
+                            self.other_allocation_input]:
+            input_widget.valueChanged.connect(self.update_allocation_total)
+
+        update_portfolio_btn = QPushButton("Update Portfolio Allocation")
+        update_portfolio_btn.clicked.connect(self.update_portfolio_allocation)
+        portfolio_layout.addRow(update_portfolio_btn)
+
+        portfolio_group.setLayout(portfolio_layout)
+        layout.addWidget(portfolio_group)
+
+        # Add instructions section
+        instructions_group = QGroupBox("Instructions and Tab Guide")
+        instructions_layout = QVBoxLayout()
+
+        instructions_text = """
+        <h3>How to Use the Financial Planner</h3>
+
+        <p><b>Settings and Instructions:</b> Configure household information, scenario parameters, and Social Security settings.
+        Social Security insolvency option allows you to model the projected 30% shortfall in benefits starting in 2034.</p>
+
+        <p><b>Partner X / Partner Y:</b> Enter detailed information for each partner including income, retirement age, death age,
+        and Social Security benefits. You can also add income changes that occur at specific years.</p>
+
+        <p><b>Dependents Templates:</b> Create expense templates for children by state and spending category. These templates
+        can be reused for multiple children and include age-specific expenses, daycare costs, and education funding.</p>
+
+        <p><b>Dependents Planning:</b> Add children to your plan and assign them to templates. View projected costs and
+        education funding needs.</p>
+
+        <p><b>Major Purchases:</b> Track large expenses like homes, cars, or other significant purchases. Include financing
+        details such as loan term and interest rate.</p>
+
+        <p><b>Tax Burden:</b> View projected tax burden over time based on income, filing status, and state tax rates.</p>
+
+        <p><b>Results:</b> Run projections to see how your net worth evolves over time under different scenarios
+        (Conservative, Moderate, Aggressive). View detailed breakdowns of income, expenses, and net worth trajectories.</p>
+
+        <p><b>Monte Carlo:</b> Run probabilistic simulations that account for market volatility to estimate the likelihood
+        of financial success under various conditions.</p>
+
+        <p><i>Tip: Start by entering partner information, then add children and major purchases. Run projections to see
+        how different scenarios affect your financial future.</i></p>
+        """
+
+        from PyQt6.QtWidgets import QTextBrowser
+        instructions_browser = QTextBrowser()
+        instructions_browser.setHtml(instructions_text)
+        instructions_browser.setMaximumHeight(400)
+
+        instructions_layout.addWidget(instructions_browser)
+        instructions_group.setLayout(instructions_layout)
+        layout.addWidget(instructions_group)
+
+        # Add Scenario Library section
+        library_group = QGroupBox("Scenario Library")
+        library_layout = QVBoxLayout()
+
+        # Saved scenarios list
+        scenarios_list_layout = QHBoxLayout()
+
+        self.saved_scenarios_list = QListWidget()
+        self.saved_scenarios_list.setMaximumHeight(150)
+        scenarios_list_layout.addWidget(self.saved_scenarios_list)
+
+        # Buttons for scenario management
+        library_buttons_layout = QVBoxLayout()
+
+        self.load_selected_scenario_btn = QPushButton("Load Selected")
+        self.load_selected_scenario_btn.clicked.connect(self.load_selected_scenario)
+        library_buttons_layout.addWidget(self.load_selected_scenario_btn)
+
+        self.delete_selected_scenario_btn = QPushButton("Delete Selected")
+        self.delete_selected_scenario_btn.clicked.connect(self.delete_selected_scenario)
+        library_buttons_layout.addWidget(self.delete_selected_scenario_btn)
+
+        library_buttons_layout.addStretch()
+        scenarios_list_layout.addLayout(library_buttons_layout)
+
+        library_layout.addLayout(scenarios_list_layout)
+
+        # Save current scenario with name
+        save_layout = QHBoxLayout()
+        save_layout.addWidget(QLabel("Scenario Name:"))
+
+        self.scenario_name_input = QLineEdit()
+        self.scenario_name_input.setPlaceholderText("Enter scenario name...")
+        save_layout.addWidget(self.scenario_name_input)
+
+        self.save_named_scenario_btn = QPushButton("Save as Named Scenario")
+        self.save_named_scenario_btn.clicked.connect(self.save_named_scenario)
+        save_layout.addWidget(self.save_named_scenario_btn)
+
+        library_layout.addLayout(save_layout)
+
+        # Add file-based save/load buttons
+        file_layout = QHBoxLayout()
+
+        export_file_btn = QPushButton("Export to File...")
+        export_file_btn.clicked.connect(self.save_scenario)
+        file_layout.addWidget(export_file_btn)
+
+        import_file_btn = QPushButton("Import from File...")
+        import_file_btn.clicked.connect(self.load_scenario)
+        file_layout.addWidget(import_file_btn)
+
+        library_layout.addLayout(file_layout)
+
+        library_group.setLayout(library_layout)
+        layout.addWidget(library_group)
+
+        # Refresh the scenarios list
+        self.refresh_scenarios_library()
+
         return tab
 
     def refresh_scenario_params_table(self):
@@ -1407,6 +1787,8 @@ class FinancialPlannerGUI(QMainWindow):
         filing_attr = f"partner_{partner_id.lower()}_filing_status_input"
         tax_attr = f"partner_{partner_id.lower()}_state_tax_input"
         net_worth_attr = f"partner_{partner_id.lower()}_net_worth_input"
+        ss_age_attr = f"partner_{partner_id.lower()}_ss_age_input"
+        ss_benefit_attr = f"partner_{partner_id.lower()}_ss_benefit_input"
 
         # Partner info fields
         partner_group = QGroupBox(f"Partner {partner_id} Information")
@@ -1435,6 +1817,15 @@ class FinancialPlannerGUI(QMainWindow):
         getattr(self, death_attr).setRange(50, 120)
         getattr(self, death_attr).setValue(100)
 
+        setattr(self, ss_age_attr, QSpinBox())
+        getattr(self, ss_age_attr).setRange(62, 70)
+        getattr(self, ss_age_attr).setValue(67)
+
+        setattr(self, ss_benefit_attr, QDoubleSpinBox())
+        getattr(self, ss_benefit_attr).setRange(0, 100000)
+        getattr(self, ss_benefit_attr).setPrefix("$")
+        getattr(self, ss_benefit_attr).setValue(0)
+
         setattr(self, filing_attr, QComboBox())
         getattr(self, filing_attr).addItems(['single', 'married', 'head_of_household'])
 
@@ -1461,6 +1852,8 @@ class FinancialPlannerGUI(QMainWindow):
         partner_layout.addRow("Income Growth Rate:", getattr(self, growth_attr))
         partner_layout.addRow("Retirement Age:", getattr(self, retirement_attr))
         partner_layout.addRow("Death Age:", getattr(self, death_attr))
+        partner_layout.addRow("Social Security Age:", getattr(self, ss_age_attr))
+        partner_layout.addRow("Annual SS Benefit:", getattr(self, ss_benefit_attr))
         partner_layout.addRow("Filing Status:", getattr(self, filing_attr))
         partner_layout.addRow("State Tax Rate:", getattr(self, tax_attr))
         partner_layout.addRow("Net Worth:", getattr(self, net_worth_attr))
@@ -1640,7 +2033,7 @@ class FinancialPlannerGUI(QMainWindow):
                 value = float(text)
 
                 # Update the cell with formatted value
-                item.setText(f"${value:,.2f}")
+                item.setText(format_currency(value))
             except ValueError:
                 # If conversion fails, reset to $0
                 item.setText("$0")
@@ -1660,7 +2053,7 @@ class FinancialPlannerGUI(QMainWindow):
             # Update total cell
             total_item = self.expense_table.item(row, 12)
             if total_item:
-                total_item.setText(f"${row_total:,.2f}")
+                total_item.setText(format_currency(row_total))
 
             # Update summary
             self.update_cost_summary()
@@ -1684,8 +2077,8 @@ class FinancialPlannerGUI(QMainWindow):
                     except ValueError:
                         pass
 
-            self.total_child_cost_label.setText(f"${total_cost:,.2f}")
-            self.annual_avg_cost_label.setText(f"${total_cost / 26:,.2f}")
+            self.total_child_cost_label.setText(format_currency(total_cost))
+            self.annual_avg_cost_label.setText(format_currency(total_cost / 26))
         except Exception as e:
             logger.error(f"Error in update_cost_summary: {e}")
 
@@ -1733,14 +2126,14 @@ class FinancialPlannerGUI(QMainWindow):
                     col_header = self.expense_table.horizontalHeaderItem(col).text()
                     if col_header in categories:
                         value = categories[col_header]
-                        item = QTableWidgetItem(f"${value:,.2f}")
+                        item = QTableWidgetItem(format_currency(value))
                         self.expense_table.setItem(row, col, item)
 
                 # Update row total
                 row_total = sum(categories.values())
                 total_item = self.expense_table.item(row, 12)
                 if total_item:
-                    total_item.setText(f"${row_total:,.2f}")
+                    total_item.setText(format_currency(row_total))
 
             # Update summary
             self.update_cost_summary()
@@ -1822,8 +2215,8 @@ class FinancialPlannerGUI(QMainWindow):
                 avg_annual_cost = total_cost / 26 if len(template.yearly_expenses) > 0 else 0
 
                 self.templates_table.setItem(row, 0, QTableWidgetItem(template.name))
-                self.templates_table.setItem(row, 1, QTableWidgetItem(f"${total_cost:,.2f}"))
-                self.templates_table.setItem(row, 2, QTableWidgetItem(f"${avg_annual_cost:,.2f}"))
+                self.templates_table.setItem(row, 1, QTableWidgetItem(format_currency(total_cost)))
+                self.templates_table.setItem(row, 2, QTableWidgetItem(format_currency(avg_annual_cost)))
 
                 # Add delete button
                 delete_btn = QPushButton("Delete")
@@ -1940,9 +2333,20 @@ class FinancialPlannerGUI(QMainWindow):
         self.interest_rate_input.setSuffix("%")
         self.interest_rate_input.setDecimals(2)
 
+        self.asset_type_input = QComboBox()
+        self.asset_type_input.addItems(["Expense", "Real Estate", "Vehicle", "Investment"])
+
+        self.appreciation_rate_input = QDoubleSpinBox()
+        self.appreciation_rate_input.setRange(-20, 20)
+        self.appreciation_rate_input.setSuffix("% /year")
+        self.appreciation_rate_input.setDecimals(2)
+        self.appreciation_rate_input.setValue(0)
+
         add_purchase_layout.addRow("Name:", self.purchase_name_input)
         add_purchase_layout.addRow("Year:", self.purchase_year_input)
         add_purchase_layout.addRow("Amount:", self.purchase_amount_input)
+        add_purchase_layout.addRow("Asset Type:", self.asset_type_input)
+        add_purchase_layout.addRow("Appreciation Rate:", self.appreciation_rate_input)
         add_purchase_layout.addRow("Financing Years (0 for cash):", self.financing_years_input)
         add_purchase_layout.addRow("Interest Rate:", self.interest_rate_input)
 
@@ -1955,9 +2359,9 @@ class FinancialPlannerGUI(QMainWindow):
 
         # Purchases table
         self.purchases_table = QTableWidget()
-        self.purchases_table.setColumnCount(6)
+        self.purchases_table.setColumnCount(8)
         self.purchases_table.setHorizontalHeaderLabels([
-            "Name", "Year", "Amount", "Financing Years", "Interest Rate", "Action"
+            "Name", "Year", "Amount", "Type", "Appreciation", "Financing Years", "Interest Rate", "Action"
         ])
         layout.addWidget(self.purchases_table)
 
@@ -2003,9 +2407,37 @@ class FinancialPlannerGUI(QMainWindow):
             self.max_net_worth_input.setValue(1000000)
             self.max_net_worth_input.setEnabled(False)
 
+            # Inflation normalization toggle
+            self.normalize_inflation_checkbox = QCheckBox("Normalize to today's dollars")
+            self.normalize_inflation_checkbox.setChecked(False)
+
+            # Variability settings
+            self.enable_variability_checkbox = QCheckBox("Enable Variability Bands")
+            self.enable_variability_checkbox.setChecked(False)
+            self.enable_variability_checkbox.stateChanged.connect(self.toggle_variability_inputs)
+
+            self.upside_variability_input = QDoubleSpinBox()
+            self.upside_variability_input.setRange(0, 100)
+            self.upside_variability_input.setSingleStep(1)
+            self.upside_variability_input.setValue(10)
+            self.upside_variability_input.setSuffix("%")
+            self.upside_variability_input.setEnabled(False)
+
+            self.downside_variability_input = QDoubleSpinBox()
+            self.downside_variability_input.setRange(0, 100)
+            self.downside_variability_input.setSingleStep(1)
+            self.downside_variability_input.setValue(10)
+            self.downside_variability_input.setSuffix("%")
+            self.downside_variability_input.setEnabled(False)
+
             display_layout.addRow("Auto-scale Y-axis:", self.auto_scale_checkbox)
             display_layout.addRow("Minimum Net Worth:", self.min_net_worth_input)
             display_layout.addRow("Maximum Net Worth:", self.max_net_worth_input)
+            display_layout.addRow("Inflation Adjustment:", self.normalize_inflation_checkbox)
+            display_layout.addRow("", QLabel(""))  # Spacer
+            display_layout.addRow(self.enable_variability_checkbox)
+            display_layout.addRow("Upside Variability:", self.upside_variability_input)
+            display_layout.addRow("Downside Variability:", self.downside_variability_input)
 
             display_group.setLayout(display_layout)
 
@@ -2040,6 +2472,12 @@ class FinancialPlannerGUI(QMainWindow):
         self.min_net_worth_input.setEnabled(enabled)
         self.max_net_worth_input.setEnabled(enabled)
 
+    def toggle_variability_inputs(self, state):
+        """Enable or disable variability inputs based on checkbox."""
+        enabled = bool(state)
+        self.upside_variability_input.setEnabled(enabled)
+        self.downside_variability_input.setEnabled(enabled)
+
     def setup_monte_carlo_tab(self) -> QWidget:
         """Set up the Monte Carlo simulation tab."""
         try:
@@ -2058,8 +2496,13 @@ class FinancialPlannerGUI(QMainWindow):
             self.num_simulations_input.setSingleStep(100)
             self.num_simulations_input.setValue(500)  # Default to safer value
 
+            # Inflation normalization toggle
+            self.mc_normalize_inflation_checkbox = QCheckBox("Normalize to today's dollars")
+            self.mc_normalize_inflation_checkbox.setChecked(False)
+
             mc_layout.addRow("Base Scenario:", self.mc_scenario_combo)
             mc_layout.addRow("Number of Simulations:", self.num_simulations_input)
+            mc_layout.addRow("Inflation Adjustment:", self.mc_normalize_inflation_checkbox)
 
             # Add warning label
             warning_label = QLabel(
@@ -2078,6 +2521,23 @@ class FinancialPlannerGUI(QMainWindow):
             self.mc_figure = Figure(figsize=(10, 6))
             self.mc_canvas = FigureCanvasQTAgg(self.mc_figure)
             layout.addWidget(self.mc_canvas)
+
+            # Add detailed breakdown section
+            breakdown_group = QGroupBox("Detailed Breakdown")
+            breakdown_group.setCheckable(True)
+            breakdown_group.setChecked(False)  # Collapsed by default
+            breakdown_layout = QVBoxLayout()
+
+            # Table for statistics
+            self.mc_breakdown_table = QTableWidget()
+            self.mc_breakdown_table.setColumnCount(6)
+            self.mc_breakdown_table.setHorizontalHeaderLabels([
+                "Metric", "10th %ile", "25th %ile", "Median", "75th %ile", "90th %ile"
+            ])
+            breakdown_layout.addWidget(self.mc_breakdown_table)
+
+            breakdown_group.setLayout(breakdown_layout)
+            layout.addWidget(breakdown_group)
 
             logger.debug("Monte Carlo tab setup complete")
             return tab
@@ -2110,6 +2570,11 @@ class FinancialPlannerGUI(QMainWindow):
             template = next((t for t in self.planner.child_templates if t.name == template_name), None)
             if not template:
                 QMessageBox.warning(self, "Warning", "Selected template not found")
+                return
+
+            # Check for duplicate child names
+            if any(c.name == name for c in self.planner.children):
+                QMessageBox.warning(self, "Warning", f"A child named '{name}' already exists. Please use a different name.")
                 return
 
             # Create and add the child
@@ -2164,6 +2629,8 @@ class FinancialPlannerGUI(QMainWindow):
             amount = self.purchase_amount_input.value()
             financing_years = self.financing_years_input.value()
             interest_rate = self.interest_rate_input.value() / 100  # Convert from percentage
+            asset_type = self.asset_type_input.currentText()
+            appreciation_rate = self.appreciation_rate_input.value() / 100  # Convert from percentage
 
             if not name:
                 QMessageBox.warning(self, "Warning", "Purchase name is required")
@@ -2175,7 +2642,9 @@ class FinancialPlannerGUI(QMainWindow):
                 year=year,
                 amount=amount,
                 financing_years=financing_years,
-                interest_rate=interest_rate
+                interest_rate=interest_rate,
+                asset_type=asset_type,
+                appreciation_rate=appreciation_rate
             )
 
             self.planner.major_purchases.append(purchase)
@@ -2184,7 +2653,7 @@ class FinancialPlannerGUI(QMainWindow):
             self.refresh_purchases_table()
             self.clear_purchase_inputs()
 
-            logger.debug(f"Added purchase: {name}, ${amount}")
+            logger.debug(f"Added purchase: {name}, ${amount}, type: {asset_type}")
         except Exception as e:
             logger.error(f"Error adding purchase: {e}")
             QMessageBox.warning(self, "Error", f"Failed to add purchase: {str(e)}")
@@ -2195,6 +2664,8 @@ class FinancialPlannerGUI(QMainWindow):
         self.purchase_amount_input.setValue(0)
         self.financing_years_input.setValue(0)
         self.interest_rate_input.setValue(0)
+        self.asset_type_input.setCurrentIndex(0)
+        self.appreciation_rate_input.setValue(0)
 
     def refresh_purchases_table(self):
         """Refresh the purchases table with current data."""
@@ -2209,14 +2680,16 @@ class FinancialPlannerGUI(QMainWindow):
 
                 self.purchases_table.setItem(row, 0, QTableWidgetItem(purchase.name))
                 self.purchases_table.setItem(row, 1, QTableWidgetItem(str(purchase.year)))
-                self.purchases_table.setItem(row, 2, QTableWidgetItem(f"${purchase.amount:,.2f}"))
-                self.purchases_table.setItem(row, 3, QTableWidgetItem(str(purchase.financing_years)))
-                self.purchases_table.setItem(row, 4, QTableWidgetItem(f"{purchase.interest_rate * 100:.2f}%"))
+                self.purchases_table.setItem(row, 2, QTableWidgetItem(format_currency(purchase.amount)))
+                self.purchases_table.setItem(row, 3, QTableWidgetItem(purchase.asset_type))
+                self.purchases_table.setItem(row, 4, QTableWidgetItem(f"{purchase.appreciation_rate * 100:.2f}%"))
+                self.purchases_table.setItem(row, 5, QTableWidgetItem(str(purchase.financing_years)))
+                self.purchases_table.setItem(row, 6, QTableWidgetItem(f"{purchase.interest_rate * 100:.2f}%"))
 
                 # Add delete button
                 delete_btn = QPushButton("Delete")
                 delete_btn.clicked.connect(lambda checked, p=purchase: self.delete_purchase(p))
-                self.purchases_table.setCellWidget(row, 5, delete_btn)
+                self.purchases_table.setCellWidget(row, 7, delete_btn)
         except Exception as e:
             logger.error(f"Error refreshing purchases table: {e}")
 
@@ -2310,7 +2783,7 @@ class FinancialPlannerGUI(QMainWindow):
             QMessageBox.information(
                 self,
                 "Success",
-                f"Income change added: {person_name} will earn ${amount:,.2f} starting in {year}"
+                f"Income change added: {person_name} will earn {format_currency(amount)} starting in {year}"
             )
             self.income_change_amount_input.setValue(0)
 
@@ -2329,7 +2802,7 @@ class FinancialPlannerGUI(QMainWindow):
 
                 self.persons_table.setItem(row, 0, QTableWidgetItem(person.name))
                 self.persons_table.setItem(row, 1, QTableWidgetItem(str(person.birth_year)))
-                self.persons_table.setItem(row, 2, QTableWidgetItem(f"${person.base_income:,.2f}"))
+                self.persons_table.setItem(row, 2, QTableWidgetItem(format_currency(person.base_income)))
                 self.persons_table.setItem(row, 3, QTableWidgetItem(f"{person.income_growth_rate * 100:.1f}%"))
                 self.persons_table.setItem(row, 4, QTableWidgetItem(str(person.retirement_age)))
                 self.persons_table.setItem(row, 5, QTableWidgetItem(str(person.death_age)))
@@ -2368,6 +2841,213 @@ class FinancialPlannerGUI(QMainWindow):
             logger.error(f"Error updating basic info: {e}")
             QMessageBox.warning(self, "Error", f"Failed to update basic information: {str(e)}")
 
+    def update_ss_settings(self):
+        """Update Social Security insolvency settings."""
+        try:
+            self.planner.scenario_params.ss_insolvency_enabled = self.ss_insolvency_enabled.isChecked()
+            self.planner.scenario_params.ss_insolvency_year = self.ss_insolvency_year_input.value()
+            self.planner.scenario_params.ss_shortfall_rate = self.ss_shortfall_rate_input.value()
+
+            QMessageBox.information(self, "Success", "Social Security settings updated")
+            logger.debug(f"Updated SS settings: enabled={self.planner.scenario_params.ss_insolvency_enabled}, "
+                        f"year={self.planner.scenario_params.ss_insolvency_year}, "
+                        f"shortfall={self.planner.scenario_params.ss_shortfall_rate}")
+        except Exception as e:
+            logger.error(f"Error updating SS settings: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to update Social Security settings: {str(e)}")
+
+    def update_allocation_total(self):
+        """Update the total allocation percentage display."""
+        try:
+            total = (self.stocks_allocation_input.value() +
+                    self.bonds_allocation_input.value() +
+                    self.cash_allocation_input.value() +
+                    self.realestate_allocation_input.value() +
+                    self.other_allocation_input.value())
+
+            self.allocation_total_label.setText(f"Total: {total:.1f}%")
+
+            # Change color based on whether it equals 100%
+            if abs(total - 100.0) < 0.01:  # Allow for floating point precision
+                self.allocation_total_label.setStyleSheet("font-weight: bold; color: green;")
+            else:
+                self.allocation_total_label.setStyleSheet("font-weight: bold; color: red;")
+        except Exception as e:
+            logger.error(f"Error updating allocation total: {e}")
+
+    def update_portfolio_allocation(self):
+        """Update the portfolio allocation in the planner."""
+        try:
+            # Get values
+            total = (self.stocks_allocation_input.value() +
+                    self.bonds_allocation_input.value() +
+                    self.cash_allocation_input.value() +
+                    self.realestate_allocation_input.value() +
+                    self.other_allocation_input.value())
+
+            # Validate that total equals 100%
+            if abs(total - 100.0) > 0.01:
+                QMessageBox.warning(self, "Warning",
+                                  f"Portfolio allocation must sum to 100%. Current total: {total:.1f}%")
+                return
+
+            # Update planner
+            self.planner.portfolio_allocation = {
+                'Stocks': self.stocks_allocation_input.value(),
+                'Bonds': self.bonds_allocation_input.value(),
+                'Cash': self.cash_allocation_input.value(),
+                'Real Estate': self.realestate_allocation_input.value(),
+                'Other': self.other_allocation_input.value()
+            }
+
+            QMessageBox.information(self, "Success", "Portfolio allocation updated")
+            logger.debug(f"Updated portfolio allocation: {self.planner.portfolio_allocation}")
+        except Exception as e:
+            logger.error(f"Error updating portfolio allocation: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to update portfolio allocation: {str(e)}")
+
+    def get_scenarios_directory(self):
+        """Get or create the scenarios directory."""
+        import os
+        scenarios_dir = Path.home() / ".financial_planner" / "scenarios"
+        scenarios_dir.mkdir(parents=True, exist_ok=True)
+        return scenarios_dir
+
+    def refresh_scenarios_library(self):
+        """Refresh the list of saved scenarios."""
+        try:
+            self.saved_scenarios_list.clear()
+            scenarios_dir = self.get_scenarios_directory()
+
+            # List all .json files in the scenarios directory
+            for scenario_file in scenarios_dir.glob("*.json"):
+                scenario_name = scenario_file.stem  # Filename without extension
+                self.saved_scenarios_list.addItem(scenario_name)
+
+            logger.debug(f"Refreshed scenarios library with {self.saved_scenarios_list.count()} scenarios")
+        except Exception as e:
+            logger.error(f"Error refreshing scenarios library: {e}")
+
+    def save_named_scenario(self):
+        """Save the current scenario with a user-provided name."""
+        try:
+            scenario_name = self.scenario_name_input.text().strip()
+
+            if not scenario_name:
+                QMessageBox.warning(self, "Warning", "Please enter a scenario name")
+                return
+
+            # Validate scenario name (no special characters)
+            import re
+            if not re.match(r'^[\w\s-]+$', scenario_name):
+                QMessageBox.warning(self, "Warning",
+                                  "Scenario name can only contain letters, numbers, spaces, hyphens, and underscores")
+                return
+
+            scenarios_dir = self.get_scenarios_directory()
+            filename = scenarios_dir / f"{scenario_name}.json"
+
+            # Check if scenario already exists
+            if filename.exists():
+                reply = QMessageBox.question(
+                    self,
+                    "Overwrite Scenario",
+                    f"Scenario '{scenario_name}' already exists. Overwrite?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                if reply == QMessageBox.StandardButton.No:
+                    return
+
+            # Save the scenario
+            self.planner.save_scenario(str(filename))
+
+            QMessageBox.information(self, "Success", f"Scenario '{scenario_name}' saved successfully")
+            logger.debug(f"Saved named scenario: {scenario_name}")
+
+            # Clear the input and refresh the list
+            self.scenario_name_input.clear()
+            self.refresh_scenarios_library()
+
+        except Exception as e:
+            logger.error(f"Error saving named scenario: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to save scenario: {str(e)}")
+
+    def load_selected_scenario(self):
+        """Load the selected scenario from the library."""
+        try:
+            selected_items = self.saved_scenarios_list.selectedItems()
+            if not selected_items:
+                QMessageBox.warning(self, "Warning", "Please select a scenario to load")
+                return
+
+            scenario_name = selected_items[0].text()
+            scenarios_dir = self.get_scenarios_directory()
+            filename = scenarios_dir / f"{scenario_name}.json"
+
+            if not filename.exists():
+                QMessageBox.warning(self, "Error", f"Scenario file not found: {scenario_name}")
+                return
+
+            # Load the scenario
+            loaded_planner = FinancialPlanner.load_scenario(str(filename))
+
+            if loaded_planner:
+                self.planner = loaded_planner
+
+                # Refresh all UI elements
+                self.current_year_input.setValue(self.planner.current_year)
+                self.yearly_expenses_input.setValue(self.planner.yearly_expenses)
+                self.healthcare_expenses_input.setValue(self.planner.healthcare_expenses)
+
+                # Refresh partner data
+                self.refresh_partner_data("X")
+                self.refresh_partner_data("Y")
+
+                QMessageBox.information(self, "Success", f"Scenario '{scenario_name}' loaded successfully")
+                logger.debug(f"Loaded scenario from library: {scenario_name}")
+            else:
+                QMessageBox.warning(self, "Error", "Failed to load scenario")
+
+        except Exception as e:
+            logger.error(f"Error loading selected scenario: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to load scenario: {str(e)}")
+
+    def delete_selected_scenario(self):
+        """Delete the selected scenario from the library."""
+        try:
+            selected_items = self.saved_scenarios_list.selectedItems()
+            if not selected_items:
+                QMessageBox.warning(self, "Warning", "Please select a scenario to delete")
+                return
+
+            scenario_name = selected_items[0].text()
+
+            # Confirm deletion
+            reply = QMessageBox.question(
+                self,
+                "Delete Scenario",
+                f"Are you sure you want to delete scenario '{scenario_name}'?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+
+            if reply == QMessageBox.StandardButton.No:
+                return
+
+            scenarios_dir = self.get_scenarios_directory()
+            filename = scenarios_dir / f"{scenario_name}.json"
+
+            if filename.exists():
+                filename.unlink()  # Delete the file
+                QMessageBox.information(self, "Success", f"Scenario '{scenario_name}' deleted")
+                logger.debug(f"Deleted scenario: {scenario_name}")
+                self.refresh_scenarios_library()
+            else:
+                QMessageBox.warning(self, "Error", f"Scenario file not found: {scenario_name}")
+
+        except Exception as e:
+            logger.error(f"Error deleting scenario: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to delete scenario: {str(e)}")
+
     def run_projection(self):
         """Run financial projection and display results."""
         try:
@@ -2391,10 +3071,61 @@ class FinancialPlannerGUI(QMainWindow):
             income = [r['total_income'] for r in results]
             expenses = [r['total_expenses'] for r in results]
 
+            # Apply inflation normalization if checkbox is checked
+            if self.normalize_inflation_checkbox.isChecked():
+                scenario_params = self.planner.scenario_params.scenarios[scenario_name]
+                inflation_rate = scenario_params['inflation_rate']
+                current_year = self.planner.current_year
+
+                # Convert to real dollars (purchasing power in today's dollars)
+                net_worth = [nw / ((1 + inflation_rate) ** (year - current_year))
+                            for year, nw in zip(years, net_worth)]
+                income = [inc / ((1 + inflation_rate) ** (year - current_year))
+                         for year, inc in zip(years, income)]
+                expenses = [exp / ((1 + inflation_rate) ** (year - current_year))
+                           for year, exp in zip(years, expenses)]
+
+                dollar_label = "Real Dollars (Today's Purchasing Power)"
+            else:
+                dollar_label = "Nominal Dollars"
+
+            # Calculate and plot variability bands if enabled
+            if self.enable_variability_checkbox.isChecked():
+                upside_pct = self.upside_variability_input.value() / 100.0
+                downside_pct = self.downside_variability_input.value() / 100.0
+
+                # Calculate best case (upside variability)
+                best_case_net_worth = []
+                # Calculate worst case (downside variability)
+                worst_case_net_worth = []
+
+                for i, year in enumerate(years):
+                    base_value = results[i]['net_worth']
+                    # Apply asymmetric variability
+                    best_case = base_value * (1 + upside_pct)
+                    worst_case = base_value * (1 - downside_pct)
+
+                    # Apply inflation normalization if enabled
+                    if self.normalize_inflation_checkbox.isChecked():
+                        year_offset = year - current_year
+                        inflation_factor = ((1 + inflation_rate) ** year_offset)
+                        best_case = best_case / inflation_factor
+                        worst_case = worst_case / inflation_factor
+
+                    best_case_net_worth.append(best_case)
+                    worst_case_net_worth.append(worst_case)
+
+                # Plot variability bands as shaded regions
+                ax1.fill_between(years, worst_case_net_worth, best_case_net_worth,
+                                alpha=0.2, color='blue', label='Variability Range')
+                ax1.plot(years, best_case_net_worth, 'b--', linewidth=1, alpha=0.5, label='Best Case')
+                ax1.plot(years, worst_case_net_worth, 'b--', linewidth=1, alpha=0.5, label='Worst Case')
+
             # Plot net worth with custom scale if specified
-            ax1.plot(years, net_worth, 'b-', linewidth=2)
+            ax1.plot(years, net_worth, 'b-', linewidth=2, label='Expected')
             ax1.set_title('Net Worth Projection')
-            ax1.set_ylabel('Net Worth ($)')
+            ax1.set_ylabel(f'Net Worth ({dollar_label})')
+            ax1.legend(loc='best')
             ax1.grid(True)
 
             # Apply custom scale if auto-scale is not checked
@@ -2431,7 +3162,7 @@ class FinancialPlannerGUI(QMainWindow):
             ax2.plot(years, expenses, 'r-', label='Expenses')
             ax2.set_title('Income and Expenses Projection')
             ax2.set_xlabel('Year')
-            ax2.set_ylabel('Amount ($)')
+            ax2.set_ylabel(f'Amount ({dollar_label})')
             ax2.legend()
             ax2.grid(True)
 
@@ -2454,6 +3185,63 @@ class FinancialPlannerGUI(QMainWindow):
             logger.error(f"Error in financial projection: {e}")
             logger.error(traceback.format_exc())
             QMessageBox.warning(self, "Error", f"Failed to run projection: {str(e)}")
+
+    def populate_mc_breakdown_table(self, simulation_results, normalize_inflation, inflation_rate, current_year):
+        """Populate the Monte Carlo detailed breakdown table with percentile statistics."""
+        try:
+            import numpy as np
+
+            # Clear existing rows
+            self.mc_breakdown_table.setRowCount(0)
+
+            # Extract ending net worth from all simulations
+            ending_net_worths = []
+            min_net_worths = []
+            max_net_worths = []
+
+            for result in simulation_results['results']:
+                years = [r['year'] for r in result]
+                net_worth_values = [r['net_worth'] for r in result]
+
+                # Apply inflation normalization if enabled
+                if normalize_inflation:
+                    net_worth_values = [nw / ((1 + inflation_rate) ** (year - current_year))
+                                      for year, nw in zip(years, net_worth_values)]
+
+                ending_net_worths.append(net_worth_values[-1])
+                min_net_worths.append(min(net_worth_values))
+                max_net_worths.append(max(net_worth_values))
+
+            # Calculate percentiles
+            metrics = {
+                "Ending Net Worth": ending_net_worths,
+                "Minimum Net Worth": min_net_worths,
+                "Maximum Net Worth": max_net_worths
+            }
+
+            for metric_name, values in metrics.items():
+                row = self.mc_breakdown_table.rowCount()
+                self.mc_breakdown_table.insertRow(row)
+
+                p10 = np.percentile(values, 10)
+                p25 = np.percentile(values, 25)
+                p50 = np.percentile(values, 50)
+                p75 = np.percentile(values, 75)
+                p90 = np.percentile(values, 90)
+
+                self.mc_breakdown_table.setItem(row, 0, QTableWidgetItem(metric_name))
+                self.mc_breakdown_table.setItem(row, 1, QTableWidgetItem(format_currency(p10)))
+                self.mc_breakdown_table.setItem(row, 2, QTableWidgetItem(format_currency(p25)))
+                self.mc_breakdown_table.setItem(row, 3, QTableWidgetItem(format_currency(p50)))
+                self.mc_breakdown_table.setItem(row, 4, QTableWidgetItem(format_currency(p75)))
+                self.mc_breakdown_table.setItem(row, 5, QTableWidgetItem(format_currency(p90)))
+
+            # Resize columns to content
+            self.mc_breakdown_table.resizeColumnsToContents()
+
+            logger.debug("Monte Carlo breakdown table populated")
+        except Exception as e:
+            logger.error(f"Error populating MC breakdown table: {e}")
 
     def run_monte_carlo(self):
         """Run Monte Carlo simulation and display results."""
@@ -2510,6 +3298,16 @@ class FinancialPlannerGUI(QMainWindow):
             # Create subplot
             ax = self.mc_figure.add_subplot(111)
 
+            # Check if inflation normalization is enabled
+            normalize_inflation = self.mc_normalize_inflation_checkbox.isChecked()
+            if normalize_inflation:
+                scenario_params = self.planner.scenario_params.scenarios[scenario_name]
+                inflation_rate = scenario_params['inflation_rate']
+                current_year = self.planner.current_year
+                dollar_label = "Real Dollars (Today's Purchasing Power)"
+            else:
+                dollar_label = "Nominal Dollars"
+
             # Plot all simulation paths with low opacity
             max_year = 0
             min_net_worth = 0
@@ -2518,6 +3316,11 @@ class FinancialPlannerGUI(QMainWindow):
             for result in simulation_results['results']:
                 years = [r['year'] for r in result]
                 net_worth = [r['net_worth'] for r in result]
+
+                # Apply inflation normalization if enabled
+                if normalize_inflation:
+                    net_worth = [nw / ((1 + inflation_rate) ** (year - current_year))
+                                for year, nw in zip(years, net_worth)]
 
                 max_year = max(max_year, years[-1])
                 min_net_worth = min(min_net_worth, min(net_worth))
@@ -2529,7 +3332,7 @@ class FinancialPlannerGUI(QMainWindow):
             success_rate = simulation_results['success_rate']
             ax.set_title(f'Monte Carlo Simulation: {success_rate:.1f}% Success Rate')
             ax.set_xlabel('Year')
-            ax.set_ylabel('Net Worth ($)')
+            ax.set_ylabel(f'Net Worth ({dollar_label})')
             ax.grid(True)
 
             # Add reference lines
@@ -2542,6 +3345,11 @@ class FinancialPlannerGUI(QMainWindow):
 
             self.mc_figure.tight_layout()
             self.mc_canvas.draw()
+
+            # Populate detailed breakdown table
+            self.populate_mc_breakdown_table(simulation_results, normalize_inflation,
+                                            scenario_params.get('inflation_rate', 0),
+                                            current_year)
 
             # Force garbage collection to free memory
             gc.collect()
@@ -2777,10 +3585,10 @@ class FinancialPlannerGUI(QMainWindow):
 
                 results_table.insertRow(row)
                 results_table.setItem(row, 0, QTableWidgetItem(display_name))
-                results_table.setItem(row, 1, QTableWidgetItem(f"${data['ending_net_worth']:,.2f}"))
-                results_table.setItem(row, 2, QTableWidgetItem(f"${data['min_net_worth']:,.2f}"))
-                results_table.setItem(row, 3, QTableWidgetItem(f"${data['max_annual_expense']:,.2f}"))
-                results_table.setItem(row, 4, QTableWidgetItem(f"${data['retirement_income']:,.2f}"))
+                results_table.setItem(row, 1, QTableWidgetItem(format_currency(data['ending_net_worth'])))
+                results_table.setItem(row, 2, QTableWidgetItem(format_currency(data['min_net_worth'])))
+                results_table.setItem(row, 3, QTableWidgetItem(format_currency(data['max_annual_expense'])))
+                results_table.setItem(row, 4, QTableWidgetItem(format_currency(data['retirement_income'])))
 
             layout.addWidget(results_table)
 
