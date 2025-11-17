@@ -130,6 +130,8 @@ def update_partner(self, partner_id: str):
         filing_attr = f"partner_{partner_id.lower()}_filing_status_input"
         tax_attr = f"partner_{partner_id.lower()}_state_tax_input"
         net_worth_attr = f"partner_{partner_id.lower()}_net_worth_input"
+        ss_age_attr = f"partner_{partner_id.lower()}_ss_age_input"
+        ss_benefit_attr = f"partner_{partner_id.lower()}_ss_benefit_input"
 
         name = getattr(self, name_attr).text()
         birth_year = getattr(self, birth_attr).value()
@@ -139,6 +141,8 @@ def update_partner(self, partner_id: str):
         death_age = getattr(self, death_attr).value()
         filing_status = getattr(self, filing_attr).currentText()
         state_tax = getattr(self, tax_attr).value()
+        ss_age = getattr(self, ss_age_attr).value()
+        ss_benefit = getattr(self, ss_benefit_attr).value()
 
         if not name:
             QMessageBox.warning(self, "Warning", f"Partner {partner_id} name is required")
@@ -163,6 +167,8 @@ def update_partner(self, partner_id: str):
             partner_person.death_age = death_age
             partner_person.filing_status = filing_status
             partner_person.state_tax_rate = state_tax
+            partner_person.ss_benefit_age = ss_age
+            partner_person.estimated_ss_benefit = ss_benefit
         else:
             # Create new person for this partner
             partner_person = Person(
@@ -173,7 +179,9 @@ def update_partner(self, partner_id: str):
                 retirement_age=retirement_age,
                 death_age=death_age,
                 filing_status=filing_status,
-                state_tax_rate=state_tax
+                state_tax_rate=state_tax,
+                ss_benefit_age=ss_age,
+                estimated_ss_benefit=ss_benefit
             )
             self.planner.persons.append(partner_person)
 
@@ -233,7 +241,7 @@ def add_partner_income_change(self, partner_id: str):
         QMessageBox.information(
             self,
             "Success",
-            f"Income change added for Partner {partner_id}: ${amount:,.2f} starting in {year}"
+            f"Income change added for Partner {partner_id}: {format_currency(amount)} starting in {year}"
         )
         getattr(self, amount_attr).setValue(0)
 
@@ -282,10 +290,13 @@ def refresh_partner_data(self, partner_id: str):
         death_attr = f"partner_{partner_id.lower()}_death_age_input"
         filing_attr = f"partner_{partner_id.lower()}_filing_status_input"
         tax_attr = f"partner_{partner_id.lower()}_state_tax_input"
+        ss_age_attr = f"partner_{partner_id.lower()}_ss_age_input"
+        ss_benefit_attr = f"partner_{partner_id.lower()}_ss_benefit_input"
 
         # Check if all attributes exist before continuing
         required_attrs = [name_attr, birth_attr, income_attr, growth_attr,
-                          retirement_attr, death_attr, filing_attr, tax_attr]
+                          retirement_attr, death_attr, filing_attr, tax_attr,
+                          ss_age_attr, ss_benefit_attr]
 
         if not all(hasattr(self, attr) for attr in required_attrs):
             logger.warning(f"Some partner {partner_id} UI elements are not yet initialized")
@@ -309,6 +320,8 @@ def refresh_partner_data(self, partner_id: str):
             getattr(self, growth_attr).setValue(partner_person.income_growth_rate)
             getattr(self, retirement_attr).setValue(partner_person.retirement_age)
             getattr(self, death_attr).setValue(partner_person.death_age)
+            getattr(self, ss_age_attr).setValue(partner_person.ss_benefit_age)
+            getattr(self, ss_benefit_attr).setValue(partner_person.estimated_ss_benefit)
 
             # Set combo box index by text
             index = getattr(self, filing_attr).findText(partner_person.filing_status)
@@ -352,7 +365,7 @@ def refresh_partner_income_changes(self, partner_id: str):
             getattr(self, table_attr).insertRow(row)
 
             getattr(self, table_attr).setItem(row, 0, QTableWidgetItem(str(year)))
-            getattr(self, table_attr).setItem(row, 1, QTableWidgetItem(f"${amount:,.2f}"))
+            getattr(self, table_attr).setItem(row, 1, QTableWidgetItem(format_currency(amount)))
 
             # Add delete button
             delete_btn = QPushButton("Delete")
@@ -398,6 +411,32 @@ logging.basicConfig(
 logger = logging.getLogger("FinancialPlanner")
 
 
+# Utility function for formatting dollar amounts
+def format_currency(amount: float, show_cents: bool = False) -> str:
+    """
+    Format dollar amounts without cents and with thousands notation for large values.
+
+    Args:
+        amount: The dollar amount to format
+        show_cents: If True, show cents (for rates/percentages only)
+
+    Returns:
+        Formatted string like "$1.2M", "$450K", or "$1,234"
+    """
+    if abs(amount) >= 1_000_000:
+        # Format in millions
+        return f"${amount / 1_000_000:.1f}M"
+    elif abs(amount) >= 100_000:
+        # Format in thousands for values >= 100K
+        return f"${amount / 1_000:.0f}K"
+    else:
+        # Format with commas, no cents for values < 100K
+        if show_cents:
+            return f"${amount:,.2f}"
+        else:
+            return f"${amount:,.0f}"
+
+
 @dataclass
 class TaxBracket:
     min_income: float
@@ -416,6 +455,8 @@ class Person:
     state_tax_rate: float = 0.0
     income_changes: Dict[int, float] = None
     death_age: int = 100  # Maximum age set to 100
+    ss_benefit_age: int = 67  # Age when Social Security benefits start
+    estimated_ss_benefit: float = 0.0  # Annual estimated Social Security benefit
 
     def __post_init__(self):
         if self.income_changes is None:
@@ -652,6 +693,11 @@ class ScenarioParameters:
             }
         }
 
+        # Social Security insolvency settings
+        self.ss_insolvency_enabled = True  # Enable by default
+        self.ss_insolvency_year = 2034  # Projected insolvency year
+        self.ss_shortfall_rate = 0.30  # 30% shortfall (70% of benefits will be paid)
+
 
 class TaxSystem:
     def __init__(self):
@@ -867,6 +913,26 @@ class FinancialPlanner:
             logger.error(f"Error loading scenario: {e}")
             raise
 
+    def _calculate_ss_benefit(self, person: Person, year: int) -> float:
+        """Calculate Social Security benefit for a person in a given year."""
+        # Check if person is eligible for SS (has reached SS benefit age)
+        person_age = year - person.birth_year
+        if person_age < person.ss_benefit_age:
+            return 0
+
+        # Check if person is alive
+        if person_age > person.death_age:
+            return 0
+
+        # Calculate base benefit
+        benefit = person.estimated_ss_benefit
+
+        # Apply insolvency shortfall if enabled and year is after insolvency year
+        if self.scenario_params.ss_insolvency_enabled and year >= self.scenario_params.ss_insolvency_year:
+            benefit = benefit * (1 - self.scenario_params.ss_shortfall_rate)
+
+        return benefit
+
     def _calculate_gross_income(self, person: Person, year: int, inflation_rate: float) -> float:
         """Calculate gross income before taxes with step changes."""
         # Check if person is alive in this year
@@ -875,7 +941,8 @@ class FinancialPlanner:
 
         # Check if person is retired in this year
         if year >= person.birth_year + person.retirement_age:
-            return 0
+            # If retired, only include Social Security benefits
+            return self._calculate_ss_benefit(person, year)
 
         # Find the most recent income change before or at the current year
         most_recent_change = None
@@ -1270,7 +1337,7 @@ class FinancialPlannerGUI(QMainWindow):
         try:
             # Basic info tab
             basic_info_tab = self.setup_basic_info_tab()
-            self.tabs.addTab(basic_info_tab, "Basic Info")
+            self.tabs.addTab(basic_info_tab, "Settings and Instructions")
 
             # Partner X tab
             partner_x_tab = self.setup_partner_tab("X")
@@ -1375,6 +1442,78 @@ class FinancialPlannerGUI(QMainWindow):
         scenario_group.setLayout(scenario_layout)
         layout.addWidget(scenario_group)
 
+        # Add Social Security insolvency settings
+        ss_group = QGroupBox("Social Security Insolvency Settings")
+        ss_layout = QFormLayout()
+
+        self.ss_insolvency_enabled = QCheckBox()
+        self.ss_insolvency_enabled.setChecked(self.planner.scenario_params.ss_insolvency_enabled)
+
+        self.ss_insolvency_year_input = QSpinBox()
+        self.ss_insolvency_year_input.setRange(2024, 2100)
+        self.ss_insolvency_year_input.setValue(self.planner.scenario_params.ss_insolvency_year)
+
+        self.ss_shortfall_rate_input = QDoubleSpinBox()
+        self.ss_shortfall_rate_input.setRange(0, 1.0)
+        self.ss_shortfall_rate_input.setSingleStep(0.05)
+        self.ss_shortfall_rate_input.setDecimals(2)
+        self.ss_shortfall_rate_input.setValue(self.planner.scenario_params.ss_shortfall_rate)
+        self.ss_shortfall_rate_input.setSuffix("%")
+
+        ss_layout.addRow("Enable SS Insolvency:", self.ss_insolvency_enabled)
+        ss_layout.addRow("Insolvency Year:", self.ss_insolvency_year_input)
+        ss_layout.addRow("Benefit Shortfall Rate:", self.ss_shortfall_rate_input)
+
+        update_ss_button = QPushButton("Update SS Settings")
+        update_ss_button.clicked.connect(self.update_ss_settings)
+        ss_layout.addRow(update_ss_button)
+
+        ss_group.setLayout(ss_layout)
+        layout.addWidget(ss_group)
+
+        # Add instructions section
+        instructions_group = QGroupBox("Instructions and Tab Guide")
+        instructions_layout = QVBoxLayout()
+
+        instructions_text = """
+        <h3>How to Use the Financial Planner</h3>
+
+        <p><b>Settings and Instructions:</b> Configure household information, scenario parameters, and Social Security settings.
+        Social Security insolvency option allows you to model the projected 30% shortfall in benefits starting in 2034.</p>
+
+        <p><b>Partner X / Partner Y:</b> Enter detailed information for each partner including income, retirement age, death age,
+        and Social Security benefits. You can also add income changes that occur at specific years.</p>
+
+        <p><b>Dependents Templates:</b> Create expense templates for children by state and spending category. These templates
+        can be reused for multiple children and include age-specific expenses, daycare costs, and education funding.</p>
+
+        <p><b>Dependents Planning:</b> Add children to your plan and assign them to templates. View projected costs and
+        education funding needs.</p>
+
+        <p><b>Major Purchases:</b> Track large expenses like homes, cars, or other significant purchases. Include financing
+        details such as loan term and interest rate.</p>
+
+        <p><b>Tax Burden:</b> View projected tax burden over time based on income, filing status, and state tax rates.</p>
+
+        <p><b>Results:</b> Run projections to see how your net worth evolves over time under different scenarios
+        (Conservative, Moderate, Aggressive). View detailed breakdowns of income, expenses, and net worth trajectories.</p>
+
+        <p><b>Monte Carlo:</b> Run probabilistic simulations that account for market volatility to estimate the likelihood
+        of financial success under various conditions.</p>
+
+        <p><i>Tip: Start by entering partner information, then add children and major purchases. Run projections to see
+        how different scenarios affect your financial future.</i></p>
+        """
+
+        from PyQt6.QtWidgets import QTextBrowser
+        instructions_browser = QTextBrowser()
+        instructions_browser.setHtml(instructions_text)
+        instructions_browser.setMaximumHeight(400)
+
+        instructions_layout.addWidget(instructions_browser)
+        instructions_group.setLayout(instructions_layout)
+        layout.addWidget(instructions_group)
+
         return tab
 
     def refresh_scenario_params_table(self):
@@ -1407,6 +1546,8 @@ class FinancialPlannerGUI(QMainWindow):
         filing_attr = f"partner_{partner_id.lower()}_filing_status_input"
         tax_attr = f"partner_{partner_id.lower()}_state_tax_input"
         net_worth_attr = f"partner_{partner_id.lower()}_net_worth_input"
+        ss_age_attr = f"partner_{partner_id.lower()}_ss_age_input"
+        ss_benefit_attr = f"partner_{partner_id.lower()}_ss_benefit_input"
 
         # Partner info fields
         partner_group = QGroupBox(f"Partner {partner_id} Information")
@@ -1435,6 +1576,15 @@ class FinancialPlannerGUI(QMainWindow):
         getattr(self, death_attr).setRange(50, 120)
         getattr(self, death_attr).setValue(100)
 
+        setattr(self, ss_age_attr, QSpinBox())
+        getattr(self, ss_age_attr).setRange(62, 70)
+        getattr(self, ss_age_attr).setValue(67)
+
+        setattr(self, ss_benefit_attr, QDoubleSpinBox())
+        getattr(self, ss_benefit_attr).setRange(0, 100000)
+        getattr(self, ss_benefit_attr).setPrefix("$")
+        getattr(self, ss_benefit_attr).setValue(0)
+
         setattr(self, filing_attr, QComboBox())
         getattr(self, filing_attr).addItems(['single', 'married', 'head_of_household'])
 
@@ -1461,6 +1611,8 @@ class FinancialPlannerGUI(QMainWindow):
         partner_layout.addRow("Income Growth Rate:", getattr(self, growth_attr))
         partner_layout.addRow("Retirement Age:", getattr(self, retirement_attr))
         partner_layout.addRow("Death Age:", getattr(self, death_attr))
+        partner_layout.addRow("Social Security Age:", getattr(self, ss_age_attr))
+        partner_layout.addRow("Annual SS Benefit:", getattr(self, ss_benefit_attr))
         partner_layout.addRow("Filing Status:", getattr(self, filing_attr))
         partner_layout.addRow("State Tax Rate:", getattr(self, tax_attr))
         partner_layout.addRow("Net Worth:", getattr(self, net_worth_attr))
@@ -1640,7 +1792,7 @@ class FinancialPlannerGUI(QMainWindow):
                 value = float(text)
 
                 # Update the cell with formatted value
-                item.setText(f"${value:,.2f}")
+                item.setText(format_currency(value))
             except ValueError:
                 # If conversion fails, reset to $0
                 item.setText("$0")
@@ -1660,7 +1812,7 @@ class FinancialPlannerGUI(QMainWindow):
             # Update total cell
             total_item = self.expense_table.item(row, 12)
             if total_item:
-                total_item.setText(f"${row_total:,.2f}")
+                total_item.setText(format_currency(row_total))
 
             # Update summary
             self.update_cost_summary()
@@ -1684,8 +1836,8 @@ class FinancialPlannerGUI(QMainWindow):
                     except ValueError:
                         pass
 
-            self.total_child_cost_label.setText(f"${total_cost:,.2f}")
-            self.annual_avg_cost_label.setText(f"${total_cost / 26:,.2f}")
+            self.total_child_cost_label.setText(format_currency(total_cost))
+            self.annual_avg_cost_label.setText(format_currency(total_cost / 26))
         except Exception as e:
             logger.error(f"Error in update_cost_summary: {e}")
 
@@ -1733,14 +1885,14 @@ class FinancialPlannerGUI(QMainWindow):
                     col_header = self.expense_table.horizontalHeaderItem(col).text()
                     if col_header in categories:
                         value = categories[col_header]
-                        item = QTableWidgetItem(f"${value:,.2f}")
+                        item = QTableWidgetItem(format_currency(value))
                         self.expense_table.setItem(row, col, item)
 
                 # Update row total
                 row_total = sum(categories.values())
                 total_item = self.expense_table.item(row, 12)
                 if total_item:
-                    total_item.setText(f"${row_total:,.2f}")
+                    total_item.setText(format_currency(row_total))
 
             # Update summary
             self.update_cost_summary()
@@ -1822,8 +1974,8 @@ class FinancialPlannerGUI(QMainWindow):
                 avg_annual_cost = total_cost / 26 if len(template.yearly_expenses) > 0 else 0
 
                 self.templates_table.setItem(row, 0, QTableWidgetItem(template.name))
-                self.templates_table.setItem(row, 1, QTableWidgetItem(f"${total_cost:,.2f}"))
-                self.templates_table.setItem(row, 2, QTableWidgetItem(f"${avg_annual_cost:,.2f}"))
+                self.templates_table.setItem(row, 1, QTableWidgetItem(format_currency(total_cost)))
+                self.templates_table.setItem(row, 2, QTableWidgetItem(format_currency(avg_annual_cost)))
 
                 # Add delete button
                 delete_btn = QPushButton("Delete")
@@ -2112,6 +2264,11 @@ class FinancialPlannerGUI(QMainWindow):
                 QMessageBox.warning(self, "Warning", "Selected template not found")
                 return
 
+            # Check for duplicate child names
+            if any(c.name == name for c in self.planner.children):
+                QMessageBox.warning(self, "Warning", f"A child named '{name}' already exists. Please use a different name.")
+                return
+
             # Create and add the child
             child = Child(name=name, birth_year=birth_year, template=template)
             self.planner.children.append(child)
@@ -2209,7 +2366,7 @@ class FinancialPlannerGUI(QMainWindow):
 
                 self.purchases_table.setItem(row, 0, QTableWidgetItem(purchase.name))
                 self.purchases_table.setItem(row, 1, QTableWidgetItem(str(purchase.year)))
-                self.purchases_table.setItem(row, 2, QTableWidgetItem(f"${purchase.amount:,.2f}"))
+                self.purchases_table.setItem(row, 2, QTableWidgetItem(format_currency(purchase.amount)))
                 self.purchases_table.setItem(row, 3, QTableWidgetItem(str(purchase.financing_years)))
                 self.purchases_table.setItem(row, 4, QTableWidgetItem(f"{purchase.interest_rate * 100:.2f}%"))
 
@@ -2310,7 +2467,7 @@ class FinancialPlannerGUI(QMainWindow):
             QMessageBox.information(
                 self,
                 "Success",
-                f"Income change added: {person_name} will earn ${amount:,.2f} starting in {year}"
+                f"Income change added: {person_name} will earn {format_currency(amount)} starting in {year}"
             )
             self.income_change_amount_input.setValue(0)
 
@@ -2329,7 +2486,7 @@ class FinancialPlannerGUI(QMainWindow):
 
                 self.persons_table.setItem(row, 0, QTableWidgetItem(person.name))
                 self.persons_table.setItem(row, 1, QTableWidgetItem(str(person.birth_year)))
-                self.persons_table.setItem(row, 2, QTableWidgetItem(f"${person.base_income:,.2f}"))
+                self.persons_table.setItem(row, 2, QTableWidgetItem(format_currency(person.base_income)))
                 self.persons_table.setItem(row, 3, QTableWidgetItem(f"{person.income_growth_rate * 100:.1f}%"))
                 self.persons_table.setItem(row, 4, QTableWidgetItem(str(person.retirement_age)))
                 self.persons_table.setItem(row, 5, QTableWidgetItem(str(person.death_age)))
@@ -2367,6 +2524,21 @@ class FinancialPlannerGUI(QMainWindow):
         except Exception as e:
             logger.error(f"Error updating basic info: {e}")
             QMessageBox.warning(self, "Error", f"Failed to update basic information: {str(e)}")
+
+    def update_ss_settings(self):
+        """Update Social Security insolvency settings."""
+        try:
+            self.planner.scenario_params.ss_insolvency_enabled = self.ss_insolvency_enabled.isChecked()
+            self.planner.scenario_params.ss_insolvency_year = self.ss_insolvency_year_input.value()
+            self.planner.scenario_params.ss_shortfall_rate = self.ss_shortfall_rate_input.value()
+
+            QMessageBox.information(self, "Success", "Social Security settings updated")
+            logger.debug(f"Updated SS settings: enabled={self.planner.scenario_params.ss_insolvency_enabled}, "
+                        f"year={self.planner.scenario_params.ss_insolvency_year}, "
+                        f"shortfall={self.planner.scenario_params.ss_shortfall_rate}")
+        except Exception as e:
+            logger.error(f"Error updating SS settings: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to update Social Security settings: {str(e)}")
 
     def run_projection(self):
         """Run financial projection and display results."""
@@ -2777,10 +2949,10 @@ class FinancialPlannerGUI(QMainWindow):
 
                 results_table.insertRow(row)
                 results_table.setItem(row, 0, QTableWidgetItem(display_name))
-                results_table.setItem(row, 1, QTableWidgetItem(f"${data['ending_net_worth']:,.2f}"))
-                results_table.setItem(row, 2, QTableWidgetItem(f"${data['min_net_worth']:,.2f}"))
-                results_table.setItem(row, 3, QTableWidgetItem(f"${data['max_annual_expense']:,.2f}"))
-                results_table.setItem(row, 4, QTableWidgetItem(f"${data['retirement_income']:,.2f}"))
+                results_table.setItem(row, 1, QTableWidgetItem(format_currency(data['ending_net_worth'])))
+                results_table.setItem(row, 2, QTableWidgetItem(format_currency(data['min_net_worth'])))
+                results_table.setItem(row, 3, QTableWidgetItem(format_currency(data['max_annual_expense'])))
+                results_table.setItem(row, 4, QTableWidgetItem(format_currency(data['retirement_income'])))
 
             layout.addWidget(results_table)
 
