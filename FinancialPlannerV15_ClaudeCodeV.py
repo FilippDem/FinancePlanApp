@@ -1655,12 +1655,13 @@ def parent_settings_tab():
     st.header("⚙️ Settings and Instructions")
 
     st.subheader("📅 Current Year Setting")
-    st.session_state.current_year = st.number_input(
+    st.number_input(
         "Current Year",
         min_value=2020,
         max_value=2030,
         value=int(st.session_state.current_year),
-        step=1
+        step=1,
+        key="current_year"
     )
 
     st.subheader("💍 Marriage Information")
@@ -1674,47 +1675,50 @@ def parent_settings_tab():
         except (ValueError, TypeError):
             marriage_index = 0
 
-    selected_marriage = st.selectbox(
+    st.selectbox(
         "Marriage Year",
         options=marriage_options,
-        index=marriage_index
+        index=marriage_index,
+        key="marriage_year"
     )
-
-    st.session_state.marriage_year = selected_marriage
 
     col1, col2 = st.columns(2)
 
     with col1:
         st.subheader("🔧 Customize Parent 1")
-        st.session_state.parent1_name = st.text_input(
+        st.text_input(
             "Parent 1 Name",
-            value=st.session_state.parent1_name
+            value=st.session_state.parent1_name,
+            key="parent1_name"
         )
 
         emoji_options = ["👨", "👩", "🧑", "👤", "👼", "🏃", "⭐", "🎯"]
         current_emoji_idx = emoji_options.index(
             st.session_state.parent1_emoji) if st.session_state.parent1_emoji in emoji_options else 0
 
-        st.session_state.parent1_emoji = st.selectbox(
+        st.selectbox(
             "Parent 1 Emoji",
             emoji_options,
-            index=current_emoji_idx
+            index=current_emoji_idx,
+            key="parent1_emoji"
         )
 
     with col2:
         st.subheader("🔧 Customize Parent 2")
-        st.session_state.parent2_name = st.text_input(
+        st.text_input(
             "Parent 2 Name",
-            value=st.session_state.parent2_name
+            value=st.session_state.parent2_name,
+            key="parent2_name"
         )
 
         current_emoji_idx = emoji_options.index(
             st.session_state.parent2_emoji) if st.session_state.parent2_emoji in emoji_options else 1
 
-        st.session_state.parent2_emoji = st.selectbox(
+        st.selectbox(
             "Parent 2 Emoji",
             emoji_options,
-            index=current_emoji_idx
+            index=current_emoji_idx,
+            key="parent2_emoji"
         )
 
     st.info("💡 Changes to parent names and emojis will be reflected in all tabs after you navigate to them.")
@@ -1782,77 +1786,77 @@ def parent_x_tab():
 
     with col1:
         st.subheader("Basic Information")
-        st.session_state.parentX_age = st.number_input(
+        st.number_input(
             "Current Age",
             min_value=18,
             max_value=100,
             value=int(st.session_state.parentX_age),
             step=1,
-            key="parentX_age_input"
+            key="parentX_age"
         )
 
-        st.session_state.parentX_net_worth = st.number_input(
+        st.number_input(
             "Current Net Worth ($)",
             min_value=-10000000.0,
             max_value=100000000.0,
             value=float(st.session_state.parentX_net_worth),
             step=1000.0,
             format="%.0f",
-            key="parentX_net_worth_input"
+            key="parentX_net_worth"
         )
         st.caption(f"Formatted: {format_currency(st.session_state.parentX_net_worth, force_full=False)}")
 
-        st.session_state.parentX_income = st.number_input(
+        st.number_input(
             "Annual Income ($)",
             min_value=0.0,
             max_value=10000000.0,
             value=float(st.session_state.parentX_income),
             step=1000.0,
             format="%.0f",
-            key="parentX_income_input"
+            key="parentX_income"
         )
         st.caption(f"Formatted: {format_currency(st.session_state.parentX_income, force_full=False)}")
 
-        st.session_state.parentX_raise = st.number_input(
+        st.number_input(
             "Annual Raise (%)",
             min_value=0.0,
             max_value=20.0,
             value=float(st.session_state.parentX_raise),
             step=0.1,
             format="%.2f",
-            key="parentX_raise_input"
+            key="parentX_raise"
         )
 
     with col2:
         st.subheader("Retirement Information")
-        st.session_state.parentX_retirement_age = st.number_input(
+        st.number_input(
             "Retirement Age",
             min_value=int(st.session_state.parentX_age),
             max_value=100,
             value=int(st.session_state.parentX_retirement_age),
             step=1,
-            key="parentX_retirement_age_input"
+            key="parentX_retirement_age"
         )
 
-        st.session_state.parentX_ss_benefit = st.number_input(
+        st.number_input(
             "Monthly Social Security Benefit ($)",
             min_value=0.0,
             max_value=10000.0,
             value=float(st.session_state.parentX_ss_benefit),
             step=50.0,
             format="%.0f",
-            key="parentX_ss_benefit_input"
+            key="parentX_ss_benefit"
         )
         st.caption(f"Annual: {format_currency(st.session_state.parentX_ss_benefit * 12, force_full=False)}")
 
     st.subheader("Job Changes / Income Adjustments")
     st.markdown("Plan for promotions, career changes, or income adjustments")
 
-    st.session_state.parentX_job_changes = st.data_editor(
+    st.data_editor(
         st.session_state.parentX_job_changes,
         num_rows="dynamic",
         use_container_width=True,
-        key="parentX_job_changes_editor"
+        key="parentX_job_changes"
     )
 
 
@@ -1864,77 +1868,77 @@ def parent_y_tab():
 
     with col1:
         st.subheader("Basic Information")
-        st.session_state.parentY_age = st.number_input(
+        st.number_input(
             "Current Age",
             min_value=18,
             max_value=100,
             value=int(st.session_state.parentY_age),
             step=1,
-            key="parentY_age_input"
+            key="parentY_age"
         )
 
-        st.session_state.parentY_net_worth = st.number_input(
+        st.number_input(
             "Current Net Worth ($)",
             min_value=-10000000.0,
             max_value=100000000.0,
             value=float(st.session_state.parentY_net_worth),
             step=1000.0,
             format="%.0f",
-            key="parentY_net_worth_input"
+            key="parentY_net_worth"
         )
         st.caption(f"Formatted: {format_currency(st.session_state.parentY_net_worth, force_full=False)}")
 
-        st.session_state.parentY_income = st.number_input(
+        st.number_input(
             "Annual Income ($)",
             min_value=0.0,
             max_value=10000000.0,
             value=float(st.session_state.parentY_income),
             step=1000.0,
             format="%.0f",
-            key="parentY_income_input"
+            key="parentY_income"
         )
         st.caption(f"Formatted: {format_currency(st.session_state.parentY_income, force_full=False)}")
 
-        st.session_state.parentY_raise = st.number_input(
+        st.number_input(
             "Annual Raise (%)",
             min_value=0.0,
             max_value=20.0,
             value=float(st.session_state.parentY_raise),
             step=0.1,
             format="%.2f",
-            key="parentY_raise_input"
+            key="parentY_raise"
         )
 
     with col2:
         st.subheader("Retirement Information")
-        st.session_state.parentY_retirement_age = st.number_input(
+        st.number_input(
             "Retirement Age",
             min_value=int(st.session_state.parentY_age),
             max_value=100,
             value=int(st.session_state.parentY_retirement_age),
             step=1,
-            key="parentY_retirement_age_input"
+            key="parentY_retirement_age"
         )
 
-        st.session_state.parentY_ss_benefit = st.number_input(
+        st.number_input(
             "Monthly Social Security Benefit ($)",
             min_value=0.0,
             max_value=10000.0,
             value=float(st.session_state.parentY_ss_benefit),
             step=50.0,
             format="%.0f",
-            key="parentY_ss_benefit_input"
+            key="parentY_ss_benefit"
         )
         st.caption(f"Annual: {format_currency(st.session_state.parentY_ss_benefit * 12, force_full=False)}")
 
     st.subheader("Job Changes / Income Adjustments")
     st.markdown("Plan for promotions, career changes, or income adjustments")
 
-    st.session_state.parentY_job_changes = st.data_editor(
+    st.data_editor(
         st.session_state.parentY_job_changes,
         num_rows="dynamic",
         use_container_width=True,
-        key="parentY_job_changes_editor"
+        key="parentY_job_changes"
     )
 
 
@@ -1984,23 +1988,25 @@ def family_expenses_tab():
     col1, col2 = st.columns(2)
 
     with col1:
-        st.session_state.state_tax_rate = st.number_input(
+        st.number_input(
             "State Tax Rate (%)",
             min_value=0.0,
             max_value=15.0,
             value=float(st.session_state.state_tax_rate),
             step=0.1,
-            format="%.2f"
+            format="%.2f",
+            key="state_tax_rate"
         )
 
     with col2:
-        st.session_state.pretax_401k = st.number_input(
+        st.number_input(
             "Pre-tax 401k Contribution ($)",
             min_value=0.0,
             max_value=100000.0,
             value=float(st.session_state.pretax_401k),
             step=500.0,
-            format="%.0f"
+            format="%.0f",
+            key="pretax_401k"
         )
 
     # Major Purchases
@@ -2462,10 +2468,11 @@ def economy_tab():
     col1, col2 = st.columns([1, 2])
 
     with col1:
-        st.session_state.active_scenario = st.selectbox(
+        st.selectbox(
             "Active Scenario",
             scenario_names,
-            index=scenario_names.index(st.session_state.active_scenario) if st.session_state.active_scenario in scenario_names else 0
+            index=scenario_names.index(st.session_state.active_scenario) if st.session_state.active_scenario in scenario_names else 0,
+            key="active_scenario"
         )
 
     with col2:
@@ -2586,21 +2593,23 @@ def retirement_tab():
     col1, col2 = st.columns(2)
 
     with col1:
-        st.session_state.ss_insolvency_enabled = st.checkbox(
+        st.checkbox(
             "Enable SS Insolvency Modeling",
             value=st.session_state.ss_insolvency_enabled,
-            help="Model potential Social Security benefit shortfall"
+            help="Model potential Social Security benefit shortfall",
+            key="ss_insolvency_enabled"
         )
 
     with col2:
-        st.session_state.ss_shortfall_percentage = st.number_input(
+        st.number_input(
             "Benefit Shortfall (%)",
             min_value=0.0,
             max_value=100.0,
             value=float(st.session_state.ss_shortfall_percentage),
             step=1.0,
             help="Percentage reduction in benefits after insolvency (default 30%)",
-            disabled=not st.session_state.ss_insolvency_enabled
+            disabled=not st.session_state.ss_insolvency_enabled,
+            key="ss_shortfall_percentage"
         )
 
     if st.session_state.ss_insolvency_enabled:
@@ -2718,15 +2727,15 @@ def combined_simulation_tab():
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.session_state.mc_start_year = st.number_input(
+        st.number_input(
             "Start Year",
             min_value=st.session_state.current_year,
             max_value=2100,
             value=int(st.session_state.mc_start_year),
-            key="mc_start"
+            key="mc_start_year"
         )
 
-        st.session_state.mc_years = st.number_input(
+        st.number_input(
             "Projection Years",
             min_value=1,
             max_value=80,
@@ -2735,100 +2744,113 @@ def combined_simulation_tab():
         )
 
     with col2:
-        st.session_state.mc_simulations = st.number_input(
+        st.number_input(
             "Number of Simulations",
             min_value=100,
             max_value=10000,
             value=int(st.session_state.mc_simulations),
             step=100,
-            key="mc_sims"
+            key="mc_simulations"
         )
 
-        st.session_state.mc_use_historical = st.checkbox(
+        st.checkbox(
             "Use Historical Returns",
             value=st.session_state.mc_use_historical,
-            help="Use actual historical S&P 500 returns instead of random generation"
+            help="Use actual historical S&P 500 returns instead of random generation",
+            key="mc_use_historical"
         )
 
     with col3:
-        st.session_state.mc_normalize_to_today_dollars = st.checkbox(
+        st.checkbox(
             "Normalize to Today's Dollars",
             value=st.session_state.mc_normalize_to_today_dollars,
-            help="Adjust all future values to today's purchasing power"
+            help="Adjust all future values to today's purchasing power",
+            key="mc_normalize_to_today_dollars"
         )
 
     # Variability Settings
     st.subheader("📊 Variability Settings (for Traditional Simulations)")
 
-    use_asymmetric = st.checkbox("Use Asymmetric Variability", value=True, help="Set different positive and negative variability ranges")
+    # Initialize use_asymmetric in session state if not present
+    if 'use_asymmetric' not in st.session_state:
+        st.session_state.use_asymmetric = True
+
+    st.checkbox(
+        "Use Asymmetric Variability",
+        value=st.session_state.use_asymmetric,
+        help="Set different positive and negative variability ranges",
+        key="use_asymmetric"
+    )
+
+    use_asymmetric = st.session_state.use_asymmetric
 
     if use_asymmetric:
         col1, col2, col3 = st.columns(3)
 
         with col1:
             st.markdown("**Income Variability**")
-            st.session_state.mc_income_variability_positive = st.number_input(
+            st.number_input(
                 "Positive (%)",
                 min_value=0.0,
                 max_value=100.0,
                 value=float(st.session_state.mc_income_variability_positive),
                 step=1.0,
-                key="income_var_pos"
+                key="mc_income_variability_positive"
             )
-            st.session_state.mc_income_variability_negative = st.number_input(
+            st.number_input(
                 "Negative (%)",
                 min_value=0.0,
                 max_value=100.0,
                 value=float(st.session_state.mc_income_variability_negative),
                 step=1.0,
-                key="income_var_neg"
+                key="mc_income_variability_negative"
             )
 
         with col2:
             st.markdown("**Expense Variability**")
-            st.session_state.mc_expense_variability_positive = st.number_input(
+            st.number_input(
                 "Positive (%)",
                 min_value=0.0,
                 max_value=100.0,
                 value=float(st.session_state.mc_expense_variability_positive),
                 step=1.0,
-                key="expense_var_pos"
+                key="mc_expense_variability_positive"
             )
-            st.session_state.mc_expense_variability_negative = st.number_input(
+            st.number_input(
                 "Negative (%)",
                 min_value=0.0,
                 max_value=100.0,
                 value=float(st.session_state.mc_expense_variability_negative),
                 step=1.0,
-                key="expense_var_neg"
+                key="mc_expense_variability_negative"
             )
 
         with col3:
             st.markdown("**Return Variability**")
-            st.session_state.mc_return_variability_positive = st.number_input(
+            st.number_input(
                 "Positive (%)",
                 min_value=0.0,
                 max_value=100.0,
                 value=float(st.session_state.mc_return_variability_positive),
                 step=1.0,
-                key="return_var_pos"
+                key="mc_return_variability_positive"
             )
-            st.session_state.mc_return_variability_negative = st.number_input(
+            st.number_input(
                 "Negative (%)",
                 min_value=0.0,
                 max_value=100.0,
                 value=float(st.session_state.mc_return_variability_negative),
                 step=1.0,
-                key="return_var_neg"
+                key="mc_return_variability_negative"
             )
     else:
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.session_state.mc_income_variability = st.slider("Income Variability (%)", 0.0, 100.0, 10.0)
+            st.slider("Income Variability (%)", 0.0, 100.0, 10.0, key="mc_income_variability")
         with col2:
-            st.session_state.mc_expense_variability = st.slider("Expense Variability (%)", 0.0, 100.0, 5.0)
+            st.slider("Expense Variability (%)", 0.0, 100.0, 5.0, key="mc_expense_variability")
         with col3:
-            st.session_state.mc_return_variability = st.slider("Return Variability (%)", 0.0, 100.0, 15.0)
+            st.slider("Return Variability (%)", 0.0, 100.0, 15.0, key="mc_return_variability")
 
     # Run Simulation Button
     if st.button("▶️ Run Monte Carlo Simulation", type="primary"):
