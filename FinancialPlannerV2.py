@@ -1514,6 +1514,66 @@ class FinancialPlannerGUI(QMainWindow):
         instructions_group.setLayout(instructions_layout)
         layout.addWidget(instructions_group)
 
+        # Add Scenario Library section
+        library_group = QGroupBox("Scenario Library")
+        library_layout = QVBoxLayout()
+
+        # Saved scenarios list
+        scenarios_list_layout = QHBoxLayout()
+
+        self.saved_scenarios_list = QListWidget()
+        self.saved_scenarios_list.setMaximumHeight(150)
+        scenarios_list_layout.addWidget(self.saved_scenarios_list)
+
+        # Buttons for scenario management
+        library_buttons_layout = QVBoxLayout()
+
+        self.load_selected_scenario_btn = QPushButton("Load Selected")
+        self.load_selected_scenario_btn.clicked.connect(self.load_selected_scenario)
+        library_buttons_layout.addWidget(self.load_selected_scenario_btn)
+
+        self.delete_selected_scenario_btn = QPushButton("Delete Selected")
+        self.delete_selected_scenario_btn.clicked.connect(self.delete_selected_scenario)
+        library_buttons_layout.addWidget(self.delete_selected_scenario_btn)
+
+        library_buttons_layout.addStretch()
+        scenarios_list_layout.addLayout(library_buttons_layout)
+
+        library_layout.addLayout(scenarios_list_layout)
+
+        # Save current scenario with name
+        save_layout = QHBoxLayout()
+        save_layout.addWidget(QLabel("Scenario Name:"))
+
+        self.scenario_name_input = QLineEdit()
+        self.scenario_name_input.setPlaceholderText("Enter scenario name...")
+        save_layout.addWidget(self.scenario_name_input)
+
+        self.save_named_scenario_btn = QPushButton("Save as Named Scenario")
+        self.save_named_scenario_btn.clicked.connect(self.save_named_scenario)
+        save_layout.addWidget(self.save_named_scenario_btn)
+
+        library_layout.addLayout(save_layout)
+
+        # Add file-based save/load buttons
+        file_layout = QHBoxLayout()
+
+        export_file_btn = QPushButton("Export to File...")
+        export_file_btn.clicked.connect(self.save_scenario)
+        file_layout.addWidget(export_file_btn)
+
+        import_file_btn = QPushButton("Import from File...")
+        import_file_btn.clicked.connect(self.load_scenario)
+        file_layout.addWidget(import_file_btn)
+
+        library_layout.addLayout(file_layout)
+
+        library_group.setLayout(library_layout)
+        layout.addWidget(library_group)
+
+        # Refresh the scenarios list
+        self.refresh_scenarios_library()
+
         return tab
 
     def refresh_scenario_params_table(self):
@@ -2155,9 +2215,37 @@ class FinancialPlannerGUI(QMainWindow):
             self.max_net_worth_input.setValue(1000000)
             self.max_net_worth_input.setEnabled(False)
 
+            # Inflation normalization toggle
+            self.normalize_inflation_checkbox = QCheckBox("Normalize to today's dollars")
+            self.normalize_inflation_checkbox.setChecked(False)
+
+            # Variability settings
+            self.enable_variability_checkbox = QCheckBox("Enable Variability Bands")
+            self.enable_variability_checkbox.setChecked(False)
+            self.enable_variability_checkbox.stateChanged.connect(self.toggle_variability_inputs)
+
+            self.upside_variability_input = QDoubleSpinBox()
+            self.upside_variability_input.setRange(0, 100)
+            self.upside_variability_input.setSingleStep(1)
+            self.upside_variability_input.setValue(10)
+            self.upside_variability_input.setSuffix("%")
+            self.upside_variability_input.setEnabled(False)
+
+            self.downside_variability_input = QDoubleSpinBox()
+            self.downside_variability_input.setRange(0, 100)
+            self.downside_variability_input.setSingleStep(1)
+            self.downside_variability_input.setValue(10)
+            self.downside_variability_input.setSuffix("%")
+            self.downside_variability_input.setEnabled(False)
+
             display_layout.addRow("Auto-scale Y-axis:", self.auto_scale_checkbox)
             display_layout.addRow("Minimum Net Worth:", self.min_net_worth_input)
             display_layout.addRow("Maximum Net Worth:", self.max_net_worth_input)
+            display_layout.addRow("Inflation Adjustment:", self.normalize_inflation_checkbox)
+            display_layout.addRow("", QLabel(""))  # Spacer
+            display_layout.addRow(self.enable_variability_checkbox)
+            display_layout.addRow("Upside Variability:", self.upside_variability_input)
+            display_layout.addRow("Downside Variability:", self.downside_variability_input)
 
             display_group.setLayout(display_layout)
 
@@ -2192,6 +2280,12 @@ class FinancialPlannerGUI(QMainWindow):
         self.min_net_worth_input.setEnabled(enabled)
         self.max_net_worth_input.setEnabled(enabled)
 
+    def toggle_variability_inputs(self, state):
+        """Enable or disable variability inputs based on checkbox."""
+        enabled = bool(state)
+        self.upside_variability_input.setEnabled(enabled)
+        self.downside_variability_input.setEnabled(enabled)
+
     def setup_monte_carlo_tab(self) -> QWidget:
         """Set up the Monte Carlo simulation tab."""
         try:
@@ -2210,8 +2304,13 @@ class FinancialPlannerGUI(QMainWindow):
             self.num_simulations_input.setSingleStep(100)
             self.num_simulations_input.setValue(500)  # Default to safer value
 
+            # Inflation normalization toggle
+            self.mc_normalize_inflation_checkbox = QCheckBox("Normalize to today's dollars")
+            self.mc_normalize_inflation_checkbox.setChecked(False)
+
             mc_layout.addRow("Base Scenario:", self.mc_scenario_combo)
             mc_layout.addRow("Number of Simulations:", self.num_simulations_input)
+            mc_layout.addRow("Inflation Adjustment:", self.mc_normalize_inflation_checkbox)
 
             # Add warning label
             warning_label = QLabel(
@@ -2540,6 +2639,148 @@ class FinancialPlannerGUI(QMainWindow):
             logger.error(f"Error updating SS settings: {e}")
             QMessageBox.warning(self, "Error", f"Failed to update Social Security settings: {str(e)}")
 
+    def get_scenarios_directory(self):
+        """Get or create the scenarios directory."""
+        import os
+        scenarios_dir = Path.home() / ".financial_planner" / "scenarios"
+        scenarios_dir.mkdir(parents=True, exist_ok=True)
+        return scenarios_dir
+
+    def refresh_scenarios_library(self):
+        """Refresh the list of saved scenarios."""
+        try:
+            self.saved_scenarios_list.clear()
+            scenarios_dir = self.get_scenarios_directory()
+
+            # List all .json files in the scenarios directory
+            for scenario_file in scenarios_dir.glob("*.json"):
+                scenario_name = scenario_file.stem  # Filename without extension
+                self.saved_scenarios_list.addItem(scenario_name)
+
+            logger.debug(f"Refreshed scenarios library with {self.saved_scenarios_list.count()} scenarios")
+        except Exception as e:
+            logger.error(f"Error refreshing scenarios library: {e}")
+
+    def save_named_scenario(self):
+        """Save the current scenario with a user-provided name."""
+        try:
+            scenario_name = self.scenario_name_input.text().strip()
+
+            if not scenario_name:
+                QMessageBox.warning(self, "Warning", "Please enter a scenario name")
+                return
+
+            # Validate scenario name (no special characters)
+            import re
+            if not re.match(r'^[\w\s-]+$', scenario_name):
+                QMessageBox.warning(self, "Warning",
+                                  "Scenario name can only contain letters, numbers, spaces, hyphens, and underscores")
+                return
+
+            scenarios_dir = self.get_scenarios_directory()
+            filename = scenarios_dir / f"{scenario_name}.json"
+
+            # Check if scenario already exists
+            if filename.exists():
+                reply = QMessageBox.question(
+                    self,
+                    "Overwrite Scenario",
+                    f"Scenario '{scenario_name}' already exists. Overwrite?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                if reply == QMessageBox.StandardButton.No:
+                    return
+
+            # Save the scenario
+            self.planner.save_scenario(str(filename))
+
+            QMessageBox.information(self, "Success", f"Scenario '{scenario_name}' saved successfully")
+            logger.debug(f"Saved named scenario: {scenario_name}")
+
+            # Clear the input and refresh the list
+            self.scenario_name_input.clear()
+            self.refresh_scenarios_library()
+
+        except Exception as e:
+            logger.error(f"Error saving named scenario: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to save scenario: {str(e)}")
+
+    def load_selected_scenario(self):
+        """Load the selected scenario from the library."""
+        try:
+            selected_items = self.saved_scenarios_list.selectedItems()
+            if not selected_items:
+                QMessageBox.warning(self, "Warning", "Please select a scenario to load")
+                return
+
+            scenario_name = selected_items[0].text()
+            scenarios_dir = self.get_scenarios_directory()
+            filename = scenarios_dir / f"{scenario_name}.json"
+
+            if not filename.exists():
+                QMessageBox.warning(self, "Error", f"Scenario file not found: {scenario_name}")
+                return
+
+            # Load the scenario
+            loaded_planner = FinancialPlanner.load_scenario(str(filename))
+
+            if loaded_planner:
+                self.planner = loaded_planner
+
+                # Refresh all UI elements
+                self.current_year_input.setValue(self.planner.current_year)
+                self.yearly_expenses_input.setValue(self.planner.yearly_expenses)
+                self.healthcare_expenses_input.setValue(self.planner.healthcare_expenses)
+
+                # Refresh partner data
+                self.refresh_partner_data("X")
+                self.refresh_partner_data("Y")
+
+                QMessageBox.information(self, "Success", f"Scenario '{scenario_name}' loaded successfully")
+                logger.debug(f"Loaded scenario from library: {scenario_name}")
+            else:
+                QMessageBox.warning(self, "Error", "Failed to load scenario")
+
+        except Exception as e:
+            logger.error(f"Error loading selected scenario: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to load scenario: {str(e)}")
+
+    def delete_selected_scenario(self):
+        """Delete the selected scenario from the library."""
+        try:
+            selected_items = self.saved_scenarios_list.selectedItems()
+            if not selected_items:
+                QMessageBox.warning(self, "Warning", "Please select a scenario to delete")
+                return
+
+            scenario_name = selected_items[0].text()
+
+            # Confirm deletion
+            reply = QMessageBox.question(
+                self,
+                "Delete Scenario",
+                f"Are you sure you want to delete scenario '{scenario_name}'?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+
+            if reply == QMessageBox.StandardButton.No:
+                return
+
+            scenarios_dir = self.get_scenarios_directory()
+            filename = scenarios_dir / f"{scenario_name}.json"
+
+            if filename.exists():
+                filename.unlink()  # Delete the file
+                QMessageBox.information(self, "Success", f"Scenario '{scenario_name}' deleted")
+                logger.debug(f"Deleted scenario: {scenario_name}")
+                self.refresh_scenarios_library()
+            else:
+                QMessageBox.warning(self, "Error", f"Scenario file not found: {scenario_name}")
+
+        except Exception as e:
+            logger.error(f"Error deleting scenario: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to delete scenario: {str(e)}")
+
     def run_projection(self):
         """Run financial projection and display results."""
         try:
@@ -2563,10 +2804,61 @@ class FinancialPlannerGUI(QMainWindow):
             income = [r['total_income'] for r in results]
             expenses = [r['total_expenses'] for r in results]
 
+            # Apply inflation normalization if checkbox is checked
+            if self.normalize_inflation_checkbox.isChecked():
+                scenario_params = self.planner.scenario_params.scenarios[scenario_name]
+                inflation_rate = scenario_params['inflation_rate']
+                current_year = self.planner.current_year
+
+                # Convert to real dollars (purchasing power in today's dollars)
+                net_worth = [nw / ((1 + inflation_rate) ** (year - current_year))
+                            for year, nw in zip(years, net_worth)]
+                income = [inc / ((1 + inflation_rate) ** (year - current_year))
+                         for year, inc in zip(years, income)]
+                expenses = [exp / ((1 + inflation_rate) ** (year - current_year))
+                           for year, exp in zip(years, expenses)]
+
+                dollar_label = "Real Dollars (Today's Purchasing Power)"
+            else:
+                dollar_label = "Nominal Dollars"
+
+            # Calculate and plot variability bands if enabled
+            if self.enable_variability_checkbox.isChecked():
+                upside_pct = self.upside_variability_input.value() / 100.0
+                downside_pct = self.downside_variability_input.value() / 100.0
+
+                # Calculate best case (upside variability)
+                best_case_net_worth = []
+                # Calculate worst case (downside variability)
+                worst_case_net_worth = []
+
+                for i, year in enumerate(years):
+                    base_value = results[i]['net_worth']
+                    # Apply asymmetric variability
+                    best_case = base_value * (1 + upside_pct)
+                    worst_case = base_value * (1 - downside_pct)
+
+                    # Apply inflation normalization if enabled
+                    if self.normalize_inflation_checkbox.isChecked():
+                        year_offset = year - current_year
+                        inflation_factor = ((1 + inflation_rate) ** year_offset)
+                        best_case = best_case / inflation_factor
+                        worst_case = worst_case / inflation_factor
+
+                    best_case_net_worth.append(best_case)
+                    worst_case_net_worth.append(worst_case)
+
+                # Plot variability bands as shaded regions
+                ax1.fill_between(years, worst_case_net_worth, best_case_net_worth,
+                                alpha=0.2, color='blue', label='Variability Range')
+                ax1.plot(years, best_case_net_worth, 'b--', linewidth=1, alpha=0.5, label='Best Case')
+                ax1.plot(years, worst_case_net_worth, 'b--', linewidth=1, alpha=0.5, label='Worst Case')
+
             # Plot net worth with custom scale if specified
-            ax1.plot(years, net_worth, 'b-', linewidth=2)
+            ax1.plot(years, net_worth, 'b-', linewidth=2, label='Expected')
             ax1.set_title('Net Worth Projection')
-            ax1.set_ylabel('Net Worth ($)')
+            ax1.set_ylabel(f'Net Worth ({dollar_label})')
+            ax1.legend(loc='best')
             ax1.grid(True)
 
             # Apply custom scale if auto-scale is not checked
@@ -2603,7 +2895,7 @@ class FinancialPlannerGUI(QMainWindow):
             ax2.plot(years, expenses, 'r-', label='Expenses')
             ax2.set_title('Income and Expenses Projection')
             ax2.set_xlabel('Year')
-            ax2.set_ylabel('Amount ($)')
+            ax2.set_ylabel(f'Amount ({dollar_label})')
             ax2.legend()
             ax2.grid(True)
 
@@ -2682,6 +2974,16 @@ class FinancialPlannerGUI(QMainWindow):
             # Create subplot
             ax = self.mc_figure.add_subplot(111)
 
+            # Check if inflation normalization is enabled
+            normalize_inflation = self.mc_normalize_inflation_checkbox.isChecked()
+            if normalize_inflation:
+                scenario_params = self.planner.scenario_params.scenarios[scenario_name]
+                inflation_rate = scenario_params['inflation_rate']
+                current_year = self.planner.current_year
+                dollar_label = "Real Dollars (Today's Purchasing Power)"
+            else:
+                dollar_label = "Nominal Dollars"
+
             # Plot all simulation paths with low opacity
             max_year = 0
             min_net_worth = 0
@@ -2690,6 +2992,11 @@ class FinancialPlannerGUI(QMainWindow):
             for result in simulation_results['results']:
                 years = [r['year'] for r in result]
                 net_worth = [r['net_worth'] for r in result]
+
+                # Apply inflation normalization if enabled
+                if normalize_inflation:
+                    net_worth = [nw / ((1 + inflation_rate) ** (year - current_year))
+                                for year, nw in zip(years, net_worth)]
 
                 max_year = max(max_year, years[-1])
                 min_net_worth = min(min_net_worth, min(net_worth))
@@ -2701,7 +3008,7 @@ class FinancialPlannerGUI(QMainWindow):
             success_rate = simulation_results['success_rate']
             ax.set_title(f'Monte Carlo Simulation: {success_rate:.1f}% Success Rate')
             ax.set_xlabel('Year')
-            ax.set_ylabel('Net Worth ($)')
+            ax.set_ylabel(f'Net Worth ({dollar_label})')
             ax.grid(True)
 
             # Add reference lines
