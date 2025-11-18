@@ -12,7 +12,7 @@ from typing import List, Dict, Optional, Any
 
 # Set page configuration
 st.set_page_config(
-    page_title="Financial Planning Application V15 - Claude Code Enhanced",
+    page_title="Financial Planning Application V16",
     page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -1268,10 +1268,10 @@ class RetirementWithdrawal:
     purpose: str = "Living Expenses"
 
 
-# Enhanced format_currency function with automatic scaling
+# Currency formatting function with automatic scaling
 def format_currency(value, force_full=False, context="general"):
     """
-    Enhanced currency formatting with automatic scaling
+    Currency formatting with automatic scaling
 
     Args:
         value: The monetary value to format
@@ -1405,7 +1405,26 @@ def initialize_session_state():
         })
 
         # Children instances
-        st.session_state.children_list = []
+        st.session_state.children_list = [
+            {
+                'name': 'Child 1',
+                'birth_year': 2028,
+                'use_template': True,
+                'template_state': 'Seattle',
+                'template_strategy': 'Average',
+                'school_type': 'Public',
+                'college_location': 'Seattle'
+            },
+            {
+                'name': 'Child 2',
+                'birth_year': 2030,
+                'use_template': True,
+                'template_state': 'Seattle',
+                'template_strategy': 'Average',
+                'school_type': 'Public',
+                'college_location': 'Seattle'
+            }
+        ]
         st.session_state.children_today_dollars = True
 
         # Major purchases and recurring expenses
@@ -1816,8 +1835,7 @@ def main():
     """Main application function"""
     initialize_session_state()
 
-    st.title("💰 Financial Planning Suite V16 - Claude Code Enhanced (5 New Features!)")
-    st.markdown("**V16 adds Healthcare, Debt Management, Education Funding, Tax Optimization & Report Export!**")
+    st.title("💰 Financial Planning Suite V16")
 
     # Build tab list dynamically based on visibility settings
     tab_configs = [
@@ -1853,7 +1871,7 @@ def main():
         with tab:
             func()
 
-    # Enhanced sidebar
+    # Display sidebar
     display_sidebar()
 
 
@@ -1979,54 +1997,41 @@ def parent_settings_tab():
     st.header("📖 Application Instructions")
 
     st.markdown("""
-    ### Welcome to Financial Planning Suite V15 - Claude Code Enhanced Edition
+    ### Welcome to Financial Planning Suite
 
-    This is a **web-based Streamlit application** combining the best features from both versions:
+    This application helps you plan and project your family's financial future through comprehensive
+    modeling of income, expenses, investments, and major life events.
 
-    #### 🆕 **NEW IN V15 (Claude Code Enhanced):**
-    - **Portfolio Allocation Breakdown**: Track your asset allocation across stocks, bonds, cash, real estate, and other investments
-    - **Enhanced Monte Carlo Analytics**: Detailed breakdown showing percentiles (10th, 25th, 50th, 75th, 90th) for net worth projections
-    - **Real Estate Asset Tracking**: Major purchases now track asset type and appreciation rates
-    - **Duplicate Child Name Prevention**: System prevents adding children with the same name
-    - **Unified Currency Formatting**: Auto-scaled display (k/M) throughout the entire application
-    - **Complete Analysis Tab**: Fully functional with comprehensive financial projections
-    - **Enhanced Save/Load**: Internal scenario library with named scenario management
-    - **Web-Based Interface**: Stable Streamlit interface accessible from any browser
+    #### Quick Start Guide
 
-    #### 📊 Tab-by-Tab Guide:
+    1. **Settings**: Configure current year, parent names, and which tabs to show
+    2. **Parent Tabs**: Enter age, net worth, income, retirement plans, and Social Security
+    3. **Family Expenses**: Define annual expenses, taxes, major purchases
+    4. **Children**: Add children and configure their education expenses
+    5. **Houses**: Track property ownership, mortgages, and timelines
+    6. **Economy**: Select economic scenario (Conservative/Moderate/Aggressive)
+    7. **Timeline**: Review consolidated timeline and plan relocations
+    8. **Analysis**: Run Monte Carlo simulations to project future outcomes
+    9. **Save/Load**: Save scenarios for future reference
 
-    **⚙️ Settings and Instructions**: Set current year, customize parent names/emojis, define marriage year
+    #### Optional Advanced Features
 
-    **👨/👩 Parent Tabs**: Enter age, net worth, income, raises, retirement age, Social Security estimates, job changes
+    Enable in Settings → Tab Visibility to access:
+    - **Portfolio Allocation**: Define investment mix across asset classes
+    - **Healthcare & Insurance**: Plan Medicare, HSA, and long-term care costs
+    - **Debt Management**: Track loans and optimize payoff strategies
+    - **Education Funding**: Manage 529 plans and college savings
+    - **Tax Optimization**: Plan Roth conversions and withdrawal strategies
+    - **Export Reports**: Generate Excel/CSV/JSON reports
 
-    **💸 Family Expenses**: Define annual expense categories, tax settings, major purchases, recurring expenses
+    #### Key Capabilities
 
-    **👶 Children**: Add children, customize expense templates by age and state
-
-    **🏠 House Portfolio**: Track multiple properties with ownership attribution and timelines
-
-    **💼 Portfolio Allocation (NEW)**: Define your investment portfolio mix across asset classes
-
-    **📈 Economy**: Choose economic scenarios, view historical market data
-
-    **🖼️ Retirement**: Review retirement timeline, Social Security benefits with insolvency modeling
-
-    **🗓️ Timeline**: View consolidated timeline with state relocation management
-
-    **📊 Analysis (ENHANCED)**: Run Monte Carlo simulations with detailed percentile breakdowns
-
-    **💾 Save/Load (ENHANCED)**: Save multiple named scenarios internally or export to files
-
-    #### 💡 Key Features:
-
-    - **Auto-Scaled Currency**: Values display as 150k, 2.5M for readability
-    - **State-Based Planning**: Expenses adjust automatically when you move states
-    - **Dynamic Categories**: Add/remove expense categories as needed
-    - **Ownership Tracking**: Separate parent vs. family assets
-    - **Historical Simulation**: Use 100 years of market data
-    - **Inflation Adjustment**: View in today's dollars or future values
-    - **Asymmetric Variability**: Set different positive/negative ranges
-    - **Comprehensive Modeling**: Includes taxes, Social Security, detailed expenses
+    - Location-based expense templates for major U.S. cities
+    - Monte Carlo simulation with detailed percentile analysis
+    - Historical market data (100+ years of S&P 500 returns)
+    - Social Security insolvency modeling
+    - Inflation adjustment and today's dollars view
+    - Multiple scenario comparison
     """)
 
 
