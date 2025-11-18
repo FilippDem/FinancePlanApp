@@ -1173,6 +1173,103 @@ class PortfolioAllocation:
         return abs(self.total() - 100.0) < 0.01
 
 
+# NEW: Healthcare & Insurance dataclasses
+@dataclass
+class HealthInsurance:
+    name: str
+    type: str  # "Employer", "Marketplace", "Medicare", "Medicaid"
+    monthly_premium: float
+    annual_deductible: float
+    annual_out_of_pocket_max: float
+    copay_primary: float
+    copay_specialist: float
+    covered_by: str  # "Parent 1", "Parent 2", "Both", "Family"
+    start_age: int = 0
+    end_age: int = 999
+
+@dataclass
+class LongTermCareInsurance:
+    name: str
+    monthly_premium: float
+    daily_benefit: float
+    benefit_period_days: int
+    elimination_period_days: int
+    covered_person: str  # "Parent 1", "Parent 2"
+    start_age: int = 55
+    inflation_protection: float = 0.03
+
+@dataclass
+class HealthExpense:
+    category: str  # "Routine Care", "Prescription", "Emergency", "Dental", "Vision", "Mental Health"
+    annual_amount: float
+    covered_by_insurance: bool
+    start_age: int
+    end_age: int
+    affected_person: str  # "Parent 1", "Parent 2", "Both"
+
+
+# NEW: Debt Management dataclasses
+@dataclass
+class Debt:
+    name: str
+    debt_type: str  # "Student Loan", "Credit Card", "Auto Loan", "Personal Loan", "Medical Debt"
+    principal: float
+    interest_rate: float
+    monthly_payment: float
+    minimum_payment: float
+    start_date: str
+    owner: str  # "Parent 1", "Parent 2", "Shared"
+    interest_type: str = "Fixed"  # "Fixed", "Variable"
+    income_based_repayment: bool = False
+    forgiveness_eligible: bool = False
+    forgiveness_years: int = 0
+
+
+# NEW: Education Funding dataclasses
+@dataclass
+class Plan529:
+    name: str
+    beneficiary: str  # Child name or "TBD"
+    current_balance: float
+    monthly_contribution: float
+    state: str  # For state tax deduction calculation
+    investment_return: float = 0.07
+    age_based_allocation: bool = True
+    contribution_end_age: int = 18
+
+@dataclass
+class EducationGoal:
+    beneficiary: str
+    institution_type: str  # "Public In-State", "Public Out-of-State", "Private", "Community College"
+    estimated_annual_cost: float
+    years_of_college: int = 4
+    start_year: int = 2043
+    scholarship_amount: float = 0.0
+    grants_amount: float = 0.0
+    student_loans_allowed: bool = False
+    max_parent_contribution: float = 0.0
+
+
+# NEW: Tax Optimization dataclasses
+@dataclass
+class TaxStrategy:
+    name: str
+    strategy_type: str  # "Roth Conversion", "Tax Loss Harvesting", "Charitable Giving", "HSA Max"
+    annual_amount: float
+    start_year: int
+    end_year: int
+    estimated_tax_savings: float = 0.0
+    notes: str = ""
+
+@dataclass
+class RetirementWithdrawal:
+    year: int
+    account_type: str  # "401k", "IRA", "Roth IRA", "Taxable", "HSA"
+    amount: float
+    tax_rate: float
+    purpose: str = "Living Expenses"
+
+
 # Enhanced format_currency function with automatic scaling
 def format_currency(value, force_full=False, context="general"):
     """
@@ -1412,6 +1509,35 @@ def initialize_session_state():
         # NEW: Custom children templates
         st.session_state.custom_children_templates = {}
 
+        # NEW: Healthcare & Insurance
+        st.session_state.health_insurances = []
+        st.session_state.ltc_insurances = []
+        st.session_state.health_expenses = []
+        st.session_state.hsa_balance = 0.0
+        st.session_state.hsa_contribution = 0.0
+        st.session_state.medicare_part_b_premium = 174.70  # 2025 standard
+        st.session_state.medicare_part_d_premium = 55.0    # Average estimate
+        st.session_state.medigap_premium = 150.0           # Average estimate
+
+        # NEW: Debt Management
+        st.session_state.debts = []
+        st.session_state.debt_payoff_strategy = "Avalanche"  # "Avalanche", "Snowball", "Minimum Only"
+        st.session_state.extra_debt_payment = 0.0
+
+        # NEW: Education Funding
+        st.session_state.plan529_accounts = []
+        st.session_state.education_goals = []
+        st.session_state.coverdell_esa = 0.0
+        st.session_state.utma_ugma_balance = 0.0
+
+        # NEW: Tax Optimization
+        st.session_state.tax_strategies = []
+        st.session_state.retirement_withdrawals = []
+        st.session_state.roth_conversion_amount = 0.0
+        st.session_state.charitable_contributions = 0.0
+        st.session_state.qcd_enabled = False  # Qualified Charitable Distribution
+        st.session_state.tax_bracket = 0.22    # Federal marginal tax bracket
+
         st.session_state.initialized = True
 
 
@@ -1588,8 +1714,8 @@ def main():
     """Main application function"""
     initialize_session_state()
 
-    st.title("💰 Financial Planning Suite V15 - Claude Code Enhanced")
-    st.markdown("**V15 combines the best of PyQt V2 and Streamlit V14 - Now with Portfolio Breakdown & Enhanced Analytics**")
+    st.title("💰 Financial Planning Suite V16 - Claude Code Enhanced (5 New Features!)")
+    st.markdown("**V16 adds Healthcare, Debt Management, Education Funding, Tax Optimization & Report Export!**")
 
     # Create tabs
     tab_list = [
@@ -1599,11 +1725,16 @@ def main():
         "💸 Family Expenses",
         "👶 Children",
         "🏠 House Portfolio",
-        "💼 Portfolio Allocation",  # NEW TAB
+        "💼 Portfolio Allocation",
         "📈 Economy",
         "🖼️ Retirement",
+        "🏥 Healthcare & Insurance",  # NEW
+        "💳 Debt Management",  # NEW
+        "🎓 Education Funding",  # NEW
+        "💼 Tax Optimization",  # NEW
         "🗓️ Timeline",
         "📊 Analysis",
+        "📄 Export Reports",  # NEW
         "💾 Save/Load"
     ]
 
@@ -1636,14 +1767,29 @@ def main():
     with tabs[8]:  # Retirement
         retirement_tab()
 
-    with tabs[9]:  # Timeline
+    with tabs[9]:  # NEW: Healthcare & Insurance
+        healthcare_insurance_tab()
+
+    with tabs[10]:  # NEW: Debt Management
+        debt_management_tab()
+
+    with tabs[11]:  # NEW: Education Funding
+        education_funding_tab()
+
+    with tabs[12]:  # NEW: Tax Optimization
+        tax_optimization_tab()
+
+    with tabs[13]:  # Timeline
         timeline_tab()
 
-    with tabs[10]:  # Analysis
-        combined_simulation_tab()  # IMPLEMENTED
+    with tabs[14]:  # Analysis
+        combined_simulation_tab()
 
-    with tabs[11]:  # Save/Load
-        save_load_tab()  # IMPLEMENTED
+    with tabs[15]:  # NEW: Export Reports
+        report_export_tab()
+
+    with tabs[16]:  # Save/Load
+        save_load_tab()
 
     # Enhanced sidebar
     display_sidebar()
@@ -2032,7 +2178,7 @@ def family_expenses_tab():
                 purchase.asset_type = st.selectbox(
                     "Asset Type",
                     ["Expense", "Real Estate", "Vehicle", "Investment"],
-                    index=["Expense", "Real Estate", "Vehicle", "Investment"].index(purchase.asset_type),
+                    index=["Expense", "Real Estate", "Vehicle", "Investment"].index(purchase.asset_type) if purchase.asset_type in ["Expense", "Real Estate", "Vehicle", "Investment"] else 0,
                     key=f"mp_asset_type_{idx}"
                 )
                 purchase.appreciation_rate = st.number_input(
@@ -2096,7 +2242,7 @@ def family_expenses_tab():
 
             with col3:
                 recurring.inflation_adjust = st.checkbox("Inflation Adjust", value=recurring.inflation_adjust, key=f"re_inflate_{idx}")
-                recurring.parent = st.selectbox("Owner", ["Both", "ParentX", "ParentY"], index=["Both", "ParentX", "ParentY"].index(recurring.parent), key=f"re_parent_{idx}")
+                recurring.parent = st.selectbox("Owner", ["Both", "ParentX", "ParentY"], index=["Both", "ParentX", "ParentY"].index(recurring.parent) if recurring.parent in ["Both", "ParentX", "ParentY"] else 0, key=f"re_parent_{idx}")
                 recurring.financing_years = st.number_input("Financing Years", min_value=0, max_value=30, value=recurring.financing_years, key=f"re_financing_{idx}")
                 recurring.interest_rate = st.number_input(
                     "Interest Rate (%)",
@@ -2309,7 +2455,7 @@ def house_tab():
             house.owner = st.selectbox(
                 "Owner",
                 ["Shared", "ParentX", "ParentY"],
-                index=["Shared", "ParentX", "ParentY"].index(house.owner),
+                index=["Shared", "ParentX", "ParentY"].index(house.owner) if house.owner in ["Shared", "ParentX", "ParentY"] else 0,
                 key=f"house_owner_{idx}"
             )
 
@@ -3208,6 +3354,1008 @@ def save_load_tab():
 
             except Exception as e:
                 st.error(f"❌ Error importing file: {str(e)}")
+
+
+# NEW TAB 1: Healthcare & Insurance
+def healthcare_insurance_tab():
+    """Healthcare and Insurance Planning Tab"""
+    st.header("🏥 Healthcare & Insurance Planning")
+
+    st.markdown("""
+    Plan for healthcare costs throughout retirement, including Medicare, insurance premiums,
+    out-of-pocket expenses, and long-term care insurance.
+    """)
+
+    # HSA Account
+    st.subheader("💰 Health Savings Account (HSA)")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.session_state.hsa_balance = st.number_input(
+            "Current HSA Balance",
+            min_value=0.0,
+            value=float(st.session_state.hsa_balance),
+            step=1000.0,
+            format="%.2f"
+        )
+    with col2:
+        st.session_state.hsa_contribution = st.number_input(
+            "Annual HSA Contribution",
+            min_value=0.0,
+            max_value=8300.0,  # 2025 family limit
+            value=float(st.session_state.hsa_contribution),
+            step=100.0,
+            format="%.2f"
+        )
+
+    st.info("💡 HSA Triple Tax Advantage: Tax-deductible contributions, tax-free growth, tax-free withdrawals for medical expenses")
+
+    # Health Insurance Plans
+    st.subheader("🏥 Health Insurance Plans")
+
+    if st.button("➕ Add Health Insurance Plan"):
+        new_insurance = HealthInsurance(
+            name="New Health Plan",
+            type="Employer",
+            monthly_premium=500.0,
+            annual_deductible=3000.0,
+            annual_out_of_pocket_max=8000.0,
+            copay_primary=25.0,
+            copay_specialist=50.0,
+            covered_by="Family",
+            start_age=0,
+            end_age=65
+        )
+        st.session_state.health_insurances.append(new_insurance)
+        st.rerun()
+
+    for idx, insurance in enumerate(st.session_state.health_insurances):
+        with st.expander(f"📋 {insurance.name}"):
+            col1, col2, col3 = st.columns([3, 3, 1])
+
+            with col1:
+                insurance.name = st.text_input(f"Plan Name##ins{idx}", value=insurance.name)
+                insurance.type = st.selectbox(
+                    f"Insurance Type##ins{idx}",
+                    ["Employer", "Marketplace", "Medicare", "Medicaid"],
+                    index=["Employer", "Marketplace", "Medicare", "Medicaid"].index(insurance.type) if insurance.type in ["Employer", "Marketplace", "Medicare", "Medicaid"] else 0
+                )
+                insurance.monthly_premium = st.number_input(
+                    f"Monthly Premium##ins{idx}",
+                    min_value=0.0,
+                    value=float(insurance.monthly_premium),
+                    step=50.0
+                )
+
+            with col2:
+                insurance.annual_deductible = st.number_input(
+                    f"Annual Deductible##ins{idx}",
+                    min_value=0.0,
+                    value=float(insurance.annual_deductible),
+                    step=100.0
+                )
+                insurance.annual_out_of_pocket_max = st.number_input(
+                    f"Out-of-Pocket Maximum##ins{idx}",
+                    min_value=0.0,
+                    value=float(insurance.annual_out_of_pocket_max),
+                    step=500.0
+                )
+                insurance.covered_by = st.selectbox(
+                    f"Covered By##ins{idx}",
+                    ["Parent 1", "Parent 2", "Both", "Family"],
+                    index=["Parent 1", "Parent 2", "Both", "Family"].index(insurance.covered_by) if insurance.covered_by in ["Parent 1", "Parent 2", "Both", "Family"] else 3
+                )
+
+            with col3:
+                if st.button(f"🗑️ Delete##{idx}_insurance"):
+                    st.session_state.health_insurances.pop(idx)
+                    st.rerun()
+
+            st.session_state.health_insurances[idx] = insurance
+
+    # Medicare Settings
+    st.subheader("🩺 Medicare Planning (Age 65+)")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.session_state.medicare_part_b_premium = st.number_input(
+            "Medicare Part B Premium (Monthly)",
+            min_value=0.0,
+            value=float(st.session_state.medicare_part_b_premium),
+            step=10.0,
+            help="Standard 2025 premium: $174.70/month"
+        )
+    with col2:
+        st.session_state.medicare_part_d_premium = st.number_input(
+            "Medicare Part D Premium (Monthly)",
+            min_value=0.0,
+            value=float(st.session_state.medicare_part_d_premium),
+            step=10.0,
+            help="Average prescription drug plan premium"
+        )
+    with col3:
+        st.session_state.medigap_premium = st.number_input(
+            "Medigap Supplement Premium (Monthly)",
+            min_value=0.0,
+            value=float(st.session_state.medigap_premium),
+            step=10.0,
+            help="Optional supplemental coverage"
+        )
+
+    # Long-Term Care Insurance
+    st.subheader("🏨 Long-Term Care Insurance")
+
+    if st.button("➕ Add LTC Insurance Policy"):
+        new_ltc = LongTermCareInsurance(
+            name="LTC Policy",
+            monthly_premium=300.0,
+            daily_benefit=200.0,
+            benefit_period_days=1095,  # 3 years
+            elimination_period_days=90,
+            covered_person="Parent 1",
+            start_age=55,
+            inflation_protection=0.03
+        )
+        st.session_state.ltc_insurances.append(new_ltc)
+        st.rerun()
+
+    for idx, ltc in enumerate(st.session_state.ltc_insurances):
+        with st.expander(f"🏨 {ltc.name} - {ltc.covered_person}"):
+            col1, col2, col3 = st.columns([3, 3, 1])
+
+            with col1:
+                ltc.name = st.text_input(f"Policy Name##ltc{idx}", value=ltc.name)
+                ltc.covered_person = st.selectbox(
+                    f"Covered Person##ltc{idx}",
+                    ["Parent 1", "Parent 2"],
+                    index=["Parent 1", "Parent 2"].index(ltc.covered_person) if ltc.covered_person in ["Parent 1", "Parent 2"] else 0
+                )
+                ltc.monthly_premium = st.number_input(
+                    f"Monthly Premium##ltc{idx}",
+                    min_value=0.0,
+                    value=float(ltc.monthly_premium),
+                    step=50.0
+                )
+
+            with col2:
+                ltc.daily_benefit = st.number_input(
+                    f"Daily Benefit##ltc{idx}",
+                    min_value=0.0,
+                    value=float(ltc.daily_benefit),
+                    step=25.0,
+                    help="Daily benefit amount for care"
+                )
+                ltc.benefit_period_days = st.number_input(
+                    f"Benefit Period (days)##ltc{idx}",
+                    min_value=0,
+                    value=int(ltc.benefit_period_days),
+                    step=365,
+                    help="Total days of coverage (e.g., 1095 = 3 years)"
+                )
+                ltc.start_age = st.number_input(
+                    f"Coverage Start Age##ltc{idx}",
+                    min_value=30,
+                    max_value=80,
+                    value=int(ltc.start_age),
+                    step=1
+                )
+
+            with col3:
+                if st.button(f"🗑️ Delete##ltc{idx}"):
+                    st.session_state.ltc_insurances.pop(idx)
+                    st.rerun()
+
+            st.session_state.ltc_insurances[idx] = ltc
+
+    # Healthcare Cost Summary
+    st.subheader("📊 Healthcare Cost Projection")
+
+    total_annual_premium = sum([ins.monthly_premium * 12 for ins in st.session_state.health_insurances])
+    total_ltc_premium = sum([ltc.monthly_premium * 12 for ltc in st.session_state.ltc_insurances])
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Annual Health Insurance", format_currency(total_annual_premium))
+    col2.metric("Annual LTC Insurance", format_currency(total_ltc_premium))
+    col3.metric("Total Insurance Cost", format_currency(total_annual_premium + total_ltc_premium))
+
+
+# NEW TAB 2: Debt Management
+def debt_management_tab():
+    """Comprehensive Debt Management Tab"""
+    st.header("💳 Debt Management")
+
+    st.markdown("""
+    Manage all debts including student loans, credit cards, auto loans, and personal loans.
+    Track payoff strategies and visualize debt-free timeline.
+    """)
+
+    # Debt Payoff Strategy
+    st.subheader("📊 Debt Payoff Strategy")
+    col1, col2 = st.columns(2)
+    with col1:
+        # Map short form to full form for display
+        strategy_options = ["Avalanche (Highest Interest First)", "Snowball (Smallest Balance First)", "Minimum Payments Only"]
+        strategy_map = {"Avalanche": 0, "Snowball": 1, "Minimum Only": 2}
+        # Handle both short and long forms
+        if "Avalanche" in st.session_state.debt_payoff_strategy:
+            current_index = 0
+        elif "Snowball" in st.session_state.debt_payoff_strategy:
+            current_index = 1
+        else:
+            current_index = 2
+
+        st.session_state.debt_payoff_strategy = st.selectbox(
+            "Payoff Strategy",
+            strategy_options,
+            index=current_index
+        )
+    with col2:
+        st.session_state.extra_debt_payment = st.number_input(
+            "Extra Monthly Payment (Applied to Strategy)",
+            min_value=0.0,
+            value=float(st.session_state.extra_debt_payment),
+            step=100.0,
+            help="Additional amount beyond minimum payments"
+        )
+
+    # Add New Debt
+    st.subheader("➕ Add New Debt")
+
+    if st.button("Add Debt"):
+        new_debt = Debt(
+            name="New Debt",
+            debt_type="Student Loan",
+            principal=25000.0,
+            interest_rate=0.045,
+            monthly_payment=250.0,
+            minimum_payment=250.0,
+            start_date=f"{st.session_state.current_year}-01-01",
+            owner="Parent 1",
+            interest_type="Fixed",
+            income_based_repayment=False,
+            forgiveness_eligible=False,
+            forgiveness_years=0
+        )
+        st.session_state.debts.append(new_debt)
+        st.rerun()
+
+    # Display All Debts
+    st.subheader("📋 Current Debts")
+
+    if not st.session_state.debts:
+        st.info("No debts added yet. Click 'Add Debt' to get started.")
+
+    for idx, debt in enumerate(st.session_state.debts):
+        with st.expander(f"💰 {debt.name} ({debt.debt_type}) - {format_currency(debt.principal)} @ {debt.interest_rate*100:.2f}%"):
+            col1, col2, col3, col4 = st.columns([3, 3, 3, 1])
+
+            with col1:
+                debt.name = st.text_input(f"Debt Name##debt{idx}", value=debt.name)
+                debt.debt_type = st.selectbox(
+                    f"Debt Type##debt{idx}",
+                    ["Student Loan", "Credit Card", "Auto Loan", "Personal Loan", "Medical Debt", "Mortgage", "Other"],
+                    index=["Student Loan", "Credit Card", "Auto Loan", "Personal Loan", "Medical Debt", "Mortgage", "Other"].index(debt.debt_type) if debt.debt_type in ["Student Loan", "Credit Card", "Auto Loan", "Personal Loan", "Medical Debt", "Mortgage", "Other"] else 0
+                )
+                debt.owner = st.selectbox(
+                    f"Owner##debt{idx}",
+                    ["Parent 1", "Parent 2", "Shared"],
+                    index=["Parent 1", "Parent 2", "Shared"].index(debt.owner) if debt.owner in ["Parent 1", "Parent 2", "Shared"] else 0
+                )
+
+            with col2:
+                debt.principal = st.number_input(
+                    f"Current Balance##debt{idx}",
+                    min_value=0.0,
+                    value=float(debt.principal),
+                    step=1000.0
+                )
+                debt.interest_rate = st.number_input(
+                    f"Interest Rate (%)##debt{idx}",
+                    min_value=0.0,
+                    max_value=100.0,
+                    value=float(debt.interest_rate * 100),
+                    step=0.1
+                ) / 100
+                debt.interest_type = st.selectbox(
+                    f"Interest Type##debt{idx}",
+                    ["Fixed", "Variable"],
+                    index=["Fixed", "Variable"].index(debt.interest_type) if debt.interest_type in ["Fixed", "Variable"] else 0
+                )
+
+            with col3:
+                debt.monthly_payment = st.number_input(
+                    f"Monthly Payment##debt{idx}",
+                    min_value=0.0,
+                    value=float(debt.monthly_payment),
+                    step=50.0
+                )
+                debt.minimum_payment = st.number_input(
+                    f"Minimum Payment##debt{idx}",
+                    min_value=0.0,
+                    value=float(debt.minimum_payment),
+                    step=25.0
+                )
+
+                # Student Loan Specific
+                if debt.debt_type == "Student Loan":
+                    debt.income_based_repayment = st.checkbox(
+                        f"Income-Based Repayment##debt{idx}",
+                        value=debt.income_based_repayment
+                    )
+                    debt.forgiveness_eligible = st.checkbox(
+                        f"Forgiveness Eligible (PSLF/IDR)##debt{idx}",
+                        value=debt.forgiveness_eligible
+                    )
+                    if debt.forgiveness_eligible:
+                        debt.forgiveness_years = st.number_input(
+                            f"Years Until Forgiveness##debt{idx}",
+                            min_value=0,
+                            max_value=25,
+                            value=int(debt.forgiveness_years),
+                            step=1
+                        )
+
+            with col4:
+                if st.button(f"🗑️##debt{idx}"):
+                    st.session_state.debts.pop(idx)
+                    st.rerun()
+
+            st.session_state.debts[idx] = debt
+
+    # Debt Summary
+    if st.session_state.debts:
+        st.subheader("📊 Debt Summary")
+
+        total_debt = sum([d.principal for d in st.session_state.debts])
+        total_monthly_payment = sum([d.monthly_payment for d in st.session_state.debts])
+        weighted_avg_rate = sum([d.principal * d.interest_rate for d in st.session_state.debts]) / total_debt if total_debt > 0 else 0
+
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Total Debt", format_currency(total_debt))
+        col2.metric("Total Monthly Payment", format_currency(total_monthly_payment))
+        col3.metric("Weighted Avg. Interest Rate", f"{weighted_avg_rate*100:.2f}%")
+        col4.metric("Monthly + Extra", format_currency(total_monthly_payment + st.session_state.extra_debt_payment))
+
+        # Debt Breakdown Chart
+        if st.session_state.debts:
+            debt_df = pd.DataFrame([
+                {"Debt": d.name, "Balance": d.principal, "Type": d.debt_type, "Rate": d.interest_rate*100}
+                for d in st.session_state.debts
+            ])
+
+            fig = px.pie(debt_df, values='Balance', names='Debt', title='Debt Breakdown by Balance')
+            st.plotly_chart(fig, use_container_width=True)
+
+
+# NEW TAB 3: Education Funding
+def education_funding_tab():
+    """Education Funding and 529 Planning Tab"""
+    st.header("🎓 Education Funding Planner")
+
+    st.markdown("""
+    Plan for college expenses with 529 plans, Coverdell ESAs, and other education savings vehicles.
+    Project costs and funding gaps for each child.
+    """)
+
+    # 529 Plan Management
+    st.subheader("💰 529 College Savings Plans")
+
+    if st.button("➕ Add 529 Account"):
+        new_529 = Plan529(
+            name="529 Plan",
+            beneficiary="Child 1",
+            current_balance=5000.0,
+            monthly_contribution=250.0,
+            state="Washington",
+            investment_return=0.07,
+            age_based_allocation=True,
+            contribution_end_age=18
+        )
+        st.session_state.plan529_accounts.append(new_529)
+        st.rerun()
+
+    for idx, plan in enumerate(st.session_state.plan529_accounts):
+        with st.expander(f"🎓 {plan.name} - Beneficiary: {plan.beneficiary}"):
+            col1, col2, col3 = st.columns([3, 3, 1])
+
+            with col1:
+                plan.name = st.text_input(f"Plan Name##529_{idx}", value=plan.name)
+                plan.beneficiary = st.text_input(f"Beneficiary##529_{idx}", value=plan.beneficiary)
+                plan.state = st.selectbox(
+                    f"State (for tax deductions)##529_{idx}",
+                    AVAILABLE_LOCATIONS_FAMILY[:7],  # US locations
+                    index=AVAILABLE_LOCATIONS_FAMILY[:7].index(plan.state) if plan.state in AVAILABLE_LOCATIONS_FAMILY[:7] else 0
+                )
+                plan.age_based_allocation = st.checkbox(
+                    f"Age-Based Asset Allocation##529_{idx}",
+                    value=plan.age_based_allocation,
+                    help="Automatically adjusts from aggressive to conservative as beneficiary ages"
+                )
+
+            with col2:
+                plan.current_balance = st.number_input(
+                    f"Current Balance##529_{idx}",
+                    min_value=0.0,
+                    value=float(plan.current_balance),
+                    step=1000.0
+                )
+                plan.monthly_contribution = st.number_input(
+                    f"Monthly Contribution##529_{idx}",
+                    min_value=0.0,
+                    value=float(plan.monthly_contribution),
+                    step=50.0
+                )
+                plan.investment_return = st.number_input(
+                    f"Expected Annual Return (%)##529_{idx}",
+                    min_value=0.0,
+                    max_value=20.0,
+                    value=float(plan.investment_return * 100),
+                    step=0.5
+                ) / 100
+                plan.contribution_end_age = st.number_input(
+                    f"Stop Contributing at Age##529_{idx}",
+                    min_value=0,
+                    max_value=30,
+                    value=int(plan.contribution_end_age),
+                    step=1
+                )
+
+            with col3:
+                if st.button(f"🗑️##529_{idx}"):
+                    st.session_state.plan529_accounts.pop(idx)
+                    st.rerun()
+
+            st.session_state.plan529_accounts[idx] = plan
+
+    # Education Goals
+    st.subheader("🎯 Education Goals")
+
+    if st.button("➕ Add Education Goal"):
+        new_goal = EducationGoal(
+            beneficiary="Child 1",
+            institution_type="Public In-State",
+            estimated_annual_cost=15000.0,
+            years_of_college=4,
+            start_year=st.session_state.current_year + 13,
+            scholarship_amount=5000.0,
+            grants_amount=2000.0,
+            student_loans_allowed=False,
+            max_parent_contribution=50000.0
+        )
+        st.session_state.education_goals.append(new_goal)
+        st.rerun()
+
+    for idx, goal in enumerate(st.session_state.education_goals):
+        with st.expander(f"🎓 {goal.beneficiary} - {goal.institution_type}"):
+            col1, col2, col3 = st.columns([3, 3, 1])
+
+            with col1:
+                goal.beneficiary = st.text_input(f"Student Name##goal{idx}", value=goal.beneficiary)
+                goal.institution_type = st.selectbox(
+                    f"Institution Type##goal{idx}",
+                    ["Public In-State", "Public Out-of-State", "Private", "Community College", "Trade School"],
+                    index=["Public In-State", "Public Out-of-State", "Private", "Community College", "Trade School"].index(goal.institution_type) if goal.institution_type in ["Public In-State", "Public Out-of-State", "Private", "Community College", "Trade School"] else 0
+                )
+                goal.estimated_annual_cost = st.number_input(
+                    f"Estimated Annual Cost (Today's Dollars)##goal{idx}",
+                    min_value=0.0,
+                    value=float(goal.estimated_annual_cost),
+                    step=1000.0,
+                    help="Total cost including tuition, room, board, books"
+                )
+
+            with col2:
+                goal.years_of_college = st.number_input(
+                    f"Years of College##goal{idx}",
+                    min_value=1,
+                    max_value=8,
+                    value=int(goal.years_of_college),
+                    step=1
+                )
+                goal.start_year = st.number_input(
+                    f"College Start Year##goal{idx}",
+                    min_value=st.session_state.current_year,
+                    max_value=st.session_state.current_year + 50,
+                    value=int(goal.start_year),
+                    step=1
+                )
+                goal.scholarship_amount = st.number_input(
+                    f"Expected Annual Scholarship##goal{idx}",
+                    min_value=0.0,
+                    value=float(goal.scholarship_amount),
+                    step=500.0
+                )
+                goal.grants_amount = st.number_input(
+                    f"Expected Annual Grants##goal{idx}",
+                    min_value=0.0,
+                    value=float(goal.grants_amount),
+                    step=500.0
+                )
+
+            with col3:
+                if st.button(f"🗑️##goal{idx}"):
+                    st.session_state.education_goals.pop(idx)
+                    st.rerun()
+
+            goal.student_loans_allowed = st.checkbox(
+                f"Student Loans Allowed##goal{idx}",
+                value=goal.student_loans_allowed
+            )
+            goal.max_parent_contribution = st.number_input(
+                f"Maximum Parent Contribution (Total)##goal{idx}",
+                min_value=0.0,
+                value=float(goal.max_parent_contribution),
+                step=5000.0
+            )
+
+            st.session_state.education_goals[idx] = goal
+
+    # Education Funding Summary
+    if st.session_state.education_goals:
+        st.subheader("📊 Education Funding Summary")
+
+        total_529_balance = sum([p.current_balance for p in st.session_state.plan529_accounts])
+        total_education_need = sum([g.estimated_annual_cost * g.years_of_college for g in st.session_state.education_goals])
+        total_scholarships_grants = sum([(g.scholarship_amount + g.grants_amount) * g.years_of_college for g in st.session_state.education_goals])
+
+        net_need = total_education_need - total_scholarships_grants
+        funding_gap = net_need - total_529_balance
+
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Total 529 Balance", format_currency(total_529_balance))
+        col2.metric("Total Education Cost", format_currency(total_education_need))
+        col3.metric("Scholarships & Grants", format_currency(total_scholarships_grants))
+        col4.metric("Funding Gap", format_currency(funding_gap),
+                   delta="Surplus" if funding_gap < 0 else "Deficit")
+
+
+# NEW TAB 4: Tax Optimization
+def tax_optimization_tab():
+    """Tax Optimization Strategies Tab"""
+    st.header("💼 Tax Optimization Strategies")
+
+    st.markdown("""
+    Implement tax-efficient strategies to minimize lifetime tax burden and maximize retirement income.
+    Includes Roth conversions, tax-loss harvesting, charitable giving, and withdrawal sequencing.
+    """)
+
+    # Current Tax Situation
+    st.subheader("📊 Current Tax Situation")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        tax_brackets = [0.10, 0.12, 0.22, 0.24, 0.32, 0.35, 0.37]
+        try:
+            bracket_index = tax_brackets.index(st.session_state.tax_bracket)
+        except ValueError:
+            # Default to 22% if current bracket is invalid
+            bracket_index = 2
+
+        st.session_state.tax_bracket = st.selectbox(
+            "Federal Marginal Tax Bracket",
+            tax_brackets,
+            index=bracket_index,
+            format_func=lambda x: f"{x*100:.0f}%"
+        )
+    with col2:
+        st.session_state.state_tax_rate = st.number_input(
+            "State Tax Rate (%)",
+            min_value=0.0,
+            max_value=15.0,
+            value=float(st.session_state.state_tax_rate * 100),
+            step=0.1
+        ) / 100
+    with col3:
+        combined_rate = st.session_state.tax_bracket + st.session_state.state_tax_rate
+        st.metric("Combined Marginal Rate", f"{combined_rate*100:.1f}%")
+
+    # Tax Strategies
+    st.subheader("💡 Tax Optimization Strategies")
+
+    if st.button("➕ Add Tax Strategy"):
+        new_strategy = TaxStrategy(
+            name="New Strategy",
+            strategy_type="Roth Conversion",
+            annual_amount=10000.0,
+            start_year=st.session_state.current_year,
+            end_year=st.session_state.current_year + 10,
+            estimated_tax_savings=0.0,
+            notes=""
+        )
+        st.session_state.tax_strategies.append(new_strategy)
+        st.rerun()
+
+    for idx, strategy in enumerate(st.session_state.tax_strategies):
+        with st.expander(f"💼 {strategy.name} ({strategy.strategy_type})"):
+            col1, col2, col3 = st.columns([3, 3, 1])
+
+            with col1:
+                strategy.name = st.text_input(f"Strategy Name##tax{idx}", value=strategy.name)
+                strategy.strategy_type = st.selectbox(
+                    f"Strategy Type##tax{idx}",
+                    ["Roth Conversion", "Tax Loss Harvesting", "Charitable Giving", "HSA Maximization",
+                     "Qualified Charitable Distribution", "Tax Gain Harvesting", "Backdoor Roth"],
+                    index=["Roth Conversion", "Tax Loss Harvesting", "Charitable Giving", "HSA Maximization",
+                           "Qualified Charitable Distribution", "Tax Gain Harvesting", "Backdoor Roth"].index(strategy.strategy_type) if strategy.strategy_type in ["Roth Conversion", "Tax Loss Harvesting", "Charitable Giving", "HSA Maximization", "Qualified Charitable Distribution", "Tax Gain Harvesting", "Backdoor Roth"] else 0
+                )
+                strategy.annual_amount = st.number_input(
+                    f"Annual Amount##tax{idx}",
+                    min_value=0.0,
+                    value=float(strategy.annual_amount),
+                    step=1000.0,
+                    help="Annual amount for this strategy"
+                )
+
+            with col2:
+                strategy.start_year = st.number_input(
+                    f"Start Year##tax{idx}",
+                    min_value=st.session_state.current_year,
+                    max_value=st.session_state.current_year + 50,
+                    value=int(strategy.start_year),
+                    step=1
+                )
+                strategy.end_year = st.number_input(
+                    f"End Year##tax{idx}",
+                    min_value=st.session_state.current_year,
+                    max_value=st.session_state.current_year + 50,
+                    value=int(strategy.end_year),
+                    step=1
+                )
+                strategy.estimated_tax_savings = st.number_input(
+                    f"Estimated Annual Tax Savings##tax{idx}",
+                    min_value=0.0,
+                    value=float(strategy.estimated_tax_savings),
+                    step=100.0,
+                    help="Estimated tax savings per year"
+                )
+
+            with col3:
+                if st.button(f"🗑️##tax{idx}"):
+                    st.session_state.tax_strategies.pop(idx)
+                    st.rerun()
+
+            strategy.notes = st.text_area(
+                f"Notes##tax{idx}",
+                value=strategy.notes,
+                height=60,
+                help="Additional notes about this strategy"
+            )
+
+            st.session_state.tax_strategies[idx] = strategy
+
+    # Roth Conversion Ladder
+    st.subheader("🪜 Roth Conversion Ladder Planning")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.session_state.roth_conversion_amount = st.number_input(
+            "Annual Roth Conversion Amount",
+            min_value=0.0,
+            value=float(st.session_state.roth_conversion_amount),
+            step=1000.0,
+            help="Amount to convert from Traditional IRA/401k to Roth IRA annually"
+        )
+    with col2:
+        tax_on_conversion = st.session_state.roth_conversion_amount * st.session_state.tax_bracket
+        st.metric("Estimated Tax on Conversion", format_currency(tax_on_conversion))
+
+    st.info("💡 **Roth Conversion Strategy**: Convert traditional retirement accounts to Roth IRA in low-income years to minimize taxes and create tax-free retirement income.")
+
+    # Charitable Giving
+    st.subheader("❤️ Charitable Giving Strategies")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.session_state.charitable_contributions = st.number_input(
+            "Annual Charitable Contributions",
+            min_value=0.0,
+            value=float(st.session_state.charitable_contributions),
+            step=500.0
+        )
+    with col2:
+        st.session_state.qcd_enabled = st.checkbox(
+            "Use QCD (Age 70½+)",
+            value=st.session_state.qcd_enabled,
+            help="Qualified Charitable Distribution from IRA (up to $105,000/year for 2025)"
+        )
+    with col3:
+        if st.session_state.charitable_contributions > 0:
+            tax_savings = st.session_state.charitable_contributions * st.session_state.tax_bracket
+            st.metric("Estimated Tax Savings", format_currency(tax_savings))
+
+    # Withdrawal Sequencing
+    st.subheader("💰 Retirement Withdrawal Sequencing")
+
+    st.markdown("""
+    **Recommended Withdrawal Sequence** (Tax-Efficient):
+    1. **RMDs (Required Minimum Distributions)** - Must take to avoid penalties
+    2. **Taxable Accounts** - Long-term capital gains (lower rate)
+    3. **Tax-Deferred (401k/IRA)** - Fill up to top of current tax bracket
+    4. **Roth IRA** - Tax-free, save for last
+    5. **HSA** - Tax-free for medical expenses, ultimate flexibility
+    """)
+
+    if st.button("➕ Add Planned Withdrawal"):
+        new_withdrawal = RetirementWithdrawal(
+            year=st.session_state.current_year,
+            account_type="401k",
+            amount=40000.0,
+            tax_rate=0.22,
+            purpose="Living Expenses"
+        )
+        st.session_state.retirement_withdrawals.append(new_withdrawal)
+        st.rerun()
+
+    for idx, withdrawal in enumerate(st.session_state.retirement_withdrawals):
+        with st.expander(f"💰 Year {withdrawal.year} - {withdrawal.account_type}: {format_currency(withdrawal.amount)}"):
+            col1, col2, col3 = st.columns([3, 3, 1])
+
+            with col1:
+                withdrawal.year = st.number_input(
+                    f"Year##wd{idx}",
+                    min_value=st.session_state.current_year,
+                    max_value=st.session_state.current_year + 50,
+                    value=int(withdrawal.year),
+                    step=1
+                )
+                withdrawal.account_type = st.selectbox(
+                    f"Account Type##wd{idx}",
+                    ["401k", "Traditional IRA", "Roth IRA", "Taxable Brokerage", "HSA", "Pension"],
+                    index=["401k", "Traditional IRA", "Roth IRA", "Taxable Brokerage", "HSA", "Pension"].index(withdrawal.account_type) if withdrawal.account_type in ["401k", "Traditional IRA", "Roth IRA", "Taxable Brokerage", "HSA", "Pension"] else 0
+                )
+
+            with col2:
+                withdrawal.amount = st.number_input(
+                    f"Withdrawal Amount##wd{idx}",
+                    min_value=0.0,
+                    value=float(withdrawal.amount),
+                    step=1000.0
+                )
+                withdrawal.tax_rate = st.number_input(
+                    f"Tax Rate (%)##wd{idx}",
+                    min_value=0.0,
+                    max_value=50.0,
+                    value=float(withdrawal.tax_rate * 100),
+                    step=1.0
+                ) / 100
+
+            with col3:
+                if st.button(f"🗑️##wd{idx}"):
+                    st.session_state.retirement_withdrawals.pop(idx)
+                    st.rerun()
+
+            withdrawal.purpose = st.text_input(f"Purpose##wd{idx}", value=withdrawal.purpose)
+
+            after_tax_amount = withdrawal.amount * (1 - withdrawal.tax_rate)
+            st.metric("After-Tax Amount", format_currency(after_tax_amount))
+
+            st.session_state.retirement_withdrawals[idx] = withdrawal
+
+    # Tax Savings Summary
+    if st.session_state.tax_strategies:
+        st.subheader("📊 Tax Optimization Summary")
+
+        total_annual_savings = sum([s.estimated_tax_savings for s in st.session_state.tax_strategies])
+        total_strategies = len(st.session_state.tax_strategies)
+
+        col1, col2 = st.columns(2)
+        col1.metric("Active Tax Strategies", total_strategies)
+        col2.metric("Estimated Annual Tax Savings", format_currency(total_annual_savings))
+
+
+# NEW TAB 5: Report Export
+def report_export_tab():
+    """PDF/Excel Report Export Tab"""
+    st.header("📄 Export Financial Reports")
+
+    st.markdown("""
+    Generate comprehensive financial planning reports in PDF or Excel format.
+    Share with financial advisors, partners, or keep for your records.
+    """)
+
+    # Report Configuration
+    st.subheader("📊 Report Configuration")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        report_name = st.text_input(
+            "Report Name",
+            value=f"Financial_Plan_{st.session_state.current_year}",
+            help="Name for your exported report"
+        )
+
+        include_sections = st.multiselect(
+            "Include Sections",
+            ["Summary", "Income & Expenses", "Assets & Debts", "Children", "Healthcare",
+             "Education", "Tax Strategies", "Monte Carlo Analysis", "Timeline"],
+            default=["Summary", "Income & Expenses", "Assets & Debts", "Monte Carlo Analysis"]
+        )
+
+    with col2:
+        report_format = st.selectbox(
+            "Export Format",
+            ["Excel (.xlsx)", "CSV (Multiple Files)", "JSON (Data Export)"],
+            index=0
+        )
+
+        include_charts = st.checkbox(
+            "Include Charts & Visualizations",
+            value=True,
+            help="Include Plotly charts as images (Excel only)"
+        )
+
+    # Generate Report Button
+    st.subheader("📥 Generate Report")
+
+    if st.button("🚀 Generate Report", type="primary"):
+        with st.spinner("Generating your financial report..."):
+            try:
+                # Prepare report data
+                report_data = {
+                    "metadata": {
+                        "report_name": report_name,
+                        "generated_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "current_year": st.session_state.current_year,
+                        "planning_horizon": st.session_state.mc_years
+                    },
+                    "summary": {
+                        "combined_net_worth": st.session_state.parentX_net_worth + st.session_state.parentY_net_worth,
+                        "combined_income": st.session_state.parentX_income + st.session_state.parentY_income,
+                        "total_expenses": sum(st.session_state.expenses.values()),
+                        "num_children": len(st.session_state.children_list),
+                        "num_houses": len(st.session_state.houses),
+                        "total_debt": sum([d.principal for d in st.session_state.debts]),
+                        "total_529_balance": sum([p.current_balance for p in st.session_state.plan529_accounts])
+                    },
+                    "parents": {
+                        "parent1": {
+                            "name": st.session_state.parent1_name,
+                            "age": st.session_state.parentX_age,
+                            "income": st.session_state.parentX_income,
+                            "net_worth": st.session_state.parentX_net_worth,
+                            "retirement_age": st.session_state.parentX_retirement_age,
+                            "ss_benefit": st.session_state.parentX_ss_benefit
+                        },
+                        "parent2": {
+                            "name": st.session_state.parent2_name,
+                            "age": st.session_state.parentY_age,
+                            "income": st.session_state.parentY_income,
+                            "net_worth": st.session_state.parentY_net_worth,
+                            "retirement_age": st.session_state.parentY_retirement_age,
+                            "ss_benefit": st.session_state.parentY_ss_benefit
+                        }
+                    },
+                    "expenses": st.session_state.expenses,
+                    "children": [{"name": c["name"], "age": c["age"]} for c in st.session_state.children_list],
+                    "debts": [asdict(d) for d in st.session_state.debts],
+                    "healthcare": {
+                        "health_insurances": [asdict(h) for h in st.session_state.health_insurances],
+                        "ltc_insurances": [asdict(l) for l in st.session_state.ltc_insurances],
+                        "hsa_balance": st.session_state.hsa_balance
+                    },
+                    "education": {
+                        "529_plans": [asdict(p) for p in st.session_state.plan529_accounts],
+                        "goals": [asdict(g) for g in st.session_state.education_goals]
+                    },
+                    "tax_strategies": [asdict(t) for t in st.session_state.tax_strategies]
+                }
+
+                if report_format == "Excel (.xlsx)":
+                    # Create Excel workbook
+                    output = io.BytesIO()
+
+                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                        # Summary Sheet
+                        if "Summary" in include_sections:
+                            summary_df = pd.DataFrame([report_data["summary"]]).T
+                            summary_df.columns = ["Value"]
+                            summary_df.to_excel(writer, sheet_name='Summary')
+
+                        # Parents Sheet
+                        if "Income & Expenses" in include_sections:
+                            parents_df = pd.DataFrame(report_data["parents"]).T
+                            parents_df.to_excel(writer, sheet_name='Parents')
+
+                            expenses_df = pd.DataFrame([report_data["expenses"]]).T
+                            expenses_df.columns = ["Annual Amount"]
+                            expenses_df.to_excel(writer, sheet_name='Expenses')
+
+                        # Debts Sheet
+                        if "Assets & Debts" in include_sections and st.session_state.debts:
+                            debts_df = pd.DataFrame(report_data["debts"])
+                            debts_df.to_excel(writer, sheet_name='Debts', index=False)
+
+                        # Children Sheet
+                        if "Children" in include_sections and st.session_state.children_list:
+                            children_df = pd.DataFrame(report_data["children"])
+                            children_df.to_excel(writer, sheet_name='Children', index=False)
+
+                        # Healthcare Sheet
+                        if "Healthcare" in include_sections and st.session_state.health_insurances:
+                            healthcare_df = pd.DataFrame(report_data["healthcare"]["health_insurances"])
+                            healthcare_df.to_excel(writer, sheet_name='Healthcare', index=False)
+
+                        # Education Sheet
+                        if "Education" in include_sections and st.session_state.plan529_accounts:
+                            education_df = pd.DataFrame(report_data["education"]["529_plans"])
+                            education_df.to_excel(writer, sheet_name='Education_529', index=False)
+
+                        # Tax Strategies Sheet
+                        if "Tax Strategies" in include_sections and st.session_state.tax_strategies:
+                            tax_df = pd.DataFrame(report_data["tax_strategies"])
+                            tax_df.to_excel(writer, sheet_name='Tax_Strategies', index=False)
+
+                    output.seek(0)
+
+                    st.download_button(
+                        label="📥 Download Excel Report",
+                        data=output,
+                        file_name=f"{report_name}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                    st.success("✅ Excel report generated successfully!")
+
+                elif report_format == "JSON (Data Export)":
+                    json_str = json.dumps(report_data, indent=2, default=str)
+
+                    st.download_button(
+                        label="📥 Download JSON Data",
+                        data=json_str,
+                        file_name=f"{report_name}.json",
+                        mime="application/json"
+                    )
+                    st.success("✅ JSON export generated successfully!")
+
+                elif report_format == "CSV (Multiple Files)":
+                    st.info("📊 CSV export will generate multiple files. Download them separately:")
+
+                    # Summary CSV
+                    if "Summary" in include_sections:
+                        summary_df = pd.DataFrame([report_data["summary"]]).T
+                        summary_csv = summary_df.to_csv()
+                        st.download_button(
+                            "Download Summary.csv",
+                            summary_csv,
+                            f"{report_name}_summary.csv",
+                            "text/csv"
+                        )
+
+                    # Debts CSV
+                    if "Assets & Debts" in include_sections and st.session_state.debts:
+                        debts_df = pd.DataFrame(report_data["debts"])
+                        debts_csv = debts_df.to_csv(index=False)
+                        st.download_button(
+                            "Download Debts.csv",
+                            debts_csv,
+                            f"{report_name}_debts.csv",
+                            "text/csv"
+                        )
+
+                    st.success("✅ CSV files ready for download!")
+
+            except Exception as e:
+                st.error(f"❌ Error generating report: {str(e)}")
+                st.exception(e)
+
+    # Report Preview
+    st.subheader("👁️ Report Preview")
+
+    with st.expander("View Summary Data"):
+        col1, col2, col3 = st.columns(3)
+
+        total_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
+        total_income = st.session_state.parentX_income + st.session_state.parentY_income
+        total_expenses = sum(st.session_state.expenses.values())
+
+        col1.metric("Combined Net Worth", format_currency(total_net_worth))
+        col2.metric("Combined Annual Income", format_currency(total_income))
+        col3.metric("Total Annual Expenses", format_currency(total_expenses))
+
+        if st.session_state.debts:
+            total_debt = sum([d.principal for d in st.session_state.debts])
+            col1.metric("Total Debt", format_currency(total_debt))
+
+        if st.session_state.plan529_accounts:
+            total_529 = sum([p.current_balance for p in st.session_state.plan529_accounts])
+            col2.metric("Total 529 Balance", format_currency(total_529))
+
+        if st.session_state.children_list:
+            col3.metric("Number of Children", len(st.session_state.children_list))
 
 
 def display_sidebar():

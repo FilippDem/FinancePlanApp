@@ -44,4 +44,4 @@ echo ""
 echo "To stop the application, press Ctrl+C in this window."
 echo ""
 
-streamlit run FinancialPlannerV15_ClaudeCodeV.py
+streamlit run FinancialPlannerV16_ClaudeCodeV.py
