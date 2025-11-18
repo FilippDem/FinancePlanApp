@@ -15,6 +15,13 @@ A comprehensive web-based financial planning application that helps families pla
 - **Save/Load Scenarios**: Store and compare different planning scenarios
 - **Global Cost-of-Living**: Support for 14 locations across 5 countries
 
+### NEW in V16 🎉
+- **🏥 Healthcare & Insurance Planning**: Model Medicare, HSA accounts, long-term care insurance, and health insurance costs
+- **💳 Comprehensive Debt Management**: Track student loans, credit cards, auto loans with payoff strategies (Avalanche/Snowball)
+- **🎓 Education Funding**: 529 plan tracking, college cost projections, scholarship/grant management, and funding gap analysis
+- **💼 Tax Optimization**: Roth conversions, QCD strategies, withdrawal sequencing, and tax-loss harvesting
+- **📄 Report Export**: Generate professional Excel, CSV, or JSON reports of your complete financial plan
+
 ### Supported Locations
 
 **United States**: California, Washington, Texas, New York, San Francisco, Los Angeles, Portland
@@ -82,7 +89,7 @@ venv\Scripts\activate
 pip install -r requirements.txt
 
 # Run application
-streamlit run FinancialPlannerV15_ClaudeCodeV.py
+streamlit run FinancialPlannerV16_ClaudeCodeV.py
 ```
 
 ## How to Use
@@ -151,6 +158,7 @@ streamlit run FinancialPlannerV15_ClaudeCodeV.py
 - **Pandas** (≥2.0.0): Data manipulation and analysis
 - **NumPy** (≥1.24.0): Numerical computing
 - **Plotly** (≥5.17.0): Interactive visualizations
+- **openpyxl** (≥3.1.0): Excel file export (NEW in V16)
 
 ### Data Models
 
@@ -179,13 +187,15 @@ Uses 100 years (1928-2024) of S&P 500 returns for realistic market modeling:
 
 ```
 FinancePlanApp/
-├── FinancialPlannerV15_ClaudeCodeV.py  # Main application
+├── FinancialPlannerV16_ClaudeCodeV.py  # Main application (V16)
 ├── requirements.txt                     # Python dependencies
 ├── setup.sh                             # Mac/Linux setup script
 ├── setup.bat                            # Windows setup script
 ├── run.sh                               # Mac/Linux launcher
 ├── run.bat                              # Windows launcher
 ├── README.md                            # This file
+├── test_scenarios.py                    # Comprehensive test suite
+├── test_static_analysis.py              # Static code analysis
 └── .gitignore                           # Git ignore rules
 ```
 
@@ -198,7 +208,7 @@ FinancePlanApp/
 
 ### Port already in use
 - If port 8501 is occupied, Streamlit will automatically try 8502, 8503, etc.
-- Or specify a different port: `streamlit run FinancialPlannerV15_ClaudeCodeV.py --server.port 8080`
+- Or specify a different port: `streamlit run FinancialPlannerV16_ClaudeCodeV.py --server.port 8080`
 
 ### Dependencies won't install
 - Ensure you have internet connection
@@ -211,16 +221,26 @@ FinancePlanApp/
 
 ## Version History
 
-### V15 (Current)
+### V16 (Current) - Major Feature Release
+- 🏥 Healthcare & Insurance Planning (Medicare, HSA, LTC)
+- 💳 Comprehensive Debt Management (Student loans, credit cards, payoff strategies)
+- 🎓 Education Funding (529 plans, college cost projections)
+- 💼 Tax Optimization (Roth conversions, QCD, withdrawal sequencing)
+- 📄 Report Export (Excel, CSV, JSON)
+- 17 functional tabs (expanded from 12)
+- Enhanced safety checks and error handling
+- Comprehensive test suite included
+
+### V15
 - Web-based Streamlit interface (stable)
 - Support for 14 global locations
 - Monte Carlo simulations with 1,000 iterations
 - Complete save/load functionality
-- All 12 functional tabs implemented
+- 12 functional tabs implemented
 
 ### Previous Versions
 - V14: Streamlit prototype
-- V2: PyQt6 desktop application (deprecated)
+- V2: PyQt6 desktop application (deprecated, archived)
 
 ## Contributing
 
