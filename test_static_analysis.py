@@ -12,7 +12,7 @@ print("=" * 80)
 print("FINANCIAL PLANNING SUITE V16 - STATIC ANALYSIS & PATTERN TESTING")
 print("=" * 80)
 
-with open('FinancialPlannerV15_ClaudeCodeV.py', 'r') as f:
+with open('FinancialPlannerV16_ClaudeCodeV.py', 'r') as f:
     code = f.read()
     lines = code.split('\n')
 

@@ -2872,7 +2872,7 @@ def combined_simulation_tab():
             key="mc_start"
         )
 
-        st.session_state.mc_years = st.number_input(
+        st.number_input(
             "Projection Years",
             min_value=1,
             max_value=80,
