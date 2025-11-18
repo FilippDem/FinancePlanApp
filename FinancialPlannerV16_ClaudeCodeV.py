@@ -3313,8 +3313,18 @@ def combined_simulation_tab():
                         income *= (1 + np.random.uniform(-st.session_state.mc_income_variability / 100, st.session_state.mc_income_variability / 100))
 
                     # Calculate expenses
-                    expenses = sum(st.session_state.expenses.values())
-                    expenses *= (1 + scenario.expense_growth_rate) ** year_offset
+                    # Base family expenses
+                    base_expenses = sum(st.session_state.expenses.values())
+                    base_expenses *= (1 + scenario.expense_growth_rate) ** year_offset
+
+                    # Add dynamic children expenses for this year
+                    children_expenses = 0
+                    for child in st.session_state.children_list:
+                        child_exp = get_child_expenses(child, year, st.session_state.current_year)
+                        children_expenses += sum(child_exp.values())
+
+                    # Total expenses
+                    expenses = base_expenses + children_expenses
 
                     # Add variability to expenses
                     if use_asymmetric:
