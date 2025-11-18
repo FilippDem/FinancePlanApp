@@ -12,7 +12,7 @@ from typing import List, Dict, Optional, Any
 
 # Set page configuration
 st.set_page_config(
-    page_title="Financial Planning Application V15 - Claude Code Enhanced",
+    page_title="Financial Planning Application V16",
     page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -48,16 +48,14 @@ HISTORICAL_STOCK_RETURNS = [
 # Note: CHILDREN_EXPENSE_TEMPLATES currently only includes US locations and original 3 states
 # FAMILY_EXPENSE_TEMPLATES includes all locations below
 AVAILABLE_LOCATIONS_CHILDREN = [
-    # US States (with detailed children templates)
-    "California", "Washington", "Texas",
     # Major US Cities (with detailed children templates)
+    "Seattle", "Sacramento", "Houston",
     "New York", "San Francisco", "Los Angeles", "Portland"
 ]
 
 AVAILABLE_LOCATIONS_FAMILY = [
-    # US States
-    "California", "Washington", "Texas",
     # Major US Cities
+    "Seattle", "Sacramento", "Houston",
     "New York", "San Francisco", "Los Angeles", "Portland",
     # Canada
     "Toronto", "Vancouver",
@@ -73,7 +71,7 @@ AVAILABLE_LOCATIONS_FAMILY = [
 # [I'll include the full templates but truncate here for readability]
 
 CHILDREN_EXPENSE_TEMPLATES = {
-    "California": {
+    "Sacramento": {
         "Conservative": {
             'Food': [1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200,
                      4400, 4600, 2000, 1800, 1600, 1400, 1200, 1000, 800, 600, 400, 200, 100, 50, 0],
@@ -148,7 +146,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
                           0, 0, 0, 0, 0]
         }
     },
-    "Washington": {
+    "Seattle": {
         "Conservative": {
             'Food': [1100, 1300, 1500, 1700, 1900, 2100, 2300, 2500, 2700, 2900, 3100, 3300, 3500, 3700, 3900, 4100,
                      4300, 4500, 1900, 1700, 1500, 1300, 1100, 900, 700, 500, 300, 100, 50, 25, 0],
@@ -222,7 +220,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
                           0, 0, 0, 0, 0]
         }
     },
-    "Texas": {
+    "Houston": {
         "Conservative": {
             'Food': [1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000,
                      4200, 4400, 1800, 1600, 1400, 1200, 1000, 800, 600, 400, 200, 100, 50, 25, 0],
@@ -625,7 +623,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Other Expenses': 12000
         }
     },
-    "Washington": {
+    "Seattle": {
         "Conservative": {
             'Food & Groceries': 13200,
             'Clothing': 3000,
@@ -654,7 +652,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Other Expenses': 10800
         }
     },
-    "Texas": {
+    "Houston": {
         "Conservative": {
             'Food & Groceries': 12600,
             'Clothing': 2800,
@@ -1270,10 +1268,10 @@ class RetirementWithdrawal:
     purpose: str = "Living Expenses"
 
 
-# Enhanced format_currency function with automatic scaling
+# Currency formatting function with automatic scaling
 def format_currency(value, force_full=False, context="general"):
     """
-    Enhanced currency formatting with automatic scaling
+    Currency formatting with automatic scaling
 
     Args:
         value: The monetary value to format
@@ -1327,7 +1325,7 @@ def initialize_session_state():
         st.session_state.marriage_year = "N/A"
 
         st.session_state.state_timeline = [
-            StateTimelineEntry(2025, "Washington", "Average")
+            StateTimelineEntry(2025, "Seattle", "Average")
         ]
 
         # NEW: Portfolio allocation
@@ -1407,7 +1405,26 @@ def initialize_session_state():
         })
 
         # Children instances
-        st.session_state.children_list = []
+        st.session_state.children_list = [
+            {
+                'name': 'Child 1',
+                'birth_year': 2028,
+                'use_template': True,
+                'template_state': 'Seattle',
+                'template_strategy': 'Average',
+                'school_type': 'Public',
+                'college_location': 'Seattle'
+            },
+            {
+                'name': 'Child 2',
+                'birth_year': 2030,
+                'use_template': True,
+                'template_state': 'Seattle',
+                'template_strategy': 'Average',
+                'school_type': 'Public',
+                'college_location': 'Seattle'
+            }
+        ]
         st.session_state.children_today_dollars = True
 
         # Major purchases and recurring expenses
@@ -1538,17 +1555,25 @@ def initialize_session_state():
         st.session_state.qcd_enabled = False  # Qualified Charitable Distribution
         st.session_state.tax_bracket = 0.22    # Federal marginal tax bracket
 
+        # Tab visibility settings
+        st.session_state.show_portfolio_allocation = False  # Off by default
+        st.session_state.show_healthcare = False  # Off by default
+        st.session_state.show_debt = False  # Off by default
+        st.session_state.show_education = False  # Off by default
+        st.session_state.show_tax = False  # Off by default
+        st.session_state.show_export = True  # On by default
+
         st.session_state.initialized = True
 
 
 def get_state_for_year(year: int) -> tuple:
     """Get the state and spending strategy for a given year"""
     if not st.session_state.state_timeline:
-        return "Washington", "Average"
+        return "Seattle", "Average"
 
     sorted_timeline = sorted(st.session_state.state_timeline, key=lambda x: x.year)
 
-    current_state = "Washington"
+    current_state = "Seattle"
     current_strategy = "Average"
 
     for entry in sorted_timeline:
@@ -1595,6 +1620,102 @@ def get_state_based_children_expenses(year: int, child_age: int) -> dict:
             return {col: row[col] for col in row.index if col != 'Age'}
         else:
             return {}
+
+
+def get_child_expenses(child: dict, year: int, current_year: int) -> dict:
+    """
+    Get expenses for a specific child in a specific year, accounting for:
+    - School type (public/private)
+    - College location (where they attend college)
+    - Living arrangement (at home vs at college)
+
+    Args:
+        child: Child dictionary with keys: name, birth_year, template_state, template_strategy,
+               school_type, college_location
+        year: The year to calculate expenses for
+        current_year: The current year (for age calculation)
+
+    Returns:
+        dict: Expense categories and amounts for this child in this year
+    """
+    child_age = year - child['birth_year']
+
+    # Child expenses only apply from age 0-25
+    if child_age < 0 or child_age > 30:
+        return {}
+
+    # Determine which location template to use
+    # Ages 18-21: Use college location (living at college)
+    # Other ages: Use family's template location
+    if 18 <= child_age <= 21:
+        location = child.get('college_location', 'Seattle')
+        lives_at_college = True
+    else:
+        location = child.get('template_state', 'Seattle')
+        lives_at_college = False
+
+    strategy = child.get('template_strategy', 'Average')
+    school_type = child.get('school_type', 'Public')
+
+    # Get base expenses from template
+    if (location in CHILDREN_EXPENSE_TEMPLATES and
+            strategy in CHILDREN_EXPENSE_TEMPLATES[location] and
+            0 <= child_age < len(CHILDREN_EXPENSE_TEMPLATES[location][strategy]['Food'])):
+
+        template = CHILDREN_EXPENSE_TEMPLATES[location][strategy]
+        child_expenses = {}
+
+        for category, values in template.items():
+            if child_age < len(values):
+                child_expenses[category] = values[child_age]
+            else:
+                child_expenses[category] = 0
+    else:
+        # Fallback to default template
+        if 0 <= child_age < len(st.session_state.children_expenses):
+            row = st.session_state.children_expenses.iloc[child_age]
+            child_expenses = {col: row[col] for col in row.index if col != 'Age'}
+        else:
+            child_expenses = {}
+
+    # Adjust for private school (ages 5-17, K-12 education)
+    if school_type == 'Private' and 5 <= child_age <= 17:
+        # Add private school tuition based on location
+        private_school_costs = {
+            'Seattle': 20000,  # Average private school in Seattle
+            'Sacramento': 18000,
+            'Houston': 15000,
+            'New York': 35000,
+            'San Francisco': 32000,
+            'Los Angeles': 25000,
+            'Portland': 17000
+        }
+        additional_tuition = private_school_costs.get(child.get('template_state', 'Seattle'), 20000)
+        child_expenses['Education'] = child_expenses.get('Education', 0) + additional_tuition
+
+    # Adjust expenses for living at college (ages 18-21)
+    if lives_at_college:
+        # College students living on campus have different expense patterns
+        # Room & board is included in Education costs
+        # Reduce home-based expenses (food, transportation, etc.)
+        child_expenses['Food'] = child_expenses.get('Food', 0) * 0.3  # Occasional meals at home
+        child_expenses['Transportation'] = child_expenses.get('Transportation', 0) * 0.4  # Less frequent trips home
+        child_expenses['Entertainment'] = child_expenses.get('Entertainment', 0) * 0.5  # Less at-home entertainment
+
+        # Education costs now include room & board (~$15k-25k depending on location)
+        room_board_costs = {
+            'Seattle': 18000,
+            'Sacramento': 15000,
+            'Houston': 12000,
+            'New York': 25000,
+            'San Francisco': 24000,
+            'Los Angeles': 20000,
+            'Portland': 16000
+        }
+        additional_room_board = room_board_costs.get(location, 18000)
+        child_expenses['Education'] = child_expenses.get('Education', 0) + additional_room_board
+
+    return child_expenses
 
 
 def get_historical_return_stats():
@@ -1714,84 +1835,43 @@ def main():
     """Main application function"""
     initialize_session_state()
 
-    st.title("💰 Financial Planning Suite V16 - Claude Code Enhanced (5 New Features!)")
-    st.markdown("**V16 adds Healthcare, Debt Management, Education Funding, Tax Optimization & Report Export!**")
+    st.title("💰 Financial Planning Suite V16")
 
-    # Create tabs
-    tab_list = [
-        "⚙️ Settings",
-        f"{st.session_state.parent1_emoji} {st.session_state.parent1_name}",
-        f"{st.session_state.parent2_emoji} {st.session_state.parent2_name}",
-        "💸 Family Expenses",
-        "👶 Children",
-        "🏠 House Portfolio",
-        "💼 Portfolio Allocation",
-        "📈 Economy",
-        "🖼️ Retirement",
-        "🏥 Healthcare & Insurance",  # NEW
-        "💳 Debt Management",  # NEW
-        "🎓 Education Funding",  # NEW
-        "💼 Tax Optimization",  # NEW
-        "🗓️ Timeline",
-        "📊 Analysis",
-        "📄 Export Reports",  # NEW
-        "💾 Save/Load"
+    # Build tab list dynamically based on visibility settings
+    tab_configs = [
+        ("⚙️ Settings", parent_settings_tab, True),  # Always shown
+        (f"{st.session_state.parent1_emoji} {st.session_state.parent1_name}", parent_x_tab, True),
+        (f"{st.session_state.parent2_emoji} {st.session_state.parent2_name}", parent_y_tab, True),
+        ("💸 Family Expenses", family_expenses_tab, True),
+        ("👶 Children", children_tab, True),
+        ("🏠 House Portfolio", house_tab, True),
+        ("💼 Portfolio Allocation", portfolio_allocation_tab, st.session_state.get('show_portfolio_allocation', False)),
+        ("📈 Economy", economy_tab, True),
+        ("🖼️ Retirement", retirement_tab, True),
+        ("🏥 Healthcare & Insurance", healthcare_insurance_tab, st.session_state.get('show_healthcare', False)),
+        ("💳 Debt Management", debt_management_tab, st.session_state.get('show_debt', False)),
+        ("🎓 Education Funding", education_funding_tab, st.session_state.get('show_education', False)),
+        ("💼 Tax Optimization", tax_optimization_tab, st.session_state.get('show_tax', False)),
+        ("🗓️ Timeline", timeline_tab, True),
+        ("📊 Analysis", combined_simulation_tab, True),
+        ("📄 Export Reports", report_export_tab, st.session_state.get('show_export', True)),
+        ("💾 Save/Load", save_load_tab, True)
     ]
 
-    tabs = st.tabs(tab_list)
+    # Filter to only enabled tabs
+    enabled_tabs = [(name, func) for name, func, enabled in tab_configs if enabled]
+    tab_names = [name for name, func in enabled_tabs]
+    tab_functions = [func for name, func in enabled_tabs]
 
-    with tabs[0]:  # Settings
-        parent_settings_tab()
+    # Create tabs
+    tabs = st.tabs(tab_names)
 
-    with tabs[1]:  # Parent X
-        parent_x_tab()
+    # Render each enabled tab
+    for idx, (tab, func) in enumerate(zip(tabs, tab_functions)):
+        with tab:
+            func()
 
-    with tabs[2]:  # Parent Y
-        parent_y_tab()
-
-    with tabs[3]:  # Family Expenses
-        family_expenses_tab()
-
-    with tabs[4]:  # Children
-        children_tab()
-
-    with tabs[5]:  # Houses
-        house_tab()
-
-    with tabs[6]:  # NEW: Portfolio Allocation
-        portfolio_allocation_tab()
-
-    with tabs[7]:  # Economy
-        economy_tab()
-
-    with tabs[8]:  # Retirement
-        retirement_tab()
-
-    with tabs[9]:  # NEW: Healthcare & Insurance
-        healthcare_insurance_tab()
-
-    with tabs[10]:  # NEW: Debt Management
-        debt_management_tab()
-
-    with tabs[11]:  # NEW: Education Funding
-        education_funding_tab()
-
-    with tabs[12]:  # NEW: Tax Optimization
-        tax_optimization_tab()
-
-    with tabs[13]:  # Timeline
-        timeline_tab()
-
-    with tabs[14]:  # Analysis
-        combined_simulation_tab()
-
-    with tabs[15]:  # NEW: Export Reports
-        report_export_tab()
-
-    with tabs[16]:  # Save/Load
-        save_load_tab()
-
-    # Enhanced sidebar
+    # Display sidebar
     display_sidebar()
 
 
@@ -1865,58 +1945,93 @@ def parent_settings_tab():
 
     st.info("💡 Changes to parent names and emojis will be reflected in all tabs after you navigate to them.")
 
+    # Tab Visibility Settings
+    st.markdown("---")
+    st.subheader("👁️ Tab Visibility Settings")
+    st.markdown("Choose which advanced features to show. Disabled tabs are hidden to simplify the interface.")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.session_state.show_portfolio_allocation = st.checkbox(
+            "💼 Portfolio Allocation",
+            value=st.session_state.get('show_portfolio_allocation', False),
+            help="Configure asset allocation (stocks, bonds, cash, real estate)"
+        )
+
+        st.session_state.show_healthcare = st.checkbox(
+            "🏥 Healthcare & Insurance",
+            value=st.session_state.get('show_healthcare', False),
+            help="Plan Medicare, HSA, long-term care, and health insurance"
+        )
+
+        st.session_state.show_debt = st.checkbox(
+            "💳 Debt Management",
+            value=st.session_state.get('show_debt', False),
+            help="Track student loans, credit cards, and payoff strategies"
+        )
+
+    with col2:
+        st.session_state.show_education = st.checkbox(
+            "🎓 Education Funding",
+            value=st.session_state.get('show_education', False),
+            help="Plan 529 accounts, college costs, and scholarships"
+        )
+
+        st.session_state.show_tax = st.checkbox(
+            "💼 Tax Optimization",
+            value=st.session_state.get('show_tax', False),
+            help="Optimize Roth conversions, QCDs, and withdrawal sequencing"
+        )
+
+        st.session_state.show_export = st.checkbox(
+            "📄 Export Reports",
+            value=st.session_state.get('show_export', True),
+            help="Export financial data to Excel, CSV, or JSON"
+        )
+
+    st.info("💡 Changes take effect immediately. Disabled tabs are hidden from the navigation.")
+
     # Instructions Section
+    st.markdown("---")
     st.header("📖 Application Instructions")
 
     st.markdown("""
-    ### Welcome to Financial Planning Suite V15 - Claude Code Enhanced Edition
+    ### Welcome to Financial Planning Suite
 
-    This is a **web-based Streamlit application** combining the best features from both versions:
+    This application helps you plan and project your family's financial future through comprehensive
+    modeling of income, expenses, investments, and major life events.
 
-    #### 🆕 **NEW IN V15 (Claude Code Enhanced):**
-    - **Portfolio Allocation Breakdown**: Track your asset allocation across stocks, bonds, cash, real estate, and other investments
-    - **Enhanced Monte Carlo Analytics**: Detailed breakdown showing percentiles (10th, 25th, 50th, 75th, 90th) for net worth projections
-    - **Real Estate Asset Tracking**: Major purchases now track asset type and appreciation rates
-    - **Duplicate Child Name Prevention**: System prevents adding children with the same name
-    - **Unified Currency Formatting**: Auto-scaled display (k/M) throughout the entire application
-    - **Complete Analysis Tab**: Fully functional with comprehensive financial projections
-    - **Enhanced Save/Load**: Internal scenario library with named scenario management
-    - **Web-Based Interface**: Stable Streamlit interface accessible from any browser
+    #### Quick Start Guide
 
-    #### 📊 Tab-by-Tab Guide:
+    1. **Settings**: Configure current year, parent names, and which tabs to show
+    2. **Parent Tabs**: Enter age, net worth, income, retirement plans, and Social Security
+    3. **Family Expenses**: Define annual expenses, taxes, major purchases
+    4. **Children**: Add children and configure their education expenses
+    5. **Houses**: Track property ownership, mortgages, and timelines
+    6. **Economy**: Select economic scenario (Conservative/Moderate/Aggressive)
+    7. **Timeline**: Review consolidated timeline and plan relocations
+    8. **Analysis**: Run Monte Carlo simulations to project future outcomes
+    9. **Save/Load**: Save scenarios for future reference
 
-    **⚙️ Settings and Instructions**: Set current year, customize parent names/emojis, define marriage year
+    #### Optional Advanced Features
 
-    **👨/👩 Parent Tabs**: Enter age, net worth, income, raises, retirement age, Social Security estimates, job changes
+    Enable in Settings → Tab Visibility to access:
+    - **Portfolio Allocation**: Define investment mix across asset classes
+    - **Healthcare & Insurance**: Plan Medicare, HSA, and long-term care costs
+    - **Debt Management**: Track loans and optimize payoff strategies
+    - **Education Funding**: Manage 529 plans and college savings
+    - **Tax Optimization**: Plan Roth conversions and withdrawal strategies
+    - **Export Reports**: Generate Excel/CSV/JSON reports
 
-    **💸 Family Expenses**: Define annual expense categories, tax settings, major purchases, recurring expenses
+    #### Key Capabilities
 
-    **👶 Children**: Add children, customize expense templates by age and state
-
-    **🏠 House Portfolio**: Track multiple properties with ownership attribution and timelines
-
-    **💼 Portfolio Allocation (NEW)**: Define your investment portfolio mix across asset classes
-
-    **📈 Economy**: Choose economic scenarios, view historical market data
-
-    **🖼️ Retirement**: Review retirement timeline, Social Security benefits with insolvency modeling
-
-    **🗓️ Timeline**: View consolidated timeline with state relocation management
-
-    **📊 Analysis (ENHANCED)**: Run Monte Carlo simulations with detailed percentile breakdowns
-
-    **💾 Save/Load (ENHANCED)**: Save multiple named scenarios internally or export to files
-
-    #### 💡 Key Features:
-
-    - **Auto-Scaled Currency**: Values display as 150k, 2.5M for readability
-    - **State-Based Planning**: Expenses adjust automatically when you move states
-    - **Dynamic Categories**: Add/remove expense categories as needed
-    - **Ownership Tracking**: Separate parent vs. family assets
-    - **Historical Simulation**: Use 100 years of market data
-    - **Inflation Adjustment**: View in today's dollars or future values
-    - **Asymmetric Variability**: Set different positive/negative ranges
-    - **Comprehensive Modeling**: Includes taxes, Social Security, detailed expenses
+    - Location-based expense templates for major U.S. cities
+    - Monte Carlo simulation with detailed percentile analysis
+    - Historical market data (100+ years of S&P 500 returns)
+    - Social Security insolvency modeling
+    - Inflation adjustment and today's dollars view
+    - Multiple scenario comparison
     """)
 
 
@@ -2289,8 +2404,10 @@ def children_tab():
                     'name': child_name,
                     'birth_year': child_birth_year,
                     'use_template': True,
-                    'template_state': 'Washington',
-                    'template_strategy': 'Average'
+                    'template_state': 'Seattle',
+                    'template_strategy': 'Average',
+                    'school_type': 'Public',  # Public or Private
+                    'college_location': 'Seattle'  # Where they attend college
                 })
                 st.success(f"Added {child_name}")
                 st.rerun()
@@ -2326,7 +2443,7 @@ def children_tab():
                         child['template_state'] = st.selectbox(
                             "Template Location",
                             AVAILABLE_LOCATIONS_CHILDREN,
-                            index=AVAILABLE_LOCATIONS_CHILDREN.index(child.get('template_state', 'Washington')) if child.get('template_state', 'Washington') in AVAILABLE_LOCATIONS_CHILDREN else 1,
+                            index=AVAILABLE_LOCATIONS_CHILDREN.index(child.get('template_state', 'Seattle')) if child.get('template_state', 'Seattle') in AVAILABLE_LOCATIONS_CHILDREN else 1,
                             key=f"child_state_{idx}"
                         )
                         child['template_strategy'] = st.selectbox(
@@ -2342,6 +2459,28 @@ def children_tab():
                     if st.button(f"🗑️ Remove {child['name']}", key=f"remove_child_{idx}"):
                         st.session_state.children_list.pop(idx)
                         st.rerun()
+
+                # Add new row for school type and college location
+                st.markdown("---")
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    child['school_type'] = st.selectbox(
+                        "K-12 School Type",
+                        ["Public", "Private"],
+                        index=["Public", "Private"].index(child.get('school_type', 'Public')),
+                        key=f"child_school_{idx}",
+                        help="Private schools typically add $10k-30k/year to education costs"
+                    )
+
+                with col2:
+                    child['college_location'] = st.selectbox(
+                        "College Location",
+                        AVAILABLE_LOCATIONS_CHILDREN,
+                        index=AVAILABLE_LOCATIONS_CHILDREN.index(child.get('college_location', 'Seattle')) if child.get('college_location', 'Seattle') in AVAILABLE_LOCATIONS_CHILDREN else 0,
+                        key=f"child_college_{idx}",
+                        help="Location where child will attend college (ages 18-21). Room & board included."
+                    )
     else:
         st.info("No children added yet. Add children using the form above.")
 
@@ -3804,7 +3943,7 @@ def education_funding_tab():
             beneficiary="Child 1",
             current_balance=5000.0,
             monthly_contribution=250.0,
-            state="Washington",
+            state="Seattle",
             investment_return=0.07,
             age_based_allocation=True,
             contribution_end_age=18
