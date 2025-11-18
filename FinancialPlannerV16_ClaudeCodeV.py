@@ -2858,6 +2858,30 @@ def combined_simulation_tab():
 
     st.markdown("Run comprehensive financial projections with Monte Carlo simulations")
 
+    # Ensure Monte Carlo variables are initialized (defensive programming for old sessions)
+    if 'mc_start_year' not in st.session_state:
+        st.session_state.mc_start_year = 2025
+    if 'mc_years' not in st.session_state:
+        st.session_state.mc_years = 30
+    if 'mc_simulations' not in st.session_state:
+        st.session_state.mc_simulations = 1000
+    if 'mc_use_historical' not in st.session_state:
+        st.session_state.mc_use_historical = False
+    if 'mc_normalize_to_today_dollars' not in st.session_state:
+        st.session_state.mc_normalize_to_today_dollars = False
+    if 'mc_income_variability_positive' not in st.session_state:
+        st.session_state.mc_income_variability_positive = 10.0
+    if 'mc_income_variability_negative' not in st.session_state:
+        st.session_state.mc_income_variability_negative = 10.0
+    if 'mc_expense_variability_positive' not in st.session_state:
+        st.session_state.mc_expense_variability_positive = 5.0
+    if 'mc_expense_variability_negative' not in st.session_state:
+        st.session_state.mc_expense_variability_negative = 5.0
+    if 'mc_return_variability_positive' not in st.session_state:
+        st.session_state.mc_return_variability_positive = 15.0
+    if 'mc_return_variability_negative' not in st.session_state:
+        st.session_state.mc_return_variability_negative = 15.0
+
     # Simulation Settings
     st.subheader("⚙️ Simulation Settings")
 
@@ -3366,6 +3390,24 @@ def healthcare_insurance_tab():
     out-of-pocket expenses, and long-term care insurance.
     """)
 
+    # Ensure healthcare variables are initialized (defensive programming for old sessions)
+    if 'health_insurances' not in st.session_state:
+        st.session_state.health_insurances = []
+    if 'ltc_insurances' not in st.session_state:
+        st.session_state.ltc_insurances = []
+    if 'health_expenses' not in st.session_state:
+        st.session_state.health_expenses = []
+    if 'hsa_balance' not in st.session_state:
+        st.session_state.hsa_balance = 0.0
+    if 'hsa_contribution' not in st.session_state:
+        st.session_state.hsa_contribution = 0.0
+    if 'medicare_part_b_premium' not in st.session_state:
+        st.session_state.medicare_part_b_premium = 174.70
+    if 'medicare_part_d_premium' not in st.session_state:
+        st.session_state.medicare_part_d_premium = 55.0
+    if 'medigap_premium' not in st.session_state:
+        st.session_state.medigap_premium = 150.0
+
     # HSA Account
     st.subheader("💰 Health Savings Account (HSA)")
     col1, col2 = st.columns(2)
@@ -3567,6 +3609,14 @@ def debt_management_tab():
     Track payoff strategies and visualize debt-free timeline.
     """)
 
+    # Ensure debt variables are initialized (defensive programming for old sessions)
+    if 'debts' not in st.session_state:
+        st.session_state.debts = []
+    if 'debt_payoff_strategy' not in st.session_state:
+        st.session_state.debt_payoff_strategy = "Avalanche"
+    if 'extra_debt_payment' not in st.session_state:
+        st.session_state.extra_debt_payment = 0.0
+
     # Debt Payoff Strategy
     st.subheader("📊 Debt Payoff Strategy")
     col1, col2 = st.columns(2)
@@ -3734,6 +3784,16 @@ def education_funding_tab():
     Plan for college expenses with 529 plans, Coverdell ESAs, and other education savings vehicles.
     Project costs and funding gaps for each child.
     """)
+
+    # Ensure education variables are initialized (defensive programming for old sessions)
+    if 'plan529_accounts' not in st.session_state:
+        st.session_state.plan529_accounts = []
+    if 'education_goals' not in st.session_state:
+        st.session_state.education_goals = []
+    if 'coverdell_esa' not in st.session_state:
+        st.session_state.coverdell_esa = 0.0
+    if 'utma_ugma_balance' not in st.session_state:
+        st.session_state.utma_ugma_balance = 0.0
 
     # 529 Plan Management
     st.subheader("💰 529 College Savings Plans")
@@ -3916,6 +3976,20 @@ def tax_optimization_tab():
     Implement tax-efficient strategies to minimize lifetime tax burden and maximize retirement income.
     Includes Roth conversions, tax-loss harvesting, charitable giving, and withdrawal sequencing.
     """)
+
+    # Ensure tax variables are initialized (defensive programming for old sessions)
+    if 'tax_strategies' not in st.session_state:
+        st.session_state.tax_strategies = []
+    if 'retirement_withdrawals' not in st.session_state:
+        st.session_state.retirement_withdrawals = []
+    if 'roth_conversion_amount' not in st.session_state:
+        st.session_state.roth_conversion_amount = 0.0
+    if 'charitable_contributions' not in st.session_state:
+        st.session_state.charitable_contributions = 0.0
+    if 'qcd_enabled' not in st.session_state:
+        st.session_state.qcd_enabled = False
+    if 'tax_bracket' not in st.session_state:
+        st.session_state.tax_bracket = 0.22
 
     # Current Tax Situation
     st.subheader("📊 Current Tax Situation")
