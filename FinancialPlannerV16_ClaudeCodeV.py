@@ -1702,7 +1702,36 @@ def get_child_expenses(child: dict, year: int, current_year: int) -> dict:
         child_expenses['Transportation'] = child_expenses.get('Transportation', 0) * 0.4  # Less frequent trips home
         child_expenses['Entertainment'] = child_expenses.get('Entertainment', 0) * 0.5  # Less at-home entertainment
 
-        # Education costs now include room & board (~$15k-25k depending on location)
+        # Education costs now include tuition + room & board
+        college_type = child.get('college_type', 'Public')
+
+        # Base tuition costs (public vs private)
+        if college_type == 'Public':
+            # Public college tuition by location
+            public_tuition = {
+                'Seattle': 12000,      # UW in-state
+                'Sacramento': 10000,   # UC in-state
+                'Houston': 11000,      # UT in-state
+                'New York': 13000,     # SUNY/CUNY in-state
+                'San Francisco': 10000, # UC in-state
+                'Los Angeles': 10000,  # UC in-state
+                'Portland': 12000      # Oregon in-state
+            }
+            tuition = public_tuition.get(location, 12000)
+        else:  # Private college
+            # Private college tuition by location (2-3x public costs)
+            private_tuition = {
+                'Seattle': 55000,      # Seattle University, etc.
+                'Sacramento': 50000,
+                'Houston': 48000,
+                'New York': 60000,     # NYU, Columbia, etc.
+                'San Francisco': 58000, # Stanford area schools
+                'Los Angeles': 56000,  # USC, etc.
+                'Portland': 52000
+            }
+            tuition = private_tuition.get(location, 55000)
+
+        # Room & board costs (~$15k-25k depending on location)
         room_board_costs = {
             'Seattle': 18000,
             'Sacramento': 15000,
@@ -1712,8 +1741,10 @@ def get_child_expenses(child: dict, year: int, current_year: int) -> dict:
             'Los Angeles': 20000,
             'Portland': 16000
         }
-        additional_room_board = room_board_costs.get(location, 18000)
-        child_expenses['Education'] = child_expenses.get('Education', 0) + additional_room_board
+        room_board = room_board_costs.get(location, 18000)
+
+        # Total college costs = tuition + room & board
+        child_expenses['Education'] = child_expenses.get('Education', 0) + tuition + room_board
 
     return child_expenses
 
@@ -2357,7 +2388,13 @@ def family_expenses_tab():
 
             with col3:
                 recurring.inflation_adjust = st.checkbox("Inflation Adjust", value=recurring.inflation_adjust, key=f"re_inflate_{idx}")
-                recurring.parent = st.selectbox("Owner", ["Both", "ParentX", "ParentY"], index=["Both", "ParentX", "ParentY"].index(recurring.parent) if recurring.parent in ["Both", "ParentX", "ParentY"] else 0, key=f"re_parent_{idx}")
+                owner_options = ["Both", st.session_state.parent1_name, st.session_state.parent2_name]
+                # Map old values to new values for backwards compatibility
+                if recurring.parent == "ParentX":
+                    recurring.parent = st.session_state.parent1_name
+                elif recurring.parent == "ParentY":
+                    recurring.parent = st.session_state.parent2_name
+                recurring.parent = st.selectbox("Owner", owner_options, index=owner_options.index(recurring.parent) if recurring.parent in owner_options else 0, key=f"re_parent_{idx}")
                 recurring.financing_years = st.number_input("Financing Years", min_value=0, max_value=30, value=recurring.financing_years, key=f"re_financing_{idx}")
                 recurring.interest_rate = st.number_input(
                     "Interest Rate (%)",
@@ -2406,7 +2443,8 @@ def children_tab():
                     'use_template': True,
                     'template_state': 'Seattle',
                     'template_strategy': 'Average',
-                    'school_type': 'Public',  # Public or Private
+                    'school_type': 'Public',  # K-12: Public or Private
+                    'college_type': 'Public',  # College: Public or Private
                     'college_location': 'Seattle'  # Where they attend college
                 })
                 st.success(f"Added {child_name}")
@@ -2462,7 +2500,7 @@ def children_tab():
 
                 # Add new row for school type and college location
                 st.markdown("---")
-                col1, col2 = st.columns(2)
+                col1, col2, col3 = st.columns(3)
 
                 with col1:
                     child['school_type'] = st.selectbox(
@@ -2474,6 +2512,15 @@ def children_tab():
                     )
 
                 with col2:
+                    child['college_type'] = st.selectbox(
+                        "College Type",
+                        ["Public", "Private"],
+                        index=["Public", "Private"].index(child.get('college_type', 'Public')),
+                        key=f"child_college_type_{idx}",
+                        help="Private colleges typically cost 2-3x more than public colleges"
+                    )
+
+                with col3:
                     child['college_location'] = st.selectbox(
                         "College Location",
                         AVAILABLE_LOCATIONS_CHILDREN,
@@ -2591,10 +2638,16 @@ def house_tab():
                 ) / 100.0
                 house.upkeep_costs = st.number_input("Additional Upkeep ($/year)", min_value=0.0, value=float(house.upkeep_costs), step=100.0, key=f"house_upkeep_{idx}")
 
+            owner_options = ["Shared", st.session_state.parent1_name, st.session_state.parent2_name]
+            # Map old values to new values for backwards compatibility
+            if house.owner == "ParentX":
+                house.owner = st.session_state.parent1_name
+            elif house.owner == "ParentY":
+                house.owner = st.session_state.parent2_name
             house.owner = st.selectbox(
                 "Owner",
-                ["Shared", "ParentX", "ParentY"],
-                index=["Shared", "ParentX", "ParentY"].index(house.owner) if house.owner in ["Shared", "ParentX", "ParentY"] else 0,
+                owner_options,
+                index=owner_options.index(house.owner) if house.owner in owner_options else 0,
                 key=f"house_owner_{idx}"
             )
 
@@ -2953,27 +3006,88 @@ def timeline_tab():
     if len(edited_timeline) > 0:
         st.subheader("Timeline Visualization")
 
+        # Calculate when both parents reach age 100
+        parent1_100_year = (st.session_state.current_year - st.session_state.parentX_age) + 100
+        parent2_100_year = (st.session_state.current_year - st.session_state.parentY_age) + 100
+        end_year = max(parent1_100_year, parent2_100_year)
+
+        # Create timeline data for all years from current to end
+        all_years = list(range(st.session_state.current_year, end_year + 1))
+
+        # Create a horizontal timeline showing state/spending for each year
+        timeline_states = []
+        timeline_spending = []
+
+        for year in all_years:
+            state, strategy = get_state_for_year(year)
+            timeline_states.append(state)
+            timeline_spending.append(strategy)
+
+        # Create a Gantt-style timeline
         fig = go.Figure()
 
-        # Create timeline bars
-        for _, row in edited_timeline.iterrows():
+        # Group consecutive years with same state/strategy
+        segments = []
+        if timeline_states:
+            current_state = timeline_states[0]
+            current_strategy = timeline_spending[0]
+            start_year = all_years[0]
+
+            for i in range(1, len(all_years)):
+                if timeline_states[i] != current_state or timeline_spending[i] != current_strategy:
+                    # End of current segment
+                    segments.append({
+                        'state': current_state,
+                        'strategy': current_strategy,
+                        'start': start_year,
+                        'end': all_years[i-1]
+                    })
+                    current_state = timeline_states[i]
+                    current_strategy = timeline_spending[i]
+                    start_year = all_years[i]
+
+            # Add final segment
+            segments.append({
+                'state': current_state,
+                'strategy': current_strategy,
+                'start': start_year,
+                'end': all_years[-1]
+            })
+
+        # Plot segments as horizontal bars
+        for seg in segments:
+            duration = seg['end'] - seg['start'] + 1
             fig.add_trace(go.Bar(
-                x=[row['Year']],
-                y=[1],
-                name=f"{row['State']} - {row['Spending Strategy']}",
-                text=f"{row['State']}<br>{row['Spending Strategy']}",
-                textposition='auto',
+                x=[duration],
+                y=['Timeline'],
+                orientation='h',
+                name=f"{seg['state']} - {seg['strategy']}",
+                text=f"{seg['state']}<br>{seg['strategy']}<br>{seg['start']}-{seg['end']}",
+                textposition='inside',
+                hovertemplate=f"<b>{seg['state']}</b><br>{seg['strategy']}<br>Years: {seg['start']}-{seg['end']}<br>Duration: {duration} years<extra></extra>",
+                base=seg['start']
             ))
 
         fig.update_layout(
-            title="State & Spending Timeline",
+            title=f"State & Spending Timeline (Until Both Parents Reach Age 100)",
             xaxis_title="Year",
+            xaxis=dict(
+                tickmode='linear',
+                tick0=st.session_state.current_year,
+                dtick=5,  # Show tick every 5 years
+                range=[st.session_state.current_year, end_year]
+            ),
             yaxis=dict(showticklabels=False),
-            height=300,
-            showlegend=False
+            height=200,
+            showlegend=True,
+            barmode='stack',
+            bargap=0
         )
 
         st.plotly_chart(fig, use_container_width=True)
+
+        # Show key milestones
+        st.markdown(f"**Timeline extends to {end_year}** ({st.session_state.parent1_name} age 100: {parent1_100_year}, {st.session_state.parent2_name} age 100: {parent2_100_year})")
 
     # Show current and future states
     st.subheader("Timeline Summary")
@@ -3149,6 +3263,9 @@ def combined_simulation_tab():
 
             num_sims = min(st.session_state.mc_simulations, 1000)  # Cap at 1000 for web performance
             results = []
+            income_results = []
+            expense_results = []
+            cashflow_results = []
 
             # Starting values
             initial_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
@@ -3157,6 +3274,9 @@ def combined_simulation_tab():
             progress_bar = st.progress(0)
             for sim in range(num_sims):
                 sim_results = []
+                sim_income = []
+                sim_expenses = []
+                sim_cashflow = []
                 net_worth = initial_net_worth
 
                 for year_offset in range(st.session_state.mc_years):
@@ -3207,8 +3327,8 @@ def combined_simulation_tab():
 
                     # Calculate investment returns
                     if st.session_state.mc_use_historical:
-                        year_idx = (year - st.session_state.mc_start_year) % len(HISTORICAL_STOCK_RETURNS)
-                        return_rate = HISTORICAL_STOCK_RETURNS[year_idx]
+                        # Use random sampling from historical returns instead of sequential
+                        return_rate = np.random.choice(HISTORICAL_STOCK_RETURNS)
                     else:
                         if use_asymmetric:
                             if np.random.random() > 0.5:
@@ -3225,16 +3345,30 @@ def combined_simulation_tab():
 
                     # Normalize to today's dollars if requested
                     display_net_worth = net_worth
+                    display_income = income
+                    display_expenses = expenses
                     if st.session_state.mc_normalize_to_today_dollars:
                         display_net_worth = net_worth / ((1 + scenario.inflation_rate) ** year_offset)
+                        display_income = income / ((1 + scenario.inflation_rate) ** year_offset)
+                        display_expenses = expenses / ((1 + scenario.inflation_rate) ** year_offset)
 
+                    cashflow = display_income - display_expenses
                     sim_results.append(display_net_worth)
+                    sim_income.append(display_income)
+                    sim_expenses.append(display_expenses)
+                    sim_cashflow.append(cashflow)
 
                 results.append(sim_results)
+                income_results.append(sim_income)
+                expense_results.append(sim_expenses)
+                cashflow_results.append(sim_cashflow)
                 progress_bar.progress((sim + 1) / num_sims)
 
             # Calculate percentiles
             results_array = np.array(results)
+            income_array = np.array(income_results)
+            expense_array = np.array(expense_results)
+            cashflow_array = np.array(cashflow_results)
 
             percentiles = {
                 '10th': np.percentile(results_array, 10, axis=0),
@@ -3243,6 +3377,11 @@ def combined_simulation_tab():
                 '75th': np.percentile(results_array, 75, axis=0),
                 '90th': np.percentile(results_array, 90, axis=0),
             }
+
+            # Calculate 50th percentile for income, expenses, and cashflow
+            income_50th = np.percentile(income_array, 50, axis=0)
+            expense_50th = np.percentile(expense_array, 50, axis=0)
+            cashflow_50th = np.percentile(cashflow_array, 50, axis=0)
 
             years = list(range(st.session_state.mc_start_year, st.session_state.mc_start_year + st.session_state.mc_years))
 
@@ -3338,6 +3477,59 @@ def combined_simulation_tab():
                 st.metric("Final Median Net Worth", format_currency(percentiles['50th'][-1]))
             with col3:
                 st.metric("Final 10th Percentile", format_currency(percentiles['10th'][-1]))
+
+            # 50th Percentile Cashflow Breakdown
+            st.subheader("📊 50th Percentile Cashflow Breakdown")
+            st.markdown("This shows the median (50th percentile) income, expenses, and cashflow projections across all simulations.")
+
+            # Create dataframe for 50th percentile breakdown
+            cashflow_breakdown_data = []
+            for idx in key_years_idx:
+                if idx < len(years):
+                    cashflow_breakdown_data.append({
+                        'Year': years[idx],
+                        'Income': format_currency(income_50th[idx]),
+                        'Expenses': format_currency(expense_50th[idx]),
+                        'Cashflow': format_currency(cashflow_50th[idx]),
+                    })
+
+            cashflow_breakdown_df = pd.DataFrame(cashflow_breakdown_data)
+            st.dataframe(cashflow_breakdown_df, use_container_width=True, hide_index=True)
+
+            # Plot 50th percentile income, expenses, and cashflow
+            fig_cashflow = go.Figure()
+
+            fig_cashflow.add_trace(go.Scatter(
+                x=years, y=income_50th,
+                mode='lines',
+                name='Income (50th %ile)',
+                line=dict(color='green', width=2)
+            ))
+
+            fig_cashflow.add_trace(go.Scatter(
+                x=years, y=expense_50th,
+                mode='lines',
+                name='Expenses (50th %ile)',
+                line=dict(color='red', width=2)
+            ))
+
+            fig_cashflow.add_trace(go.Scatter(
+                x=years, y=cashflow_50th,
+                mode='lines',
+                name='Cashflow (50th %ile)',
+                line=dict(color='blue', width=2),
+                fill='tozeroy'
+            ))
+
+            fig_cashflow.update_layout(
+                title="50th Percentile Income, Expenses, and Cashflow Over Time",
+                xaxis_title="Year",
+                yaxis_title="Amount ($)" + (" - Today's Dollars" if st.session_state.mc_normalize_to_today_dollars else ""),
+                height=400,
+                hovermode='x unified'
+            )
+
+            st.plotly_chart(fig_cashflow, use_container_width=True)
 
 
 def save_load_tab():
@@ -4434,7 +4626,7 @@ def report_export_tab():
                         }
                     },
                     "expenses": st.session_state.expenses,
-                    "children": [{"name": c["name"], "age": c["age"]} for c in st.session_state.children_list],
+                    "children": [{"name": c["name"], "age": st.session_state.current_year - c["birth_year"], "birth_year": c["birth_year"]} for c in st.session_state.children_list],
                     "debts": [asdict(d) for d in st.session_state.debts],
                     "healthcare": {
                         "health_insurances": [asdict(h) for h in st.session_state.health_insurances],
