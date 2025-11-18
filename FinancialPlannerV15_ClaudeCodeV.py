@@ -2178,7 +2178,7 @@ def family_expenses_tab():
                 purchase.asset_type = st.selectbox(
                     "Asset Type",
                     ["Expense", "Real Estate", "Vehicle", "Investment"],
-                    index=["Expense", "Real Estate", "Vehicle", "Investment"].index(purchase.asset_type),
+                    index=["Expense", "Real Estate", "Vehicle", "Investment"].index(purchase.asset_type) if purchase.asset_type in ["Expense", "Real Estate", "Vehicle", "Investment"] else 0,
                     key=f"mp_asset_type_{idx}"
                 )
                 purchase.appreciation_rate = st.number_input(
@@ -2242,7 +2242,7 @@ def family_expenses_tab():
 
             with col3:
                 recurring.inflation_adjust = st.checkbox("Inflation Adjust", value=recurring.inflation_adjust, key=f"re_inflate_{idx}")
-                recurring.parent = st.selectbox("Owner", ["Both", "ParentX", "ParentY"], index=["Both", "ParentX", "ParentY"].index(recurring.parent), key=f"re_parent_{idx}")
+                recurring.parent = st.selectbox("Owner", ["Both", "ParentX", "ParentY"], index=["Both", "ParentX", "ParentY"].index(recurring.parent) if recurring.parent in ["Both", "ParentX", "ParentY"] else 0, key=f"re_parent_{idx}")
                 recurring.financing_years = st.number_input("Financing Years", min_value=0, max_value=30, value=recurring.financing_years, key=f"re_financing_{idx}")
                 recurring.interest_rate = st.number_input(
                     "Interest Rate (%)",
@@ -2455,7 +2455,7 @@ def house_tab():
             house.owner = st.selectbox(
                 "Owner",
                 ["Shared", "ParentX", "ParentY"],
-                index=["Shared", "ParentX", "ParentY"].index(house.owner),
+                index=["Shared", "ParentX", "ParentY"].index(house.owner) if house.owner in ["Shared", "ParentX", "ParentY"] else 0,
                 key=f"house_owner_{idx}"
             )
 
@@ -3637,7 +3637,7 @@ def debt_management_tab():
                 debt.owner = st.selectbox(
                     f"Owner##debt{idx}",
                     ["Parent 1", "Parent 2", "Shared"],
-                    index=["Parent 1", "Parent 2", "Shared"].index(debt.owner)
+                    index=["Parent 1", "Parent 2", "Shared"].index(debt.owner) if debt.owner in ["Parent 1", "Parent 2", "Shared"] else 0
                 )
 
             with col2:
