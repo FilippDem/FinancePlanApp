@@ -1749,6 +1749,41 @@ def get_child_expenses(child: dict, year: int, current_year: int) -> dict:
     return child_expenses
 
 
+def get_income_for_year(base_income: float, raise_rate: float, job_changes_df: pd.DataFrame,
+                        current_year: int, target_year: int) -> float:
+    """
+    Calculate income for a specific year considering job changes and raises.
+
+    Args:
+        base_income: Starting income (current year)
+        raise_rate: Annual raise percentage
+        job_changes_df: DataFrame with 'Year' and 'New Income' columns
+        current_year: The current year (base year)
+        target_year: The year to calculate income for
+
+    Returns:
+        float: Income for the target year
+    """
+    # Find the most recent job change that applies to target_year
+    applicable_job_changes = job_changes_df[job_changes_df['Year'] <= target_year]
+
+    if len(applicable_job_changes) > 0:
+        # Get the most recent job change
+        most_recent = applicable_job_changes.sort_values('Year').iloc[-1]
+        last_change_year = most_recent['Year']
+        last_change_income = most_recent['New Income']
+
+        # Apply raises from the last job change to target year
+        years_since_change = target_year - last_change_year
+        income = last_change_income * (1 + raise_rate / 100) ** years_since_change
+    else:
+        # No job changes, apply raises from current year
+        years_from_now = target_year - current_year
+        income = base_income * (1 + raise_rate / 100) ** years_from_now
+
+    return income
+
+
 def get_historical_return_stats():
     """Calculate statistics from historical returns"""
     returns = np.array(HISTORICAL_STOCK_RETURNS)
@@ -2139,13 +2174,36 @@ def parent_x_tab():
 
     st.subheader("Job Changes / Income Adjustments")
     st.markdown("Plan for promotions, career changes, or income adjustments")
+    st.caption("💡 Tip: Click '+' to add rows, enter Year and New Income, changes save automatically")
 
-    st.session_state.parentX_job_changes = st.data_editor(
+    # Use data_editor and capture its output properly
+    edited_job_changes = st.data_editor(
         st.session_state.parentX_job_changes,
         num_rows="dynamic",
         use_container_width=True,
+        column_config={
+            "Year": st.column_config.NumberColumn(
+                "Year",
+                help="Year when income changes",
+                min_value=st.session_state.current_year,
+                max_value=2100,
+                step=1,
+                format="%d"
+            ),
+            "New Income": st.column_config.NumberColumn(
+                "New Income ($)",
+                help="New annual income starting this year",
+                min_value=0,
+                max_value=10000000,
+                step=1000,
+                format="$%d"
+            )
+        },
         key="parentX_job_changes_editor"
     )
+
+    # Update session state with the edited data
+    st.session_state.parentX_job_changes = edited_job_changes
 
 
 def parent_y_tab():
@@ -2221,13 +2279,36 @@ def parent_y_tab():
 
     st.subheader("Job Changes / Income Adjustments")
     st.markdown("Plan for promotions, career changes, or income adjustments")
+    st.caption("💡 Tip: Click '+' to add rows, enter Year and New Income, changes save automatically")
 
-    st.session_state.parentY_job_changes = st.data_editor(
+    # Use data_editor and capture its output properly
+    edited_job_changes = st.data_editor(
         st.session_state.parentY_job_changes,
         num_rows="dynamic",
         use_container_width=True,
+        column_config={
+            "Year": st.column_config.NumberColumn(
+                "Year",
+                help="Year when income changes",
+                min_value=st.session_state.current_year,
+                max_value=2100,
+                step=1,
+                format="%d"
+            ),
+            "New Income": st.column_config.NumberColumn(
+                "New Income ($)",
+                help="New annual income starting this year",
+                min_value=0,
+                max_value=10000000,
+                step=1000,
+                format="$%d"
+            )
+        },
         key="parentY_job_changes_editor"
     )
+
+    # Update session state with the edited data
+    st.session_state.parentY_job_changes = edited_job_changes
 
 
 def family_expenses_tab():
@@ -3288,7 +3369,15 @@ def combined_simulation_tab():
 
                     income = 0
                     if parentX_working:
-                        income += st.session_state.parentX_income * (1 + st.session_state.parentX_raise/100) ** year_offset
+                        # Use job changes if available
+                        parentX_year_income = get_income_for_year(
+                            st.session_state.parentX_income,
+                            st.session_state.parentX_raise,
+                            st.session_state.parentX_job_changes,
+                            st.session_state.current_year,
+                            year
+                        )
+                        income += parentX_year_income
                     else:
                         ss_benefit = st.session_state.parentX_ss_benefit * 12
                         if st.session_state.ss_insolvency_enabled and year >= 2034:
@@ -3296,7 +3385,15 @@ def combined_simulation_tab():
                         income += ss_benefit
 
                     if parentY_working:
-                        income += st.session_state.parentY_income * (1 + st.session_state.parentY_raise/100) ** year_offset
+                        # Use job changes if available
+                        parentY_year_income = get_income_for_year(
+                            st.session_state.parentY_income,
+                            st.session_state.parentY_raise,
+                            st.session_state.parentY_job_changes,
+                            st.session_state.current_year,
+                            year
+                        )
+                        income += parentY_year_income
                     else:
                         ss_benefit = st.session_state.parentY_ss_benefit * 12
                         if st.session_state.ss_insolvency_enabled and year >= 2034:
