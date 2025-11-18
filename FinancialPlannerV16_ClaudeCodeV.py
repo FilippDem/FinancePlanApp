@@ -1536,6 +1536,14 @@ def initialize_session_state():
         st.session_state.qcd_enabled = False  # Qualified Charitable Distribution
         st.session_state.tax_bracket = 0.22    # Federal marginal tax bracket
 
+        # Tab visibility settings
+        st.session_state.show_portfolio_allocation = False  # Off by default
+        st.session_state.show_healthcare = False  # Off by default
+        st.session_state.show_debt = False  # Off by default
+        st.session_state.show_education = False  # Off by default
+        st.session_state.show_tax = False  # Off by default
+        st.session_state.show_export = True  # On by default
+
         st.session_state.initialized = True
 
 
@@ -1811,79 +1819,39 @@ def main():
     st.title("💰 Financial Planning Suite V16 - Claude Code Enhanced (5 New Features!)")
     st.markdown("**V16 adds Healthcare, Debt Management, Education Funding, Tax Optimization & Report Export!**")
 
-    # Create tabs
-    tab_list = [
-        "⚙️ Settings",
-        f"{st.session_state.parent1_emoji} {st.session_state.parent1_name}",
-        f"{st.session_state.parent2_emoji} {st.session_state.parent2_name}",
-        "💸 Family Expenses",
-        "👶 Children",
-        "🏠 House Portfolio",
-        "💼 Portfolio Allocation",
-        "📈 Economy",
-        "🖼️ Retirement",
-        "🏥 Healthcare & Insurance",  # NEW
-        "💳 Debt Management",  # NEW
-        "🎓 Education Funding",  # NEW
-        "💼 Tax Optimization",  # NEW
-        "🗓️ Timeline",
-        "📊 Analysis",
-        "📄 Export Reports",  # NEW
-        "💾 Save/Load"
+    # Build tab list dynamically based on visibility settings
+    tab_configs = [
+        ("⚙️ Settings", parent_settings_tab, True),  # Always shown
+        (f"{st.session_state.parent1_emoji} {st.session_state.parent1_name}", parent_x_tab, True),
+        (f"{st.session_state.parent2_emoji} {st.session_state.parent2_name}", parent_y_tab, True),
+        ("💸 Family Expenses", family_expenses_tab, True),
+        ("👶 Children", children_tab, True),
+        ("🏠 House Portfolio", house_tab, True),
+        ("💼 Portfolio Allocation", portfolio_allocation_tab, st.session_state.get('show_portfolio_allocation', False)),
+        ("📈 Economy", economy_tab, True),
+        ("🖼️ Retirement", retirement_tab, True),
+        ("🏥 Healthcare & Insurance", healthcare_insurance_tab, st.session_state.get('show_healthcare', False)),
+        ("💳 Debt Management", debt_management_tab, st.session_state.get('show_debt', False)),
+        ("🎓 Education Funding", education_funding_tab, st.session_state.get('show_education', False)),
+        ("💼 Tax Optimization", tax_optimization_tab, st.session_state.get('show_tax', False)),
+        ("🗓️ Timeline", timeline_tab, True),
+        ("📊 Analysis", combined_simulation_tab, True),
+        ("📄 Export Reports", report_export_tab, st.session_state.get('show_export', True)),
+        ("💾 Save/Load", save_load_tab, True)
     ]
 
-    tabs = st.tabs(tab_list)
+    # Filter to only enabled tabs
+    enabled_tabs = [(name, func) for name, func, enabled in tab_configs if enabled]
+    tab_names = [name for name, func in enabled_tabs]
+    tab_functions = [func for name, func in enabled_tabs]
 
-    with tabs[0]:  # Settings
-        parent_settings_tab()
+    # Create tabs
+    tabs = st.tabs(tab_names)
 
-    with tabs[1]:  # Parent X
-        parent_x_tab()
-
-    with tabs[2]:  # Parent Y
-        parent_y_tab()
-
-    with tabs[3]:  # Family Expenses
-        family_expenses_tab()
-
-    with tabs[4]:  # Children
-        children_tab()
-
-    with tabs[5]:  # Houses
-        house_tab()
-
-    with tabs[6]:  # NEW: Portfolio Allocation
-        portfolio_allocation_tab()
-
-    with tabs[7]:  # Economy
-        economy_tab()
-
-    with tabs[8]:  # Retirement
-        retirement_tab()
-
-    with tabs[9]:  # NEW: Healthcare & Insurance
-        healthcare_insurance_tab()
-
-    with tabs[10]:  # NEW: Debt Management
-        debt_management_tab()
-
-    with tabs[11]:  # NEW: Education Funding
-        education_funding_tab()
-
-    with tabs[12]:  # NEW: Tax Optimization
-        tax_optimization_tab()
-
-    with tabs[13]:  # Timeline
-        timeline_tab()
-
-    with tabs[14]:  # Analysis
-        combined_simulation_tab()
-
-    with tabs[15]:  # NEW: Export Reports
-        report_export_tab()
-
-    with tabs[16]:  # Save/Load
-        save_load_tab()
+    # Render each enabled tab
+    for idx, (tab, func) in enumerate(zip(tabs, tab_functions)):
+        with tab:
+            func()
 
     # Enhanced sidebar
     display_sidebar()
@@ -1959,7 +1927,55 @@ def parent_settings_tab():
 
     st.info("💡 Changes to parent names and emojis will be reflected in all tabs after you navigate to them.")
 
+    # Tab Visibility Settings
+    st.markdown("---")
+    st.subheader("👁️ Tab Visibility Settings")
+    st.markdown("Choose which advanced features to show. Disabled tabs are hidden to simplify the interface.")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.session_state.show_portfolio_allocation = st.checkbox(
+            "💼 Portfolio Allocation",
+            value=st.session_state.get('show_portfolio_allocation', False),
+            help="Configure asset allocation (stocks, bonds, cash, real estate)"
+        )
+
+        st.session_state.show_healthcare = st.checkbox(
+            "🏥 Healthcare & Insurance",
+            value=st.session_state.get('show_healthcare', False),
+            help="Plan Medicare, HSA, long-term care, and health insurance"
+        )
+
+        st.session_state.show_debt = st.checkbox(
+            "💳 Debt Management",
+            value=st.session_state.get('show_debt', False),
+            help="Track student loans, credit cards, and payoff strategies"
+        )
+
+    with col2:
+        st.session_state.show_education = st.checkbox(
+            "🎓 Education Funding",
+            value=st.session_state.get('show_education', False),
+            help="Plan 529 accounts, college costs, and scholarships"
+        )
+
+        st.session_state.show_tax = st.checkbox(
+            "💼 Tax Optimization",
+            value=st.session_state.get('show_tax', False),
+            help="Optimize Roth conversions, QCDs, and withdrawal sequencing"
+        )
+
+        st.session_state.show_export = st.checkbox(
+            "📄 Export Reports",
+            value=st.session_state.get('show_export', True),
+            help="Export financial data to Excel, CSV, or JSON"
+        )
+
+    st.info("💡 Changes take effect immediately. Disabled tabs are hidden from the navigation.")
+
     # Instructions Section
+    st.markdown("---")
     st.header("📖 Application Instructions")
 
     st.markdown("""
