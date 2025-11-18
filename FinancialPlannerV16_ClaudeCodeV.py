@@ -48,16 +48,14 @@ HISTORICAL_STOCK_RETURNS = [
 # Note: CHILDREN_EXPENSE_TEMPLATES currently only includes US locations and original 3 states
 # FAMILY_EXPENSE_TEMPLATES includes all locations below
 AVAILABLE_LOCATIONS_CHILDREN = [
-    # US States (with detailed children templates)
-    "California", "Washington", "Texas",
     # Major US Cities (with detailed children templates)
+    "Seattle", "Sacramento", "Houston",
     "New York", "San Francisco", "Los Angeles", "Portland"
 ]
 
 AVAILABLE_LOCATIONS_FAMILY = [
-    # US States
-    "California", "Washington", "Texas",
     # Major US Cities
+    "Seattle", "Sacramento", "Houston",
     "New York", "San Francisco", "Los Angeles", "Portland",
     # Canada
     "Toronto", "Vancouver",
@@ -73,7 +71,7 @@ AVAILABLE_LOCATIONS_FAMILY = [
 # [I'll include the full templates but truncate here for readability]
 
 CHILDREN_EXPENSE_TEMPLATES = {
-    "California": {
+    "Sacramento": {
         "Conservative": {
             'Food': [1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200,
                      4400, 4600, 2000, 1800, 1600, 1400, 1200, 1000, 800, 600, 400, 200, 100, 50, 0],
@@ -148,7 +146,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
                           0, 0, 0, 0, 0]
         }
     },
-    "Washington": {
+    "Seattle": {
         "Conservative": {
             'Food': [1100, 1300, 1500, 1700, 1900, 2100, 2300, 2500, 2700, 2900, 3100, 3300, 3500, 3700, 3900, 4100,
                      4300, 4500, 1900, 1700, 1500, 1300, 1100, 900, 700, 500, 300, 100, 50, 25, 0],
@@ -222,7 +220,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
                           0, 0, 0, 0, 0]
         }
     },
-    "Texas": {
+    "Houston": {
         "Conservative": {
             'Food': [1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000,
                      4200, 4400, 1800, 1600, 1400, 1200, 1000, 800, 600, 400, 200, 100, 50, 25, 0],
@@ -625,7 +623,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Other Expenses': 12000
         }
     },
-    "Washington": {
+    "Seattle": {
         "Conservative": {
             'Food & Groceries': 13200,
             'Clothing': 3000,
@@ -654,7 +652,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Other Expenses': 10800
         }
     },
-    "Texas": {
+    "Houston": {
         "Conservative": {
             'Food & Groceries': 12600,
             'Clothing': 2800,
@@ -1327,7 +1325,7 @@ def initialize_session_state():
         st.session_state.marriage_year = "N/A"
 
         st.session_state.state_timeline = [
-            StateTimelineEntry(2025, "Washington", "Average")
+            StateTimelineEntry(2025, "Seattle", "Average")
         ]
 
         # NEW: Portfolio allocation
@@ -1544,11 +1542,11 @@ def initialize_session_state():
 def get_state_for_year(year: int) -> tuple:
     """Get the state and spending strategy for a given year"""
     if not st.session_state.state_timeline:
-        return "Washington", "Average"
+        return "Seattle", "Average"
 
     sorted_timeline = sorted(st.session_state.state_timeline, key=lambda x: x.year)
 
-    current_state = "Washington"
+    current_state = "Seattle"
     current_strategy = "Average"
 
     for entry in sorted_timeline:
@@ -1595,6 +1593,102 @@ def get_state_based_children_expenses(year: int, child_age: int) -> dict:
             return {col: row[col] for col in row.index if col != 'Age'}
         else:
             return {}
+
+
+def get_child_expenses(child: dict, year: int, current_year: int) -> dict:
+    """
+    Get expenses for a specific child in a specific year, accounting for:
+    - School type (public/private)
+    - College location (where they attend college)
+    - Living arrangement (at home vs at college)
+
+    Args:
+        child: Child dictionary with keys: name, birth_year, template_state, template_strategy,
+               school_type, college_location
+        year: The year to calculate expenses for
+        current_year: The current year (for age calculation)
+
+    Returns:
+        dict: Expense categories and amounts for this child in this year
+    """
+    child_age = year - child['birth_year']
+
+    # Child expenses only apply from age 0-25
+    if child_age < 0 or child_age > 30:
+        return {}
+
+    # Determine which location template to use
+    # Ages 18-21: Use college location (living at college)
+    # Other ages: Use family's template location
+    if 18 <= child_age <= 21:
+        location = child.get('college_location', 'Seattle')
+        lives_at_college = True
+    else:
+        location = child.get('template_state', 'Seattle')
+        lives_at_college = False
+
+    strategy = child.get('template_strategy', 'Average')
+    school_type = child.get('school_type', 'Public')
+
+    # Get base expenses from template
+    if (location in CHILDREN_EXPENSE_TEMPLATES and
+            strategy in CHILDREN_EXPENSE_TEMPLATES[location] and
+            0 <= child_age < len(CHILDREN_EXPENSE_TEMPLATES[location][strategy]['Food'])):
+
+        template = CHILDREN_EXPENSE_TEMPLATES[location][strategy]
+        child_expenses = {}
+
+        for category, values in template.items():
+            if child_age < len(values):
+                child_expenses[category] = values[child_age]
+            else:
+                child_expenses[category] = 0
+    else:
+        # Fallback to default template
+        if 0 <= child_age < len(st.session_state.children_expenses):
+            row = st.session_state.children_expenses.iloc[child_age]
+            child_expenses = {col: row[col] for col in row.index if col != 'Age'}
+        else:
+            child_expenses = {}
+
+    # Adjust for private school (ages 5-17, K-12 education)
+    if school_type == 'Private' and 5 <= child_age <= 17:
+        # Add private school tuition based on location
+        private_school_costs = {
+            'Seattle': 20000,  # Average private school in Seattle
+            'Sacramento': 18000,
+            'Houston': 15000,
+            'New York': 35000,
+            'San Francisco': 32000,
+            'Los Angeles': 25000,
+            'Portland': 17000
+        }
+        additional_tuition = private_school_costs.get(child.get('template_state', 'Seattle'), 20000)
+        child_expenses['Education'] = child_expenses.get('Education', 0) + additional_tuition
+
+    # Adjust expenses for living at college (ages 18-21)
+    if lives_at_college:
+        # College students living on campus have different expense patterns
+        # Room & board is included in Education costs
+        # Reduce home-based expenses (food, transportation, etc.)
+        child_expenses['Food'] = child_expenses.get('Food', 0) * 0.3  # Occasional meals at home
+        child_expenses['Transportation'] = child_expenses.get('Transportation', 0) * 0.4  # Less frequent trips home
+        child_expenses['Entertainment'] = child_expenses.get('Entertainment', 0) * 0.5  # Less at-home entertainment
+
+        # Education costs now include room & board (~$15k-25k depending on location)
+        room_board_costs = {
+            'Seattle': 18000,
+            'Sacramento': 15000,
+            'Houston': 12000,
+            'New York': 25000,
+            'San Francisco': 24000,
+            'Los Angeles': 20000,
+            'Portland': 16000
+        }
+        additional_room_board = room_board_costs.get(location, 18000)
+        child_expenses['Education'] = child_expenses.get('Education', 0) + additional_room_board
+
+    return child_expenses
 
 
 def get_historical_return_stats():
@@ -2289,8 +2383,10 @@ def children_tab():
                     'name': child_name,
                     'birth_year': child_birth_year,
                     'use_template': True,
-                    'template_state': 'Washington',
-                    'template_strategy': 'Average'
+                    'template_state': 'Seattle',
+                    'template_strategy': 'Average',
+                    'school_type': 'Public',  # Public or Private
+                    'college_location': 'Seattle'  # Where they attend college
                 })
                 st.success(f"Added {child_name}")
                 st.rerun()
@@ -2326,7 +2422,7 @@ def children_tab():
                         child['template_state'] = st.selectbox(
                             "Template Location",
                             AVAILABLE_LOCATIONS_CHILDREN,
-                            index=AVAILABLE_LOCATIONS_CHILDREN.index(child.get('template_state', 'Washington')) if child.get('template_state', 'Washington') in AVAILABLE_LOCATIONS_CHILDREN else 1,
+                            index=AVAILABLE_LOCATIONS_CHILDREN.index(child.get('template_state', 'Seattle')) if child.get('template_state', 'Seattle') in AVAILABLE_LOCATIONS_CHILDREN else 1,
                             key=f"child_state_{idx}"
                         )
                         child['template_strategy'] = st.selectbox(
@@ -2342,6 +2438,28 @@ def children_tab():
                     if st.button(f"🗑️ Remove {child['name']}", key=f"remove_child_{idx}"):
                         st.session_state.children_list.pop(idx)
                         st.rerun()
+
+                # Add new row for school type and college location
+                st.markdown("---")
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    child['school_type'] = st.selectbox(
+                        "K-12 School Type",
+                        ["Public", "Private"],
+                        index=["Public", "Private"].index(child.get('school_type', 'Public')),
+                        key=f"child_school_{idx}",
+                        help="Private schools typically add $10k-30k/year to education costs"
+                    )
+
+                with col2:
+                    child['college_location'] = st.selectbox(
+                        "College Location",
+                        AVAILABLE_LOCATIONS_CHILDREN,
+                        index=AVAILABLE_LOCATIONS_CHILDREN.index(child.get('college_location', 'Seattle')) if child.get('college_location', 'Seattle') in AVAILABLE_LOCATIONS_CHILDREN else 0,
+                        key=f"child_college_{idx}",
+                        help="Location where child will attend college (ages 18-21). Room & board included."
+                    )
     else:
         st.info("No children added yet. Add children using the form above.")
 
@@ -3804,7 +3922,7 @@ def education_funding_tab():
             beneficiary="Child 1",
             current_balance=5000.0,
             monthly_contribution=250.0,
-            state="Washington",
+            state="Seattle",
             investment_return=0.07,
             age_based_allocation=True,
             contribution_end_age=18
