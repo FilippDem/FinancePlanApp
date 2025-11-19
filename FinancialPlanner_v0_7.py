@@ -1544,7 +1544,7 @@ def initialize_session_state():
         current_year = datetime.now().year
 
         # Scenario 1: Young Tech Couple in San Francisco
-        st.session_state.saved_scenarios["[DEMO] Young Tech Couple - SF"] = {
+        st.session_state.saved_scenarios["[DEMO] High-Income Tech Couple with Toddlers (SF, Aggressive)"] = {
             'current_year': current_year,
             'parent1_name': "Alex",
             'parent1_emoji': "👨",
@@ -1636,7 +1636,7 @@ def initialize_session_state():
         }
 
         # Scenario 2: Mid-Career Family with Children in Seattle
-        st.session_state.saved_scenarios["[DEMO] Mid-Career Family - Seattle"] = {
+        st.session_state.saved_scenarios["[DEMO] 3-Kid Family with Mixed Education Plans (Seattle, Moderate)"] = {
             'current_year': current_year,
             'parent1_name': "Mike",
             'parent1_emoji': "👨",
@@ -1750,7 +1750,7 @@ def initialize_session_state():
         }
 
         # Scenario 3: High-Net-Worth Couple in New York
-        st.session_state.saved_scenarios["[DEMO] High Net Worth - NYC"] = {
+        st.session_state.saved_scenarios["[DEMO] Wealthy Executives with Multiple Properties (NYC, $4.7M)"] = {
             'current_year': current_year,
             'parent1_name': "David",
             'parent1_emoji': "👨",
@@ -1876,7 +1876,7 @@ def initialize_session_state():
         }
 
         # Scenario 4: Single Parent Teacher in Sacramento
-        st.session_state.saved_scenarios["[DEMO] Single Parent - Sacramento"] = {
+        st.session_state.saved_scenarios["[DEMO] Single Teacher Mom, Conservative Saver (Sacramento, $95K)"] = {
             'current_year': current_year,
             'parent1_name': "Maria",
             'parent1_emoji': "👩",
@@ -1970,7 +1970,7 @@ def initialize_session_state():
         }
 
         # Scenario 5: Pre-Retirement Empty Nesters in Portland
-        st.session_state.saved_scenarios["[DEMO] Pre-Retirement - Portland"] = {
+        st.session_state.saved_scenarios["[DEMO] Empty Nesters Planning Retirement & Downsizing (Portland, Ages 58/57)"] = {
             'current_year': current_year,
             'parent1_name': "Robert",
             'parent1_emoji': "👨",
