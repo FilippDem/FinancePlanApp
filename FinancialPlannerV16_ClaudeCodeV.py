@@ -656,7 +656,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 10000,
             'Entertainment & Activities': 4800,
             'Personal Care': 2400,
-            'Parent Retirement Help': 12000,
             'Other Expenses': 6000
         },
         "Average": {
@@ -665,7 +664,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 13000,
             'Entertainment & Activities': 7200,
             'Personal Care': 3600,
-            'Parent Retirement Help': 18000,
             'Other Expenses': 8400
         },
         "High-end": {
@@ -674,7 +672,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 18000,
             'Entertainment & Activities': 12000,
             'Personal Care': 6000,
-            'Parent Retirement Help': 30000,
             'Other Expenses': 12000
         }
     },
@@ -685,7 +682,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 9000,
             'Entertainment & Activities': 4200,
             'Personal Care': 2100,
-            'Parent Retirement Help': 10000,
             'Other Expenses': 5400
         },
         "Average": {
@@ -694,7 +690,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 12000,
             'Entertainment & Activities': 6600,
             'Personal Care': 3000,
-            'Parent Retirement Help': 16000,
             'Other Expenses': 7800
         },
         "High-end": {
@@ -703,7 +698,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 16800,
             'Entertainment & Activities': 10800,
             'Personal Care': 5400,
-            'Parent Retirement Help': 28000,
             'Other Expenses': 10800
         }
     },
@@ -714,7 +708,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 8400,
             'Entertainment & Activities': 3900,
             'Personal Care': 1800,
-            'Parent Retirement Help': 9000,
             'Other Expenses': 5100
         },
         "Average": {
@@ -723,7 +716,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 11400,
             'Entertainment & Activities': 6000,
             'Personal Care': 2700,
-            'Parent Retirement Help': 15000,
             'Other Expenses': 7200
         },
         "High-end": {
@@ -732,7 +724,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 15600,
             'Entertainment & Activities': 9600,
             'Personal Care': 4800,
-            'Parent Retirement Help': 25000,
             'Other Expenses': 10200
         }
     },
@@ -744,7 +735,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 13000,
             'Entertainment & Activities': 6240,
             'Personal Care': 3120,
-            'Parent Retirement Help': 15600,
             'Other Expenses': 7800
         },
         "Average": {
@@ -753,7 +743,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 16900,
             'Entertainment & Activities': 9360,
             'Personal Care': 4680,
-            'Parent Retirement Help': 23400,
             'Other Expenses': 10920
         },
         "High-end": {
@@ -762,7 +751,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 23400,
             'Entertainment & Activities': 15600,
             'Personal Care': 7800,
-            'Parent Retirement Help': 39000,
             'Other Expenses': 15600
         }
     },
@@ -773,7 +761,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 11500,
             'Entertainment & Activities': 5520,
             'Personal Care': 2760,
-            'Parent Retirement Help': 13800,
             'Other Expenses': 6900
         },
         "Average": {
@@ -782,7 +769,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 14950,
             'Entertainment & Activities': 8280,
             'Personal Care': 4140,
-            'Parent Retirement Help': 20700,
             'Other Expenses': 9660
         },
         "High-end": {
@@ -791,7 +777,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 20700,
             'Entertainment & Activities': 13800,
             'Personal Care': 6900,
-            'Parent Retirement Help': 34500,
             'Other Expenses': 13800
         }
     },
@@ -802,7 +787,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 9500,
             'Entertainment & Activities': 4560,
             'Personal Care': 2280,
-            'Parent Retirement Help': 11400,
             'Other Expenses': 5700
         },
         "Average": {
@@ -811,7 +795,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 12350,
             'Entertainment & Activities': 6840,
             'Personal Care': 3420,
-            'Parent Retirement Help': 17100,
             'Other Expenses': 7980
         },
         "High-end": {
@@ -820,7 +803,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 17100,
             'Entertainment & Activities': 11400,
             'Personal Care': 5700,
-            'Parent Retirement Help': 28500,
             'Other Expenses': 11400
         }
     },
@@ -831,7 +813,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 8500,
             'Entertainment & Activities': 4080,
             'Personal Care': 2040,
-            'Parent Retirement Help': 10200,
             'Other Expenses': 5100
         },
         "Average": {
@@ -840,7 +821,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 11050,
             'Entertainment & Activities': 6120,
             'Personal Care': 3060,
-            'Parent Retirement Help': 15300,
             'Other Expenses': 7140
         },
         "High-end": {
@@ -849,7 +829,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 15300,
             'Entertainment & Activities': 10200,
             'Personal Care': 5100,
-            'Parent Retirement Help': 25500,
             'Other Expenses': 10200
         }
     },
@@ -864,7 +843,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 9000,
             'Entertainment & Activities': 4320,
             'Personal Care': 2160,
-            'Parent Retirement Help': 10800,
             'Other Expenses': 5400
         },
         "Average": {
@@ -873,7 +851,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 11700,
             'Entertainment & Activities': 6480,
             'Personal Care': 3240,
-            'Parent Retirement Help': 16200,
             'Other Expenses': 7560
         },
         "High-end": {
@@ -882,7 +859,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 16200,
             'Entertainment & Activities': 10800,
             'Personal Care': 5400,
-            'Parent Retirement Help': 27000,
             'Other Expenses': 10800
         }
     },
@@ -893,7 +869,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 9500,
             'Entertainment & Activities': 4560,
             'Personal Care': 2280,
-            'Parent Retirement Help': 11400,
             'Other Expenses': 5700
         },
         "Average": {
@@ -902,7 +877,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 12350,
             'Entertainment & Activities': 6840,
             'Personal Care': 3420,
-            'Parent Retirement Help': 17100,
             'Other Expenses': 7980
         },
         "High-end": {
@@ -911,7 +885,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 17100,
             'Entertainment & Activities': 11400,
             'Personal Care': 5700,
-            'Parent Retirement Help': 28500,
             'Other Expenses': 11400
         }
     },
@@ -922,7 +895,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 7500,
             'Entertainment & Activities': 3600,
             'Personal Care': 1800,
-            'Parent Retirement Help': 9000,
             'Other Expenses': 4500
         },
         "Average": {
@@ -931,7 +903,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 9750,
             'Entertainment & Activities': 5400,
             'Personal Care': 2700,
-            'Parent Retirement Help': 13500,
             'Other Expenses': 6300
         },
         "High-end": {
@@ -940,7 +911,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 13500,
             'Entertainment & Activities': 9000,
             'Personal Care': 4500,
-            'Parent Retirement Help': 22500,
             'Other Expenses': 9000
         }
     },
@@ -951,7 +921,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 6500,
             'Entertainment & Activities': 3120,
             'Personal Care': 1560,
-            'Parent Retirement Help': 7800,
             'Other Expenses': 3900
         },
         "Average": {
@@ -960,7 +929,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 8450,
             'Entertainment & Activities': 4680,
             'Personal Care': 2340,
-            'Parent Retirement Help': 11700,
             'Other Expenses': 5460
         },
         "High-end": {
@@ -969,7 +937,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 11700,
             'Entertainment & Activities': 7800,
             'Personal Care': 3900,
-            'Parent Retirement Help': 19500,
             'Other Expenses': 7800
         }
     },
@@ -980,7 +947,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 7000,
             'Entertainment & Activities': 3360,
             'Personal Care': 1680,
-            'Parent Retirement Help': 8400,
             'Other Expenses': 4200
         },
         "Average": {
@@ -989,7 +955,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 9100,
             'Entertainment & Activities': 5040,
             'Personal Care': 2520,
-            'Parent Retirement Help': 12600,
             'Other Expenses': 5880
         },
         "High-end": {
@@ -998,7 +963,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 12600,
             'Entertainment & Activities': 8400,
             'Personal Care': 4200,
-            'Parent Retirement Help': 21000,
             'Other Expenses': 8400
         }
     },
@@ -1009,7 +973,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 9000,
             'Entertainment & Activities': 4320,
             'Personal Care': 2160,
-            'Parent Retirement Help': 10800,
             'Other Expenses': 5400
         },
         "Average": {
@@ -1018,7 +981,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 11700,
             'Entertainment & Activities': 6480,
             'Personal Care': 3240,
-            'Parent Retirement Help': 16200,
             'Other Expenses': 7560
         },
         "High-end": {
@@ -1027,7 +989,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 16200,
             'Entertainment & Activities': 10800,
             'Personal Care': 5400,
-            'Parent Retirement Help': 27000,
             'Other Expenses': 10800
         }
     },
@@ -1038,7 +999,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 11000,
             'Entertainment & Activities': 5280,
             'Personal Care': 2640,
-            'Parent Retirement Help': 13200,
             'Other Expenses': 6600
         },
         "Average": {
@@ -1047,7 +1007,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 14300,
             'Entertainment & Activities': 7920,
             'Personal Care': 3960,
-            'Parent Retirement Help': 19800,
             'Other Expenses': 9240
         },
         "High-end": {
@@ -1056,7 +1015,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 19800,
             'Entertainment & Activities': 13200,
             'Personal Care': 6600,
-            'Parent Retirement Help': 33000,
             'Other Expenses': 13200
         }
     },
@@ -1067,7 +1025,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 9500,
             'Entertainment & Activities': 4560,
             'Personal Care': 2280,
-            'Parent Retirement Help': 11400,
             'Other Expenses': 5700
         },
         "Average": {
@@ -1076,7 +1033,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 12350,
             'Entertainment & Activities': 6840,
             'Personal Care': 3420,
-            'Parent Retirement Help': 17100,
             'Other Expenses': 7980
         },
         "High-end": {
@@ -1085,7 +1041,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 17100,
             'Entertainment & Activities': 11400,
             'Personal Care': 5700,
-            'Parent Retirement Help': 28500,
             'Other Expenses': 11400
         }
     },
@@ -1096,7 +1051,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 8500,
             'Entertainment & Activities': 4080,
             'Personal Care': 2040,
-            'Parent Retirement Help': 10200,
             'Other Expenses': 5100
         },
         "Average": {
@@ -1105,7 +1059,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 11050,
             'Entertainment & Activities': 6120,
             'Personal Care': 3060,
-            'Parent Retirement Help': 15300,
             'Other Expenses': 7140
         },
         "High-end": {
@@ -1114,7 +1067,6 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 15300,
             'Entertainment & Activities': 10200,
             'Personal Care': 5100,
-            'Parent Retirement Help': 25500,
             'Other Expenses': 10200
         }
     }
@@ -1417,7 +1369,6 @@ def initialize_session_state():
             'Transportation',
             'Entertainment & Activities',
             'Personal Care',
-            'Parent Retirement Help',
             'Other Expenses'
         ]
 
@@ -1428,7 +1379,6 @@ def initialize_session_state():
             'Transportation': 12000.0,
             'Entertainment & Activities': 6000.0,
             'Personal Care': 3600.0,
-            'Parent Retirement Help': 20000.0,
             'Other Expenses': 7200.0
         }
 
@@ -1485,6 +1435,18 @@ def initialize_session_state():
         # Major purchases and recurring expenses
         st.session_state.major_purchases = []
         st.session_state.recurring_expenses = [
+            RecurringExpense(
+                name="Parent Retirement Help",
+                category="Family Support",
+                amount=20000.0,
+                frequency_years=1,
+                start_year=2025,
+                end_year=None,
+                inflation_adjust=False,
+                parent="Both",
+                financing_years=0,
+                interest_rate=0.0
+            ),
             RecurringExpense(
                 name="Parent X Vehicle",
                 category="Vehicle",
@@ -2095,6 +2057,20 @@ def parent_settings_tab():
 
     with col1:
         st.checkbox(
+            "💸 Family Expenses",
+            value=st.session_state.get('show_family_expenses', False),
+            key='show_family_expenses',
+            help="Advanced template-based expense management for different cities"
+        )
+
+        st.checkbox(
+            "🔄 Recurring & One-Time Expenses",
+            value=st.session_state.get('show_recurring_expenses', True),
+            key='show_recurring_expenses',
+            help="Manage recurring and one-time expenses"
+        )
+
+        st.checkbox(
             "💼 Portfolio Allocation",
             value=st.session_state.get('show_portfolio_allocation', False),
             key='show_portfolio_allocation',
@@ -2488,20 +2464,21 @@ def family_expenses_tab():
             st.metric("Total Annual Expenses", f"${total:,.0f}")
             st.caption(f"Monthly: ${total/12:,.0f}")
 
-        # Quick load button
+        # Quick save button
         st.markdown("---")
-        col_load1, col_load2 = st.columns([3, 1])
+        col_save1, col_save2 = st.columns([3, 1])
 
-        with col_load1:
-            st.markdown(f"**Load this template into your current expenses?**")
-            st.caption("This will replace your current expense values with this template.")
+        with col_save1:
+            st.markdown(f"**Save this template for future use?**")
+            st.caption("This will save the template to your custom templates.")
 
-        with col_load2:
-            if st.button("📥 Load Template", type="primary", key="load_template_btn"):
-                for category, amount in template.items():
-                    if category in st.session_state.expenses:
-                        st.session_state.expenses[category] = amount
-                st.success(f"✅ Loaded {selected_strategy} template for {get_location_display_name(selected_location)}!")
+        with col_save2:
+            if st.button("💾 Save Template", type="primary", key="save_template_btn"):
+                # Save to custom templates
+                if selected_location not in st.session_state.custom_family_templates:
+                    st.session_state.custom_family_templates[selected_location] = {}
+                st.session_state.custom_family_templates[selected_location][selected_strategy] = template.copy()
+                st.success(f"✅ Saved {selected_strategy} template for {get_location_display_name(selected_location)}!")
                 st.rerun()
 
     # TAB 2: Edit Templates
@@ -2577,19 +2554,39 @@ def family_expenses_tab():
         st.markdown("---")
         st.subheader("💾 Save Changes")
 
-        if save_as_new:
+        # Option to save as a completely new city/location
+        save_as_new_city = st.checkbox("Save as new city/location", value=False, key="save_as_new_city")
+
+        if save_as_new_city:
+            new_city_location = st.text_input(
+                "New City/Location Name:",
+                value=f"{edit_location} (Copy)",
+                key="new_city_location",
+                help="Enter a new city/location name to save this template under"
+            )
+            new_strategy_name = st.text_input(
+                "Strategy Name:",
+                value=edit_strategy,
+                key="new_strategy_name_city"
+            )
+            save_location = new_city_location
+        elif save_as_new:
             new_strategy_name = st.text_input(
                 "New Strategy Name:",
                 value=f"{edit_strategy} (Modified)",
                 key="new_strategy_name"
             )
+            save_location = edit_location
         else:
             new_strategy_name = edit_strategy
+            save_location = edit_location
 
         col_save1, col_save2 = st.columns([3, 1])
 
         with col_save1:
-            if save_as_new:
+            if save_as_new_city:
+                st.info(f"Will save as new city: **{new_city_location} - {new_strategy_name}**")
+            elif save_as_new:
                 st.info(f"Will save as: **{get_location_display_name(edit_location)} - {new_strategy_name}**")
             else:
                 st.warning(f"⚠️ Will overwrite: **{get_location_display_name(edit_location)} - {edit_strategy}** (saved as custom template)")
@@ -2597,13 +2594,13 @@ def family_expenses_tab():
         with col_save2:
             if st.button("💾 Save Template", type="primary", key="save_edited_template"):
                 # Initialize location if needed
-                if edit_location not in st.session_state.custom_family_templates:
-                    st.session_state.custom_family_templates[edit_location] = {}
+                if save_location not in st.session_state.custom_family_templates:
+                    st.session_state.custom_family_templates[save_location] = {}
 
                 # Save the template
-                st.session_state.custom_family_templates[edit_location][new_strategy_name] = edited_template.copy()
+                st.session_state.custom_family_templates[save_location][new_strategy_name] = edited_template.copy()
 
-                st.success(f"✅ Saved template: {get_location_display_name(edit_location)} - {new_strategy_name}")
+                st.success(f"✅ Saved template: {save_location} - {new_strategy_name}")
                 st.rerun()
 
     # TAB 3: Create Custom City
@@ -2672,7 +2669,6 @@ def family_expenses_tab():
                 'Transportation': 0.0,
                 'Entertainment & Activities': 0.0,
                 'Personal Care': 0.0,
-                'Parent Retirement Help': 0.0,
                 'Other Expenses': 0.0
             }
 
@@ -3552,14 +3548,15 @@ def timeline_tab():
         # Plot segments as horizontal bars
         for seg in segments:
             duration = seg['end'] - seg['start'] + 1
+            location_full_name = get_location_display_name(seg['state'])
             fig.add_trace(go.Bar(
                 x=[duration],
                 y=['Timeline'],
                 orientation='h',
-                name=f"{seg['state']} - {seg['strategy']}",
-                text=f"{seg['state']}<br>{seg['strategy']}<br>{seg['start']}-{seg['end']}",
+                name=f"{location_full_name} - {seg['strategy']}",
+                text=f"{location_full_name}<br>{seg['strategy']}<br>{seg['start']}-{seg['end']}",
                 textposition='inside',
-                hovertemplate=f"<b>{seg['state']}</b><br>{seg['strategy']}<br>Years: {seg['start']}-{seg['end']}<br>Duration: {duration} years<extra></extra>",
+                hovertemplate=f"<b>{location_full_name}</b><br>{seg['strategy']}<br>Years: {seg['start']}-{seg['end']}<br>Duration: {duration} years<extra></extra>",
                 base=seg['start']
             ))
 
@@ -3769,12 +3766,13 @@ def calculate_lifetime_cashflow():
         total_income = parent1_income + parent2_income + ss_income
 
         # Calculate expenses
-        # Base family expenses (with inflation)
+        # Base family expenses (state-based with inflation)
         years_from_now = year - st.session_state.current_year
-        base_expenses = sum(st.session_state.expenses.values())
+        base_expenses_dict = get_state_based_family_expenses(year)
+        base_expenses = sum(base_expenses_dict.values())
         base_expenses *= (1.03 ** years_from_now)  # 3% inflation
 
-        # Children expenses
+        # Children expenses (state-based)
         children_expenses = 0
         children_in_college = []
         for child in st.session_state.children_list:
@@ -3787,7 +3785,27 @@ def calculate_lifetime_cashflow():
             if 18 <= child_age <= 21:
                 children_in_college.append(child['name'])
 
-        total_expenses = base_expenses + children_expenses
+        # Recurring expenses
+        recurring_expenses_total = 0
+        for recurring in st.session_state.recurring_expenses:
+            # Check if this expense occurs this year
+            if year >= recurring.start_year:
+                if recurring.end_year is None or year <= recurring.end_year:
+                    # Check if it's a year when this recurring expense occurs
+                    years_since_start = year - recurring.start_year
+                    if years_since_start % recurring.frequency_years == 0:
+                        expense_amount = recurring.amount
+                        if recurring.inflation_adjust:
+                            expense_amount *= (1.03 ** years_from_now)
+                        recurring_expenses_total += expense_amount
+
+        # One-time major purchases
+        major_purchase_expenses = 0
+        for purchase in st.session_state.major_purchases:
+            if purchase.year == year:
+                major_purchase_expenses += purchase.amount
+
+        total_expenses = base_expenses + children_expenses + recurring_expenses_total + major_purchase_expenses
 
         # Calculate cashflow
         cashflow = total_income - total_expenses
