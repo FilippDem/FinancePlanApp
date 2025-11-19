@@ -1625,7 +1625,7 @@ def initialize_session_state():
                 'purchase_price': 1200000.0,
                 'current_value': 1300000.0,
                 'mortgage_balance': 900000.0,
-                'mortgage_rate': 6.5,
+                'mortgage_rate': 0.065,
                 'mortgage_years_left': 28,
                 'property_tax_rate': 1.2,
                 'home_insurance': 2400.0,
@@ -1732,7 +1732,7 @@ def initialize_session_state():
                 'purchase_price': 650000.0,
                 'current_value': 800000.0,
                 'mortgage_balance': 420000.0,
-                'mortgage_rate': 3.5,
+                'mortgage_rate': 0.035,
                 'mortgage_years_left': 22,
                 'property_tax_rate': 1.0,
                 'home_insurance': 1800.0,
@@ -1760,7 +1760,7 @@ def initialize_session_state():
                     'inflation_adjust': True,
                     'parent': 'Both',
                     'financing_years': 5,
-                    'interest_rate': 4.5
+                    'interest_rate': 0.045
                 },
                 {
                     'name': 'Annual Family Vacation',
@@ -1969,7 +1969,7 @@ def initialize_session_state():
                 'purchase_price': 420000.0,
                 'current_value': 450000.0,
                 'mortgage_balance': 336000.0,
-                'mortgage_rate': 6.8,
+                'mortgage_rate': 0.068,
                 'mortgage_years_left': 27,
                 'property_tax_rate': 1.1,
                 'home_insurance': 1400.0,
@@ -1997,7 +1997,7 @@ def initialize_session_state():
                     'inflation_adjust': True,
                     'parent': 'ParentX',
                     'financing_years': 5,
-                    'interest_rate': 4.0
+                    'interest_rate': 0.04
                 },
                 {
                     'name': 'Summer Camp',
