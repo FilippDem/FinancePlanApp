@@ -18,6 +18,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Base year for expense templates (all templates inflation-adjusted to this year)
+EXPENSE_TEMPLATE_BASE_YEAR = 2024
+
 # Historical S&P 500 Annual Returns (approximately 1924-2023, 100 years)
 HISTORICAL_STOCK_RETURNS = [
     # 1924-1929 (Pre-Depression)
@@ -66,6 +69,58 @@ AVAILABLE_LOCATIONS_FAMILY = [
     # Australia
     "Sydney", "Melbourne", "Brisbane"
 ]
+
+# Display names for locations (includes country and state for USA cities)
+LOCATION_DISPLAY_NAMES = {
+    # USA
+    "Seattle": "Seattle, WA, USA",
+    "Sacramento": "Sacramento, CA, USA",
+    "California": "California, USA",
+    "Houston": "Houston, TX, USA",
+    "New York": "New York, NY, USA",
+    "San Francisco": "San Francisco, CA, USA",
+    "Los Angeles": "Los Angeles, CA, USA",
+    "Portland": "Portland, OR, USA",
+    # Canada
+    "Toronto": "Toronto, ON, Canada",
+    "Vancouver": "Vancouver, BC, Canada",
+    # France
+    "Paris": "Paris, France",
+    "Toulouse": "Toulouse, France",
+    # Germany
+    "Berlin": "Berlin, Germany",
+    "Munich": "Munich, Germany",
+    # Australia
+    "Sydney": "Sydney, NSW, Australia",
+    "Melbourne": "Melbourne, VIC, Australia",
+    "Brisbane": "Brisbane, QLD, Australia"
+}
+
+# Geographic coordinates for world map visualization
+LOCATION_COORDINATES = {
+    # USA
+    "Seattle": {"lat": 47.6062, "lon": -122.3321},
+    "Sacramento": {"lat": 38.5816, "lon": -121.4944},
+    "California": {"lat": 36.7783, "lon": -119.4179},  # Center of CA
+    "Houston": {"lat": 29.7604, "lon": -95.3698},
+    "New York": {"lat": 40.7128, "lon": -74.0060},
+    "San Francisco": {"lat": 37.7749, "lon": -122.4194},
+    "Los Angeles": {"lat": 34.0522, "lon": -118.2437},
+    "Portland": {"lat": 45.5152, "lon": -122.6784},
+    # Canada
+    "Toronto": {"lat": 43.6532, "lon": -79.3832},
+    "Vancouver": {"lat": 49.2827, "lon": -123.1207},
+    # France
+    "Paris": {"lat": 48.8566, "lon": 2.3522},
+    "Toulouse": {"lat": 43.6047, "lon": 1.4442},
+    # Germany
+    "Berlin": {"lat": 52.5200, "lon": 13.4050},
+    "Munich": {"lat": 48.1351, "lon": 11.5820},
+    # Australia
+    "Sydney": {"lat": -33.8688, "lon": 151.2093},
+    "Melbourne": {"lat": -37.8136, "lon": 144.9631},
+    "Brisbane": {"lat": -27.4698, "lon": 153.0251}
+}
 
 # [Keep all the CHILDREN_EXPENSE_TEMPLATES and FAMILY_EXPENSE_TEMPLATES from V14]
 # [I'll include the full templates but truncate here for readability]
@@ -1526,6 +1581,12 @@ def initialize_session_state():
         # NEW: Custom children templates
         st.session_state.custom_children_templates = {}
 
+        # NEW: Custom family expense templates
+        st.session_state.custom_family_templates = {}
+
+        # NEW: Custom location display names (for user-created cities)
+        st.session_state.custom_location_display_names = {}
+
         # NEW: Healthcare & Insurance
         st.session_state.health_insurances = []
         st.session_state.ltc_insurances = []
@@ -1556,6 +1617,8 @@ def initialize_session_state():
         st.session_state.tax_bracket = 0.22    # Federal marginal tax bracket
 
         # Tab visibility settings
+        st.session_state.show_family_expenses = False  # Off by default (advanced template management)
+        st.session_state.show_recurring_expenses = True  # On by default
         st.session_state.show_portfolio_allocation = False  # Off by default
         st.session_state.show_healthcare = False  # Off by default
         st.session_state.show_debt = False  # Off by default
@@ -1584,6 +1647,16 @@ def get_state_for_year(year: int) -> tuple:
             break
 
     return current_state, current_strategy
+
+
+def get_location_display_name(location: str) -> str:
+    """Get full display name for a location including country and state"""
+    # Check custom display names first, then built-in ones
+    if hasattr(st.session_state, 'custom_location_display_names'):
+        custom_name = st.session_state.custom_location_display_names.get(location)
+        if custom_name:
+            return custom_name
+    return LOCATION_DISPLAY_NAMES.get(location, location)
 
 
 def get_state_based_family_expenses(year: int) -> dict:
@@ -1908,7 +1981,8 @@ def main():
         ("⚙️ Settings", parent_settings_tab, True),  # Always shown
         (f"{st.session_state.parent1_emoji} {st.session_state.parent1_name}", parent_x_tab, True),
         (f"{st.session_state.parent2_emoji} {st.session_state.parent2_name}", parent_y_tab, True),
-        ("💸 Family Expenses", family_expenses_tab, True),
+        ("💸 Family Expenses", family_expenses_tab, st.session_state.get('show_family_expenses', False)),
+        ("🔄 Recurring & One-Time Expenses", recurring_one_time_expenses_tab, st.session_state.get('show_recurring_expenses', True)),
         ("👶 Children", children_tab, True),
         ("🏠 House Portfolio", house_tab, True),
         ("💼 Portfolio Allocation", portfolio_allocation_tab, st.session_state.get('show_portfolio_allocation', False)),
@@ -2319,26 +2393,346 @@ def parent_y_tab():
 
 
 def family_expenses_tab():
-    """Family expenses tab"""
+    """Family expenses tab with template browsing, modification, and custom city creation"""
     st.header("💸 Family Expenses")
 
-    # State-based expense templates
-    st.subheader("📍 State-Based Expense Templates")
-    st.markdown("Expenses will automatically adjust based on your state timeline in the Timeline tab")
+    # Show inflation adjustment info
+    st.info(f"ℹ️ All expense templates are inflation-adjusted to **{EXPENSE_TEMPLATE_BASE_YEAR}** dollars")
+
+    # Create tabs for different views
+    expense_tab1, expense_tab2, expense_tab3 = st.tabs([
+        "📊 Browse Templates",
+        "✏️ Edit Templates",
+        "🌍 Create Custom City"
+    ])
+
+    # TAB 1: Browse Templates
+    with expense_tab1:
+        st.subheader("📊 Browse Expense Templates by Location")
+
+        # Get all available locations (built-in + custom)
+        all_templates = {**FAMILY_EXPENSE_TEMPLATES, **st.session_state.custom_family_templates}
+        available_locations = sorted(all_templates.keys())
+
+        if not available_locations:
+            st.warning("No templates available. Please create a custom city in the 'Create Custom City' tab.")
+            return
+
+        # Create display options with full location names
+        location_display_options = [get_location_display_name(loc) for loc in available_locations]
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            selected_display = st.selectbox(
+                "Select Location/City:",
+                options=location_display_options,
+                index=0,
+                key="browse_location"
+            )
+            # Get the actual location key from the display name
+            selected_location = available_locations[location_display_options.index(selected_display)]
+
+        # Get available strategies for selected location
+        available_strategies = list(all_templates[selected_location].keys())
+
+        with col2:
+            selected_strategy = st.selectbox(
+                "Select Spending Strategy:",
+                options=available_strategies,
+                index=0,
+                key="browse_strategy"
+            )
+
+        # Display template details
+        template = all_templates[selected_location][selected_strategy]
+
+        st.markdown("---")
+        st.subheader(f"📋 {get_location_display_name(selected_location)} - {selected_strategy} Strategy")
+
+        # Show template as visualization and table
+        col_chart, col_table = st.columns([1, 1])
+
+        with col_chart:
+            # Create pie chart
+            categories = list(template.keys())
+            amounts = list(template.values())
+
+            fig = go.Figure(data=[go.Pie(
+                labels=categories,
+                values=amounts,
+                hole=0.4,
+                textinfo='label+percent',
+                marker=dict(colors=px.colors.qualitative.Set3)
+            )])
+
+            fig.update_layout(
+                title=f"Expense Breakdown",
+                height=400,
+                showlegend=True
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col_table:
+            # Create detailed table
+            template_df = pd.DataFrame({
+                'Category': categories,
+                'Annual Amount': [f"${amt:,.0f}" for amt in amounts],
+                'Monthly Amount': [f"${amt/12:,.0f}" for amt in amounts]
+            })
+
+            st.dataframe(template_df, hide_index=True, use_container_width=True)
+
+            total = sum(amounts)
+            st.metric("Total Annual Expenses", f"${total:,.0f}")
+            st.caption(f"Monthly: ${total/12:,.0f}")
+
+        # Quick load button
+        st.markdown("---")
+        col_load1, col_load2 = st.columns([3, 1])
+
+        with col_load1:
+            st.markdown(f"**Load this template into your current expenses?**")
+            st.caption("This will replace your current expense values with this template.")
+
+        with col_load2:
+            if st.button("📥 Load Template", type="primary", key="load_template_btn"):
+                for category, amount in template.items():
+                    if category in st.session_state.expenses:
+                        st.session_state.expenses[category] = amount
+                st.success(f"✅ Loaded {selected_strategy} template for {get_location_display_name(selected_location)}!")
+                st.rerun()
+
+    # TAB 2: Edit Templates
+    with expense_tab2:
+        st.subheader("✏️ Edit and Save Templates")
+
+        st.markdown("""
+        Modify expense templates and save them. You can:
+        - Edit existing built-in templates (saved as custom versions)
+        - Modify your custom templates
+        - Create variations of existing templates
+        """)
+
+        # Select template to edit
+        all_templates = {**FAMILY_EXPENSE_TEMPLATES, **st.session_state.custom_family_templates}
+        available_locations = sorted(all_templates.keys())
+        location_display_options = [get_location_display_name(loc) for loc in available_locations]
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            edit_display = st.selectbox(
+                "Location to Edit:",
+                options=location_display_options,
+                key="edit_location"
+            )
+            edit_location = available_locations[location_display_options.index(edit_display)]
+
+        available_strategies = list(all_templates[edit_location].keys())
+
+        with col2:
+            edit_strategy = st.selectbox(
+                "Strategy to Edit:",
+                options=available_strategies,
+                key="edit_strategy"
+            )
+
+        with col3:
+            save_as_new = st.checkbox("Save as new strategy", value=False, key="save_as_new")
+
+        # Load template for editing
+        current_template = all_templates[edit_location][edit_strategy].copy()
+
+        st.markdown("---")
+        st.markdown(f"### Editing: {get_location_display_name(edit_location)} - {edit_strategy}")
+
+        # Edit each category
+        edited_template = {}
+
+        for category, value in current_template.items():
+            col_cat, col_val = st.columns([2, 1])
+
+            with col_cat:
+                st.markdown(f"**{category}**")
+
+            with col_val:
+                new_value = st.number_input(
+                    f"Amount for {category}",
+                    min_value=0.0,
+                    max_value=1000000.0,
+                    value=float(value),
+                    step=100.0,
+                    key=f"edit_{category}",
+                    label_visibility="collapsed"
+                )
+                edited_template[category] = new_value
+
+        # Show total
+        total_edited = sum(edited_template.values())
+        st.metric("Total Annual Expenses", f"${total_edited:,.0f}")
+
+        # Save options
+        st.markdown("---")
+        st.subheader("💾 Save Changes")
+
+        if save_as_new:
+            new_strategy_name = st.text_input(
+                "New Strategy Name:",
+                value=f"{edit_strategy} (Modified)",
+                key="new_strategy_name"
+            )
+        else:
+            new_strategy_name = edit_strategy
+
+        col_save1, col_save2 = st.columns([3, 1])
+
+        with col_save1:
+            if save_as_new:
+                st.info(f"Will save as: **{get_location_display_name(edit_location)} - {new_strategy_name}**")
+            else:
+                st.warning(f"⚠️ Will overwrite: **{get_location_display_name(edit_location)} - {edit_strategy}** (saved as custom template)")
+
+        with col_save2:
+            if st.button("💾 Save Template", type="primary", key="save_edited_template"):
+                # Initialize location if needed
+                if edit_location not in st.session_state.custom_family_templates:
+                    st.session_state.custom_family_templates[edit_location] = {}
+
+                # Save the template
+                st.session_state.custom_family_templates[edit_location][new_strategy_name] = edited_template.copy()
+
+                st.success(f"✅ Saved template: {get_location_display_name(edit_location)} - {new_strategy_name}")
+                st.rerun()
+
+    # TAB 3: Create Custom City
+    with expense_tab3:
+        st.subheader("🌍 Create Custom City/Location Template")
+
+        st.markdown("""
+        Create a brand new location template from scratch or copy an existing one as a starting point.
+        """)
+
+        # Option to copy from existing or start fresh
+        creation_mode = st.radio(
+            "Creation Mode:",
+            options=["Start from scratch", "Copy from existing template"],
+            horizontal=True,
+            key="creation_mode"
+        )
+
+        # New city name
+        new_city_name = st.text_input(
+            "New City/Location Name:",
+            value="",
+            placeholder="e.g., Miami, FL, USA or London, UK",
+            key="new_city_name",
+            help="Include city, state (for USA), and country for clarity"
+        )
+
+        new_strategy_name_city = st.text_input(
+            "Strategy Name:",
+            value="Average",
+            key="new_strategy_name_city"
+        )
+
+        if creation_mode == "Copy from existing template":
+            # Select template to copy
+            all_templates = {**FAMILY_EXPENSE_TEMPLATES, **st.session_state.custom_family_templates}
+            available_locations = sorted(all_templates.keys())
+            location_display_options = [get_location_display_name(loc) for loc in available_locations]
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                copy_display = st.selectbox(
+                    "Copy from Location:",
+                    options=location_display_options,
+                    key="copy_location"
+                )
+                copy_location = available_locations[location_display_options.index(copy_display)]
+
+            available_strategies = list(all_templates[copy_location].keys())
+
+            with col2:
+                copy_strategy = st.selectbox(
+                    "Copy from Strategy:",
+                    options=available_strategies,
+                    key="copy_strategy"
+                )
+
+            # Load template to use as base
+            base_template = all_templates[copy_location][copy_strategy].copy()
+        else:
+            # Start with default categories and zero values
+            base_template = {
+                'Food & Groceries': 0.0,
+                'Clothing': 0.0,
+                'Transportation': 0.0,
+                'Entertainment & Activities': 0.0,
+                'Personal Care': 0.0,
+                'Parent Retirement Help': 0.0,
+                'Other Expenses': 0.0
+            }
+
+        st.markdown("---")
+        st.subheader(f"💵 Set Expense Values for {new_city_name if new_city_name else '(enter city name above)'}")
+
+        # Edit template values
+        new_template = {}
+
+        for category, value in base_template.items():
+            col_cat, col_val = st.columns([2, 1])
+
+            with col_cat:
+                st.markdown(f"**{category}**")
+
+            with col_val:
+                new_value = st.number_input(
+                    f"Amount for {category}",
+                    min_value=0.0,
+                    max_value=1000000.0,
+                    value=float(value),
+                    step=100.0,
+                    key=f"new_{category}",
+                    label_visibility="collapsed"
+                )
+                new_template[category] = new_value
+
+        # Show total
+        total_new = sum(new_template.values())
+        st.metric("Total Annual Expenses", f"${total_new:,.0f}")
+
+        # Create button
+        st.markdown("---")
+        col_create1, col_create2 = st.columns([3, 1])
+
+        with col_create1:
+            if new_city_name:
+                st.info(f"Will create: **{new_city_name} - {new_strategy_name_city}**")
+            else:
+                st.warning("⚠️ Please enter a city name above")
+
+        with col_create2:
+            if st.button("🌍 Create City", type="primary", key="create_city_btn", disabled=not new_city_name):
+                # Initialize location
+                if new_city_name not in st.session_state.custom_family_templates:
+                    st.session_state.custom_family_templates[new_city_name] = {}
+
+                # Save the template
+                st.session_state.custom_family_templates[new_city_name][new_strategy_name_city] = new_template.copy()
+
+                st.success(f"✅ Created new city: {new_city_name} - {new_strategy_name_city}!")
+                st.balloons()
+                st.rerun()
+
+    # Show current expenses section at bottom (always visible)
+    st.markdown("---")
+    st.subheader("💳 Your Current Annual Family Expenses")
 
     current_state, current_strategy = get_state_for_year(st.session_state.current_year)
-    st.info(f"Current State: **{current_state}** | Spending Strategy: **{current_strategy}**")
-
-    if st.button("Load Template for Current State"):
-        template_expenses = get_state_based_family_expenses(st.session_state.current_year)
-        for category, amount in template_expenses.items():
-            if category in st.session_state.expenses:
-                st.session_state.expenses[category] = amount
-        st.success(f"Loaded {current_strategy} template for {current_state}")
-        st.rerun()
-
-    # Annual Expenses
-    st.subheader("Annual Family Expenses")
+    st.info(f"📍 Current State from Timeline: **{current_state}** | Strategy: **{current_strategy}**")
 
     for category in st.session_state.expense_categories:
         col1, col2 = st.columns([3, 1])
@@ -2383,8 +2777,15 @@ def family_expenses_tab():
             format="%.0f"
         )
 
-    # Major Purchases
-    st.subheader("🛒 Major Purchases")
+
+def recurring_one_time_expenses_tab():
+    """Recurring expenses and one-time major purchases tab"""
+    st.header("🔄 Recurring & One-Time Expenses")
+
+    st.markdown("""
+    Manage recurring expenses (like vehicle purchases every N years) and one-time major purchases.
+    These expenses are included in all financial simulations and projections.
+    """)
 
     if st.button("➕ Add Major Purchase"):
         new_purchase = MajorPurchase(
@@ -2440,7 +2841,13 @@ def family_expenses_tab():
                 st.rerun()
 
     # Recurring Expenses
+    st.markdown("---")
     st.subheader("🔄 Recurring Expenses")
+
+    st.markdown("""
+    Add expenses that repeat every N years (e.g., buying a new car every 7 years,
+    home renovations every 15 years).
+    """)
 
     if st.button("➕ Add Recurring Expense"):
         new_recurring = RecurringExpense(
@@ -3177,6 +3584,116 @@ def timeline_tab():
         # Show key milestones
         st.markdown(f"**Timeline extends to {end_year}** ({st.session_state.parent1_name} age 100: {parent1_100_year}, {st.session_state.parent2_name} age 100: {parent2_100_year})")
 
+        # Add world map visualization
+        st.markdown("---")
+        st.subheader("🌍 World Map: Your Relocation Journey")
+
+        # Get unique locations from timeline in chronological order
+        timeline_locations = []
+        seen_states = set()
+
+        for entry in sorted(st.session_state.state_timeline, key=lambda x: x.year):
+            if entry.state not in seen_states:
+                timeline_locations.append({
+                    'state': entry.state,
+                    'year': entry.year,
+                    'coords': LOCATION_COORDINATES.get(entry.state)
+                })
+                seen_states.add(entry.state)
+
+        # Only show map if we have valid coordinates for at least 2 locations
+        valid_locations = [loc for loc in timeline_locations if loc['coords'] is not None]
+
+        if len(valid_locations) >= 2:
+            # Create map figure
+            map_fig = go.Figure()
+
+            # Add flight path lines between consecutive locations
+            for i in range(len(valid_locations) - 1):
+                loc1 = valid_locations[i]
+                loc2 = valid_locations[i + 1]
+
+                # Add curved line (great circle route simulation)
+                map_fig.add_trace(go.Scattergeo(
+                    lon=[loc1['coords']['lon'], loc2['coords']['lon']],
+                    lat=[loc1['coords']['lat'], loc2['coords']['lat']],
+                    mode='lines',
+                    line=dict(width=2, color='rgb(255, 100, 100)'),
+                    opacity=0.6,
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+
+            # Add location markers
+            lats = [loc['coords']['lat'] for loc in valid_locations]
+            lons = [loc['coords']['lon'] for loc in valid_locations]
+            texts = [f"{get_location_display_name(loc['state'])}<br>Year: {loc['year']}" for loc in valid_locations]
+            markers = [f"📍 {loc['state']}<br>{loc['year']}" for loc in valid_locations]
+
+            map_fig.add_trace(go.Scattergeo(
+                lon=lons,
+                lat=lats,
+                mode='markers+text',
+                marker=dict(
+                    size=15,
+                    color='rgb(50, 120, 255)',
+                    line=dict(width=3, color='white'),
+                    symbol='circle'
+                ),
+                text=[f"{i+1}" for i in range(len(valid_locations))],  # Number each location
+                textfont=dict(size=10, color='white', family='Arial Black'),
+                textposition='middle center',
+                hovertext=texts,
+                hoverinfo='text',
+                showlegend=False
+            ))
+
+            # Update map layout
+            map_fig.update_layout(
+                title=dict(
+                    text='Your Life Journey: Where You\'ll Live',
+                    font=dict(size=18)
+                ),
+                geo=dict(
+                    projection_type='natural earth',
+                    showland=True,
+                    landcolor='rgb(243, 243, 243)',
+                    coastlinecolor='rgb(204, 204, 204)',
+                    countrycolor='rgb(204, 204, 204)',
+                    showcountries=True,
+                    showocean=True,
+                    oceancolor='rgb(230, 245, 255)',
+                    showlakes=True,
+                    lakecolor='rgb(230, 245, 255)',
+                    projection=dict(
+                        rotation=dict(
+                            lon=-60,  # Center roughly on Atlantic
+                            lat=20
+                        )
+                    )
+                ),
+                height=600,
+                margin=dict(l=0, r=0, t=50, b=0)
+            )
+
+            st.plotly_chart(map_fig, use_container_width=True)
+
+            # Show location journey summary
+            st.markdown("**🛫 Your Relocation Journey:**")
+            for i, loc in enumerate(valid_locations):
+                if i == 0:
+                    st.info(f"**{loc['year']}:** 🏠 Start in {get_location_display_name(loc['state'])}")
+                else:
+                    prev_loc = valid_locations[i-1]
+                    years_duration = loc['year'] - prev_loc['year']
+                    st.success(f"**{loc['year']}:** ✈️ Move to {get_location_display_name(loc['state'])} (after {years_duration} years in {get_location_display_name(prev_loc['state'])})")
+
+        elif len(valid_locations) == 1:
+            loc = valid_locations[0]
+            st.info(f"📍 You're staying in **{get_location_display_name(loc['state'])}** throughout the timeline. Add more locations in the table above to see your relocation journey on the map!")
+        else:
+            st.warning("⚠️ No valid location coordinates found. Please ensure your timeline includes recognized locations.")
+
     # Show current and future states
     st.subheader("Timeline Summary")
 
@@ -3327,9 +3844,14 @@ def lifetime_cashflow_tab():
     st.markdown("""
     See how money flows through your entire life from now until age 100.
     This view helps you identify peak earning years, high expense periods, and retirement readiness.
+    **Click on any year in the chart to see detailed income and expense breakdown.**
     """)
 
-    # Calculate lifetime data
+    # Initialize selected year in session state
+    if 'selected_cashflow_year' not in st.session_state:
+        st.session_state.selected_cashflow_year = None
+
+    # Calculate lifetime data (no caching to ensure it updates when data changes)
     with st.spinner("Calculating lifetime cashflow..."):
         cashflow_data = calculate_lifetime_cashflow()
 
@@ -3359,7 +3881,7 @@ def lifetime_cashflow_tab():
             mode='lines',
             name='Income',
             line=dict(color='green', width=2),
-            hovertemplate='<b>%{x}</b><br>Income: $%{y:,.0f}<extra></extra>'
+            hovertemplate='<b>Year %{x}</b><br>Income: $%{y:,.0f}<br>Click for details<extra></extra>'
         ))
 
         # Add expenses line
@@ -3369,7 +3891,7 @@ def lifetime_cashflow_tab():
             mode='lines',
             name='Expenses',
             line=dict(color='red', width=2),
-            hovertemplate='<b>%{x}</b><br>Expenses: $%{y:,.0f}<extra></extra>'
+            hovertemplate='<b>Year %{x}</b><br>Expenses: $%{y:,.0f}<br>Click for details<extra></extra>'
         ))
 
         # Add cashflow area (positive)
@@ -3381,7 +3903,7 @@ def lifetime_cashflow_tab():
             name='Positive Cashflow',
             fill='tozeroy',
             fillcolor='rgba(0, 255, 0, 0.1)',
-            hovertemplate='<b>%{x}</b><br>Surplus: $%{y:,.0f}<extra></extra>'
+            hovertemplate='<b>Year %{x}</b><br>Surplus: $%{y:,.0f}<extra></extra>'
         ))
 
         # Add cashflow area (negative)
@@ -3393,55 +3915,202 @@ def lifetime_cashflow_tab():
             name='Deficit',
             fill='tozeroy',
             fillcolor='rgba(255, 0, 0, 0.1)',
-            hovertemplate='<b>%{x}</b><br>Deficit: $%{y:,.0f}<extra></extra>'
+            hovertemplate='<b>Year %{x}</b><br>Deficit: $%{y:,.0f}<extra></extra>'
         ))
 
-        # Add event markers
-        event_years = []
-        event_labels = []
-        event_values = []
+        # Add major event markers (only significant events to avoid clutter)
+        major_events = []
 
+        # Collect all major events
         for d in cashflow_data:
             for event_type, *event_data in d['events']:
                 if event_type == 'job_change':
-                    event_years.append(d['year'])
-                    event_labels.append(f"💼 {event_data[0]} job change")
-                    event_values.append(d['total_income'])
-                elif event_type == 'college' and len(event_data[0]) > 0:
-                    if len(event_data[0]) > 1:
-                        event_years.append(d['year'])
-                        event_labels.append(f"🎓 {len(event_data[0])} in college")
-                        event_values.append(d['total_expenses'])
+                    major_events.append({
+                        'year': d['year'],
+                        'type': 'job_change',
+                        'label': f"💼 {event_data[0]}",
+                        'value': d['total_income']
+                    })
                 elif event_type == 'retirement':
-                    event_years.append(d['year'])
-                    event_labels.append(f"🏖️ {event_data[0]} retires")
-                    event_values.append(d['total_income'])
+                    major_events.append({
+                        'year': d['year'],
+                        'type': 'retirement',
+                        'label': f"🏖️ {event_data[0]}",
+                        'value': d['total_income']
+                    })
 
-        if event_years:
+        # Add first and last college years only
+        college_years_list = [d['year'] for d in cashflow_data if d['children_in_college']]
+        if college_years_list:
+            first_college = min(college_years_list)
+            last_college = max(college_years_list)
+
+            first_college_data = next(d for d in cashflow_data if d['year'] == first_college)
+            major_events.append({
+                'year': first_college,
+                'type': 'college_start',
+                'label': '🎓 College Starts',
+                'value': first_college_data['total_expenses']
+            })
+
+            if last_college != first_college:
+                last_college_data = next(d for d in cashflow_data if d['year'] == last_college)
+                major_events.append({
+                    'year': last_college,
+                    'type': 'college_end',
+                    'label': '🎓 College Ends',
+                    'value': last_college_data['total_expenses']
+                })
+
+        # Add markers without text labels (use annotations instead)
+        if major_events:
+            event_years = [e['year'] for e in major_events]
+            event_values = [e['value'] for e in major_events]
+            event_labels = [e['label'] for e in major_events]
+
             fig.add_trace(go.Scatter(
                 x=event_years,
                 y=event_values,
-                mode='markers+text',
-                name='Events',
-                marker=dict(size=12, color='blue', symbol='star'),
-                text=event_labels,
-                textposition='top center',
-                textfont=dict(size=10),
-                hovertemplate='<b>%{text}</b><br>Year: %{x}<extra></extra>'
+                mode='markers',
+                name='Major Events',
+                marker=dict(size=15, color='blue', symbol='star', line=dict(width=2, color='white')),
+                hovertemplate='<b>%{customdata}</b><br>Year: %{x}<extra></extra>',
+                customdata=event_labels
             ))
 
         fig.update_layout(
-            title="Lifetime Income, Expenses, and Cashflow",
+            title="Lifetime Income, Expenses, and Cashflow (Click any year for details)",
             xaxis_title="Year",
             yaxis_title="Amount ($)",
-            height=600,
+            height=700,
             hovermode='x unified',
-            showlegend=True
+            showlegend=True,
+            clickmode='event+select'
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        # Display chart and capture click events
+        selected_points = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="cashflow_chart")
+
+        # Handle year selection via manual input
+        st.markdown("---")
+        col_select1, col_select2 = st.columns([3, 1])
+        with col_select1:
+            selected_year = st.selectbox(
+                "Select a year to see detailed breakdown:",
+                options=years,
+                index=0,
+                key="year_selector"
+            )
+        with col_select2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("Show Details", type="primary"):
+                st.session_state.selected_cashflow_year = selected_year
+
+        # Show detailed breakdown if year is selected
+        if st.session_state.selected_cashflow_year:
+            year_data = next((d for d in cashflow_data if d['year'] == st.session_state.selected_cashflow_year), None)
+
+            if year_data:
+                st.markdown("---")
+                st.subheader(f"📊 Detailed Breakdown for {st.session_state.selected_cashflow_year}")
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.markdown("#### 💵 Income Breakdown")
+
+                    income_breakdown = []
+                    if year_data['parent1_income'] > 0:
+                        income_breakdown.append({
+                            'Source': f"{st.session_state.parent1_name} Salary",
+                            'Amount': year_data['parent1_income']
+                        })
+                    if year_data['parent2_income'] > 0:
+                        income_breakdown.append({
+                            'Source': f"{st.session_state.parent2_name} Salary",
+                            'Amount': year_data['parent2_income']
+                        })
+                    if year_data['ss_income'] > 0:
+                        income_breakdown.append({
+                            'Source': 'Social Security',
+                            'Amount': year_data['ss_income']
+                        })
+
+                    if income_breakdown:
+                        income_df = pd.DataFrame(income_breakdown)
+
+                        # Create pie chart for income
+                        income_fig = go.Figure(data=[go.Pie(
+                            labels=income_df['Source'],
+                            values=income_df['Amount'],
+                            hole=0.3,
+                            marker_colors=['#2ecc71', '#27ae60', '#16a085']
+                        )])
+                        income_fig.update_layout(height=300, showlegend=True)
+                        st.plotly_chart(income_fig, use_container_width=True)
+
+                        # Show table
+                        income_df['Amount'] = income_df['Amount'].apply(lambda x: f"${x:,.0f}")
+                        st.dataframe(income_df, hide_index=True, use_container_width=True)
+                        st.metric("Total Income", f"${year_data['total_income']:,.0f}")
+                    else:
+                        st.info("No income for this year")
+
+                with col2:
+                    st.markdown("#### 💳 Expense Breakdown")
+
+                    expense_breakdown = []
+                    if year_data['base_expenses'] > 0:
+                        expense_breakdown.append({
+                            'Category': 'Family Living Expenses',
+                            'Amount': year_data['base_expenses']
+                        })
+                    if year_data['children_expenses'] > 0:
+                        expense_breakdown.append({
+                            'Category': 'Children Expenses',
+                            'Amount': year_data['children_expenses']
+                        })
+
+                    if expense_breakdown:
+                        expense_df = pd.DataFrame(expense_breakdown)
+
+                        # Create pie chart for expenses
+                        expense_fig = go.Figure(data=[go.Pie(
+                            labels=expense_df['Category'],
+                            values=expense_df['Amount'],
+                            hole=0.3,
+                            marker_colors=['#e74c3c', '#c0392b']
+                        )])
+                        expense_fig.update_layout(height=300, showlegend=True)
+                        st.plotly_chart(expense_fig, use_container_width=True)
+
+                        # Show table
+                        expense_df['Amount'] = expense_df['Amount'].apply(lambda x: f"${x:,.0f}")
+                        st.dataframe(expense_df, hide_index=True, use_container_width=True)
+                        st.metric("Total Expenses", f"${year_data['total_expenses']:,.0f}")
+                    else:
+                        st.info("No expenses for this year")
+
+                # Show summary metrics
+                st.markdown("#### 📈 Year Summary")
+                sum_col1, sum_col2, sum_col3, sum_col4 = st.columns(4)
+
+                with sum_col1:
+                    st.metric("Ages", f"{year_data['parent1_age']} / {year_data['parent2_age']}")
+                with sum_col2:
+                    cashflow_val = year_data['cashflow']
+                    cashflow_delta = "Surplus" if cashflow_val >= 0 else "Deficit"
+                    st.metric("Cashflow", f"${abs(cashflow_val):,.0f}", cashflow_delta)
+                with sum_col3:
+                    st.metric("Net Worth", f"${year_data['net_worth']:,.0f}")
+                with sum_col4:
+                    if year_data['children_in_college']:
+                        st.metric("In College", ", ".join(year_data['children_in_college']))
+                    else:
+                        st.metric("In College", "None")
 
         # Key insights
+        st.markdown("---")
         st.subheader("📌 Key Insights")
 
         col1, col2, col3 = st.columns(3)
