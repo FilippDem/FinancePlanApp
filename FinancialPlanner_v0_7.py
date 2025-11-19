@@ -3621,11 +3621,26 @@ def children_tab():
     # Children expense templates preview
     st.subheader("📊 Children Expense Templates Preview")
 
-    preview_state = st.selectbox("Preview Location", AVAILABLE_LOCATIONS_CHILDREN, key="preview_state")
-    preview_strategy = st.selectbox("Preview Strategy", ["Conservative", "Average", "High-end"], key="preview_strategy")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        preview_state = st.selectbox("Preview Location", AVAILABLE_LOCATIONS_CHILDREN, key="preview_state")
+    with col2:
+        preview_strategy = st.selectbox("Preview Strategy", ["Conservative", "Average", "High-end"], key="preview_strategy")
+    with col3:
+        preview_college_type = st.selectbox(
+            "College Type",
+            ["Public", "Private"],
+            key="preview_college_type",
+            help="Private colleges typically cost 2-3x more than public colleges"
+        )
 
     if preview_state in CHILDREN_EXPENSE_TEMPLATES and preview_strategy in CHILDREN_EXPENSE_TEMPLATES[preview_state]:
-        template = CHILDREN_EXPENSE_TEMPLATES[preview_state][preview_strategy]
+        template = CHILDREN_EXPENSE_TEMPLATES[preview_state][preview_strategy].copy()
+
+        # Adjust education costs based on college type
+        if preview_college_type == "Private":
+            # Private colleges cost approximately 2.5x more than public colleges
+            template['Education'] = [cost * 2.5 for cost in template['Education']]
 
         # Create a preview dataframe
         preview_df = pd.DataFrame({
@@ -3645,7 +3660,7 @@ def children_tab():
             name="Total Annual Expenses"
         ))
         fig.update_layout(
-            title=f"Total Annual Child Expenses by Age - {preview_state} {preview_strategy}",
+            title=f"Total Annual Child Expenses by Age - {preview_state} {preview_strategy} ({preview_college_type} College)",
             xaxis_title="Child Age",
             yaxis_title="Annual Expenses ($)",
             height=400
