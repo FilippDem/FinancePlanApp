@@ -4673,7 +4673,42 @@ def combined_analysis_cashflow_tab():
     """Combined analysis and cashflow tab"""
     st.header("📊 Financial Analysis & Lifetime Cashflow")
 
-    st.markdown("Analyze your financial future with lifetime cashflow projections and Monte Carlo simulations")
+    st.markdown("""
+    See how money flows through your entire life from now until age 100.
+    This view helps you identify peak earning years, high expense periods, and retirement readiness.
+    **Click on any year in the chart to see detailed income and expense breakdown.**
+    """)
+
+    # Initialize session state for cashflow calculation
+    if 'cashflow_data_cached' not in st.session_state:
+        st.session_state.cashflow_data_cached = None
+    if 'selected_cashflow_year' not in st.session_state:
+        st.session_state.selected_cashflow_year = None
+
+    # Add calculate/recalculate button
+    st.info("💡 Click the button below to calculate or recalculate your lifetime cashflow based on your current life plan. "
+            "This ensures you're always viewing the most up-to-date analysis.")
+
+    if st.button("🐷 Calculate Lifetime Cashflow", type="primary", use_container_width=True):
+        with st.spinner("Calculating lifetime cashflow..."):
+            st.session_state.cashflow_data_cached = calculate_lifetime_cashflow()
+        if st.session_state.cashflow_data_cached:
+            st.success("✅ Calculation complete! Scroll down to view results.")
+        st.rerun()
+
+    # Check if we have calculated data to show
+    if st.session_state.cashflow_data_cached is None:
+        st.warning("⚠️ No cashflow data calculated yet. Click the button above to generate your lifetime cashflow analysis.")
+        return
+
+    cashflow_data = st.session_state.cashflow_data_cached
+
+    if not cashflow_data:
+        st.warning("No cashflow data available. Please configure your financial details first.")
+        return
+
+    # Create tabs for different views
+    tab1, tab2, tab3 = st.tabs(["📈 Timeline View", "📊 Critical Years Table", "📅 Life Stages"])
 
     # Create main sub-tabs
     main_tab1, main_tab2 = st.tabs(["💰 Lifetime Cashflow", "🎲 Monte Carlo Simulation"])
@@ -5311,6 +5346,97 @@ def combined_analysis_cashflow_tab():
                 value=st.session_state.mc_normalize_to_today_dollars,
                 help="Adjust all future values to today's purchasing power"
             )
+            st.session_state.mc_return_variability_negative = st.number_input(
+                "Negative (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=float(st.session_state.mc_return_variability_negative),
+                step=1.0,
+                key="return_var_neg"
+            )
+    else:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.session_state.mc_income_variability = st.slider("Income Variability (%)", 0.0, 100.0, 10.0)
+        with col2:
+            st.session_state.mc_expense_variability = st.slider("Expense Variability (%)", 0.0, 100.0, 5.0)
+        with col3:
+            st.session_state.mc_return_variability = st.slider("Return Variability (%)", 0.0, 100.0, 15.0)
+
+    # Run Simulation Button
+    if st.button("🐷 Run Monte Carlo Simulation", type="primary"):
+        with st.spinner("Running Monte Carlo simulation... This may take a minute."):
+            st.info("🎲 Monte Carlo simulation is running with simplified calculations for web stability")
+
+            # Simplified Monte Carlo for web
+            scenario = st.session_state.economic_scenarios[st.session_state.active_scenario]
+
+            num_sims = min(st.session_state.mc_simulations, 1000)  # Cap at 1000 for web performance
+            results = []
+            income_results = []
+            expense_results = []
+            cashflow_results = []
+
+            # Starting values
+            initial_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
+
+            # Run simulations
+            progress_bar = st.progress(0)
+            for sim in range(num_sims):
+                sim_results = []
+                sim_income = []
+                sim_expenses = []
+                sim_cashflow = []
+                net_worth = initial_net_worth
+
+                for year_offset in range(st.session_state.mc_years):
+                    year = st.session_state.mc_start_year + year_offset
+
+                    # Calculate income
+                    parentX_working = (year - (st.session_state.current_year - st.session_state.parentX_age)) < st.session_state.parentX_retirement_age
+                    parentY_working = (year - (st.session_state.current_year - st.session_state.parentY_age)) < st.session_state.parentY_retirement_age
+
+                    income = 0
+                    if parentX_working:
+                        # Use job changes if available
+                        parentX_year_income = get_income_for_year(
+                            st.session_state.parentX_income,
+                            st.session_state.parentX_raise,
+                            st.session_state.parentX_job_changes,
+                            st.session_state.current_year,
+                            year
+                        )
+                        income += parentX_year_income
+                    else:
+                        ss_benefit = st.session_state.parentX_ss_benefit * 12
+                        if st.session_state.ss_insolvency_enabled and year >= 2034:
+                            ss_benefit *= (1 - st.session_state.ss_shortfall_percentage / 100)
+                        income += ss_benefit
+
+                    if parentY_working:
+                        # Use job changes if available
+                        parentY_year_income = get_income_for_year(
+                            st.session_state.parentY_income,
+                            st.session_state.parentY_raise,
+                            st.session_state.parentY_job_changes,
+                            st.session_state.current_year,
+                            year
+                        )
+                        income += parentY_year_income
+                    else:
+                        ss_benefit = st.session_state.parentY_ss_benefit * 12
+                        if st.session_state.ss_insolvency_enabled and year >= 2034:
+                            ss_benefit *= (1 - st.session_state.ss_shortfall_percentage / 100)
+                        income += ss_benefit
+
+                    # Add variability to income
+                    if use_asymmetric:
+                        if np.random.random() > 0.5:
+                            income *= (1 + np.random.uniform(0, st.session_state.mc_income_variability_positive / 100))
+                        else:
+                            income *= (1 - np.random.uniform(0, st.session_state.mc_income_variability_negative / 100))
+                    else:
+                        income *= (1 + np.random.uniform(-st.session_state.mc_income_variability / 100, st.session_state.mc_income_variability / 100))
 
         # Variability Settings
         st.subheader("📊 Variability Settings (for Traditional Simulations)")
