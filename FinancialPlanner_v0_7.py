@@ -2549,8 +2549,7 @@ def main():
         ("🎓 Education Funding", education_funding_tab, st.session_state.get('show_education', False)),
         ("💼 Tax Optimization", tax_optimization_tab, st.session_state.get('show_tax', False)),
         ("🗓️ Timeline", timeline_tab, True),
-        ("📊 Analysis", combined_simulation_tab, True),
-        ("💰 Lifetime Cashflow", lifetime_cashflow_tab, True),
+        ("📊 Analysis & Cashflow", combined_simulation_tab, True),
         ("📄 Export Reports", report_export_tab, st.session_state.get('show_export', True)),
         ("💾 Save/Load", save_load_tab, True)
     ]
@@ -5111,10 +5110,13 @@ def lifetime_cashflow_tab():
 
 
 def combined_simulation_tab():
-    """Combined simulation and analysis tab"""
-    st.header("📊 Financial Analysis & Monte Carlo Simulation")
+    """Combined simulation, analysis, and cashflow visualization tab"""
+    st.header("📊 Financial Analysis & Lifetime Cashflow")
 
-    st.markdown("Run comprehensive financial projections with Monte Carlo simulations")
+    st.markdown("""
+    Run comprehensive Monte Carlo simulations to understand your financial future across different scenarios.
+    Then explore detailed cashflow visualizations for different outcome percentiles.
+    """)
 
     # Ensure Monte Carlo variables are initialized (defensive programming for old sessions)
     if 'mc_start_year' not in st.session_state:
@@ -5409,12 +5411,44 @@ def combined_simulation_tab():
                 '90th': np.percentile(results_array, 90, axis=0),
             }
 
-            # Calculate 50th percentile for income, expenses, and cashflow
-            income_50th = np.percentile(income_array, 50, axis=0)
-            expense_50th = np.percentile(expense_array, 50, axis=0)
-            cashflow_50th = np.percentile(cashflow_array, 50, axis=0)
+            # Calculate percentiles for income, expenses, and cashflow
+            income_percentiles = {
+                '10th': np.percentile(income_array, 10, axis=0),
+                '25th': np.percentile(income_array, 25, axis=0),
+                '50th': np.percentile(income_array, 50, axis=0),
+                '75th': np.percentile(income_array, 75, axis=0),
+                '90th': np.percentile(income_array, 90, axis=0),
+            }
+
+            expense_percentiles = {
+                '10th': np.percentile(expense_array, 10, axis=0),
+                '25th': np.percentile(expense_array, 25, axis=0),
+                '50th': np.percentile(expense_array, 50, axis=0),
+                '75th': np.percentile(expense_array, 75, axis=0),
+                '90th': np.percentile(expense_array, 90, axis=0),
+            }
+
+            cashflow_percentiles = {
+                '10th': np.percentile(cashflow_array, 10, axis=0),
+                '25th': np.percentile(cashflow_array, 25, axis=0),
+                '50th': np.percentile(cashflow_array, 50, axis=0),
+                '75th': np.percentile(cashflow_array, 75, axis=0),
+                '90th': np.percentile(cashflow_array, 90, axis=0),
+            }
 
             years = list(range(st.session_state.mc_start_year, st.session_state.mc_start_year + st.session_state.mc_years))
+
+            # Store results in session state for later use
+            st.session_state.mc_results = {
+                'years': years,
+                'net_worth_percentiles': percentiles,
+                'income_percentiles': income_percentiles,
+                'expense_percentiles': expense_percentiles,
+                'cashflow_percentiles': cashflow_percentiles,
+                'num_simulations': num_sims,
+                'results_array': results_array,
+                'normalize_to_today_dollars': st.session_state.mc_normalize_to_today_dollars
+            }
 
             # Plot results
             st.subheader("📈 Monte Carlo Results")
@@ -5509,58 +5543,467 @@ def combined_simulation_tab():
             with col3:
                 st.metric("Final 10th Percentile", format_currency(percentiles['10th'][-1]))
 
-            # 50th Percentile Cashflow Breakdown
-            st.subheader("📊 50th Percentile Cashflow Breakdown")
-            st.markdown("This shows the median (50th percentile) income, expenses, and cashflow projections across all simulations.")
+    # Show cashflow visualization if simulation has been run
+    if 'mc_results' in st.session_state and st.session_state.mc_results:
+        st.markdown("---")
+        st.subheader("💰 Lifetime Cashflow Visualization")
+        st.markdown("Explore your financial future using results from the Monte Carlo simulation above.")
 
-            # Create dataframe for 50th percentile breakdown
-            cashflow_breakdown_data = []
-            for idx in key_years_idx:
-                if idx < len(years):
-                    cashflow_breakdown_data.append({
-                        'Year': years[idx],
-                        'Income': format_currency(income_50th[idx]),
-                        'Expenses': format_currency(expense_50th[idx]),
-                        'Cashflow': format_currency(cashflow_50th[idx]),
-                    })
+        # Use cached results
+        mc_data = st.session_state.mc_results
+        years = mc_data['years']
+        percentiles = mc_data['net_worth_percentiles']
+        income_percentiles = mc_data['income_percentiles']
+        expense_percentiles = mc_data['expense_percentiles']
+        cashflow_percentiles = mc_data['cashflow_percentiles']
 
-            cashflow_breakdown_df = pd.DataFrame(cashflow_breakdown_data)
-            st.dataframe(cashflow_breakdown_df, use_container_width=True, hide_index=True)
+        # Percentile selector
+        percentile_options = {
+            '10th Percentile (Pessimistic)': '10th',
+            '25th Percentile (Below Average)': '25th',
+            '50th Percentile (Median)': '50th',
+            '75th Percentile (Above Average)': '75th',
+            '90th Percentile (Optimistic)': '90th'
+        }
 
-            # Plot 50th percentile income, expenses, and cashflow
+        selected_percentile_label = st.selectbox(
+            "Select Scenario to View",
+            options=list(percentile_options.keys()),
+            index=2,  # Default to median
+            key="percentile_selector"
+        )
+        selected_percentile = percentile_options[selected_percentile_label]
+
+        # Get data for selected percentile
+        selected_income = income_percentiles[selected_percentile]
+        selected_expenses = expense_percentiles[selected_percentile]
+        selected_cashflow = cashflow_percentiles[selected_percentile]
+
+        # Calculate key years for tables
+        key_years_idx = [0, len(years) // 4, len(years) // 2, 3 * len(years) // 4, len(years) - 1]
+
+        # Create tabs for different views
+        cashflow_tab1, cashflow_tab2, cashflow_tab3 = st.tabs(["📈 Timeline View", "📊 Critical Years Table", "📅 Key Summary"])
+
+        with cashflow_tab1:
+            st.markdown(f"""
+            **Viewing {selected_percentile_label}** - See how money flows through your life in this scenario.
+            Click on any year to see detailed income and expense breakdown.
+            """)
+
+            # Initialize selected year in session state
+            if 'selected_cashflow_year' not in st.session_state:
+                st.session_state.selected_cashflow_year = None
+
+            # Create figure with income, expenses, and cashflow
             fig_cashflow = go.Figure()
 
+            # Add income line
             fig_cashflow.add_trace(go.Scatter(
-                x=years, y=income_50th,
+                x=years,
+                y=selected_income,
                 mode='lines',
-                name='Income (50th %ile)',
-                line=dict(color='green', width=2)
+                name='Income',
+                line=dict(color='green', width=2),
+                hovertemplate='<b>Year %{x}</b><br>Income: $%{y:,.0f}<extra></extra>'
             ))
 
+            # Add expenses line
             fig_cashflow.add_trace(go.Scatter(
-                x=years, y=expense_50th,
+                x=years,
+                y=selected_expenses,
                 mode='lines',
-                name='Expenses (50th %ile)',
-                line=dict(color='red', width=2)
+                name='Expenses',
+                line=dict(color='red', width=2),
+                hovertemplate='<b>Year %{x}</b><br>Expenses: $%{y:,.0f}<extra></extra>'
             ))
 
+            # Add cashflow area (positive)
+            cashflow_positive = [max(0, cf) for cf in selected_cashflow]
             fig_cashflow.add_trace(go.Scatter(
-                x=years, y=cashflow_50th,
-                mode='lines',
-                name='Cashflow (50th %ile)',
-                line=dict(color='blue', width=2),
-                fill='tozeroy'
+                x=years,
+                y=cashflow_positive,
+                mode='none',
+                name='Positive Cashflow',
+                fill='tozeroy',
+                fillcolor='rgba(0, 255, 0, 0.1)',
+                hovertemplate='<b>Year %{x}</b><br>Surplus: $%{y:,.0f}<extra></extra>'
             ))
+
+            # Add cashflow area (negative)
+            cashflow_negative = [min(0, cf) for cf in selected_cashflow]
+            fig_cashflow.add_trace(go.Scatter(
+                x=years,
+                y=cashflow_negative,
+                mode='none',
+                name='Deficit',
+                fill='tozeroy',
+                fillcolor='rgba(255, 0, 0, 0.1)',
+                hovertemplate='<b>Year %{x}</b><br>Deficit: $%{y:,.0f}<extra></extra>'
+            ))
+
+            # Add major event markers
+            major_events = []
+
+            # Retirement events
+            parent1_retirement_year = (st.session_state.current_year - st.session_state.parentX_age) + st.session_state.parentX_retirement_age
+            parent2_retirement_year = (st.session_state.current_year - st.session_state.parentY_age) + st.session_state.parentY_retirement_age
+
+            if parent1_retirement_year in years:
+                idx = years.index(parent1_retirement_year)
+                major_events.append({
+                    'year': parent1_retirement_year,
+                    'label': f"🏖️ {st.session_state.parent1_name} Retires",
+                    'value': selected_income[idx]
+                })
+
+            if parent2_retirement_year in years:
+                idx = years.index(parent2_retirement_year)
+                major_events.append({
+                    'year': parent2_retirement_year,
+                    'label': f"🏖️ {st.session_state.parent2_name} Retires",
+                    'value': selected_income[idx]
+                })
+
+            # College years for children
+            for child in st.session_state.children_list:
+                college_start = child['birth_year'] + 18
+                college_end = child['birth_year'] + 21
+
+                if college_start in years:
+                    idx = years.index(college_start)
+                    major_events.append({
+                        'year': college_start,
+                        'label': f"🎓 {child['name']} College Starts",
+                        'value': selected_expenses[idx]
+                    })
+
+            # Add markers
+            if major_events:
+                event_years = [e['year'] for e in major_events]
+                event_values = [e['value'] for e in major_events]
+                event_labels = [e['label'] for e in major_events]
+
+                fig_cashflow.add_trace(go.Scatter(
+                    x=event_years,
+                    y=event_values,
+                    mode='markers',
+                    name='Major Events',
+                    marker=dict(size=15, color='blue', symbol='star', line=dict(width=2, color='white')),
+                    hovertemplate='<b>%{customdata}</b><br>Year: %{x}<extra></extra>',
+                    customdata=event_labels
+                ))
 
             fig_cashflow.update_layout(
-                title="50th Percentile Income, Expenses, and Cashflow Over Time",
+                title=f"Lifetime Income, Expenses, and Cashflow - {selected_percentile_label}",
                 xaxis_title="Year",
                 yaxis_title="Amount ($)" + (" - Today's Dollars" if st.session_state.mc_normalize_to_today_dollars else ""),
-                height=400,
-                hovermode='x unified'
+                height=700,
+                hovermode='x unified',
+                showlegend=True,
+                clickmode='event+select'
             )
 
-            st.plotly_chart(fig_cashflow, use_container_width=True)
+            # Display chart
+            st.plotly_chart(fig_cashflow, use_container_width=True, on_select="rerun", key="detailed_cashflow_chart")
+
+            # Year selector for detailed breakdown
+            st.markdown("---")
+            col_select1, col_select2 = st.columns([3, 1])
+            with col_select1:
+                selected_year = st.selectbox(
+                    "Select a year to see detailed breakdown:",
+                    options=years,
+                    index=0,
+                    key="year_selector_mc"
+                )
+            with col_select2:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("Show Details", type="primary", key="show_details_btn"):
+                    st.session_state.selected_cashflow_year = selected_year
+
+            # Show detailed breakdown if year is selected
+            if st.session_state.selected_cashflow_year and st.session_state.selected_cashflow_year in years:
+                year_idx = years.index(st.session_state.selected_cashflow_year)
+
+                st.markdown("---")
+                st.subheader(f"📊 Detailed Breakdown for {st.session_state.selected_cashflow_year}")
+
+                # Calculate ages for this year
+                parent1_age = st.session_state.parentX_age + (st.session_state.selected_cashflow_year - st.session_state.current_year)
+                parent2_age = st.session_state.parentY_age + (st.session_state.selected_cashflow_year - st.session_state.current_year)
+
+                # Get detailed expense breakdown from calculate_lifetime_cashflow
+                cashflow_detailed = calculate_lifetime_cashflow()
+                year_detail = next((d for d in cashflow_detailed if d['year'] == st.session_state.selected_cashflow_year), None)
+
+                if year_detail:
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        st.markdown("#### 💵 Income Breakdown")
+
+                        income_breakdown = []
+                        if year_detail['parent1_income'] > 0:
+                            income_breakdown.append({
+                                'Source': f"{st.session_state.parent1_name} Salary",
+                                'Amount': year_detail['parent1_income']
+                            })
+                        if year_detail['parent2_income'] > 0:
+                            income_breakdown.append({
+                                'Source': f"{st.session_state.parent2_name} Salary",
+                                'Amount': year_detail['parent2_income']
+                            })
+                        if year_detail['ss_income'] > 0:
+                            income_breakdown.append({
+                                'Source': 'Social Security',
+                                'Amount': year_detail['ss_income']
+                            })
+
+                        if income_breakdown:
+                            income_df = pd.DataFrame(income_breakdown)
+
+                            # Create pie chart for income
+                            income_fig = go.Figure(data=[go.Pie(
+                                labels=income_df['Source'],
+                                values=income_df['Amount'],
+                                hole=0.3,
+                                marker_colors=['#2ecc71', '#27ae60', '#16a085']
+                            )])
+                            income_fig.update_layout(height=300, showlegend=True)
+                            st.plotly_chart(income_fig, use_container_width=True)
+
+                            # Show table
+                            income_df['Amount'] = income_df['Amount'].apply(lambda x: f"${x:,.0f}")
+                            st.dataframe(income_df, hide_index=True, use_container_width=True)
+                            st.metric("Total Income", f"${year_detail['total_income']:,.0f}")
+                        else:
+                            st.info("No income for this year")
+
+                    with col2:
+                        st.markdown("#### 💳 Expense Breakdown")
+
+                        expense_breakdown = []
+
+                        # Family Living Expenses (detailed)
+                        if year_detail['base_expenses'] > 0 and year_detail.get('base_expenses_dict'):
+                            for category, amount in year_detail['base_expenses_dict'].items():
+                                if amount > 0:
+                                    expense_breakdown.append({
+                                        'Category': f"Family: {category}",
+                                        'Amount': amount
+                                    })
+
+                        # Children Expenses (detailed)
+                        if year_detail['children_expenses'] > 0 and year_detail.get('children_expenses_dict'):
+                            for category, amount in year_detail['children_expenses_dict'].items():
+                                if amount > 0:
+                                    expense_breakdown.append({
+                                        'Category': f"Children: {category}",
+                                        'Amount': amount
+                                    })
+
+                        # Recurring Expenses
+                        if year_detail.get('recurring_expenses', 0) > 0:
+                            expense_breakdown.append({
+                                'Category': 'Recurring Expenses',
+                                'Amount': year_detail['recurring_expenses']
+                            })
+
+                        # Major Purchases
+                        if year_detail.get('major_purchases', 0) > 0:
+                            expense_breakdown.append({
+                                'Category': 'Major Purchases',
+                                'Amount': year_detail['major_purchases']
+                            })
+
+                        if expense_breakdown:
+                            expense_df = pd.DataFrame(expense_breakdown)
+
+                            # Create pie chart for expenses with more colors
+                            colors = ['#e74c3c', '#c0392b', '#e67e22', '#d35400', '#f39c12', '#f1c40f',
+                                      '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#95a5a6', '#34495e']
+
+                            expense_fig = go.Figure(data=[go.Pie(
+                                labels=expense_df['Category'],
+                                values=expense_df['Amount'],
+                                hole=0.3,
+                                marker_colors=colors[:len(expense_df)]
+                            )])
+                            expense_fig.update_layout(height=300, showlegend=True,
+                                                     legend=dict(orientation="v", yanchor="middle", y=0.5))
+                            st.plotly_chart(expense_fig, use_container_width=True)
+
+                            # Show detailed table with expandable sections
+                            st.markdown("**Detailed Breakdown:**")
+
+                            # Separate into major categories
+                            family_expenses = expense_df[expense_df['Category'].str.startswith('Family:')]
+                            children_expenses_df = expense_df[expense_df['Category'].str.startswith('Children:')]
+                            other_expenses = expense_df[~expense_df['Category'].str.contains(':')]
+
+                            # Family Living Expenses
+                            if not family_expenses.empty:
+                                with st.expander(f"🏠 Family Living (${family_expenses['Amount'].sum():,.0f})", expanded=False):
+                                    family_display = family_expenses.copy()
+                                    family_display['Category'] = family_display['Category'].str.replace('Family: ', '')
+                                    family_display['Amount'] = family_display['Amount'].apply(lambda x: f"${x:,.0f}")
+                                    st.dataframe(family_display, hide_index=True, use_container_width=True)
+
+                            # Children Expenses
+                            if not children_expenses_df.empty:
+                                with st.expander(f"👶 Children (${children_expenses_df['Amount'].sum():,.0f})", expanded=False):
+                                    children_display = children_expenses_df.copy()
+                                    children_display['Category'] = children_display['Category'].str.replace('Children: ', '')
+                                    children_display['Amount'] = children_display['Amount'].apply(lambda x: f"${x:,.0f}")
+                                    st.dataframe(children_display, hide_index=True, use_container_width=True)
+
+                            # Other Expenses
+                            if not other_expenses.empty:
+                                other_display = other_expenses.copy()
+                                other_display['Amount'] = other_display['Amount'].apply(lambda x: f"${x:,.0f}")
+                                st.dataframe(other_display, hide_index=True, use_container_width=True)
+
+                            st.metric("Total Expenses", f"${year_detail['total_expenses']:,.0f}")
+                        else:
+                            st.info("No expenses for this year")
+
+                    # Show summary metrics
+                    st.markdown("#### 📈 Year Summary")
+                    sum_col1, sum_col2, sum_col3, sum_col4 = st.columns(4)
+
+                    with sum_col1:
+                        st.metric("Ages", f"{parent1_age} / {parent2_age}")
+                    with sum_col2:
+                        cashflow_val = selected_cashflow[year_idx]
+                        cashflow_delta = "Surplus" if cashflow_val >= 0 else "Deficit"
+                        st.metric("Cashflow", f"${abs(cashflow_val):,.0f}", cashflow_delta)
+                    with sum_col3:
+                        st.metric("Net Worth", f"${percentiles[selected_percentile][year_idx]:,.0f}")
+                    with sum_col4:
+                        if year_detail.get('children_in_college'):
+                            st.metric("In College", ", ".join(year_detail['children_in_college']))
+                        else:
+                            st.metric("In College", "None")
+
+            with cashflow_tab2:
+                st.subheader("📊 Critical Years Table")
+                st.markdown(f"Key financial years in the **{selected_percentile_label}** scenario")
+
+                # Create breakdown for critical years
+                critical_years_data = []
+                for idx in key_years_idx:
+                    if idx < len(years):
+                        critical_years_data.append({
+                            'Year': years[idx],
+                            'Income': format_currency(selected_income[idx]),
+                            'Expenses': format_currency(selected_expenses[idx]),
+                            'Cashflow': format_currency(selected_cashflow[idx]),
+                            'Net Worth': format_currency(percentiles[selected_percentile][idx])
+                        })
+
+                critical_df = pd.DataFrame(critical_years_data)
+                st.dataframe(critical_df, use_container_width=True, hide_index=True)
+
+                # Find and highlight critical years
+                st.markdown("#### 🔍 Key Insights")
+                col1, col2, col3 = st.columns(3)
+
+                # Peak expense year
+                peak_expense_idx = np.argmax(selected_expenses)
+                with col1:
+                    st.metric(
+                        "Peak Expense Year",
+                        f"{years[peak_expense_idx]}",
+                        f"${selected_expenses[peak_expense_idx]:,.0f}"
+                    )
+
+                # Worst cashflow year
+                worst_cashflow_idx = np.argmin(selected_cashflow)
+                with col2:
+                    st.metric(
+                        "Worst Cashflow Year",
+                        f"{years[worst_cashflow_idx]}",
+                        f"${selected_cashflow[worst_cashflow_idx]:,.0f}"
+                    )
+
+                # Peak net worth year
+                peak_nw_idx = np.argmax(percentiles[selected_percentile])
+                with col3:
+                    st.metric(
+                        "Peak Net Worth Year",
+                        f"{years[peak_nw_idx]}",
+                        f"${percentiles[selected_percentile][peak_nw_idx]:,.0f}"
+                    )
+
+            with cashflow_tab3:
+                st.subheader("📅 Life Stage Summary")
+                st.markdown(f"Financial overview by life stage in the **{selected_percentile_label}** scenario")
+
+                # Calculate life stages
+                life_stages = []
+
+                # Working years
+                last_retirement = max(parent1_retirement_year, parent2_retirement_year)
+                working_years = [y for y in years if y < last_retirement]
+                if working_years:
+                    working_income = [selected_income[years.index(y)] for y in working_years]
+                    working_expenses = [selected_expenses[years.index(y)] for y in working_years]
+                    working_cashflow = [selected_cashflow[years.index(y)] for y in working_years]
+
+                    life_stages.append({
+                        'Stage': '💼 Working Years',
+                        'Years': f"{working_years[0]} - {working_years[-1]}",
+                        'Avg Income': format_currency(np.mean(working_income)),
+                        'Avg Expenses': format_currency(np.mean(working_expenses)),
+                        'Avg Cashflow': format_currency(np.mean(working_cashflow)),
+                        'Total Cashflow': format_currency(np.sum(working_cashflow))
+                    })
+
+                # Retirement years
+                retirement_years = [y for y in years if y >= last_retirement]
+                if retirement_years:
+                    retirement_income = [selected_income[years.index(y)] for y in retirement_years]
+                    retirement_expenses = [selected_expenses[years.index(y)] for y in retirement_years]
+                    retirement_cashflow = [selected_cashflow[years.index(y)] for y in retirement_years]
+
+                    life_stages.append({
+                        'Stage': '🏖️ Retirement Years',
+                        'Years': f"{retirement_years[0]} - {retirement_years[-1]}",
+                        'Avg Income': format_currency(np.mean(retirement_income)),
+                        'Avg Expenses': format_currency(np.mean(retirement_expenses)),
+                        'Avg Cashflow': format_currency(np.mean(retirement_cashflow)),
+                        'Total Cashflow': format_currency(np.sum(retirement_cashflow))
+                    })
+
+                # College years
+                college_years_list = []
+                for child in st.session_state.children_list:
+                    college_start = child['birth_year'] + 18
+                    college_end = child['birth_year'] + 21
+                    college_years_list.extend([y for y in range(college_start, college_end + 1) if y in years])
+
+                college_years_list = sorted(set(college_years_list))
+                if college_years_list:
+                    college_income = [selected_income[years.index(y)] for y in college_years_list]
+                    college_expenses = [selected_expenses[years.index(y)] for y in college_years_list]
+                    college_cashflow = [selected_cashflow[years.index(y)] for y in college_years_list]
+
+                    life_stages.append({
+                        'Stage': '🎓 College Years',
+                        'Years': f"{college_years_list[0]} - {college_years_list[-1]}",
+                        'Avg Income': format_currency(np.mean(college_income)),
+                        'Avg Expenses': format_currency(np.mean(college_expenses)),
+                        'Avg Cashflow': format_currency(np.mean(college_cashflow)),
+                        'Total Cashflow': format_currency(np.sum(college_cashflow))
+                    })
+
+                if life_stages:
+                    life_stages_df = pd.DataFrame(life_stages)
+                    st.dataframe(life_stages_df, use_container_width=True, hide_index=True)
+    else:
+        # Show message if no simulation has been run yet
+        st.info("👆 **Run a Monte Carlo simulation above** to see detailed lifetime cashflow visualizations with different outcome percentiles.")
 
 
 def save_load_tab():
