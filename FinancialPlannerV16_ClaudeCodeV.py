@@ -18,6 +18,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Base year for expense templates (all templates inflation-adjusted to this year)
+EXPENSE_TEMPLATE_BASE_YEAR = 2024
+
 # Historical S&P 500 Annual Returns (approximately 1924-2023, 100 years)
 HISTORICAL_STOCK_RETURNS = [
     # 1924-1929 (Pre-Depression)
@@ -66,6 +69,32 @@ AVAILABLE_LOCATIONS_FAMILY = [
     # Australia
     "Sydney", "Melbourne", "Brisbane"
 ]
+
+# Display names for locations (includes country and state for USA cities)
+LOCATION_DISPLAY_NAMES = {
+    # USA
+    "Seattle": "Seattle, WA, USA",
+    "Sacramento": "Sacramento, CA, USA",
+    "California": "California, USA",
+    "Houston": "Houston, TX, USA",
+    "New York": "New York, NY, USA",
+    "San Francisco": "San Francisco, CA, USA",
+    "Los Angeles": "Los Angeles, CA, USA",
+    "Portland": "Portland, OR, USA",
+    # Canada
+    "Toronto": "Toronto, ON, Canada",
+    "Vancouver": "Vancouver, BC, Canada",
+    # France
+    "Paris": "Paris, France",
+    "Toulouse": "Toulouse, France",
+    # Germany
+    "Berlin": "Berlin, Germany",
+    "Munich": "Munich, Germany",
+    # Australia
+    "Sydney": "Sydney, NSW, Australia",
+    "Melbourne": "Melbourne, VIC, Australia",
+    "Brisbane": "Brisbane, QLD, Australia"
+}
 
 # [Keep all the CHILDREN_EXPENSE_TEMPLATES and FAMILY_EXPENSE_TEMPLATES from V14]
 # [I'll include the full templates but truncate here for readability]
@@ -1526,6 +1555,12 @@ def initialize_session_state():
         # NEW: Custom children templates
         st.session_state.custom_children_templates = {}
 
+        # NEW: Custom family expense templates
+        st.session_state.custom_family_templates = {}
+
+        # NEW: Custom location display names (for user-created cities)
+        st.session_state.custom_location_display_names = {}
+
         # NEW: Healthcare & Insurance
         st.session_state.health_insurances = []
         st.session_state.ltc_insurances = []
@@ -1584,6 +1619,16 @@ def get_state_for_year(year: int) -> tuple:
             break
 
     return current_state, current_strategy
+
+
+def get_location_display_name(location: str) -> str:
+    """Get full display name for a location including country and state"""
+    # Check custom display names first, then built-in ones
+    if hasattr(st.session_state, 'custom_location_display_names'):
+        custom_name = st.session_state.custom_location_display_names.get(location)
+        if custom_name:
+            return custom_name
+    return LOCATION_DISPLAY_NAMES.get(location, location)
 
 
 def get_state_based_family_expenses(year: int) -> dict:
@@ -2313,26 +2358,346 @@ def parent_y_tab():
 
 
 def family_expenses_tab():
-    """Family expenses tab"""
+    """Family expenses tab with template browsing, modification, and custom city creation"""
     st.header("💸 Family Expenses")
 
-    # State-based expense templates
-    st.subheader("📍 State-Based Expense Templates")
-    st.markdown("Expenses will automatically adjust based on your state timeline in the Timeline tab")
+    # Show inflation adjustment info
+    st.info(f"ℹ️ All expense templates are inflation-adjusted to **{EXPENSE_TEMPLATE_BASE_YEAR}** dollars")
+
+    # Create tabs for different views
+    expense_tab1, expense_tab2, expense_tab3 = st.tabs([
+        "📊 Browse Templates",
+        "✏️ Edit Templates",
+        "🌍 Create Custom City"
+    ])
+
+    # TAB 1: Browse Templates
+    with expense_tab1:
+        st.subheader("📊 Browse Expense Templates by Location")
+
+        # Get all available locations (built-in + custom)
+        all_templates = {**FAMILY_EXPENSE_TEMPLATES, **st.session_state.custom_family_templates}
+        available_locations = sorted(all_templates.keys())
+
+        if not available_locations:
+            st.warning("No templates available. Please create a custom city in the 'Create Custom City' tab.")
+            return
+
+        # Create display options with full location names
+        location_display_options = [get_location_display_name(loc) for loc in available_locations]
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            selected_display = st.selectbox(
+                "Select Location/City:",
+                options=location_display_options,
+                index=0,
+                key="browse_location"
+            )
+            # Get the actual location key from the display name
+            selected_location = available_locations[location_display_options.index(selected_display)]
+
+        # Get available strategies for selected location
+        available_strategies = list(all_templates[selected_location].keys())
+
+        with col2:
+            selected_strategy = st.selectbox(
+                "Select Spending Strategy:",
+                options=available_strategies,
+                index=0,
+                key="browse_strategy"
+            )
+
+        # Display template details
+        template = all_templates[selected_location][selected_strategy]
+
+        st.markdown("---")
+        st.subheader(f"📋 {get_location_display_name(selected_location)} - {selected_strategy} Strategy")
+
+        # Show template as visualization and table
+        col_chart, col_table = st.columns([1, 1])
+
+        with col_chart:
+            # Create pie chart
+            categories = list(template.keys())
+            amounts = list(template.values())
+
+            fig = go.Figure(data=[go.Pie(
+                labels=categories,
+                values=amounts,
+                hole=0.4,
+                textinfo='label+percent',
+                marker=dict(colors=px.colors.qualitative.Set3)
+            )])
+
+            fig.update_layout(
+                title=f"Expense Breakdown",
+                height=400,
+                showlegend=True
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col_table:
+            # Create detailed table
+            template_df = pd.DataFrame({
+                'Category': categories,
+                'Annual Amount': [f"${amt:,.0f}" for amt in amounts],
+                'Monthly Amount': [f"${amt/12:,.0f}" for amt in amounts]
+            })
+
+            st.dataframe(template_df, hide_index=True, use_container_width=True)
+
+            total = sum(amounts)
+            st.metric("Total Annual Expenses", f"${total:,.0f}")
+            st.caption(f"Monthly: ${total/12:,.0f}")
+
+        # Quick load button
+        st.markdown("---")
+        col_load1, col_load2 = st.columns([3, 1])
+
+        with col_load1:
+            st.markdown(f"**Load this template into your current expenses?**")
+            st.caption("This will replace your current expense values with this template.")
+
+        with col_load2:
+            if st.button("📥 Load Template", type="primary", key="load_template_btn"):
+                for category, amount in template.items():
+                    if category in st.session_state.expenses:
+                        st.session_state.expenses[category] = amount
+                st.success(f"✅ Loaded {selected_strategy} template for {get_location_display_name(selected_location)}!")
+                st.rerun()
+
+    # TAB 2: Edit Templates
+    with expense_tab2:
+        st.subheader("✏️ Edit and Save Templates")
+
+        st.markdown("""
+        Modify expense templates and save them. You can:
+        - Edit existing built-in templates (saved as custom versions)
+        - Modify your custom templates
+        - Create variations of existing templates
+        """)
+
+        # Select template to edit
+        all_templates = {**FAMILY_EXPENSE_TEMPLATES, **st.session_state.custom_family_templates}
+        available_locations = sorted(all_templates.keys())
+        location_display_options = [get_location_display_name(loc) for loc in available_locations]
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            edit_display = st.selectbox(
+                "Location to Edit:",
+                options=location_display_options,
+                key="edit_location"
+            )
+            edit_location = available_locations[location_display_options.index(edit_display)]
+
+        available_strategies = list(all_templates[edit_location].keys())
+
+        with col2:
+            edit_strategy = st.selectbox(
+                "Strategy to Edit:",
+                options=available_strategies,
+                key="edit_strategy"
+            )
+
+        with col3:
+            save_as_new = st.checkbox("Save as new strategy", value=False, key="save_as_new")
+
+        # Load template for editing
+        current_template = all_templates[edit_location][edit_strategy].copy()
+
+        st.markdown("---")
+        st.markdown(f"### Editing: {get_location_display_name(edit_location)} - {edit_strategy}")
+
+        # Edit each category
+        edited_template = {}
+
+        for category, value in current_template.items():
+            col_cat, col_val = st.columns([2, 1])
+
+            with col_cat:
+                st.markdown(f"**{category}**")
+
+            with col_val:
+                new_value = st.number_input(
+                    f"Amount for {category}",
+                    min_value=0.0,
+                    max_value=1000000.0,
+                    value=float(value),
+                    step=100.0,
+                    key=f"edit_{category}",
+                    label_visibility="collapsed"
+                )
+                edited_template[category] = new_value
+
+        # Show total
+        total_edited = sum(edited_template.values())
+        st.metric("Total Annual Expenses", f"${total_edited:,.0f}")
+
+        # Save options
+        st.markdown("---")
+        st.subheader("💾 Save Changes")
+
+        if save_as_new:
+            new_strategy_name = st.text_input(
+                "New Strategy Name:",
+                value=f"{edit_strategy} (Modified)",
+                key="new_strategy_name"
+            )
+        else:
+            new_strategy_name = edit_strategy
+
+        col_save1, col_save2 = st.columns([3, 1])
+
+        with col_save1:
+            if save_as_new:
+                st.info(f"Will save as: **{get_location_display_name(edit_location)} - {new_strategy_name}**")
+            else:
+                st.warning(f"⚠️ Will overwrite: **{get_location_display_name(edit_location)} - {edit_strategy}** (saved as custom template)")
+
+        with col_save2:
+            if st.button("💾 Save Template", type="primary", key="save_edited_template"):
+                # Initialize location if needed
+                if edit_location not in st.session_state.custom_family_templates:
+                    st.session_state.custom_family_templates[edit_location] = {}
+
+                # Save the template
+                st.session_state.custom_family_templates[edit_location][new_strategy_name] = edited_template.copy()
+
+                st.success(f"✅ Saved template: {get_location_display_name(edit_location)} - {new_strategy_name}")
+                st.rerun()
+
+    # TAB 3: Create Custom City
+    with expense_tab3:
+        st.subheader("🌍 Create Custom City/Location Template")
+
+        st.markdown("""
+        Create a brand new location template from scratch or copy an existing one as a starting point.
+        """)
+
+        # Option to copy from existing or start fresh
+        creation_mode = st.radio(
+            "Creation Mode:",
+            options=["Start from scratch", "Copy from existing template"],
+            horizontal=True,
+            key="creation_mode"
+        )
+
+        # New city name
+        new_city_name = st.text_input(
+            "New City/Location Name:",
+            value="",
+            placeholder="e.g., Miami, FL, USA or London, UK",
+            key="new_city_name",
+            help="Include city, state (for USA), and country for clarity"
+        )
+
+        new_strategy_name_city = st.text_input(
+            "Strategy Name:",
+            value="Average",
+            key="new_strategy_name_city"
+        )
+
+        if creation_mode == "Copy from existing template":
+            # Select template to copy
+            all_templates = {**FAMILY_EXPENSE_TEMPLATES, **st.session_state.custom_family_templates}
+            available_locations = sorted(all_templates.keys())
+            location_display_options = [get_location_display_name(loc) for loc in available_locations]
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                copy_display = st.selectbox(
+                    "Copy from Location:",
+                    options=location_display_options,
+                    key="copy_location"
+                )
+                copy_location = available_locations[location_display_options.index(copy_display)]
+
+            available_strategies = list(all_templates[copy_location].keys())
+
+            with col2:
+                copy_strategy = st.selectbox(
+                    "Copy from Strategy:",
+                    options=available_strategies,
+                    key="copy_strategy"
+                )
+
+            # Load template to use as base
+            base_template = all_templates[copy_location][copy_strategy].copy()
+        else:
+            # Start with default categories and zero values
+            base_template = {
+                'Food & Groceries': 0.0,
+                'Clothing': 0.0,
+                'Transportation': 0.0,
+                'Entertainment & Activities': 0.0,
+                'Personal Care': 0.0,
+                'Parent Retirement Help': 0.0,
+                'Other Expenses': 0.0
+            }
+
+        st.markdown("---")
+        st.subheader(f"💵 Set Expense Values for {new_city_name if new_city_name else '(enter city name above)'}")
+
+        # Edit template values
+        new_template = {}
+
+        for category, value in base_template.items():
+            col_cat, col_val = st.columns([2, 1])
+
+            with col_cat:
+                st.markdown(f"**{category}**")
+
+            with col_val:
+                new_value = st.number_input(
+                    f"Amount for {category}",
+                    min_value=0.0,
+                    max_value=1000000.0,
+                    value=float(value),
+                    step=100.0,
+                    key=f"new_{category}",
+                    label_visibility="collapsed"
+                )
+                new_template[category] = new_value
+
+        # Show total
+        total_new = sum(new_template.values())
+        st.metric("Total Annual Expenses", f"${total_new:,.0f}")
+
+        # Create button
+        st.markdown("---")
+        col_create1, col_create2 = st.columns([3, 1])
+
+        with col_create1:
+            if new_city_name:
+                st.info(f"Will create: **{new_city_name} - {new_strategy_name_city}**")
+            else:
+                st.warning("⚠️ Please enter a city name above")
+
+        with col_create2:
+            if st.button("🌍 Create City", type="primary", key="create_city_btn", disabled=not new_city_name):
+                # Initialize location
+                if new_city_name not in st.session_state.custom_family_templates:
+                    st.session_state.custom_family_templates[new_city_name] = {}
+
+                # Save the template
+                st.session_state.custom_family_templates[new_city_name][new_strategy_name_city] = new_template.copy()
+
+                st.success(f"✅ Created new city: {new_city_name} - {new_strategy_name_city}!")
+                st.balloons()
+                st.rerun()
+
+    # Show current expenses section at bottom (always visible)
+    st.markdown("---")
+    st.subheader("💳 Your Current Annual Family Expenses")
 
     current_state, current_strategy = get_state_for_year(st.session_state.current_year)
-    st.info(f"Current State: **{current_state}** | Spending Strategy: **{current_strategy}**")
-
-    if st.button("Load Template for Current State"):
-        template_expenses = get_state_based_family_expenses(st.session_state.current_year)
-        for category, amount in template_expenses.items():
-            if category in st.session_state.expenses:
-                st.session_state.expenses[category] = amount
-        st.success(f"Loaded {current_strategy} template for {current_state}")
-        st.rerun()
-
-    # Annual Expenses
-    st.subheader("Annual Family Expenses")
+    st.info(f"📍 Current State from Timeline: **{current_state}** | Strategy: **{current_strategy}**")
 
     for category in st.session_state.expense_categories:
         col1, col2 = st.columns([3, 1])
