@@ -96,6 +96,32 @@ LOCATION_DISPLAY_NAMES = {
     "Brisbane": "Brisbane, QLD, Australia"
 }
 
+# Geographic coordinates for world map visualization
+LOCATION_COORDINATES = {
+    # USA
+    "Seattle": {"lat": 47.6062, "lon": -122.3321},
+    "Sacramento": {"lat": 38.5816, "lon": -121.4944},
+    "California": {"lat": 36.7783, "lon": -119.4179},  # Center of CA
+    "Houston": {"lat": 29.7604, "lon": -95.3698},
+    "New York": {"lat": 40.7128, "lon": -74.0060},
+    "San Francisco": {"lat": 37.7749, "lon": -122.4194},
+    "Los Angeles": {"lat": 34.0522, "lon": -118.2437},
+    "Portland": {"lat": 45.5152, "lon": -122.6784},
+    # Canada
+    "Toronto": {"lat": 43.6532, "lon": -79.3832},
+    "Vancouver": {"lat": 49.2827, "lon": -123.1207},
+    # France
+    "Paris": {"lat": 48.8566, "lon": 2.3522},
+    "Toulouse": {"lat": 43.6047, "lon": 1.4442},
+    # Germany
+    "Berlin": {"lat": 52.5200, "lon": 13.4050},
+    "Munich": {"lat": 48.1351, "lon": 11.5820},
+    # Australia
+    "Sydney": {"lat": -33.8688, "lon": 151.2093},
+    "Melbourne": {"lat": -37.8136, "lon": 144.9631},
+    "Brisbane": {"lat": -27.4698, "lon": 153.0251}
+}
+
 # [Keep all the CHILDREN_EXPENSE_TEMPLATES and FAMILY_EXPENSE_TEMPLATES from V14]
 # [I'll include the full templates but truncate here for readability]
 
@@ -3535,6 +3561,116 @@ def timeline_tab():
 
         # Show key milestones
         st.markdown(f"**Timeline extends to {end_year}** ({st.session_state.parent1_name} age 100: {parent1_100_year}, {st.session_state.parent2_name} age 100: {parent2_100_year})")
+
+        # Add world map visualization
+        st.markdown("---")
+        st.subheader("🌍 World Map: Your Relocation Journey")
+
+        # Get unique locations from timeline in chronological order
+        timeline_locations = []
+        seen_states = set()
+
+        for entry in sorted(st.session_state.state_timeline, key=lambda x: x.year):
+            if entry.state not in seen_states:
+                timeline_locations.append({
+                    'state': entry.state,
+                    'year': entry.year,
+                    'coords': LOCATION_COORDINATES.get(entry.state)
+                })
+                seen_states.add(entry.state)
+
+        # Only show map if we have valid coordinates for at least 2 locations
+        valid_locations = [loc for loc in timeline_locations if loc['coords'] is not None]
+
+        if len(valid_locations) >= 2:
+            # Create map figure
+            map_fig = go.Figure()
+
+            # Add flight path lines between consecutive locations
+            for i in range(len(valid_locations) - 1):
+                loc1 = valid_locations[i]
+                loc2 = valid_locations[i + 1]
+
+                # Add curved line (great circle route simulation)
+                map_fig.add_trace(go.Scattergeo(
+                    lon=[loc1['coords']['lon'], loc2['coords']['lon']],
+                    lat=[loc1['coords']['lat'], loc2['coords']['lat']],
+                    mode='lines',
+                    line=dict(width=2, color='rgb(255, 100, 100)'),
+                    opacity=0.6,
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+
+            # Add location markers
+            lats = [loc['coords']['lat'] for loc in valid_locations]
+            lons = [loc['coords']['lon'] for loc in valid_locations]
+            texts = [f"{get_location_display_name(loc['state'])}<br>Year: {loc['year']}" for loc in valid_locations]
+            markers = [f"📍 {loc['state']}<br>{loc['year']}" for loc in valid_locations]
+
+            map_fig.add_trace(go.Scattergeo(
+                lon=lons,
+                lat=lats,
+                mode='markers+text',
+                marker=dict(
+                    size=15,
+                    color='rgb(50, 120, 255)',
+                    line=dict(width=3, color='white'),
+                    symbol='circle'
+                ),
+                text=[f"{i+1}" for i in range(len(valid_locations))],  # Number each location
+                textfont=dict(size=10, color='white', family='Arial Black'),
+                textposition='middle center',
+                hovertext=texts,
+                hoverinfo='text',
+                showlegend=False
+            ))
+
+            # Update map layout
+            map_fig.update_layout(
+                title=dict(
+                    text='Your Life Journey: Where You\'ll Live',
+                    font=dict(size=18)
+                ),
+                geo=dict(
+                    projection_type='natural earth',
+                    showland=True,
+                    landcolor='rgb(243, 243, 243)',
+                    coastlinecolor='rgb(204, 204, 204)',
+                    countrycolor='rgb(204, 204, 204)',
+                    showcountries=True,
+                    showocean=True,
+                    oceancolor='rgb(230, 245, 255)',
+                    showlakes=True,
+                    lakecolor='rgb(230, 245, 255)',
+                    projection=dict(
+                        rotation=dict(
+                            lon=-60,  # Center roughly on Atlantic
+                            lat=20
+                        )
+                    )
+                ),
+                height=600,
+                margin=dict(l=0, r=0, t=50, b=0)
+            )
+
+            st.plotly_chart(map_fig, use_container_width=True)
+
+            # Show location journey summary
+            st.markdown("**🛫 Your Relocation Journey:**")
+            for i, loc in enumerate(valid_locations):
+                if i == 0:
+                    st.info(f"**{loc['year']}:** 🏠 Start in {get_location_display_name(loc['state'])}")
+                else:
+                    prev_loc = valid_locations[i-1]
+                    years_duration = loc['year'] - prev_loc['year']
+                    st.success(f"**{loc['year']}:** ✈️ Move to {get_location_display_name(loc['state'])} (after {years_duration} years in {get_location_display_name(prev_loc['state'])})")
+
+        elif len(valid_locations) == 1:
+            loc = valid_locations[0]
+            st.info(f"📍 You're staying in **{get_location_display_name(loc['state'])}** throughout the timeline. Add more locations in the table above to see your relocation journey on the map!")
+        else:
+            st.warning("⚠️ No valid location coordinates found. Please ensure your timeline includes recognized locations.")
 
     # Show current and future states
     st.subheader("Timeline Summary")
