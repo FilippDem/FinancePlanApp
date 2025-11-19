@@ -1318,6 +1318,32 @@ def format_currency(value, force_full=False, context="general"):
         return f"${value:,.0f}"
 
 
+def convert_old_portfolio_format(portfolio_dict: dict) -> dict:
+    """Convert old 7-field portfolio format to new 5-field format for backward compatibility"""
+    # Check if this is the old format (has us_stocks, international_stocks, etc.)
+    if 'us_stocks' in portfolio_dict or 'international_stocks' in portfolio_dict:
+        # Old format - convert to new
+        us_stocks = portfolio_dict.get('us_stocks', 0.0)
+        international_stocks = portfolio_dict.get('international_stocks', 0.0)
+        bonds = portfolio_dict.get('bonds', 0.0)
+        reits = portfolio_dict.get('reits', 0.0)
+        commodities = portfolio_dict.get('commodities', 0.0)
+        cash = portfolio_dict.get('cash', 0.0)
+        crypto = portfolio_dict.get('crypto', 0.0)
+
+        # Combine into new format
+        return {
+            'stocks': us_stocks + international_stocks,
+            'bonds': bonds,
+            'cash': cash,
+            'real_estate': reits,
+            'other': commodities + crypto
+        }
+    else:
+        # Already in new format
+        return portfolio_dict
+
+
 # Initialize session state
 def initialize_session_state():
     """Initialize all session state variables"""
@@ -1609,13 +1635,11 @@ def initialize_session_state():
                 'timeline': [{'year': current_year - 2, 'status': 'Own_Live', 'rental_income': 0.0}]
             }],
             'portfolio_allocation': {
-                'us_stocks': 70.0,
-                'international_stocks': 15.0,
+                'stocks': 85.0,  # US + International
                 'bonds': 5.0,
-                'reits': 5.0,
-                'commodities': 0.0,
                 'cash': 3.0,
-                'crypto': 2.0
+                'real_estate': 5.0,  # REITs
+                'other': 2.0  # Crypto
             },
             'major_purchases': [],
             'recurring_expenses': [
@@ -1718,13 +1742,11 @@ def initialize_session_state():
                 'timeline': [{'year': current_year - 8, 'status': 'Own_Live', 'rental_income': 0.0}]
             }],
             'portfolio_allocation': {
-                'us_stocks': 60.0,
-                'international_stocks': 20.0,
+                'stocks': 80.0,  # US + International
                 'bonds': 15.0,
-                'reits': 3.0,
-                'commodities': 0.0,
                 'cash': 2.0,
-                'crypto': 0.0
+                'real_estate': 3.0,  # REITs
+                'other': 0.0
             },
             'major_purchases': [],
             'recurring_expenses': [
@@ -1846,13 +1868,11 @@ def initialize_session_state():
                 }
             ],
             'portfolio_allocation': {
-                'us_stocks': 50.0,
-                'international_stocks': 20.0,
+                'stocks': 70.0,  # US + International
                 'bonds': 20.0,
-                'reits': 5.0,
-                'commodities': 3.0,
                 'cash': 2.0,
-                'crypto': 0.0
+                'real_estate': 5.0,  # REITs
+                'other': 3.0  # Commodities
             },
             'major_purchases': [],
             'recurring_expenses': [
@@ -1959,13 +1979,11 @@ def initialize_session_state():
                 'timeline': [{'year': current_year - 3, 'status': 'Own_Live', 'rental_income': 0.0}]
             }],
             'portfolio_allocation': {
-                'us_stocks': 65.0,
-                'international_stocks': 15.0,
+                'stocks': 80.0,  # US + International
                 'bonds': 15.0,
-                'reits': 0.0,
-                'commodities': 0.0,
                 'cash': 5.0,
-                'crypto': 0.0
+                'real_estate': 0.0,
+                'other': 0.0
             },
             'major_purchases': [],
             'recurring_expenses': [
@@ -2054,13 +2072,11 @@ def initialize_session_state():
                 }
             ],
             'portfolio_allocation': {
-                'us_stocks': 50.0,
-                'international_stocks': 15.0,
+                'stocks': 65.0,  # US + International
                 'bonds': 30.0,
-                'reits': 3.0,
-                'commodities': 0.0,
                 'cash': 2.0,
-                'crypto': 0.0
+                'real_estate': 3.0,  # REITs
+                'other': 0.0
             },
             'major_purchases': [],
             'recurring_expenses': [
@@ -5514,7 +5530,9 @@ def save_load_tab():
                                 houses.append(House(**house_dict))
                             st.session_state.houses = houses
                         elif key == 'portfolio_allocation':
-                            st.session_state.portfolio_allocation = PortfolioAllocation(**value)
+                            # Convert old format to new format if needed
+                            converted_value = convert_old_portfolio_format(value)
+                            st.session_state.portfolio_allocation = PortfolioAllocation(**converted_value)
                         elif key == 'major_purchases':
                             st.session_state.major_purchases = [MajorPurchase(**mp) for mp in value]
                         elif key == 'recurring_expenses':
@@ -5607,7 +5625,9 @@ def save_load_tab():
                             houses.append(House(**house_dict))
                         st.session_state.houses = houses
                     elif key == 'portfolio_allocation':
-                        st.session_state.portfolio_allocation = PortfolioAllocation(**value)
+                        # Convert old format to new format if needed
+                        converted_value = convert_old_portfolio_format(value)
+                        st.session_state.portfolio_allocation = PortfolioAllocation(**converted_value)
                     elif key == 'major_purchases':
                         st.session_state.major_purchases = [MajorPurchase(**mp) for mp in value]
                     elif key == 'recurring_expenses':
