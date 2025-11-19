@@ -2094,52 +2094,46 @@ def parent_settings_tab():
     col1, col2 = st.columns(2)
 
     with col1:
-        st.session_state.show_family_expenses = st.checkbox(
-            "💸 Family Expenses (Advanced)",
-            value=st.session_state.get('show_family_expenses', False),
-            help="Browse, edit, and create expense templates by location/strategy"
-        )
-
-        st.session_state.show_recurring_expenses = st.checkbox(
-            "🔄 Recurring & One-Time Expenses",
-            value=st.session_state.get('show_recurring_expenses', True),
-            help="Manage recurring expenses and major one-time purchases"
-        )
-
-        st.session_state.show_portfolio_allocation = st.checkbox(
+        st.checkbox(
             "💼 Portfolio Allocation",
             value=st.session_state.get('show_portfolio_allocation', False),
+            key='show_portfolio_allocation',
             help="Configure asset allocation (stocks, bonds, cash, real estate)"
         )
 
-        st.session_state.show_healthcare = st.checkbox(
+        st.checkbox(
             "🏥 Healthcare & Insurance",
             value=st.session_state.get('show_healthcare', False),
+            key='show_healthcare',
             help="Plan Medicare, HSA, long-term care, and health insurance"
         )
 
-    with col2:
-        st.session_state.show_debt = st.checkbox(
+        st.checkbox(
             "💳 Debt Management",
             value=st.session_state.get('show_debt', False),
+            key='show_debt',
             help="Track student loans, credit cards, and payoff strategies"
         )
 
-        st.session_state.show_education = st.checkbox(
+    with col2:
+        st.checkbox(
             "🎓 Education Funding",
             value=st.session_state.get('show_education', False),
+            key='show_education',
             help="Plan 529 accounts, college costs, and scholarships"
         )
 
-        st.session_state.show_tax = st.checkbox(
+        st.checkbox(
             "💼 Tax Optimization",
             value=st.session_state.get('show_tax', False),
+            key='show_tax',
             help="Optimize Roth conversions, QCDs, and withdrawal sequencing"
         )
 
-        st.session_state.show_export = st.checkbox(
+        st.checkbox(
             "📄 Export Reports",
             value=st.session_state.get('show_export', True),
+            key='show_export',
             help="Export financial data to Excel, CSV, or JSON"
         )
 
