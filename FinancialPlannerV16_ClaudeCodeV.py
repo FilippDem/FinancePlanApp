@@ -2905,6 +2905,8 @@ def children_tab():
     """Children tab"""
     st.header("👶 Children")
 
+    st.info("💡 **Note:** All child expenses shown below are in today's dollars and will be automatically adjusted for 3% annual inflation in future projections and reports.")
+
     st.subheader("Add a Child")
     col1, col2, col3 = st.columns(3)
 
