@@ -43,6 +43,6 @@ echo.
 echo To stop the application, close this window.
 echo.
 
-streamlit run FinancialPlannerV16_ClaudeCodeV.py
+streamlit run FinancialPlanner_v0_7.py
 
 pause
