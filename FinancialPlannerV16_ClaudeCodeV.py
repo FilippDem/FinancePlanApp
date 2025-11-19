@@ -1617,6 +1617,8 @@ def initialize_session_state():
         st.session_state.tax_bracket = 0.22    # Federal marginal tax bracket
 
         # Tab visibility settings
+        st.session_state.show_family_expenses = False  # Off by default (advanced template management)
+        st.session_state.show_recurring_expenses = True  # On by default
         st.session_state.show_portfolio_allocation = False  # Off by default
         st.session_state.show_healthcare = False  # Off by default
         st.session_state.show_debt = False  # Off by default
@@ -1979,7 +1981,8 @@ def main():
         ("⚙️ Settings", parent_settings_tab, True),  # Always shown
         (f"{st.session_state.parent1_emoji} {st.session_state.parent1_name}", parent_x_tab, True),
         (f"{st.session_state.parent2_emoji} {st.session_state.parent2_name}", parent_y_tab, True),
-        ("💸 Family Expenses", family_expenses_tab, True),
+        ("💸 Family Expenses", family_expenses_tab, st.session_state.get('show_family_expenses', False)),
+        ("🔄 Recurring & One-Time Expenses", recurring_one_time_expenses_tab, st.session_state.get('show_recurring_expenses', True)),
         ("👶 Children", children_tab, True),
         ("🏠 House Portfolio", house_tab, True),
         ("💼 Portfolio Allocation", portfolio_allocation_tab, st.session_state.get('show_portfolio_allocation', False)),
@@ -2091,6 +2094,18 @@ def parent_settings_tab():
     col1, col2 = st.columns(2)
 
     with col1:
+        st.session_state.show_family_expenses = st.checkbox(
+            "💸 Family Expenses (Advanced)",
+            value=st.session_state.get('show_family_expenses', False),
+            help="Browse, edit, and create expense templates by location/strategy"
+        )
+
+        st.session_state.show_recurring_expenses = st.checkbox(
+            "🔄 Recurring & One-Time Expenses",
+            value=st.session_state.get('show_recurring_expenses', True),
+            help="Manage recurring expenses and major one-time purchases"
+        )
+
         st.session_state.show_portfolio_allocation = st.checkbox(
             "💼 Portfolio Allocation",
             value=st.session_state.get('show_portfolio_allocation', False),
@@ -2103,13 +2118,13 @@ def parent_settings_tab():
             help="Plan Medicare, HSA, long-term care, and health insurance"
         )
 
+    with col2:
         st.session_state.show_debt = st.checkbox(
             "💳 Debt Management",
             value=st.session_state.get('show_debt', False),
             help="Track student loans, credit cards, and payoff strategies"
         )
 
-    with col2:
         st.session_state.show_education = st.checkbox(
             "🎓 Education Funding",
             value=st.session_state.get('show_education', False),
@@ -2768,8 +2783,15 @@ def family_expenses_tab():
             format="%.0f"
         )
 
-    # Major Purchases
-    st.subheader("🛒 Major Purchases")
+
+def recurring_one_time_expenses_tab():
+    """Recurring expenses and one-time major purchases tab"""
+    st.header("🔄 Recurring & One-Time Expenses")
+
+    st.markdown("""
+    Manage recurring expenses (like vehicle purchases every N years) and one-time major purchases.
+    These expenses are included in all financial simulations and projections.
+    """)
 
     if st.button("➕ Add Major Purchase"):
         new_purchase = MajorPurchase(
@@ -2825,7 +2847,13 @@ def family_expenses_tab():
                 st.rerun()
 
     # Recurring Expenses
+    st.markdown("---")
     st.subheader("🔄 Recurring Expenses")
+
+    st.markdown("""
+    Add expenses that repeat every N years (e.g., buying a new car every 7 years,
+    home renovations every 15 years).
+    """)
 
     if st.button("➕ Add Recurring Expense"):
         new_recurring = RecurringExpense(
