@@ -4696,7 +4696,12 @@ def combined_analysis_cashflow_tab():
         st.info("💡 Click the button below to calculate or recalculate your lifetime cashflow based on your current life plan. "
                 "This ensures you're always viewing the most up-to-date analysis.")
 
-        if st.button("🏦 Calculate Lifetime Cashflow", type="primary", use_container_width=True):
+        # Display piggy bank icon
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.image("assets/piggy-bank-coin.svg", width=100)
+
+        if st.button("Calculate Lifetime Cashflow", type="primary", use_container_width=True):
             with st.spinner("Calculating lifetime cashflow..."):
                 st.session_state.cashflow_data_cached = calculate_lifetime_cashflow()
             if st.session_state.cashflow_data_cached:
@@ -5381,7 +5386,12 @@ def combined_analysis_cashflow_tab():
                 st.session_state.mc_return_variability = st.slider("Return Variability (%)", 0.0, 100.0, 15.0)
 
         # Run Simulation Button with piggy bank icon
-        if st.button("🏦 Run Monte Carlo Simulation", type="primary"):
+        # Display piggy bank icon
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.image("assets/piggy-bank-coin.svg", width=100)
+
+        if st.button("Run Monte Carlo Simulation", type="primary"):
             with st.spinner("Running Monte Carlo simulation... This may take a minute."):
                 st.info("🎲 Monte Carlo simulation is running with simplified calculations for web stability")
 
