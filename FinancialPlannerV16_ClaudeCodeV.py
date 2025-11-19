@@ -1920,6 +1920,7 @@ def main():
         ("💼 Tax Optimization", tax_optimization_tab, st.session_state.get('show_tax', False)),
         ("🗓️ Timeline", timeline_tab, True),
         ("📊 Analysis", combined_simulation_tab, True),
+        ("💰 Lifetime Cashflow", lifetime_cashflow_tab, True),
         ("📄 Export Reports", report_export_tab, st.session_state.get('show_export', True)),
         ("💾 Save/Load", save_load_tab, True)
     ]
@@ -3184,6 +3185,524 @@ def timeline_tab():
 
         if state != prev_state or strategy != prev_strategy:
             st.success(f"**{year}:** → {state} - {strategy}")
+
+
+def calculate_lifetime_cashflow():
+    """
+    Calculate detailed year-by-year cashflow for entire lifetime (current year to age 100).
+
+    Returns:
+        list: List of dictionaries with year-by-year financial data
+    """
+    # Calculate timeline end (when younger parent reaches 100)
+    parent1_100_year = (st.session_state.current_year - st.session_state.parentX_age) + 100
+    parent2_100_year = (st.session_state.current_year - st.session_state.parentY_age) + 100
+    timeline_end = max(parent1_100_year, parent2_100_year)
+
+    results = []
+    cumulative_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
+
+    for year in range(st.session_state.current_year, timeline_end + 1):
+        # Calculate ages
+        parent1_age = st.session_state.parentX_age + (year - st.session_state.current_year)
+        parent2_age = st.session_state.parentY_age + (year - st.session_state.current_year)
+
+        # Calculate income
+        parent1_working = parent1_age < st.session_state.parentX_retirement_age
+        parent2_working = parent2_age < st.session_state.parentY_retirement_age
+
+        parent1_income = 0
+        parent2_income = 0
+        ss_income = 0
+
+        if parent1_working:
+            parent1_income = get_income_for_year(
+                st.session_state.parentX_income,
+                st.session_state.parentX_raise,
+                st.session_state.parentX_job_changes,
+                st.session_state.current_year,
+                year
+            )
+        else:
+            parent1_ss = st.session_state.parentX_ss_benefit * 12
+            if st.session_state.ss_insolvency_enabled and year >= 2034:
+                parent1_ss *= (1 - st.session_state.ss_shortfall_percentage / 100)
+            ss_income += parent1_ss
+
+        if parent2_working:
+            parent2_income = get_income_for_year(
+                st.session_state.parentY_income,
+                st.session_state.parentY_raise,
+                st.session_state.parentY_job_changes,
+                st.session_state.current_year,
+                year
+            )
+        else:
+            parent2_ss = st.session_state.parentY_ss_benefit * 12
+            if st.session_state.ss_insolvency_enabled and year >= 2034:
+                parent2_ss *= (1 - st.session_state.ss_shortfall_percentage / 100)
+            ss_income += parent2_ss
+
+        total_income = parent1_income + parent2_income + ss_income
+
+        # Calculate expenses
+        # Base family expenses (with inflation)
+        years_from_now = year - st.session_state.current_year
+        base_expenses = sum(st.session_state.expenses.values())
+        base_expenses *= (1.03 ** years_from_now)  # 3% inflation
+
+        # Children expenses
+        children_expenses = 0
+        children_in_college = []
+        for child in st.session_state.children_list:
+            child_exp = get_child_expenses(child, year, st.session_state.current_year)
+            child_total = sum(child_exp.values())
+            children_expenses += child_total
+
+            # Track who's in college
+            child_age = year - child['birth_year']
+            if 18 <= child_age <= 21:
+                children_in_college.append(child['name'])
+
+        total_expenses = base_expenses + children_expenses
+
+        # Calculate cashflow
+        cashflow = total_income - total_expenses
+
+        # Update net worth (simple model: cashflow + 7% investment return)
+        investment_return = cumulative_net_worth * 0.07
+        cumulative_net_worth += cashflow + investment_return
+
+        # Track events
+        events = []
+
+        # Job changes
+        for _, row in st.session_state.parentX_job_changes.iterrows():
+            if int(row['Year']) == year:
+                events.append(('job_change', st.session_state.parent1_name, row['New Income']))
+        for _, row in st.session_state.parentY_job_changes.iterrows():
+            if int(row['Year']) == year:
+                events.append(('job_change', st.session_state.parent2_name, row['New Income']))
+
+        # College events
+        if children_in_college:
+            events.append(('college', children_in_college))
+
+        # Retirement events
+        if parent1_age == st.session_state.parentX_retirement_age:
+            events.append(('retirement', st.session_state.parent1_name))
+        if parent2_age == st.session_state.parentY_retirement_age:
+            events.append(('retirement', st.session_state.parent2_name))
+
+        results.append({
+            'year': year,
+            'parent1_age': parent1_age,
+            'parent2_age': parent2_age,
+            'parent1_income': parent1_income,
+            'parent2_income': parent2_income,
+            'ss_income': ss_income,
+            'total_income': total_income,
+            'base_expenses': base_expenses,
+            'children_expenses': children_expenses,
+            'total_expenses': total_expenses,
+            'cashflow': cashflow,
+            'net_worth': cumulative_net_worth,
+            'children_in_college': children_in_college,
+            'events': events
+        })
+
+    return results
+
+
+def lifetime_cashflow_tab():
+    """Lifetime cashflow visualization tab"""
+    st.header("💰 Lifetime Cashflow Visualization")
+
+    st.markdown("""
+    See how money flows through your entire life from now until age 100.
+    This view helps you identify peak earning years, high expense periods, and retirement readiness.
+    """)
+
+    # Calculate lifetime data
+    with st.spinner("Calculating lifetime cashflow..."):
+        cashflow_data = calculate_lifetime_cashflow()
+
+    if not cashflow_data:
+        st.warning("No cashflow data available. Please configure your financial details first.")
+        return
+
+    # Create tabs for different views
+    tab1, tab2, tab3 = st.tabs(["📈 Timeline View", "📊 Critical Years Table", "📅 Life Stages"])
+
+    with tab1:
+        st.subheader("Lifetime Income vs Expenses Timeline")
+
+        # Prepare data for plotting
+        years = [d['year'] for d in cashflow_data]
+        income = [d['total_income'] for d in cashflow_data]
+        expenses = [d['total_expenses'] for d in cashflow_data]
+        cashflow = [d['cashflow'] for d in cashflow_data]
+
+        # Create figure
+        fig = go.Figure()
+
+        # Add income line
+        fig.add_trace(go.Scatter(
+            x=years,
+            y=income,
+            mode='lines',
+            name='Income',
+            line=dict(color='green', width=2),
+            hovertemplate='<b>%{x}</b><br>Income: $%{y:,.0f}<extra></extra>'
+        ))
+
+        # Add expenses line
+        fig.add_trace(go.Scatter(
+            x=years,
+            y=expenses,
+            mode='lines',
+            name='Expenses',
+            line=dict(color='red', width=2),
+            hovertemplate='<b>%{x}</b><br>Expenses: $%{y:,.0f}<extra></extra>'
+        ))
+
+        # Add cashflow area (positive)
+        cashflow_positive = [max(0, cf) for cf in cashflow]
+        fig.add_trace(go.Scatter(
+            x=years,
+            y=cashflow_positive,
+            mode='none',
+            name='Positive Cashflow',
+            fill='tozeroy',
+            fillcolor='rgba(0, 255, 0, 0.1)',
+            hovertemplate='<b>%{x}</b><br>Surplus: $%{y:,.0f}<extra></extra>'
+        ))
+
+        # Add cashflow area (negative)
+        cashflow_negative = [min(0, cf) for cf in cashflow]
+        fig.add_trace(go.Scatter(
+            x=years,
+            y=cashflow_negative,
+            mode='none',
+            name='Deficit',
+            fill='tozeroy',
+            fillcolor='rgba(255, 0, 0, 0.1)',
+            hovertemplate='<b>%{x}</b><br>Deficit: $%{y:,.0f}<extra></extra>'
+        ))
+
+        # Add event markers
+        event_years = []
+        event_labels = []
+        event_values = []
+
+        for d in cashflow_data:
+            for event_type, *event_data in d['events']:
+                if event_type == 'job_change':
+                    event_years.append(d['year'])
+                    event_labels.append(f"💼 {event_data[0]} job change")
+                    event_values.append(d['total_income'])
+                elif event_type == 'college' and len(event_data[0]) > 0:
+                    if len(event_data[0]) > 1:
+                        event_years.append(d['year'])
+                        event_labels.append(f"🎓 {len(event_data[0])} in college")
+                        event_values.append(d['total_expenses'])
+                elif event_type == 'retirement':
+                    event_years.append(d['year'])
+                    event_labels.append(f"🏖️ {event_data[0]} retires")
+                    event_values.append(d['total_income'])
+
+        if event_years:
+            fig.add_trace(go.Scatter(
+                x=event_years,
+                y=event_values,
+                mode='markers+text',
+                name='Events',
+                marker=dict(size=12, color='blue', symbol='star'),
+                text=event_labels,
+                textposition='top center',
+                textfont=dict(size=10),
+                hovertemplate='<b>%{text}</b><br>Year: %{x}<extra></extra>'
+            ))
+
+        fig.update_layout(
+            title="Lifetime Income, Expenses, and Cashflow",
+            xaxis_title="Year",
+            yaxis_title="Amount ($)",
+            height=600,
+            hovermode='x unified',
+            showlegend=True
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Key insights
+        st.subheader("📌 Key Insights")
+
+        col1, col2, col3 = st.columns(3)
+
+        # Find peak expense year
+        peak_expense_data = max(cashflow_data, key=lambda x: x['total_expenses'])
+        with col1:
+            st.metric(
+                "Peak Expense Year",
+                f"{peak_expense_data['year']}",
+                f"${peak_expense_data['total_expenses']:,.0f}"
+            )
+
+        # Find worst cashflow year
+        worst_cashflow_data = min(cashflow_data, key=lambda x: x['cashflow'])
+        with col2:
+            st.metric(
+                "Worst Cashflow Year",
+                f"{worst_cashflow_data['year']}",
+                f"${worst_cashflow_data['cashflow']:,.0f}"
+            )
+
+        # Count deficit years
+        deficit_years = sum(1 for d in cashflow_data if d['cashflow'] < 0)
+        with col3:
+            st.metric(
+                "Deficit Years",
+                f"{deficit_years} years",
+                "⚠️" if deficit_years > 5 else "✅"
+            )
+
+    with tab2:
+        st.subheader("Critical Years - Detailed Breakdown")
+
+        # Create DataFrame for table
+        table_data = []
+        for d in cashflow_data:
+            # Format children status
+            if d['children_in_college']:
+                children_status = ", ".join(d['children_in_college']) + " (college)"
+            else:
+                child_ages = []
+                for child in st.session_state.children_list:
+                    age = d['year'] - child['birth_year']
+                    if 0 <= age <= 21:
+                        child_ages.append(f"{child['name']} ({age})")
+                children_status = ", ".join(child_ages) if child_ages else "None"
+
+            # Format events
+            event_notes = []
+            for event_type, *event_data in d['events']:
+                if event_type == 'job_change':
+                    event_notes.append(f"💼 {event_data[0]} → ${event_data[1]:,.0f}")
+                elif event_type == 'college':
+                    event_notes.append(f"🎓 College")
+                elif event_type == 'retirement':
+                    event_notes.append(f"🏖️ {event_data[0]} retires")
+            event_str = "; ".join(event_notes) if event_notes else ""
+
+            table_data.append({
+                'Year': d['year'],
+                'Ages': f"{d['parent1_age']}/{d['parent2_age']}",
+                'Income': d['total_income'],
+                'Expenses': d['total_expenses'],
+                'Cashflow': d['cashflow'],
+                'Net Worth': d['net_worth'],
+                'Children': children_status,
+                'Events': event_str
+            })
+
+        df = pd.DataFrame(table_data)
+
+        # Add filtering
+        st.markdown("**Filter by:**")
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            show_deficit_only = st.checkbox("Show deficit years only")
+        with col2:
+            show_college_only = st.checkbox("Show college years only")
+        with col3:
+            show_events_only = st.checkbox("Show event years only")
+
+        # Apply filters
+        filtered_df = df.copy()
+        if show_deficit_only:
+            filtered_df = filtered_df[filtered_df['Cashflow'] < 0]
+        if show_college_only:
+            filtered_df = filtered_df[filtered_df['Children'].str.contains('college', na=False)]
+        if show_events_only:
+            filtered_df = filtered_df[filtered_df['Events'] != '']
+
+        # Format currency columns for display
+        display_df = filtered_df.copy()
+        display_df['Income'] = display_df['Income'].apply(lambda x: f"${x:,.0f}")
+        display_df['Expenses'] = display_df['Expenses'].apply(lambda x: f"${x:,.0f}")
+        display_df['Cashflow'] = display_df['Cashflow'].apply(lambda x: f"${x:,.0f}")
+        display_df['Net Worth'] = display_df['Net Worth'].apply(lambda x: f"${x:,.0f}")
+
+        st.dataframe(
+            display_df,
+            use_container_width=True,
+            height=600,
+            hide_index=True
+        )
+
+        st.download_button(
+            label="📥 Download as CSV",
+            data=filtered_df.to_csv(index=False),
+            file_name=f"lifetime_cashflow_{st.session_state.current_year}.csv",
+            mime="text/csv"
+        )
+
+    with tab3:
+        st.subheader("Life Stage Summary")
+
+        # Define life stages
+        parent1_retirement_year = st.session_state.current_year + (st.session_state.parentX_retirement_age - st.session_state.parentX_age)
+        parent2_retirement_year = st.session_state.current_year + (st.session_state.parentY_retirement_age - st.session_state.parentY_age)
+        retirement_year = min(parent1_retirement_year, parent2_retirement_year)
+
+        # Find first and last college years
+        college_years = [d['year'] for d in cashflow_data if d['children_in_college']]
+        if college_years:
+            first_college_year = min(college_years)
+            last_college_year = max(college_years)
+        else:
+            first_college_year = None
+            last_college_year = None
+
+        # Phase 1: Pre-college working years
+        if first_college_year:
+            phase1_data = [d for d in cashflow_data if d['year'] < first_college_year]
+        else:
+            phase1_data = [d for d in cashflow_data if d['year'] < retirement_year]
+
+        if phase1_data:
+            st.markdown("### 🏠 Phase 1: Building Wealth (Pre-College)")
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.markdown(f"**Duration**: {len(phase1_data)} years ({phase1_data[0]['year']} - {phase1_data[-1]['year']})")
+                st.markdown(f"**Your Ages**: {phase1_data[0]['parent1_age']}-{phase1_data[-1]['parent1_age']} / {phase1_data[0]['parent2_age']}-{phase1_data[-1]['parent2_age']}")
+
+                avg_income = sum(d['total_income'] for d in phase1_data) / len(phase1_data)
+                avg_expenses = sum(d['total_expenses'] for d in phase1_data) / len(phase1_data)
+                avg_savings = avg_income - avg_expenses
+
+                st.metric("Average Annual Income", f"${avg_income:,.0f}")
+                st.metric("Average Annual Expenses", f"${avg_expenses:,.0f}")
+                st.metric("Average Annual Savings", f"${avg_savings:,.0f}")
+
+            with col2:
+                start_nw = phase1_data[0]['net_worth']
+                end_nw = phase1_data[-1]['net_worth']
+                growth = end_nw - start_nw
+
+                st.metric("Starting Net Worth", f"${start_nw:,.0f}")
+                st.metric("Ending Net Worth", f"${end_nw:,.0f}")
+                st.metric("Net Worth Growth", f"${growth:,.0f}", f"+{growth/start_nw*100:.0f}%")
+
+        # Phase 2: College years
+        if college_years:
+            phase2_data = [d for d in cashflow_data if first_college_year <= d['year'] <= last_college_year]
+
+            st.markdown("---")
+            st.markdown("### 🎓 Phase 2: College Years")
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.markdown(f"**Duration**: {len(phase2_data)} years ({phase2_data[0]['year']} - {phase2_data[-1]['year']})")
+                st.markdown(f"**Your Ages**: {phase2_data[0]['parent1_age']}-{phase2_data[-1]['parent1_age']} / {phase2_data[0]['parent2_age']}-{phase2_data[-1]['parent2_age']}")
+
+                avg_income = sum(d['total_income'] for d in phase2_data) / len(phase2_data)
+                avg_expenses = sum(d['total_expenses'] for d in phase2_data) / len(phase2_data)
+                avg_savings = avg_income - avg_expenses
+
+                st.metric("Average Annual Income", f"${avg_income:,.0f}")
+                st.metric("Average Annual Expenses", f"${avg_expenses:,.0f}")
+                st.metric("Average Annual Savings", f"${avg_savings:,.0f}")
+
+                # Peak expense year
+                peak = max(phase2_data, key=lambda x: x['total_expenses'])
+                st.warning(f"**Peak**: {peak['year']} with ${peak['total_expenses']:,.0f} expenses")
+
+            with col2:
+                start_nw = phase2_data[0]['net_worth']
+                end_nw = phase2_data[-1]['net_worth']
+                growth = end_nw - start_nw
+
+                st.metric("Starting Net Worth", f"${start_nw:,.0f}")
+                st.metric("Ending Net Worth", f"${end_nw:,.0f}")
+                st.metric("Net Worth Growth", f"${growth:,.0f}")
+
+        # Phase 3: Empty nest (if applicable)
+        if last_college_year and last_college_year < retirement_year:
+            phase3_data = [d for d in cashflow_data if last_college_year < d['year'] < retirement_year]
+
+            if phase3_data:
+                st.markdown("---")
+                st.markdown("### 🚀 Phase 3: Empty Nest - Maximum Acceleration")
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.markdown(f"**Duration**: {len(phase3_data)} years ({phase3_data[0]['year']} - {phase3_data[-1]['year']})")
+                    st.markdown(f"**Your Ages**: {phase3_data[0]['parent1_age']}-{phase3_data[-1]['parent1_age']} / {phase3_data[0]['parent2_age']}-{phase3_data[-1]['parent2_age']}")
+
+                    avg_income = sum(d['total_income'] for d in phase3_data) / len(phase3_data)
+                    avg_expenses = sum(d['total_expenses'] for d in phase3_data) / len(phase3_data)
+                    avg_savings = avg_income - avg_expenses
+
+                    st.metric("Average Annual Income", f"${avg_income:,.0f}")
+                    st.metric("Average Annual Expenses", f"${avg_expenses:,.0f}")
+                    st.metric("Average Annual Savings", f"${avg_savings:,.0f}", "🚀 Peak Savings!")
+
+                with col2:
+                    start_nw = phase3_data[0]['net_worth']
+                    end_nw = phase3_data[-1]['net_worth']
+                    growth = end_nw - start_nw
+
+                    st.metric("Starting Net Worth", f"${start_nw:,.0f}")
+                    st.metric("Ending Net Worth", f"${end_nw:,.0f}")
+                    st.metric("Net Worth Growth", f"${growth:,.0f}")
+
+                    st.info("💡 **This is your critical wealth-building phase!** Maximize savings and investments.")
+
+        # Phase 4: Retirement
+        phase4_data = [d for d in cashflow_data if d['year'] >= retirement_year]
+
+        if phase4_data:
+            st.markdown("---")
+            st.markdown("### 🏖️ Phase 4: Retirement")
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.markdown(f"**Duration**: {len(phase4_data)} years ({phase4_data[0]['year']} - {phase4_data[-1]['year']})")
+                st.markdown(f"**Your Ages**: {phase4_data[0]['parent1_age']}-{phase4_data[-1]['parent1_age']} / {phase4_data[0]['parent2_age']}-{phase4_data[-1]['parent2_age']}")
+
+                avg_income = sum(d['total_income'] for d in phase4_data) / len(phase4_data)
+                avg_expenses = sum(d['total_expenses'] for d in phase4_data) / len(phase4_data)
+                avg_cashflow = avg_income - avg_expenses
+
+                st.metric("Average Annual Income", f"${avg_income:,.0f}", "SS Benefits")
+                st.metric("Average Annual Expenses", f"${avg_expenses:,.0f}")
+                st.metric("Average Annual Cashflow", f"${avg_cashflow:,.0f}")
+
+            with col2:
+                start_nw = phase4_data[0]['net_worth']
+                end_nw = phase4_data[-1]['net_worth']
+                change = end_nw - start_nw
+
+                st.metric("Retirement Net Worth", f"${start_nw:,.0f}")
+                st.metric("Age 100 Net Worth", f"${end_nw:,.0f}")
+                st.metric("Net Worth Change", f"${change:,.0f}")
+
+                # Withdrawal rate
+                if start_nw > 0:
+                    avg_annual_deficit = abs(avg_cashflow) if avg_cashflow < 0 else 0
+                    withdrawal_rate = (avg_annual_deficit / start_nw) * 100
+                    st.metric("Effective Withdrawal Rate", f"{withdrawal_rate:.1f}%")
+
+                    if withdrawal_rate > 4:
+                        st.warning("⚠️ Withdrawal rate exceeds 4% rule. Consider working longer or reducing expenses.")
+                    elif withdrawal_rate < 0:
+                        st.success("✅ No withdrawals needed! Living on SS + investment returns.")
+                    else:
+                        st.info(f"✅ Withdrawal rate within safe limits (4% rule).")
 
 
 def combined_simulation_tab():
