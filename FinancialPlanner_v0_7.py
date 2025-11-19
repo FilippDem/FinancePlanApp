@@ -1609,13 +1609,11 @@ def initialize_session_state():
                 'timeline': [{'year': current_year - 2, 'status': 'Own_Live', 'rental_income': 0.0}]
             }],
             'portfolio_allocation': {
-                'us_stocks': 70.0,
-                'international_stocks': 15.0,
+                'stocks': 85.0,  # US + International
                 'bonds': 5.0,
-                'reits': 5.0,
-                'commodities': 0.0,
                 'cash': 3.0,
-                'crypto': 2.0
+                'real_estate': 5.0,  # REITs
+                'other': 2.0  # Crypto
             },
             'major_purchases': [],
             'recurring_expenses': [
@@ -1718,13 +1716,11 @@ def initialize_session_state():
                 'timeline': [{'year': current_year - 8, 'status': 'Own_Live', 'rental_income': 0.0}]
             }],
             'portfolio_allocation': {
-                'us_stocks': 60.0,
-                'international_stocks': 20.0,
+                'stocks': 80.0,  # US + International
                 'bonds': 15.0,
-                'reits': 3.0,
-                'commodities': 0.0,
                 'cash': 2.0,
-                'crypto': 0.0
+                'real_estate': 3.0,  # REITs
+                'other': 0.0
             },
             'major_purchases': [],
             'recurring_expenses': [
@@ -1846,13 +1842,11 @@ def initialize_session_state():
                 }
             ],
             'portfolio_allocation': {
-                'us_stocks': 50.0,
-                'international_stocks': 20.0,
+                'stocks': 70.0,  # US + International
                 'bonds': 20.0,
-                'reits': 5.0,
-                'commodities': 3.0,
                 'cash': 2.0,
-                'crypto': 0.0
+                'real_estate': 5.0,  # REITs
+                'other': 3.0  # Commodities
             },
             'major_purchases': [],
             'recurring_expenses': [
@@ -1959,13 +1953,11 @@ def initialize_session_state():
                 'timeline': [{'year': current_year - 3, 'status': 'Own_Live', 'rental_income': 0.0}]
             }],
             'portfolio_allocation': {
-                'us_stocks': 65.0,
-                'international_stocks': 15.0,
+                'stocks': 80.0,  # US + International
                 'bonds': 15.0,
-                'reits': 0.0,
-                'commodities': 0.0,
                 'cash': 5.0,
-                'crypto': 0.0
+                'real_estate': 0.0,
+                'other': 0.0
             },
             'major_purchases': [],
             'recurring_expenses': [
@@ -2054,13 +2046,11 @@ def initialize_session_state():
                 }
             ],
             'portfolio_allocation': {
-                'us_stocks': 50.0,
-                'international_stocks': 15.0,
+                'stocks': 65.0,  # US + International
                 'bonds': 30.0,
-                'reits': 3.0,
-                'commodities': 0.0,
                 'cash': 2.0,
-                'crypto': 0.0
+                'real_estate': 3.0,  # REITs
+                'other': 0.0
             },
             'major_purchases': [],
             'recurring_expenses': [
