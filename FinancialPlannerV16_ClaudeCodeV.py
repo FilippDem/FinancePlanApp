@@ -3844,7 +3844,10 @@ def calculate_lifetime_cashflow():
             'ss_income': ss_income,
             'total_income': total_income,
             'base_expenses': base_expenses,
+            'base_expenses_detail': base_expenses_dict,
             'children_expenses': children_expenses,
+            'recurring_expenses': recurring_expenses_total,
+            'major_purchases': major_purchase_expenses,
             'total_expenses': total_expenses,
             'cashflow': cashflow,
             'net_worth': cumulative_net_worth,
@@ -3888,6 +3891,7 @@ def lifetime_cashflow_tab():
         income = [d['total_income'] for d in cashflow_data]
         expenses = [d['total_expenses'] for d in cashflow_data]
         cashflow = [d['cashflow'] for d in cashflow_data]
+        net_worth = [d['net_worth'] for d in cashflow_data]
 
         # Create figure
         fig = go.Figure()
@@ -3934,6 +3938,17 @@ def lifetime_cashflow_tab():
             fill='tozeroy',
             fillcolor='rgba(255, 0, 0, 0.1)',
             hovertemplate='<b>Year %{x}</b><br>Deficit: $%{y:,.0f}<extra></extra>'
+        ))
+
+        # Add net worth line (on secondary y-axis)
+        fig.add_trace(go.Scatter(
+            x=years,
+            y=net_worth,
+            mode='lines',
+            name='Net Worth',
+            line=dict(color='blue', width=3, dash='dash'),
+            yaxis='y2',
+            hovertemplate='<b>Year %{x}</b><br>Net Worth: $%{y:,.0f}<extra></extra>'
         ))
 
         # Add major event markers (only significant events to avoid clutter)
@@ -3997,9 +4012,15 @@ def lifetime_cashflow_tab():
             ))
 
         fig.update_layout(
-            title="Lifetime Income, Expenses, and Cashflow (Click any year for details)",
+            title="Lifetime Income, Expenses, Cashflow, and Net Worth (Click any year for details)",
             xaxis_title="Year",
-            yaxis_title="Amount ($)",
+            yaxis_title="Annual Cash Flow ($)",
+            yaxis2=dict(
+                title="Net Worth ($)",
+                overlaying='y',
+                side='right',
+                showgrid=False
+            ),
             height=700,
             hovermode='x unified',
             showlegend=True,
@@ -4078,26 +4099,48 @@ def lifetime_cashflow_tab():
                     st.markdown("#### 💳 Expense Breakdown")
 
                     expense_breakdown = []
-                    if year_data['base_expenses'] > 0:
-                        expense_breakdown.append({
-                            'Category': 'Family Living Expenses',
-                            'Amount': year_data['base_expenses']
-                        })
+
+                    # Add detailed base family expenses
+                    if 'base_expenses_detail' in year_data and year_data['base_expenses_detail']:
+                        for category, amount in year_data['base_expenses_detail'].items():
+                            if amount > 0:
+                                expense_breakdown.append({
+                                    'Category': category,
+                                    'Amount': amount
+                                })
+
+                    # Add children expenses
                     if year_data['children_expenses'] > 0:
                         expense_breakdown.append({
                             'Category': 'Children Expenses',
                             'Amount': year_data['children_expenses']
                         })
 
+                    # Add recurring expenses
+                    if year_data.get('recurring_expenses', 0) > 0:
+                        expense_breakdown.append({
+                            'Category': 'Recurring Expenses',
+                            'Amount': year_data['recurring_expenses']
+                        })
+
+                    # Add major purchases
+                    if year_data.get('major_purchases', 0) > 0:
+                        expense_breakdown.append({
+                            'Category': 'Major Purchases',
+                            'Amount': year_data['major_purchases']
+                        })
+
                     if expense_breakdown:
                         expense_df = pd.DataFrame(expense_breakdown)
 
-                        # Create pie chart for expenses
+                        # Create pie chart for expenses with more color variety
+                        colors = ['#e74c3c', '#c0392b', '#e67e22', '#d35400', '#f39c12',
+                                  '#f1c40f', '#16a085', '#27ae60', '#2980b9', '#8e44ad']
                         expense_fig = go.Figure(data=[go.Pie(
                             labels=expense_df['Category'],
                             values=expense_df['Amount'],
                             hole=0.3,
-                            marker_colors=['#e74c3c', '#c0392b']
+                            marker_colors=colors[:len(expense_df)]
                         )])
                         expense_fig.update_layout(height=300, showlegend=True)
                         st.plotly_chart(expense_fig, use_container_width=True)
