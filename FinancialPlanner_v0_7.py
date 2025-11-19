@@ -1540,6 +1540,539 @@ def initialize_session_state():
         # NEW: Internal save/load system
         st.session_state.saved_scenarios = {}
 
+        # Preload 5 demo scenarios showcasing different features
+        current_year = datetime.now().year
+
+        # Scenario 1: Young Tech Couple in San Francisco
+        st.session_state.saved_scenarios["[DEMO] Young Tech Couple - SF"] = {
+            'current_year': current_year,
+            'parent1_name': "Alex",
+            'parent1_emoji': "👨",
+            'parent2_name': "Jordan",
+            'parent2_emoji': "👩",
+            'marriage_year': current_year - 3,
+            'parentX_age': 28,
+            'parentX_net_worth': 150000.0,
+            'parentX_income': 180000.0,
+            'parentX_raise': 8.0,
+            'parentX_retirement_age': 60,
+            'parentX_ss_benefit': 3500.0,
+            'parentY_age': 27,
+            'parentY_net_worth': 120000.0,
+            'parentY_income': 165000.0,
+            'parentY_raise': 7.5,
+            'parentY_retirement_age': 60,
+            'parentY_ss_benefit': 3200.0,
+            'expenses': {
+                'Food & Groceries': 18000.0,
+                'Clothing': 6000.0,
+                'Transportation': 8000.0,
+                'Entertainment & Activities': 12000.0,
+                'Personal Care': 4800.0,
+                'Other Expenses': 9600.0
+            },
+            'children_list': [
+                {
+                    'name': 'Emma',
+                    'birth_year': current_year - 2,
+                    'use_template': True,
+                    'template_state': 'San Francisco',
+                    'template_strategy': 'High-end',
+                    'school_type': 'Private',
+                    'college_type': 'Private',
+                    'college_location': 'San Francisco'
+                },
+                {
+                    'name': 'Lucas',
+                    'birth_year': current_year,
+                    'use_template': True,
+                    'template_state': 'San Francisco',
+                    'template_strategy': 'High-end',
+                    'school_type': 'Private',
+                    'college_type': 'Private',
+                    'college_location': 'New York'
+                }
+            ],
+            'houses': [{
+                'name': 'SF Condo',
+                'purchase_year': current_year - 2,
+                'purchase_price': 1200000.0,
+                'current_value': 1300000.0,
+                'appreciation_rate': 4.5,
+                'sell_year': None
+            }],
+            'portfolio_allocation': {
+                'us_stocks': 70.0,
+                'international_stocks': 15.0,
+                'bonds': 5.0,
+                'reits': 5.0,
+                'commodities': 0.0,
+                'cash': 3.0,
+                'crypto': 2.0
+            },
+            'major_purchases': [],
+            'recurring_expenses': [
+                {
+                    'name': 'Tech Equipment',
+                    'category': 'Work Equipment',
+                    'amount': 5000.0,
+                    'frequency_years': 2,
+                    'start_year': current_year,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                }
+            ],
+            'state_timeline': [{
+                'year': current_year,
+                'state': 'San Francisco',
+                'spending_strategy': 'High-end'
+            }],
+            'active_scenario': 'Aggressive',
+            'ss_insolvency_enabled': True,
+            'ss_shortfall_percentage': 30.0
+        }
+
+        # Scenario 2: Mid-Career Family with Children in Seattle
+        st.session_state.saved_scenarios["[DEMO] Mid-Career Family - Seattle"] = {
+            'current_year': current_year,
+            'parent1_name': "Mike",
+            'parent1_emoji': "👨",
+            'parent2_name': "Sarah",
+            'parent2_emoji': "👩",
+            'marriage_year': current_year - 12,
+            'parentX_age': 38,
+            'parentX_net_worth': 320000.0,
+            'parentX_income': 115000.0,
+            'parentX_raise': 3.5,
+            'parentX_retirement_age': 65,
+            'parentX_ss_benefit': 2800.0,
+            'parentY_age': 37,
+            'parentY_net_worth': 280000.0,
+            'parentY_income': 95000.0,
+            'parentY_raise': 3.0,
+            'parentY_retirement_age': 65,
+            'parentY_ss_benefit': 2500.0,
+            'expenses': {
+                'Food & Groceries': 15600.0,
+                'Clothing': 4800.0,
+                'Transportation': 14400.0,
+                'Entertainment & Activities': 7200.0,
+                'Personal Care': 3600.0,
+                'Other Expenses': 8400.0
+            },
+            'children_list': [
+                {
+                    'name': 'Olivia',
+                    'birth_year': current_year - 10,
+                    'use_template': True,
+                    'template_state': 'Seattle',
+                    'template_strategy': 'Average',
+                    'school_type': 'Public',
+                    'college_type': 'Public',
+                    'college_location': 'Seattle'
+                },
+                {
+                    'name': 'Noah',
+                    'birth_year': current_year - 7,
+                    'use_template': True,
+                    'template_state': 'Seattle',
+                    'template_strategy': 'Average',
+                    'school_type': 'Public',
+                    'college_type': 'Public',
+                    'college_location': 'Seattle'
+                },
+                {
+                    'name': 'Sophia',
+                    'birth_year': current_year - 4,
+                    'use_template': True,
+                    'template_state': 'Seattle',
+                    'template_strategy': 'Average',
+                    'school_type': 'Public',
+                    'college_type': 'Private',
+                    'college_location': 'Seattle'
+                }
+            ],
+            'houses': [{
+                'name': 'Primary Home',
+                'purchase_year': current_year - 8,
+                'purchase_price': 650000.0,
+                'current_value': 800000.0,
+                'appreciation_rate': 3.5,
+                'sell_year': None
+            }],
+            'portfolio_allocation': {
+                'us_stocks': 60.0,
+                'international_stocks': 20.0,
+                'bonds': 15.0,
+                'reits': 3.0,
+                'commodities': 0.0,
+                'cash': 2.0,
+                'crypto': 0.0
+            },
+            'major_purchases': [],
+            'recurring_expenses': [
+                {
+                    'name': 'Family Vehicle',
+                    'category': 'Vehicle',
+                    'amount': 45000.0,
+                    'frequency_years': 8,
+                    'start_year': current_year + 3,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 5,
+                    'interest_rate': 4.5
+                },
+                {
+                    'name': 'Annual Family Vacation',
+                    'category': 'Travel',
+                    'amount': 8000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                }
+            ],
+            'state_timeline': [{
+                'year': current_year,
+                'state': 'Seattle',
+                'spending_strategy': 'Average'
+            }],
+            'active_scenario': 'Moderate',
+            'ss_insolvency_enabled': True,
+            'ss_shortfall_percentage': 30.0
+        }
+
+        # Scenario 3: High-Net-Worth Couple in New York
+        st.session_state.saved_scenarios["[DEMO] High Net Worth - NYC"] = {
+            'current_year': current_year,
+            'parent1_name': "David",
+            'parent1_emoji': "👨",
+            'parent2_name': "Jennifer",
+            'parent2_emoji': "👩",
+            'marriage_year': current_year - 15,
+            'parentX_age': 45,
+            'parentX_net_worth': 2500000.0,
+            'parentX_income': 350000.0,
+            'parentX_raise': 4.0,
+            'parentX_retirement_age': 62,
+            'parentX_ss_benefit': 4500.0,
+            'parentY_age': 43,
+            'parentY_net_worth': 2200000.0,
+            'parentY_income': 280000.0,
+            'parentY_raise': 3.5,
+            'parentY_retirement_age': 62,
+            'parentY_ss_benefit': 4000.0,
+            'expenses': {
+                'Food & Groceries': 24000.0,
+                'Clothing': 12000.0,
+                'Transportation': 18000.0,
+                'Entertainment & Activities': 24000.0,
+                'Personal Care': 9600.0,
+                'Other Expenses': 18000.0
+            },
+            'children_list': [
+                {
+                    'name': 'Isabella',
+                    'birth_year': current_year - 13,
+                    'use_template': True,
+                    'template_state': 'New York',
+                    'template_strategy': 'High-end',
+                    'school_type': 'Private',
+                    'college_type': 'Private',
+                    'college_location': 'New York'
+                },
+                {
+                    'name': 'William',
+                    'birth_year': current_year - 11,
+                    'use_template': True,
+                    'template_state': 'New York',
+                    'template_strategy': 'High-end',
+                    'school_type': 'Private',
+                    'college_type': 'Private',
+                    'college_location': 'New York'
+                }
+            ],
+            'houses': [
+                {
+                    'name': 'Manhattan Apartment',
+                    'purchase_year': current_year - 10,
+                    'purchase_price': 2500000.0,
+                    'current_value': 3200000.0,
+                    'appreciation_rate': 3.0,
+                    'sell_year': None
+                },
+                {
+                    'name': 'Hamptons Summer Home',
+                    'purchase_year': current_year - 5,
+                    'purchase_price': 1800000.0,
+                    'current_value': 2100000.0,
+                    'appreciation_rate': 4.0,
+                    'sell_year': None
+                }
+            ],
+            'portfolio_allocation': {
+                'us_stocks': 50.0,
+                'international_stocks': 20.0,
+                'bonds': 20.0,
+                'reits': 5.0,
+                'commodities': 3.0,
+                'cash': 2.0,
+                'crypto': 0.0
+            },
+            'major_purchases': [],
+            'recurring_expenses': [
+                {
+                    'name': 'Luxury Vehicles',
+                    'category': 'Vehicle',
+                    'amount': 90000.0,
+                    'frequency_years': 5,
+                    'start_year': current_year + 2,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'International Travel',
+                    'category': 'Travel',
+                    'amount': 25000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Charitable Giving',
+                    'category': 'Philanthropy',
+                    'amount': 50000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': None,
+                    'inflation_adjust': False,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                }
+            ],
+            'state_timeline': [{
+                'year': current_year,
+                'state': 'New York',
+                'spending_strategy': 'High-end'
+            }],
+            'active_scenario': 'Moderate',
+            'ss_insolvency_enabled': True,
+            'ss_shortfall_percentage': 30.0
+        }
+
+        # Scenario 4: Single Parent Teacher in Sacramento
+        st.session_state.saved_scenarios["[DEMO] Single Parent - Sacramento"] = {
+            'current_year': current_year,
+            'parent1_name': "Maria",
+            'parent1_emoji': "👩",
+            'parent2_name': "N/A",
+            'parent2_emoji': "👤",
+            'marriage_year': "N/A",
+            'parentX_age': 35,
+            'parentX_net_worth': 95000.0,
+            'parentX_income': 72000.0,
+            'parentX_raise': 2.5,
+            'parentX_retirement_age': 67,
+            'parentX_ss_benefit': 2200.0,
+            'parentY_age': 35,
+            'parentY_net_worth': 0.0,
+            'parentY_income': 0.0,
+            'parentY_raise': 0.0,
+            'parentY_retirement_age': 67,
+            'parentY_ss_benefit': 0.0,
+            'expenses': {
+                'Food & Groceries': 9600.0,
+                'Clothing': 2400.0,
+                'Transportation': 7200.0,
+                'Entertainment & Activities': 3600.0,
+                'Personal Care': 2400.0,
+                'Other Expenses': 4800.0
+            },
+            'children_list': [
+                {
+                    'name': 'Diego',
+                    'birth_year': current_year - 8,
+                    'use_template': True,
+                    'template_state': 'Sacramento',
+                    'template_strategy': 'Average',
+                    'school_type': 'Public',
+                    'college_type': 'Public',
+                    'college_location': 'Sacramento'
+                }
+            ],
+            'houses': [{
+                'name': 'Townhouse',
+                'purchase_year': current_year - 3,
+                'purchase_price': 420000.0,
+                'current_value': 450000.0,
+                'appreciation_rate': 3.0,
+                'sell_year': None
+            }],
+            'portfolio_allocation': {
+                'us_stocks': 65.0,
+                'international_stocks': 15.0,
+                'bonds': 15.0,
+                'reits': 0.0,
+                'commodities': 0.0,
+                'cash': 5.0,
+                'crypto': 0.0
+            },
+            'major_purchases': [],
+            'recurring_expenses': [
+                {
+                    'name': 'Reliable Sedan',
+                    'category': 'Vehicle',
+                    'amount': 28000.0,
+                    'frequency_years': 10,
+                    'start_year': current_year + 5,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'ParentX',
+                    'financing_years': 5,
+                    'interest_rate': 4.0
+                },
+                {
+                    'name': 'Summer Camp',
+                    'category': 'Children',
+                    'amount': 1500.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': current_year + 10,
+                    'inflation_adjust': True,
+                    'parent': 'ParentX',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                }
+            ],
+            'state_timeline': [{
+                'year': current_year,
+                'state': 'Sacramento',
+                'spending_strategy': 'Conservative'
+            }],
+            'active_scenario': 'Conservative',
+            'ss_insolvency_enabled': True,
+            'ss_shortfall_percentage': 30.0
+        }
+
+        # Scenario 5: Pre-Retirement Empty Nesters in Portland
+        st.session_state.saved_scenarios["[DEMO] Pre-Retirement - Portland"] = {
+            'current_year': current_year,
+            'parent1_name': "Robert",
+            'parent1_emoji': "👨",
+            'parent2_name': "Linda",
+            'parent2_emoji': "👩",
+            'marriage_year': current_year - 32,
+            'parentX_age': 58,
+            'parentX_net_worth': 1200000.0,
+            'parentX_income': 125000.0,
+            'parentX_raise': 2.0,
+            'parentX_retirement_age': 65,
+            'parentX_ss_benefit': 3200.0,
+            'parentY_age': 57,
+            'parentY_net_worth': 950000.0,
+            'parentY_income': 98000.0,
+            'parentY_raise': 2.0,
+            'parentY_retirement_age': 65,
+            'parentY_ss_benefit': 2800.0,
+            'expenses': {
+                'Food & Groceries': 12000.0,
+                'Clothing': 3600.0,
+                'Transportation': 9600.0,
+                'Entertainment & Activities': 8400.0,
+                'Personal Care': 4200.0,
+                'Other Expenses': 7200.0
+            },
+            'children_list': [],
+            'houses': [
+                {
+                    'name': 'Family Home',
+                    'purchase_year': current_year - 25,
+                    'purchase_price': 350000.0,
+                    'current_value': 720000.0,
+                    'appreciation_rate': 3.0,
+                    'sell_year': current_year + 7
+                }
+            ],
+            'portfolio_allocation': {
+                'us_stocks': 50.0,
+                'international_stocks': 15.0,
+                'bonds': 30.0,
+                'reits': 3.0,
+                'commodities': 0.0,
+                'cash': 2.0,
+                'crypto': 0.0
+            },
+            'major_purchases': [],
+            'recurring_expenses': [
+                {
+                    'name': 'Healthcare Premiums',
+                    'category': 'Healthcare',
+                    'amount': 15000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': current_year + 7,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Retirement Condo Purchase',
+                    'category': 'Housing',
+                    'amount': 450000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 7,
+                    'end_year': current_year + 7,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Help Adult Children',
+                    'category': 'Family Support',
+                    'amount': 12000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': current_year + 15,
+                    'inflation_adjust': False,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                }
+            ],
+            'state_timeline': [
+                {
+                    'year': current_year,
+                    'state': 'Portland',
+                    'spending_strategy': 'Average'
+                },
+                {
+                    'year': current_year + 7,
+                    'state': 'Portland',
+                    'spending_strategy': 'Conservative'
+                }
+            ],
+            'active_scenario': 'Conservative',
+            'ss_insolvency_enabled': True,
+            'ss_shortfall_percentage': 30.0
+        }
+
         # NEW: Custom children templates
         st.session_state.custom_children_templates = {}
 
