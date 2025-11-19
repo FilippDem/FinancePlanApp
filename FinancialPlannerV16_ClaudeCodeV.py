@@ -3321,9 +3321,14 @@ def lifetime_cashflow_tab():
     st.markdown("""
     See how money flows through your entire life from now until age 100.
     This view helps you identify peak earning years, high expense periods, and retirement readiness.
+    **Click on any year in the chart to see detailed income and expense breakdown.**
     """)
 
-    # Calculate lifetime data
+    # Initialize selected year in session state
+    if 'selected_cashflow_year' not in st.session_state:
+        st.session_state.selected_cashflow_year = None
+
+    # Calculate lifetime data (no caching to ensure it updates when data changes)
     with st.spinner("Calculating lifetime cashflow..."):
         cashflow_data = calculate_lifetime_cashflow()
 
@@ -3353,7 +3358,7 @@ def lifetime_cashflow_tab():
             mode='lines',
             name='Income',
             line=dict(color='green', width=2),
-            hovertemplate='<b>%{x}</b><br>Income: $%{y:,.0f}<extra></extra>'
+            hovertemplate='<b>Year %{x}</b><br>Income: $%{y:,.0f}<br>Click for details<extra></extra>'
         ))
 
         # Add expenses line
@@ -3363,7 +3368,7 @@ def lifetime_cashflow_tab():
             mode='lines',
             name='Expenses',
             line=dict(color='red', width=2),
-            hovertemplate='<b>%{x}</b><br>Expenses: $%{y:,.0f}<extra></extra>'
+            hovertemplate='<b>Year %{x}</b><br>Expenses: $%{y:,.0f}<br>Click for details<extra></extra>'
         ))
 
         # Add cashflow area (positive)
@@ -3375,7 +3380,7 @@ def lifetime_cashflow_tab():
             name='Positive Cashflow',
             fill='tozeroy',
             fillcolor='rgba(0, 255, 0, 0.1)',
-            hovertemplate='<b>%{x}</b><br>Surplus: $%{y:,.0f}<extra></extra>'
+            hovertemplate='<b>Year %{x}</b><br>Surplus: $%{y:,.0f}<extra></extra>'
         ))
 
         # Add cashflow area (negative)
@@ -3387,55 +3392,202 @@ def lifetime_cashflow_tab():
             name='Deficit',
             fill='tozeroy',
             fillcolor='rgba(255, 0, 0, 0.1)',
-            hovertemplate='<b>%{x}</b><br>Deficit: $%{y:,.0f}<extra></extra>'
+            hovertemplate='<b>Year %{x}</b><br>Deficit: $%{y:,.0f}<extra></extra>'
         ))
 
-        # Add event markers
-        event_years = []
-        event_labels = []
-        event_values = []
+        # Add major event markers (only significant events to avoid clutter)
+        major_events = []
 
+        # Collect all major events
         for d in cashflow_data:
             for event_type, *event_data in d['events']:
                 if event_type == 'job_change':
-                    event_years.append(d['year'])
-                    event_labels.append(f"💼 {event_data[0]} job change")
-                    event_values.append(d['total_income'])
-                elif event_type == 'college' and len(event_data[0]) > 0:
-                    if len(event_data[0]) > 1:
-                        event_years.append(d['year'])
-                        event_labels.append(f"🎓 {len(event_data[0])} in college")
-                        event_values.append(d['total_expenses'])
+                    major_events.append({
+                        'year': d['year'],
+                        'type': 'job_change',
+                        'label': f"💼 {event_data[0]}",
+                        'value': d['total_income']
+                    })
                 elif event_type == 'retirement':
-                    event_years.append(d['year'])
-                    event_labels.append(f"🏖️ {event_data[0]} retires")
-                    event_values.append(d['total_income'])
+                    major_events.append({
+                        'year': d['year'],
+                        'type': 'retirement',
+                        'label': f"🏖️ {event_data[0]}",
+                        'value': d['total_income']
+                    })
 
-        if event_years:
+        # Add first and last college years only
+        college_years_list = [d['year'] for d in cashflow_data if d['children_in_college']]
+        if college_years_list:
+            first_college = min(college_years_list)
+            last_college = max(college_years_list)
+
+            first_college_data = next(d for d in cashflow_data if d['year'] == first_college)
+            major_events.append({
+                'year': first_college,
+                'type': 'college_start',
+                'label': '🎓 College Starts',
+                'value': first_college_data['total_expenses']
+            })
+
+            if last_college != first_college:
+                last_college_data = next(d for d in cashflow_data if d['year'] == last_college)
+                major_events.append({
+                    'year': last_college,
+                    'type': 'college_end',
+                    'label': '🎓 College Ends',
+                    'value': last_college_data['total_expenses']
+                })
+
+        # Add markers without text labels (use annotations instead)
+        if major_events:
+            event_years = [e['year'] for e in major_events]
+            event_values = [e['value'] for e in major_events]
+            event_labels = [e['label'] for e in major_events]
+
             fig.add_trace(go.Scatter(
                 x=event_years,
                 y=event_values,
-                mode='markers+text',
-                name='Events',
-                marker=dict(size=12, color='blue', symbol='star'),
-                text=event_labels,
-                textposition='top center',
-                textfont=dict(size=10),
-                hovertemplate='<b>%{text}</b><br>Year: %{x}<extra></extra>'
+                mode='markers',
+                name='Major Events',
+                marker=dict(size=15, color='blue', symbol='star', line=dict(width=2, color='white')),
+                hovertemplate='<b>%{customdata}</b><br>Year: %{x}<extra></extra>',
+                customdata=event_labels
             ))
 
         fig.update_layout(
-            title="Lifetime Income, Expenses, and Cashflow",
+            title="Lifetime Income, Expenses, and Cashflow (Click any year for details)",
             xaxis_title="Year",
             yaxis_title="Amount ($)",
-            height=600,
+            height=700,
             hovermode='x unified',
-            showlegend=True
+            showlegend=True,
+            clickmode='event+select'
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        # Display chart and capture click events
+        selected_points = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="cashflow_chart")
+
+        # Handle year selection via manual input
+        st.markdown("---")
+        col_select1, col_select2 = st.columns([3, 1])
+        with col_select1:
+            selected_year = st.selectbox(
+                "Select a year to see detailed breakdown:",
+                options=years,
+                index=0,
+                key="year_selector"
+            )
+        with col_select2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("Show Details", type="primary"):
+                st.session_state.selected_cashflow_year = selected_year
+
+        # Show detailed breakdown if year is selected
+        if st.session_state.selected_cashflow_year:
+            year_data = next((d for d in cashflow_data if d['year'] == st.session_state.selected_cashflow_year), None)
+
+            if year_data:
+                st.markdown("---")
+                st.subheader(f"📊 Detailed Breakdown for {st.session_state.selected_cashflow_year}")
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.markdown("#### 💵 Income Breakdown")
+
+                    income_breakdown = []
+                    if year_data['parent1_income'] > 0:
+                        income_breakdown.append({
+                            'Source': f"{st.session_state.parent1_name} Salary",
+                            'Amount': year_data['parent1_income']
+                        })
+                    if year_data['parent2_income'] > 0:
+                        income_breakdown.append({
+                            'Source': f"{st.session_state.parent2_name} Salary",
+                            'Amount': year_data['parent2_income']
+                        })
+                    if year_data['ss_income'] > 0:
+                        income_breakdown.append({
+                            'Source': 'Social Security',
+                            'Amount': year_data['ss_income']
+                        })
+
+                    if income_breakdown:
+                        income_df = pd.DataFrame(income_breakdown)
+
+                        # Create pie chart for income
+                        income_fig = go.Figure(data=[go.Pie(
+                            labels=income_df['Source'],
+                            values=income_df['Amount'],
+                            hole=0.3,
+                            marker_colors=['#2ecc71', '#27ae60', '#16a085']
+                        )])
+                        income_fig.update_layout(height=300, showlegend=True)
+                        st.plotly_chart(income_fig, use_container_width=True)
+
+                        # Show table
+                        income_df['Amount'] = income_df['Amount'].apply(lambda x: f"${x:,.0f}")
+                        st.dataframe(income_df, hide_index=True, use_container_width=True)
+                        st.metric("Total Income", f"${year_data['total_income']:,.0f}")
+                    else:
+                        st.info("No income for this year")
+
+                with col2:
+                    st.markdown("#### 💳 Expense Breakdown")
+
+                    expense_breakdown = []
+                    if year_data['base_expenses'] > 0:
+                        expense_breakdown.append({
+                            'Category': 'Family Living Expenses',
+                            'Amount': year_data['base_expenses']
+                        })
+                    if year_data['children_expenses'] > 0:
+                        expense_breakdown.append({
+                            'Category': 'Children Expenses',
+                            'Amount': year_data['children_expenses']
+                        })
+
+                    if expense_breakdown:
+                        expense_df = pd.DataFrame(expense_breakdown)
+
+                        # Create pie chart for expenses
+                        expense_fig = go.Figure(data=[go.Pie(
+                            labels=expense_df['Category'],
+                            values=expense_df['Amount'],
+                            hole=0.3,
+                            marker_colors=['#e74c3c', '#c0392b']
+                        )])
+                        expense_fig.update_layout(height=300, showlegend=True)
+                        st.plotly_chart(expense_fig, use_container_width=True)
+
+                        # Show table
+                        expense_df['Amount'] = expense_df['Amount'].apply(lambda x: f"${x:,.0f}")
+                        st.dataframe(expense_df, hide_index=True, use_container_width=True)
+                        st.metric("Total Expenses", f"${year_data['total_expenses']:,.0f}")
+                    else:
+                        st.info("No expenses for this year")
+
+                # Show summary metrics
+                st.markdown("#### 📈 Year Summary")
+                sum_col1, sum_col2, sum_col3, sum_col4 = st.columns(4)
+
+                with sum_col1:
+                    st.metric("Ages", f"{year_data['parent1_age']} / {year_data['parent2_age']}")
+                with sum_col2:
+                    cashflow_val = year_data['cashflow']
+                    cashflow_delta = "Surplus" if cashflow_val >= 0 else "Deficit"
+                    st.metric("Cashflow", f"${abs(cashflow_val):,.0f}", cashflow_delta)
+                with sum_col3:
+                    st.metric("Net Worth", f"${year_data['net_worth']:,.0f}")
+                with sum_col4:
+                    if year_data['children_in_college']:
+                        st.metric("In College", ", ".join(year_data['children_in_college']))
+                    else:
+                        st.metric("In College", "None")
 
         # Key insights
+        st.markdown("---")
         st.subheader("📌 Key Insights")
 
         col1, col2, col3 = st.columns(3)
