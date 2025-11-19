@@ -13,7 +13,7 @@ from typing import List, Dict, Optional, Any
 # Set page configuration
 st.set_page_config(
     page_title="Financial Planning Application v0.7",
-    page_icon="💰",
+    page_icon="assets/piggy-bank-coin.svg",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -4732,9 +4732,9 @@ def combined_analysis_cashflow_tab():
                 "This ensures you're always viewing the most up-to-date analysis.")
 
         # Display piggy bank icon
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.image("assets/piggy-bank-coin.svg", width=100)
+        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+        st.image("assets/piggy-bank-coin.svg", width=100)
+        st.markdown("</div>", unsafe_allow_html=True)
 
         if st.button("Calculate Lifetime Cashflow", type="primary", use_container_width=True):
             with st.spinner("Calculating lifetime cashflow..."):
@@ -5513,9 +5513,9 @@ def combined_analysis_cashflow_tab():
 
         # Run Simulation Button with piggy bank icon
         # Display piggy bank icon
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.image("assets/piggy-bank-coin.svg", width=100)
+        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+        st.image("assets/piggy-bank-coin.svg", width=100)
+        st.markdown("</div>", unsafe_allow_html=True)
 
         if st.button("Run Monte Carlo Simulation", type="primary"):
             with st.spinner("Running Monte Carlo simulation... This may take a minute."):
