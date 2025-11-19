@@ -4476,13 +4476,29 @@ def lifetime_cashflow_tab():
     **Click on any year in the chart to see detailed income and expense breakdown.**
     """)
 
-    # Initialize selected year in session state
+    # Initialize session state for cashflow calculation
+    if 'cashflow_data_cached' not in st.session_state:
+        st.session_state.cashflow_data_cached = None
     if 'selected_cashflow_year' not in st.session_state:
         st.session_state.selected_cashflow_year = None
 
-    # Calculate lifetime data (no caching to ensure it updates when data changes)
-    with st.spinner("Calculating lifetime cashflow..."):
-        cashflow_data = calculate_lifetime_cashflow()
+    # Add calculate/recalculate button
+    st.info("💡 Click the button below to calculate or recalculate your lifetime cashflow based on your current life plan. "
+            "This ensures you're always viewing the most up-to-date analysis.")
+
+    if st.button("🔄 Calculate Lifetime Cashflow", type="primary", use_container_width=True):
+        with st.spinner("Calculating lifetime cashflow..."):
+            st.session_state.cashflow_data_cached = calculate_lifetime_cashflow()
+        if st.session_state.cashflow_data_cached:
+            st.success("✅ Calculation complete! Scroll down to view results.")
+        st.rerun()
+
+    # Check if we have calculated data to show
+    if st.session_state.cashflow_data_cached is None:
+        st.warning("⚠️ No cashflow data calculated yet. Click the button above to generate your lifetime cashflow analysis.")
+        return
+
+    cashflow_data = st.session_state.cashflow_data_cached
 
     if not cashflow_data:
         st.warning("No cashflow data available. Please configure your financial details first.")
