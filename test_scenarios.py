@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Comprehensive test scenarios for Financial Planning Suite V16
+Comprehensive test scenarios for Financial Planning Suite v0.7
 Tests various edge cases and realistic user scenarios
 """
 
@@ -15,7 +15,7 @@ import io
 # Import the main application components
 # We'll test the dataclasses and utility functions
 print("=" * 80)
-print("FINANCIAL PLANNING SUITE V16 - COMPREHENSIVE SCENARIO TESTING")
+print("FINANCIAL PLANNING SUITE v0.7 - COMPREHENSIVE SCENARIO TESTING")
 print("=" * 80)
 
 test_results = []

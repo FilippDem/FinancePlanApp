@@ -12,7 +12,7 @@ from typing import List, Dict, Optional, Any
 
 # Set page configuration
 st.set_page_config(
-    page_title="Financial Planning Application V16",
+    page_title="Financial Planning Application v0.7",
     page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -1322,7 +1322,7 @@ def format_currency(value, force_full=False, context="general"):
 def initialize_session_state():
     """Initialize all session state variables"""
     if 'initialized' not in st.session_state:
-        st.session_state.current_year = 2025
+        st.session_state.current_year = datetime.now().year
 
         st.session_state.parent1_name = "Filipp"
         st.session_state.parent1_emoji = "👨"
@@ -1332,7 +1332,7 @@ def initialize_session_state():
         st.session_state.marriage_year = "N/A"
 
         st.session_state.state_timeline = [
-            StateTimelineEntry(2025, "Seattle", "Average")
+            StateTimelineEntry(datetime.now().year, "Seattle", "Average")
         ]
 
         # NEW: Portfolio allocation
@@ -1346,7 +1346,7 @@ def initialize_session_state():
         st.session_state.parentX_retirement_age = 65
         st.session_state.parentX_ss_benefit = 2500.0
         st.session_state.parentX_job_changes = pd.DataFrame({
-            'Year': [2027, 2032],
+            'Year': [datetime.now().year + 2, datetime.now().year + 7],
             'New Income': [105000, 120000]
         })
 
@@ -1358,7 +1358,7 @@ def initialize_session_state():
         st.session_state.parentY_retirement_age = 65
         st.session_state.parentY_ss_benefit = 2200.0
         st.session_state.parentY_job_changes = pd.DataFrame({
-            'Year': [2028, 2033],
+            'Year': [datetime.now().year + 3, datetime.now().year + 8],
             'New Income': [92000, 105000]
         })
 
@@ -1440,7 +1440,7 @@ def initialize_session_state():
                 category="Family Support",
                 amount=20000.0,
                 frequency_years=1,
-                start_year=2025,
+                start_year=datetime.now().year,
                 end_year=None,
                 inflation_adjust=False,
                 parent="Both",
@@ -1452,7 +1452,7 @@ def initialize_session_state():
                 category="Vehicle",
                 amount=35000.0,
                 frequency_years=10,
-                start_year=2025,
+                start_year=datetime.now().year,
                 end_year=None,
                 inflation_adjust=True,
                 parent="ParentX",
@@ -1464,7 +1464,7 @@ def initialize_session_state():
                 category="Vehicle",
                 amount=32000.0,
                 frequency_years=10,
-                start_year=2027,
+                start_year=datetime.now().year + 2,
                 end_year=None,
                 inflation_adjust=True,
                 parent="ParentY",
@@ -1510,7 +1510,7 @@ def initialize_session_state():
         st.session_state.ss_shortfall_percentage = 30.0
 
         # Monte Carlo settings
-        st.session_state.mc_start_year = 2025
+        st.session_state.mc_start_year = datetime.now().year
         st.session_state.mc_years = 30
         st.session_state.mc_simulations = 1000
         st.session_state.mc_income_variability = 10.0
@@ -1936,7 +1936,7 @@ def main():
     """Main application function"""
     initialize_session_state()
 
-    st.title("💰 Financial Planning Suite V16")
+    st.title("💰 Financial Planning Suite v0.7")
 
     # Build tab list dynamically based on visibility settings
     tab_configs = [
@@ -2904,6 +2904,8 @@ def recurring_one_time_expenses_tab():
 def children_tab():
     """Children tab"""
     st.header("👶 Children")
+
+    st.info("💡 **About Children Expenses**: All child-related expenses shown in the templates are calculated in today's dollars and will be automatically inflation-adjusted going forward based on your selected economic scenario.")
 
     st.subheader("Add a Child")
     col1, col2, col3 = st.columns(3)
@@ -4406,7 +4408,7 @@ def combined_simulation_tab():
 
     # Ensure Monte Carlo variables are initialized (defensive programming for old sessions)
     if 'mc_start_year' not in st.session_state:
-        st.session_state.mc_start_year = 2025
+        st.session_state.mc_start_year = datetime.now().year
     if 'mc_years' not in st.session_state:
         st.session_state.mc_years = 30
     if 'mc_simulations' not in st.session_state:
