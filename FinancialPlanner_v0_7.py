@@ -1598,8 +1598,15 @@ def initialize_session_state():
                 'purchase_year': current_year - 2,
                 'purchase_price': 1200000.0,
                 'current_value': 1300000.0,
-                'appreciation_rate': 4.5,
-                'sell_year': None
+                'mortgage_balance': 900000.0,
+                'mortgage_rate': 6.5,
+                'mortgage_years_left': 28,
+                'property_tax_rate': 1.2,
+                'home_insurance': 2400.0,
+                'maintenance_rate': 0.5,
+                'upkeep_costs': 6000.0,
+                'owner': 'Shared',
+                'timeline': [{'year': current_year - 2, 'status': 'Own_Live', 'rental_income': 0.0}]
             }],
             'portfolio_allocation': {
                 'us_stocks': 70.0,
@@ -1700,8 +1707,15 @@ def initialize_session_state():
                 'purchase_year': current_year - 8,
                 'purchase_price': 650000.0,
                 'current_value': 800000.0,
-                'appreciation_rate': 3.5,
-                'sell_year': None
+                'mortgage_balance': 420000.0,
+                'mortgage_rate': 3.5,
+                'mortgage_years_left': 22,
+                'property_tax_rate': 1.0,
+                'home_insurance': 1800.0,
+                'maintenance_rate': 0.8,
+                'upkeep_costs': 5000.0,
+                'owner': 'Shared',
+                'timeline': [{'year': current_year - 8, 'status': 'Own_Live', 'rental_income': 0.0}]
             }],
             'portfolio_allocation': {
                 'us_stocks': 60.0,
@@ -1805,16 +1819,30 @@ def initialize_session_state():
                     'purchase_year': current_year - 10,
                     'purchase_price': 2500000.0,
                     'current_value': 3200000.0,
-                    'appreciation_rate': 3.0,
-                    'sell_year': None
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 0.8,
+                    'home_insurance': 4500.0,
+                    'maintenance_rate': 0.4,
+                    'upkeep_costs': 12000.0,
+                    'owner': 'Shared',
+                    'timeline': [{'year': current_year - 10, 'status': 'Own_Live', 'rental_income': 0.0}]
                 },
                 {
                     'name': 'Hamptons Summer Home',
                     'purchase_year': current_year - 5,
                     'purchase_price': 1800000.0,
                     'current_value': 2100000.0,
-                    'appreciation_rate': 4.0,
-                    'sell_year': None
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 2.5,
+                    'home_insurance': 3200.0,
+                    'maintenance_rate': 1.0,
+                    'upkeep_costs': 15000.0,
+                    'owner': 'Shared',
+                    'timeline': [{'year': current_year - 5, 'status': 'Own_Live', 'rental_income': 0.0}]
                 }
             ],
             'portfolio_allocation': {
@@ -1920,8 +1948,15 @@ def initialize_session_state():
                 'purchase_year': current_year - 3,
                 'purchase_price': 420000.0,
                 'current_value': 450000.0,
-                'appreciation_rate': 3.0,
-                'sell_year': None
+                'mortgage_balance': 336000.0,
+                'mortgage_rate': 6.8,
+                'mortgage_years_left': 27,
+                'property_tax_rate': 1.1,
+                'home_insurance': 1400.0,
+                'maintenance_rate': 0.6,
+                'upkeep_costs': 3000.0,
+                'owner': 'ParentX',
+                'timeline': [{'year': current_year - 3, 'status': 'Own_Live', 'rental_income': 0.0}]
             }],
             'portfolio_allocation': {
                 'us_stocks': 65.0,
@@ -2004,8 +2039,18 @@ def initialize_session_state():
                     'purchase_year': current_year - 25,
                     'purchase_price': 350000.0,
                     'current_value': 720000.0,
-                    'appreciation_rate': 3.0,
-                    'sell_year': current_year + 7
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 0.9,
+                    'home_insurance': 1600.0,
+                    'maintenance_rate': 1.0,
+                    'upkeep_costs': 6000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year - 25, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 7, 'status': 'Sold', 'rental_income': 0.0}
+                    ]
                 }
             ],
             'portfolio_allocation': {
@@ -5460,7 +5505,14 @@ def save_load_tab():
                     # Restore session state
                     for key, value in scenario_data.items():
                         if key == 'houses':
-                            st.session_state.houses = [House(**h) for h in value]
+                            # Convert timeline dicts to HouseTimelineEntry objects
+                            houses = []
+                            for h in value:
+                                house_dict = h.copy()
+                                if 'timeline' in house_dict and house_dict['timeline']:
+                                    house_dict['timeline'] = [HouseTimelineEntry(**entry) for entry in house_dict['timeline']]
+                                houses.append(House(**house_dict))
+                            st.session_state.houses = houses
                         elif key == 'portfolio_allocation':
                             st.session_state.portfolio_allocation = PortfolioAllocation(**value)
                         elif key == 'major_purchases':
@@ -5546,7 +5598,14 @@ def save_load_tab():
                 # Restore session state
                 for key, value in import_data.items():
                     if key == 'houses':
-                        st.session_state.houses = [House(**h) for h in value]
+                        # Convert timeline dicts to HouseTimelineEntry objects
+                        houses = []
+                        for h in value:
+                            house_dict = h.copy()
+                            if 'timeline' in house_dict and house_dict['timeline']:
+                                house_dict['timeline'] = [HouseTimelineEntry(**entry) for entry in house_dict['timeline']]
+                            houses.append(House(**house_dict))
+                        st.session_state.houses = houses
                     elif key == 'portfolio_allocation':
                         st.session_state.portfolio_allocation = PortfolioAllocation(**value)
                     elif key == 'major_purchases':
