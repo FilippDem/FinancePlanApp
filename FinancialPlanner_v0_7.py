@@ -3621,36 +3621,87 @@ def children_tab():
     # Children expense templates preview
     st.subheader("📊 Children Expense Templates Preview")
 
-    preview_state = st.selectbox("Preview Location", AVAILABLE_LOCATIONS_CHILDREN, key="preview_state")
-    preview_strategy = st.selectbox("Preview Strategy", ["Conservative", "Average", "High-end"], key="preview_strategy")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        preview_state = st.selectbox("Preview Location", AVAILABLE_LOCATIONS_CHILDREN, key="preview_state")
+    with col2:
+        preview_strategy = st.selectbox("Preview Strategy", ["Conservative", "Average", "High-end"], key="preview_strategy")
+    with col3:
+        preview_school_type = st.selectbox("School Type (K-12)", ["Public", "Private"], key="preview_school_type")
 
     if preview_state in CHILDREN_EXPENSE_TEMPLATES and preview_strategy in CHILDREN_EXPENSE_TEMPLATES[preview_state]:
         template = CHILDREN_EXPENSE_TEMPLATES[preview_state][preview_strategy]
 
-        # Create a preview dataframe
-        preview_df = pd.DataFrame({
-            'Age': list(range(31)),
-            **{category: values for category, values in template.items()}
-        })
+        # Create a preview dataframe with base template
+        preview_data = {'Age': list(range(31))}
+
+        # Add all categories from template
+        for category, values in template.items():
+            preview_data[category] = values.copy()
+
+        # Add private school costs if selected (ages 5-17, K-12 education)
+        if preview_school_type == 'Private':
+            private_school_costs = {
+                'Seattle': 20000,
+                'Sacramento': 18000,
+                'Houston': 15000,
+                'New York': 35000,
+                'San Francisco': 32000,
+                'Los Angeles': 25000,
+                'Portland': 17000
+            }
+            additional_tuition = private_school_costs.get(preview_state, 20000)
+
+            # Add private school tuition to Education for K-12 ages (5-17)
+            if 'Education' in preview_data:
+                education_costs = preview_data['Education']
+                for age in range(5, 18):  # Ages 5-17
+                    education_costs[age] += additional_tuition
+
+        preview_df = pd.DataFrame(preview_data)
+
+        # Show info about private school adjustment
+        if preview_school_type == 'Private':
+            st.info(f"💡 **Private School Selected**: Additional ${additional_tuition:,.0f}/year added to Education costs for ages 5-17 (K-12)")
 
         st.dataframe(preview_df, use_container_width=True, height=400)
 
-        # Show totals by age
+        # Show totals by age with comparison
         age_totals = preview_df.set_index('Age').sum(axis=1)
 
         fig = go.Figure()
         fig.add_trace(go.Bar(
             x=list(range(31)),
             y=age_totals.values,
-            name="Total Annual Expenses"
+            name="Total Annual Expenses",
+            marker_color=['#FF6B6B' if 5 <= age <= 17 and preview_school_type == 'Private' else '#4ECDC4' for age in range(31)]
         ))
         fig.update_layout(
-            title=f"Total Annual Child Expenses by Age - {preview_state} {preview_strategy}",
+            title=f"Total Annual Child Expenses by Age - {preview_state} {preview_strategy} ({preview_school_type} School)",
             xaxis_title="Child Age",
             yaxis_title="Annual Expenses ($)",
             height=400
         )
         st.plotly_chart(fig, use_container_width=True)
+
+        # Show breakdown by category
+        st.subheader("Expense Breakdown by Category")
+        category_fig = go.Figure()
+        for category in template.keys():
+            category_fig.add_trace(go.Scatter(
+                x=list(range(31)),
+                y=preview_df[category],
+                name=category,
+                mode='lines',
+                stackgroup='one'
+            ))
+        category_fig.update_layout(
+            title=f"Expense Categories Over Time - {preview_state} {preview_strategy} ({preview_school_type} School)",
+            xaxis_title="Child Age",
+            yaxis_title="Annual Expenses ($)",
+            height=400
+        )
+        st.plotly_chart(category_fig, use_container_width=True)
 
 
 def house_tab():
@@ -4368,13 +4419,21 @@ def calculate_lifetime_cashflow():
         base_expenses = sum(base_expenses_dict.values())
         base_expenses *= (1.03 ** years_from_now)  # 3% inflation
 
+        # Apply inflation to base_expenses_dict for detailed breakdown
+        base_expenses_dict_inflated = {k: v * (1.03 ** years_from_now) for k, v in base_expenses_dict.items()}
+
         # Children expenses (state-based)
         children_expenses = 0
+        children_expenses_dict = {}
         children_in_college = []
         for child in st.session_state.children_list:
             child_exp = get_child_expenses(child, year, st.session_state.current_year)
             child_total = sum(child_exp.values())
             children_expenses += child_total
+
+            # Aggregate children expenses by category
+            for category, amount in child_exp.items():
+                children_expenses_dict[category] = children_expenses_dict.get(category, 0) + amount
 
             # Track who's in college
             child_age = year - child['birth_year']
@@ -4440,7 +4499,11 @@ def calculate_lifetime_cashflow():
             'ss_income': ss_income,
             'total_income': total_income,
             'base_expenses': base_expenses,
+            'base_expenses_dict': base_expenses_dict_inflated,
             'children_expenses': children_expenses,
+            'children_expenses_dict': children_expenses_dict,
+            'recurring_expenses': recurring_expenses_total,
+            'major_purchases': major_purchase_expenses,
             'total_expenses': total_expenses,
             'cashflow': cashflow,
             'net_worth': cumulative_net_worth,
@@ -4674,33 +4737,86 @@ def lifetime_cashflow_tab():
                     st.markdown("#### 💳 Expense Breakdown")
 
                     expense_breakdown = []
-                    if year_data['base_expenses'] > 0:
+
+                    # Family Living Expenses (detailed)
+                    if year_data['base_expenses'] > 0 and year_data.get('base_expenses_dict'):
+                        for category, amount in year_data['base_expenses_dict'].items():
+                            if amount > 0:
+                                expense_breakdown.append({
+                                    'Category': f"Family: {category}",
+                                    'Amount': amount
+                                })
+
+                    # Children Expenses (detailed)
+                    if year_data['children_expenses'] > 0 and year_data.get('children_expenses_dict'):
+                        for category, amount in year_data['children_expenses_dict'].items():
+                            if amount > 0:
+                                expense_breakdown.append({
+                                    'Category': f"Children: {category}",
+                                    'Amount': amount
+                                })
+
+                    # Recurring Expenses
+                    if year_data.get('recurring_expenses', 0) > 0:
                         expense_breakdown.append({
-                            'Category': 'Family Living Expenses',
-                            'Amount': year_data['base_expenses']
+                            'Category': 'Recurring Expenses',
+                            'Amount': year_data['recurring_expenses']
                         })
-                    if year_data['children_expenses'] > 0:
+
+                    # Major Purchases
+                    if year_data.get('major_purchases', 0) > 0:
                         expense_breakdown.append({
-                            'Category': 'Children Expenses',
-                            'Amount': year_data['children_expenses']
+                            'Category': 'Major Purchases',
+                            'Amount': year_data['major_purchases']
                         })
 
                     if expense_breakdown:
                         expense_df = pd.DataFrame(expense_breakdown)
 
-                        # Create pie chart for expenses
+                        # Create pie chart for expenses with more colors
+                        colors = ['#e74c3c', '#c0392b', '#e67e22', '#d35400', '#f39c12', '#f1c40f',
+                                  '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#95a5a6', '#34495e']
+
                         expense_fig = go.Figure(data=[go.Pie(
                             labels=expense_df['Category'],
                             values=expense_df['Amount'],
                             hole=0.3,
-                            marker_colors=['#e74c3c', '#c0392b']
+                            marker_colors=colors[:len(expense_df)]
                         )])
-                        expense_fig.update_layout(height=300, showlegend=True)
+                        expense_fig.update_layout(height=300, showlegend=True,
+                                                 legend=dict(orientation="v", yanchor="middle", y=0.5))
                         st.plotly_chart(expense_fig, use_container_width=True)
 
-                        # Show table
-                        expense_df['Amount'] = expense_df['Amount'].apply(lambda x: f"${x:,.0f}")
-                        st.dataframe(expense_df, hide_index=True, use_container_width=True)
+                        # Show detailed table with expandable sections
+                        st.markdown("**Detailed Breakdown:**")
+
+                        # Separate into major categories
+                        family_expenses = expense_df[expense_df['Category'].str.startswith('Family:')]
+                        children_expenses_df = expense_df[expense_df['Category'].str.startswith('Children:')]
+                        other_expenses = expense_df[~expense_df['Category'].str.contains(':')]
+
+                        # Family Living Expenses
+                        if not family_expenses.empty:
+                            with st.expander(f"🏠 Family Living (${family_expenses['Amount'].sum():,.0f})", expanded=False):
+                                family_display = family_expenses.copy()
+                                family_display['Category'] = family_display['Category'].str.replace('Family: ', '')
+                                family_display['Amount'] = family_display['Amount'].apply(lambda x: f"${x:,.0f}")
+                                st.dataframe(family_display, hide_index=True, use_container_width=True)
+
+                        # Children Expenses
+                        if not children_expenses_df.empty:
+                            with st.expander(f"👶 Children (${children_expenses_df['Amount'].sum():,.0f})", expanded=False):
+                                children_display = children_expenses_df.copy()
+                                children_display['Category'] = children_display['Category'].str.replace('Children: ', '')
+                                children_display['Amount'] = children_display['Amount'].apply(lambda x: f"${x:,.0f}")
+                                st.dataframe(children_display, hide_index=True, use_container_width=True)
+
+                        # Other Expenses
+                        if not other_expenses.empty:
+                            other_display = other_expenses.copy()
+                            other_display['Amount'] = other_display['Amount'].apply(lambda x: f"${x:,.0f}")
+                            st.dataframe(other_display, hide_index=True, use_container_width=True)
+
                         st.metric("Total Expenses", f"${year_data['total_expenses']:,.0f}")
                     else:
                         st.info("No expenses for this year")
