@@ -5085,15 +5085,84 @@ def combined_analysis_cashflow_tab():
             value=st.session_state.mc_normalize_to_today_dollars,
             help="Adjust all future values to today's purchasing power"
         )
-        st.session_state.mc_return_variability_negative = st.number_input(
-            "Negative (%)",
-            min_value=0.0,
-            max_value=100.0,
-            value=float(st.session_state.mc_return_variability_negative),
-            step=1.0,
-            key="return_var_neg"
-        )
-        st.info("🎲 Monte Carlo simulation is running with simplified calculations for web stability")
+
+    # Variability Settings
+    st.subheader("📊 Variability Settings")
+
+    use_asymmetric = st.checkbox("Use Asymmetric Variability", value=True, help="Set different positive and negative variability ranges")
+
+    if use_asymmetric:
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.markdown("**Income Variability**")
+            st.session_state.mc_income_variability_positive = st.number_input(
+                "Positive (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=float(st.session_state.mc_income_variability_positive),
+                step=1.0,
+                key="income_var_pos"
+            )
+            st.session_state.mc_income_variability_negative = st.number_input(
+                "Negative (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=float(st.session_state.mc_income_variability_negative),
+                step=1.0,
+                key="income_var_neg"
+            )
+
+        with col2:
+            st.markdown("**Expense Variability**")
+            st.session_state.mc_expense_variability_positive = st.number_input(
+                "Positive (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=float(st.session_state.mc_expense_variability_positive),
+                step=1.0,
+                key="expense_var_pos"
+            )
+            st.session_state.mc_expense_variability_negative = st.number_input(
+                "Negative (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=float(st.session_state.mc_expense_variability_negative),
+                step=1.0,
+                key="expense_var_neg"
+            )
+
+        with col3:
+            st.markdown("**Return Variability**")
+            st.session_state.mc_return_variability_positive = st.number_input(
+                "Positive (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=float(st.session_state.mc_return_variability_positive),
+                step=1.0,
+                key="return_var_pos"
+            )
+            st.session_state.mc_return_variability_negative = st.number_input(
+                "Negative (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=float(st.session_state.mc_return_variability_negative),
+                step=1.0,
+                key="return_var_neg_2"
+            )
+    else:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.session_state.mc_income_variability = st.slider("Income Variability (%)", 0.0, 100.0, 10.0)
+        with col2:
+            st.session_state.mc_expense_variability = st.slider("Expense Variability (%)", 0.0, 100.0, 5.0)
+        with col3:
+            st.session_state.mc_return_variability = st.slider("Return Variability (%)", 0.0, 100.0, 15.0)
+
+    # Run Monte Carlo Simulation Button
+    if st.button("🐷 Run Monte Carlo Simulation", type="primary"):
+        with st.spinner("Running Monte Carlo simulation... This may take a minute."):
+            st.info("🎲 Monte Carlo simulation is running with simplified calculations for web stability")
 
         # Simplified Monte Carlo for web
         scenario = st.session_state.economic_scenarios[st.session_state.active_scenario]
@@ -5164,394 +5233,6 @@ def combined_analysis_cashflow_tab():
                         income *= (1 - np.random.uniform(0, st.session_state.mc_income_variability_negative / 100))
                 else:
                     income *= (1 + np.random.uniform(-st.session_state.mc_income_variability / 100, st.session_state.mc_income_variability / 100))
-
-    # Variability Settings
-    st.subheader("📊 Variability Settings (for Traditional Simulations)")
-
-    use_asymmetric = st.checkbox("Use Asymmetric Variability", value=True, help="Set different positive and negative variability ranges")
-
-    if use_asymmetric:
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            st.markdown("**Income Variability**")
-            st.session_state.mc_income_variability_positive = st.number_input(
-                "Positive (%)",
-                min_value=0.0,
-                max_value=100.0,
-                value=float(st.session_state.mc_income_variability_positive),
-                step=1.0,
-                key="income_var_pos"
-            )
-            st.session_state.mc_income_variability_negative = st.number_input(
-                "Negative (%)",
-                min_value=0.0,
-                max_value=100.0,
-                value=float(st.session_state.mc_income_variability_negative),
-                step=1.0,
-                key="income_var_neg"
-            )
-
-        with col2:
-            st.markdown("**Expense Variability**")
-            st.session_state.mc_expense_variability_positive = st.number_input(
-                "Positive (%)",
-                min_value=0.0,
-                max_value=100.0,
-                value=float(st.session_state.mc_expense_variability_positive),
-                step=1.0,
-                key="expense_var_pos"
-            )
-            st.session_state.mc_expense_variability_negative = st.number_input(
-                "Negative (%)",
-                min_value=0.0,
-                max_value=100.0,
-                value=float(st.session_state.mc_expense_variability_negative),
-                step=1.0,
-                key="expense_var_neg"
-            )
-
-        with col3:
-            st.markdown("**Return Variability**")
-            st.session_state.mc_return_variability_positive = st.number_input(
-                "Positive (%)",
-                min_value=0.0,
-                max_value=100.0,
-                value=float(st.session_state.mc_return_variability_positive),
-                step=1.0,
-                key="return_var_pos"
-            )
-
-        # Variability Settings
-        st.subheader("📊 Variability Settings (for Traditional Simulations)")
-
-        use_asymmetric = st.checkbox("Use Asymmetric Variability", value=True, help="Set different positive and negative variability ranges")
-
-        if use_asymmetric:
-            col1, col2, col3 = st.columns(3)
-
-            with col1:
-                st.markdown("**Income Variability**")
-                st.session_state.mc_income_variability_positive = st.number_input(
-                    "Positive (%)",
-                    min_value=0.0,
-                    max_value=100.0,
-                    value=float(st.session_state.mc_income_variability_positive),
-                    step=1.0,
-                    key="income_var_pos"
-                )
-                st.session_state.mc_income_variability_negative = st.number_input(
-                    "Negative (%)",
-                    min_value=0.0,
-                    max_value=100.0,
-                    value=float(st.session_state.mc_income_variability_negative),
-                    step=1.0,
-                    key="income_var_neg"
-                )
-
-            with col2:
-                st.markdown("**Expense Variability**")
-                st.session_state.mc_expense_variability_positive = st.number_input(
-                    "Positive (%)",
-                    min_value=0.0,
-                    max_value=100.0,
-                    value=float(st.session_state.mc_expense_variability_positive),
-                    step=1.0,
-                    key="expense_var_pos"
-                )
-                st.session_state.mc_expense_variability_negative = st.number_input(
-                    "Negative (%)",
-                    min_value=0.0,
-                    max_value=100.0,
-                    value=float(st.session_state.mc_expense_variability_negative),
-                    step=1.0,
-                    key="expense_var_neg"
-                )
-
-            with col3:
-                st.markdown("**Return Variability**")
-                st.session_state.mc_return_variability_positive = st.number_input(
-                    "Positive (%)",
-                    min_value=0.0,
-                    max_value=100.0,
-                    value=float(st.session_state.mc_return_variability_positive),
-                    step=1.0,
-                    key="return_var_pos"
-                )
-                st.session_state.mc_return_variability_negative = st.number_input(
-                    "Negative (%)",
-                    min_value=0.0,
-                    max_value=100.0,
-                    value=float(st.session_state.mc_return_variability_negative),
-                    step=1.0,
-                    key="return_var_neg"
-                )
-        else:
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.session_state.mc_income_variability = st.slider("Income Variability (%)", 0.0, 100.0, 10.0)
-            with col2:
-                st.session_state.mc_expense_variability = st.slider("Expense Variability (%)", 0.0, 100.0, 5.0)
-            with col3:
-                st.session_state.mc_return_variability = st.slider("Return Variability (%)", 0.0, 100.0, 15.0)
-
-        # Run Simulation Button with piggy bank icon
-        if st.button("🏦 Run Monte Carlo Simulation", type="primary"):
-            with st.spinner("Running Monte Carlo simulation... This may take a minute."):
-                st.info("🎲 Monte Carlo simulation is running with simplified calculations for web stability")
-
-                # Simplified Monte Carlo for web
-                scenario = st.session_state.economic_scenarios[st.session_state.active_scenario]
-
-                num_sims = min(st.session_state.mc_simulations, 1000)  # Cap at 1000 for web performance
-                results = []
-                income_results = []
-                expense_results = []
-                cashflow_results = []
-
-                # Starting values
-                initial_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
-
-                # Run simulations
-                progress_bar = st.progress(0)
-                for sim in range(num_sims):
-                    sim_results = []
-                    sim_income = []
-                    sim_expenses = []
-                    sim_cashflow = []
-                    net_worth = initial_net_worth
-
-                    for year_offset in range(st.session_state.mc_years):
-                        year = st.session_state.mc_start_year + year_offset
-
-                        # Calculate income
-                        parentX_working = (year - (st.session_state.current_year - st.session_state.parentX_age)) < st.session_state.parentX_retirement_age
-                        parentY_working = (year - (st.session_state.current_year - st.session_state.parentY_age)) < st.session_state.parentY_retirement_age
-
-                        income = 0
-                        if parentX_working:
-                            # Use job changes if available
-                            parentX_year_income = get_income_for_year(
-                                st.session_state.parentX_income,
-                                st.session_state.parentX_raise,
-                                st.session_state.parentX_job_changes,
-                                st.session_state.current_year,
-                                year
-                            )
-                            income += parentX_year_income
-                        else:
-                            ss_benefit = st.session_state.parentX_ss_benefit * 12
-                            if st.session_state.ss_insolvency_enabled and year >= 2034:
-                                ss_benefit *= (1 - st.session_state.ss_shortfall_percentage / 100)
-                            income += ss_benefit
-
-                        if parentY_working:
-                            # Use job changes if available
-                            parentY_year_income = get_income_for_year(
-                                st.session_state.parentY_income,
-                                st.session_state.parentY_raise,
-                                st.session_state.parentY_job_changes,
-                                st.session_state.current_year,
-                                year
-                            )
-                            income += parentY_year_income
-                        else:
-                            ss_benefit = st.session_state.parentY_ss_benefit * 12
-                            if st.session_state.ss_insolvency_enabled and year >= 2034:
-                                ss_benefit *= (1 - st.session_state.ss_shortfall_percentage / 100)
-                            income += ss_benefit
-
-                        # Add variability to income
-                        if use_asymmetric:
-                            if np.random.random() > 0.5:
-                                income *= (1 + np.random.uniform(0, st.session_state.mc_income_variability_positive / 100))
-                            else:
-                                income *= (1 - np.random.uniform(0, st.session_state.mc_income_variability_negative / 100))
-                        else:
-                            income *= (1 + np.random.uniform(-st.session_state.mc_income_variability / 100, st.session_state.mc_income_variability / 100))
-
-                        # Calculate expenses
-                        # Base family expenses
-                        base_expenses = sum(st.session_state.expenses.values())
-                        base_expenses *= (1 + scenario.expense_growth_rate) ** year_offset
-
-                        # Add dynamic children expenses for this year
-                        children_expenses = 0
-                        for child in st.session_state.children_list:
-                            child_exp = get_child_expenses(child, year, st.session_state.current_year)
-                            children_expenses += sum(child_exp.values())
-
-                        # Total expenses
-                        expenses = base_expenses + children_expenses
-
-                        # Add variability to expenses
-                        if use_asymmetric:
-                            if np.random.random() > 0.5:
-                                expenses *= (1 + np.random.uniform(0, st.session_state.mc_expense_variability_positive / 100))
-                            else:
-                                expenses *= (1 - np.random.uniform(0, st.session_state.mc_expense_variability_negative / 100))
-                        else:
-                            expenses *= (1 + np.random.uniform(-st.session_state.mc_expense_variability / 100, st.session_state.mc_expense_variability / 100))
-
-                        # Calculate investment returns
-                        if st.session_state.mc_use_historical:
-                            # Use random sampling from historical returns instead of sequential
-                            return_rate = np.random.choice(HISTORICAL_STOCK_RETURNS)
-                        else:
-                            if use_asymmetric:
-                                if np.random.random() > 0.5:
-                                    return_rate = scenario.investment_return + np.random.uniform(0, st.session_state.mc_return_variability_positive / 100)
-                                else:
-                                    return_rate = scenario.investment_return - np.random.uniform(0, st.session_state.mc_return_variability_negative / 100)
-                            else:
-                                return_rate = scenario.investment_return + np.random.uniform(-st.session_state.mc_return_variability / 100, st.session_state.mc_return_variability / 100)
-
-                        investment_return = net_worth * return_rate
-
-                        # Update net worth
-                        net_worth = net_worth + income - expenses + investment_return
-
-                        # Normalize to today's dollars if requested
-                        display_net_worth = net_worth
-                        display_income = income
-                        display_expenses = expenses
-                        if st.session_state.mc_normalize_to_today_dollars:
-                            display_net_worth = net_worth / ((1 + scenario.inflation_rate) ** year_offset)
-                            display_income = income / ((1 + scenario.inflation_rate) ** year_offset)
-                            display_expenses = expenses / ((1 + scenario.inflation_rate) ** year_offset)
-
-                        cashflow = display_income - display_expenses
-                        sim_results.append(display_net_worth)
-                        sim_income.append(display_income)
-                        sim_expenses.append(display_expenses)
-                        sim_cashflow.append(cashflow)
-
-                    results.append(sim_results)
-                    income_results.append(sim_income)
-                    expense_results.append(sim_expenses)
-                    cashflow_results.append(sim_cashflow)
-                    progress_bar.progress((sim + 1) / num_sims)
-
-                # Calculate percentiles
-                results_array = np.array(results)
-                income_array = np.array(income_results)
-                expense_array = np.array(expense_results)
-                cashflow_array = np.array(cashflow_results)
-
-                percentiles = {
-                    '10th': np.percentile(results_array, 10, axis=0),
-                    '25th': np.percentile(results_array, 25, axis=0),
-                    '50th': np.percentile(results_array, 50, axis=0),
-                    '75th': np.percentile(results_array, 75, axis=0),
-                    '90th': np.percentile(results_array, 90, axis=0),
-                }
-
-                years = list(range(st.session_state.mc_start_year, st.session_state.mc_start_year + st.session_state.mc_years))
-
-                # Store results in session state for Black Swan analysis
-                st.session_state.mc_results = {
-                    'percentiles': percentiles,
-                    'years': years,
-                    'income_array': income_array,
-                    'expense_array': expense_array,
-                    'cashflow_array': cashflow_array,
-                    'scenario': scenario,
-                    'use_asymmetric': use_asymmetric
-                }
-
-                # Plot results
-                st.subheader("📈 Monte Carlo Results")
-
-                fig = go.Figure()
-
-                fig.add_trace(go.Scatter(
-                    x=years, y=percentiles['90th'],
-                    mode='lines',
-                    name='90th Percentile',
-                    line=dict(color='rgba(0,176,246,0.2)'),
-                    fillcolor='rgba(0,176,246,0.1)',
-                ))
-
-                fig.add_trace(go.Scatter(
-                    x=years, y=percentiles['75th'],
-                    mode='lines',
-                    name='75th Percentile',
-                    line=dict(color='rgba(0,176,246,0.4)'),
-                    fillcolor='rgba(0,176,246,0.2)',
-                    fill='tonexty'
-                ))
-
-                fig.add_trace(go.Scatter(
-                    x=years, y=percentiles['50th'],
-                    mode='lines',
-                    name='50th Percentile (Median)',
-                    line=dict(color='rgba(0,176,246,1)', width=3),
-                    fillcolor='rgba(0,176,246,0.3)',
-                    fill='tonexty'
-                ))
-
-                fig.add_trace(go.Scatter(
-                    x=years, y=percentiles['25th'],
-                    mode='lines',
-                    name='25th Percentile',
-                    line=dict(color='rgba(231,107,243,0.4)'),
-                    fillcolor='rgba(231,107,243,0.2)',
-                    fill='tonexty'
-                ))
-
-                fig.add_trace(go.Scatter(
-                    x=years, y=percentiles['10th'],
-                    mode='lines',
-                    name='10th Percentile',
-                    line=dict(color='rgba(231,107,243,0.2)'),
-                    fillcolor='rgba(231,107,243,0.1)',
-                    fill='tonexty'
-                ))
-
-                fig.update_layout(
-                    title=f"Monte Carlo Simulation Results ({num_sims} simulations)",
-                    xaxis_title="Year",
-                    yaxis_title="Net Worth ($)" + (" - Today's Dollars" if st.session_state.mc_normalize_to_today_dollars else ""),
-                    height=500,
-                    hovermode='x unified'
-                )
-
-                st.plotly_chart(fig, use_container_width=True)
-
-                # Results table
-                st.subheader("📊 Detailed Percentile Breakdown")
-
-                # Show results for key years
-                key_years_idx = [0, st.session_state.mc_years // 4, st.session_state.mc_years // 2,
-                                3 * st.session_state.mc_years // 4, st.session_state.mc_years - 1]
-
-                breakdown_data = []
-                for idx in key_years_idx:
-                    if idx < len(years):
-                        breakdown_data.append({
-                            'Year': years[idx],
-                            '10th %ile': format_currency(percentiles['10th'][idx]),
-                            '25th %ile': format_currency(percentiles['25th'][idx]),
-                            'Median': format_currency(percentiles['50th'][idx]),
-                            '75th %ile': format_currency(percentiles['75th'][idx]),
-                            '90th %ile': format_currency(percentiles['90th'][idx]),
-                        })
-
-                breakdown_df = pd.DataFrame(breakdown_data)
-                st.dataframe(breakdown_df, use_container_width=True, hide_index=True)
-
-                # Success rate
-                final_values = results_array[:, -1]
-                success_rate = (np.sum(final_values > 0) / len(final_values)) * 100
-
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Success Rate", f"{success_rate:.1f}%", help="Percentage of simulations ending with positive net worth")
-                with col2:
-                    st.metric("Final Median Net Worth", format_currency(percentiles['50th'][-1]))
-                with col3:
-                    st.metric("Final 10th Percentile", format_currency(percentiles['10th'][-1]))
-
 
 def black_swan_tab():
     """Black Swan Events stress testing tab"""
