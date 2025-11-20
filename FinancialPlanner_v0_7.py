@@ -5234,6 +5234,186 @@ def combined_analysis_cashflow_tab():
                 else:
                     income *= (1 + np.random.uniform(-st.session_state.mc_income_variability / 100, st.session_state.mc_income_variability / 100))
 
+def test_net_worth_loss_scenario(percentiles_data, config):
+    """
+    Test net worth loss scenario with configurable loss percentage.
+
+    Args:
+        percentiles_data: Dict containing percentile data with 'percentiles', 'years', 'scenario'
+        config: Dict with 'loss_percent' key (e.g., {'loss_percent': 50})
+
+    Returns:
+        Dict with event name and results for each percentile
+    """
+    percentiles = percentiles_data['percentiles']
+    years = percentiles_data['years']
+    scenario = percentiles_data['scenario']
+    percentile_names = ['10th', '25th', '50th', '75th', '90th']
+
+    loss_percent = config.get('loss_percent', 50)
+    loss_multiplier = 1 - (loss_percent / 100)
+
+    event_results = {'event': f'{loss_percent}% Net Worth Loss (Worst Year)'}
+
+    for pct_name in percentile_names:
+        pct_values = percentiles[pct_name]
+        worst_final_nw = float('inf')
+        worst_year = None
+
+        # Try each year as the crash year
+        for crash_idx in range(len(years)):
+            # Simulate from crash year forward
+            net_worth = pct_values[crash_idx] * loss_multiplier
+
+            # Continue simulation from crash year to end
+            final_nw = net_worth
+            for future_idx in range(crash_idx + 1, len(years)):
+                return_rate = scenario.investment_return
+                investment_return = final_nw * return_rate
+
+                # Implied cashflow from percentile trajectory
+                if future_idx < len(pct_values) - 1:
+                    implied_cashflow = (pct_values[future_idx + 1] - pct_values[future_idx]) - (pct_values[future_idx] * scenario.investment_return)
+                    final_nw = final_nw + implied_cashflow + investment_return
+                else:
+                    final_nw = final_nw + investment_return
+
+            # Track worst case
+            if final_nw < worst_final_nw:
+                worst_final_nw = final_nw
+                worst_year = years[crash_idx]
+
+        # Store result
+        status = "✅" if worst_final_nw > 0 else "❌"
+        event_results[pct_name] = {
+            'status': status,
+            'worst_year': worst_year,
+            'final_nw': worst_final_nw
+        }
+
+    return event_results
+
+
+def test_disabled_child_scenario(percentiles_data, config):
+    """
+    Test disabled child scenario where one parent retires immediately.
+
+    Args:
+        percentiles_data: Dict containing percentile data
+        config: Dict with 'child_idx' and 'child_birth_year' keys
+
+    Returns:
+        Dict with event name and results for each percentile
+    """
+    percentiles = percentiles_data['percentiles']
+    years = percentiles_data['years']
+    scenario = percentiles_data['scenario']
+    percentile_names = ['10th', '25th', '50th', '75th', '90th']
+
+    child_idx = config.get('child_idx', 0)
+    child_birth_year = config.get('child_birth_year')
+
+    event_results = {'event': f'Disabled Child #{child_idx + 1} (Birth Year {child_birth_year})'}
+
+    for pct_name in percentile_names:
+        pct_values = percentiles[pct_name]
+
+        # Find index of birth year
+        if child_birth_year not in years:
+            event_results[pct_name] = {'status': 'N/A', 'final_nw': 0}
+            continue
+
+        birth_idx = years.index(child_birth_year)
+        net_worth = pct_values[birth_idx]
+
+        for future_idx in range(birth_idx + 1, len(years)):
+            year_offset = future_idx - birth_idx
+
+            # Reduced cashflow due to lost income
+            if future_idx < len(pct_values) - 1:
+                normal_cashflow = (pct_values[future_idx + 1] - pct_values[future_idx]) - (pct_values[future_idx] * scenario.investment_return)
+                reduced_cashflow = normal_cashflow - (st.session_state.parentY_income * (1 + scenario.inflation_rate) ** year_offset)
+            else:
+                reduced_cashflow = 0
+
+            investment_return = net_worth * scenario.investment_return
+            net_worth = net_worth + reduced_cashflow + investment_return
+
+        status = "✅" if net_worth > 0 else "❌"
+        event_results[pct_name] = {
+            'status': status,
+            'final_nw': net_worth
+        }
+
+    return event_results
+
+
+def test_unemployment_scenario(percentiles_data, config):
+    """
+    Test forced unemployment scenario.
+
+    Args:
+        percentiles_data: Dict containing percentile data
+        config: Dict with 'parent_name', 'parent_income', and 'duration_years' keys
+
+    Returns:
+        Dict with event name and results for each percentile
+    """
+    percentiles = percentiles_data['percentiles']
+    years = percentiles_data['years']
+    scenario = percentiles_data['scenario']
+    percentile_names = ['10th', '25th', '50th', '75th', '90th']
+
+    parent_name = config.get('parent_name', 'Parent')
+    parent_income = config.get('parent_income', 0)
+    duration_years = config.get('duration_years', 3)
+
+    event_results = {'event': f'{parent_name} Unemployed {duration_years} Years (Worst Year)'}
+
+    for pct_name in percentile_names:
+        pct_values = percentiles[pct_name]
+        worst_final_nw = float('inf')
+        worst_year = None
+
+        # Try each year as the unemployment start
+        for unemp_start_idx in range(len(years) - duration_years):
+            net_worth = pct_values[unemp_start_idx]
+
+            # Simulate unemployment period plus recovery
+            for future_idx in range(unemp_start_idx, len(years)):
+                year_offset = future_idx - unemp_start_idx
+
+                # Calculate cashflow impact
+                if future_idx < len(pct_values) - 1:
+                    normal_cashflow = (pct_values[future_idx + 1] - pct_values[future_idx]) - (pct_values[future_idx] * scenario.investment_return)
+
+                    # During unemployment, lose this parent's income
+                    if year_offset < duration_years:
+                        income_loss = parent_income * ((1 + scenario.inflation_rate) ** year_offset)
+                        reduced_cashflow = normal_cashflow - income_loss
+                    else:
+                        reduced_cashflow = normal_cashflow
+                else:
+                    reduced_cashflow = 0
+
+                investment_return = net_worth * scenario.investment_return
+                net_worth = net_worth + reduced_cashflow + investment_return
+
+            # Track worst case
+            if net_worth < worst_final_nw:
+                worst_final_nw = net_worth
+                worst_year = years[unemp_start_idx]
+
+        status = "✅" if worst_final_nw > 0 else "❌"
+        event_results[pct_name] = {
+            'status': status,
+            'worst_year': worst_year,
+            'final_nw': worst_final_nw
+        }
+
+    return event_results
+
+
 def black_swan_tab():
     """Black Swan Events stress testing tab"""
     st.header("🦢 Black Swan Events Analysis")
@@ -5256,6 +5436,25 @@ def black_swan_tab():
 
     st.info(f"📊 Analyzing {len(years)} years across 5 percentiles (10th, 25th, 50th, 75th, 90th)")
 
+    # Tier Selection
+    st.markdown("---")
+    st.subheader("🎯 Select Stress Test Tier")
+
+    tier_options = {
+        "Tier 1: Basic Scenarios": 1,
+        "Tier 2: Moderate Scenarios": 2,
+        "Tier 3: Comprehensive Analysis": 3,
+        "All Tiers": 0
+    }
+
+    selected_tier_name = st.radio(
+        "Choose test tier:",
+        options=list(tier_options.keys()),
+        help="Tier 1: Quick basic tests | Tier 2: Family & employment | Tier 3: All scenarios combined"
+    )
+
+    selected_tier = tier_options[selected_tier_name]
+
     # Define percentile names for iteration
     percentile_names = ['10th', '25th', '50th', '75th', '90th']
 
@@ -5264,160 +5463,131 @@ def black_swan_tab():
 
     with st.spinner("🔍 Analyzing black swan scenarios... This may take a moment."):
 
-        # Event 1: 50% Net Worth Loss at Worst Possible Year
-        st.markdown("---")
-        st.markdown("### 💥 Scenario 1: 50% Net Worth Loss")
-        st.markdown("*Finding the worst year to experience a 50% market crash for each percentile*")
+        # TIER 1: Basic Scenarios
+        if selected_tier == 1 or selected_tier == 0:
+            st.markdown("---")
+            st.markdown("## 🥉 Tier 1: Basic Scenarios")
 
-        event_results = {'event': '50% Net Worth Loss (Worst Year)'}
+            # Configurable Net Worth Loss
+            st.markdown("### 💥 Market Crash Scenario")
+            loss_percent = st.slider(
+                "Net Worth Loss Percentage",
+                min_value=10,
+                max_value=90,
+                value=50,
+                step=5,
+                help="Test how your plan handles a market crash of this magnitude"
+            )
 
-        for pct_name in percentile_names:
-            pct_values = percentiles[pct_name]
-            worst_year_idx = None
-            worst_final_nw = float('inf')
-            worst_year = None
+            st.markdown(f"*Finding the worst year to experience a {loss_percent}% market crash for each percentile*")
 
-            # Try each year as the crash year
-            for crash_idx in range(len(years)):
-                # Simulate from crash year forward
-                net_worth = pct_values[crash_idx] * 0.5  # 50% loss
-
-                # Continue simulation from crash year to end
-                final_nw = net_worth
-                for future_idx in range(crash_idx + 1, len(years)):
-                    year_offset = future_idx - crash_idx
-                    return_rate = scenario.investment_return
-                    investment_return = final_nw * return_rate
-
-                    # Simplified: assume income/expense balance from percentile trajectory
-                    if future_idx < len(pct_values) - 1:
-                        implied_cashflow = (pct_values[future_idx + 1] - pct_values[future_idx]) - (pct_values[future_idx] * scenario.investment_return)
-                        final_nw = final_nw + implied_cashflow + investment_return
-                    else:
-                        final_nw = final_nw + investment_return
-
-                # Track worst case
-                if final_nw < worst_final_nw:
-                    worst_final_nw = final_nw
-                    worst_year_idx = crash_idx
-                    worst_year = years[crash_idx]
-
-            # Store result
-            status = "✅" if worst_final_nw > 0 else "❌"
-            event_results[pct_name] = {
-                'status': status,
-                'worst_year': worst_year,
-                'final_nw': worst_final_nw
+            percentiles_data = {
+                'percentiles': percentiles,
+                'years': years,
+                'scenario': scenario
             }
 
-        black_swan_results.append(event_results)
+            config = {'loss_percent': loss_percent}
+            event_results = test_net_worth_loss_scenario(percentiles_data, config)
+            black_swan_results.append(event_results)
 
-        # Event 2: Disabled Child Scenarios (One for Each Child)
-        if st.session_state.children_list:
+        # TIER 2: Moderate Scenarios
+        if selected_tier == 2 or selected_tier == 0:
             st.markdown("---")
-            st.markdown("### 👶 Scenario 2: Disabled Child Birth (Parent Retires Immediately)")
-            st.markdown("*Testing if one parent can immediately retire to care for a disabled child*")
+            st.markdown("## 🥈 Tier 2: Moderate Scenarios")
 
-            for child_idx, child in enumerate(st.session_state.children_list):
-                child_birth_year = child['birth_year']
+            # Disabled Child Scenarios
+            if st.session_state.children_list:
+                st.markdown("### 👶 Disabled Child Birth (Parent Retires Immediately)")
+                st.markdown("*Testing if one parent can immediately retire to care for a disabled child*")
 
-                # Skip if birth year is in the past
-                if child_birth_year < st.session_state.current_year:
-                    continue
+                for child_idx, child in enumerate(st.session_state.children_list):
+                    child_birth_year = child['birth_year']
 
-                event_results = {'event': f'Disabled Child #{child_idx + 1} (Birth Year {child_birth_year})'}
+                    # Skip if birth year is in the past
+                    if child_birth_year < st.session_state.current_year:
+                        continue
+
+                    config = {
+                        'child_idx': child_idx,
+                        'child_birth_year': child_birth_year
+                    }
+
+                    event_results = test_disabled_child_scenario(percentiles_data, config)
+                    black_swan_results.append(event_results)
+
+            # Unemployment Scenarios
+            st.markdown("### 💼 Forced Unemployment")
+            st.markdown("*Testing 3-year unemployment periods at the worst possible time*")
+
+            for parent_name, parent_income in [(st.session_state.parent1_name, st.session_state.parentX_income),
+                                                (st.session_state.parent2_name, st.session_state.parentY_income)]:
+                config = {
+                    'parent_name': parent_name,
+                    'parent_income': parent_income,
+                    'duration_years': 3
+                }
+
+                event_results = test_unemployment_scenario(percentiles_data, config)
+                black_swan_results.append(event_results)
+
+        # TIER 3: Comprehensive Analysis
+        if selected_tier == 3 or selected_tier == 0:
+            st.markdown("---")
+            st.markdown("## 🥇 Tier 3: Comprehensive Analysis")
+            st.markdown("*Testing compound scenarios and worst-case combinations*")
+
+            # Compound Scenario: Market Crash + Unemployment
+            st.markdown("### ⚡ Compound: 30% Market Crash + 2 Year Unemployment")
+
+            for parent_name, parent_income in [(st.session_state.parent1_name, st.session_state.parentX_income),
+                                                (st.session_state.parent2_name, st.session_state.parentY_income)]:
+
+                event_results = {'event': f'30% Crash + {parent_name} Unemployed 2 Yrs'}
 
                 for pct_name in percentile_names:
                     pct_values = percentiles[pct_name]
+                    worst_final_nw = float('inf')
+                    worst_year = None
 
-                    # Find index of birth year
-                    if child_birth_year not in years:
-                        event_results[pct_name] = {'status': 'N/A', 'final_nw': 0}
-                        continue
+                    # Try each year as the compound event start
+                    for event_start_idx in range(len(years) - 2):
+                        # Apply 30% crash
+                        net_worth = pct_values[event_start_idx] * 0.7
 
-                    birth_idx = years.index(child_birth_year)
+                        # Simulate 2 years of unemployment plus recovery
+                        for future_idx in range(event_start_idx, len(years)):
+                            year_offset = future_idx - event_start_idx
 
-                    # Simulate with one parent retiring immediately
-                    net_worth = pct_values[birth_idx]
+                            # Calculate cashflow impact
+                            if future_idx < len(pct_values) - 1:
+                                normal_cashflow = (pct_values[future_idx + 1] - pct_values[future_idx]) - (pct_values[future_idx] * scenario.investment_return)
 
-                    # Estimate income loss (assume Parent 2 retires, loses ~half household income)
-                    income_loss_rate = 0.4  # Conservative estimate
+                                # During unemployment (first 2 years), lose this parent's income
+                                if year_offset < 2:
+                                    income_loss = parent_income * ((1 + scenario.inflation_rate) ** year_offset)
+                                    reduced_cashflow = normal_cashflow - income_loss
+                                else:
+                                    reduced_cashflow = normal_cashflow
+                            else:
+                                reduced_cashflow = 0
 
-                    for future_idx in range(birth_idx + 1, len(years)):
-                        year = years[future_idx]
-                        year_offset = future_idx - birth_idx
+                            investment_return = net_worth * scenario.investment_return
+                            net_worth = net_worth + reduced_cashflow + investment_return
 
-                        # Reduced cashflow due to lost income
-                        if future_idx < len(pct_values) - 1:
-                            normal_cashflow = (pct_values[future_idx + 1] - pct_values[future_idx]) - (pct_values[future_idx] * scenario.investment_return)
-                            reduced_cashflow = normal_cashflow - (st.session_state.parentY_income * (1 + scenario.inflation_rate) ** year_offset)
-                        else:
-                            reduced_cashflow = 0
+                        # Track worst case
+                        if net_worth < worst_final_nw:
+                            worst_final_nw = net_worth
+                            worst_year = years[event_start_idx]
 
-                        investment_return = net_worth * scenario.investment_return
-                        net_worth = net_worth + reduced_cashflow + investment_return
-
-                    status = "✅" if net_worth > 0 else "❌"
+                    status = "✅" if worst_final_nw > 0 else "❌"
                     event_results[pct_name] = {
                         'status': status,
-                        'final_nw': net_worth
+                        'worst_year': worst_year,
+                        'final_nw': worst_final_nw
                     }
 
                 black_swan_results.append(event_results)
-
-        # Event 3: Forced Unemployment - Parent 1
-        st.markdown("---")
-        st.markdown("### 💼 Scenario 3: Forced Unemployment")
-        st.markdown("*Testing 3-year unemployment periods at the worst possible time*")
-
-        for parent_name, parent_income in [(st.session_state.parent1_name, st.session_state.parentX_income),
-                                            (st.session_state.parent2_name, st.session_state.parentY_income)]:
-            event_results = {'event': f'{parent_name} Unemployed 3 Years (Worst Year)'}
-
-            for pct_name in percentile_names:
-                pct_values = percentiles[pct_name]
-                worst_unemployment_year = None
-                worst_final_nw = float('inf')
-                worst_year = None
-
-                # Try each year as the unemployment start
-                for unemp_start_idx in range(len(years) - 3):  # Need 3 years of data
-                    net_worth = pct_values[unemp_start_idx]
-
-                    # Simulate 3 years of unemployment plus recovery
-                    for future_idx in range(unemp_start_idx, len(years)):
-                        year_offset = future_idx - unemp_start_idx
-
-                        # Calculate cashflow impact
-                        if future_idx < len(pct_values) - 1:
-                            normal_cashflow = (pct_values[future_idx + 1] - pct_values[future_idx]) - (pct_values[future_idx] * scenario.investment_return)
-
-                            # During unemployment (first 3 years), lose this parent's income
-                            if year_offset < 3:
-                                income_loss = parent_income * ((1 + scenario.inflation_rate) ** year_offset)
-                                reduced_cashflow = normal_cashflow - income_loss
-                            else:
-                                reduced_cashflow = normal_cashflow
-                        else:
-                            reduced_cashflow = 0
-
-                        investment_return = net_worth * scenario.investment_return
-                        net_worth = net_worth + reduced_cashflow + investment_return
-
-                    # Track worst case
-                    if net_worth < worst_final_nw:
-                        worst_final_nw = net_worth
-                        worst_unemployment_year = unemp_start_idx
-                        worst_year = years[unemp_start_idx]
-
-                status = "✅" if worst_final_nw > 0 else "❌"
-                event_results[pct_name] = {
-                    'status': status,
-                    'worst_year': worst_year,
-                    'final_nw': worst_final_nw
-                }
-
-            black_swan_results.append(event_results)
 
     # Display Stoplight Table
     st.markdown("---")
