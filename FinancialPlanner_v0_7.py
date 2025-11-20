@@ -10,6 +10,17 @@ import io
 from dataclasses import dataclass, asdict
 from typing import List, Dict, Optional, Any
 
+# PDF generation imports
+try:
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+    from reportlab.lib import colors
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+
 # Set page configuration
 st.set_page_config(
     page_title="Financial Planning Application v0.7",
@@ -6730,9 +6741,14 @@ def report_export_tab():
         )
 
     with col2:
+        # Build format options based on library availability
+        format_options = ["Excel (.xlsx)", "CSV (Multiple Files)", "JSON (Data Export)"]
+        if REPORTLAB_AVAILABLE:
+            format_options.insert(0, "PDF (.pdf)")
+
         report_format = st.selectbox(
             "Export Format",
-            ["Excel (.xlsx)", "CSV (Multiple Files)", "JSON (Data Export)"],
+            format_options,
             index=0
         )
 
@@ -6741,6 +6757,9 @@ def report_export_tab():
             value=True,
             help="Include Plotly charts as images (Excel only)"
         )
+
+        if not REPORTLAB_AVAILABLE and report_format == "PDF (.pdf)":
+            st.warning("⚠️ PDF export requires reportlab library. Install with: pip install reportlab")
 
     # Generate Report Button
     st.subheader("📥 Generate Report")
@@ -6798,7 +6817,178 @@ def report_export_tab():
                     "tax_strategies": [asdict(t) for t in st.session_state.tax_strategies]
                 }
 
-                if report_format == "Excel (.xlsx)":
+                if report_format == "PDF (.pdf)":
+                    # Generate PDF report
+                    output = io.BytesIO()
+                    doc = SimpleDocTemplate(output, pagesize=letter,
+                                          rightMargin=72, leftMargin=72,
+                                          topMargin=72, bottomMargin=18)
+
+                    # Container for the 'Flowable' objects
+                    elements = []
+
+                    # Define styles
+                    styles = getSampleStyleSheet()
+                    title_style = ParagraphStyle(
+                        'CustomTitle',
+                        parent=styles['Heading1'],
+                        fontSize=24,
+                        textColor=colors.HexColor('#1f77b4'),
+                        spaceAfter=30,
+                    )
+                    heading_style = ParagraphStyle(
+                        'CustomHeading',
+                        parent=styles['Heading2'],
+                        fontSize=16,
+                        textColor=colors.HexColor('#2ca02c'),
+                        spaceAfter=12,
+                    )
+
+                    # Title
+                    title = Paragraph(f"Financial Planning Report", title_style)
+                    elements.append(title)
+                    elements.append(Spacer(1, 12))
+
+                    # Metadata
+                    metadata_text = f"""
+                    <b>Report Name:</b> {report_data['metadata']['report_name']}<br/>
+                    <b>Generated:</b> {report_data['metadata']['generated_date']}<br/>
+                    <b>Planning Year:</b> {report_data['metadata']['current_year']}<br/>
+                    <b>Planning Horizon:</b> {report_data['metadata']['planning_horizon']} years
+                    """
+                    elements.append(Paragraph(metadata_text, styles['Normal']))
+                    elements.append(Spacer(1, 20))
+
+                    # Summary Section
+                    if "Summary" in include_sections:
+                        elements.append(Paragraph("Financial Summary", heading_style))
+                        summary_data = [
+                            ['Metric', 'Value'],
+                            ['Combined Net Worth', f"${report_data['summary']['combined_net_worth']:,.2f}"],
+                            ['Combined Income', f"${report_data['summary']['combined_income']:,.2f}"],
+                            ['Total Expenses', f"${report_data['summary']['total_expenses']:,.2f}"],
+                            ['Number of Children', str(report_data['summary']['num_children'])],
+                            ['Number of Properties', str(report_data['summary']['num_houses'])],
+                            ['Total Debt', f"${report_data['summary']['total_debt']:,.2f}"],
+                            ['Total 529 Balance', f"${report_data['summary']['total_529_balance']:,.2f}"]
+                        ]
+                        summary_table = Table(summary_data, colWidths=[3*inch, 3*inch])
+                        summary_table.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                            ('FONTSIZE', (0, 0), (-1, 0), 12),
+                            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                        ]))
+                        elements.append(summary_table)
+                        elements.append(Spacer(1, 20))
+
+                    # Parents Section
+                    if "Income & Expenses" in include_sections:
+                        elements.append(Paragraph("Parents Information", heading_style))
+                        parents_data = [
+                            ['', 'Parent 1', 'Parent 2'],
+                            ['Name', report_data['parents']['parent1']['name'], report_data['parents']['parent2']['name']],
+                            ['Age', str(report_data['parents']['parent1']['age']), str(report_data['parents']['parent2']['age'])],
+                            ['Income', f"${report_data['parents']['parent1']['income']:,.2f}", f"${report_data['parents']['parent2']['income']:,.2f}"],
+                            ['Net Worth', f"${report_data['parents']['parent1']['net_worth']:,.2f}", f"${report_data['parents']['parent2']['net_worth']:,.2f}"],
+                            ['Retirement Age', str(report_data['parents']['parent1']['retirement_age']), str(report_data['parents']['parent2']['retirement_age'])],
+                            ['SS Benefit', f"${report_data['parents']['parent1']['ss_benefit']:,.2f}", f"${report_data['parents']['parent2']['ss_benefit']:,.2f}"]
+                        ]
+                        parents_table = Table(parents_data, colWidths=[2*inch, 2*inch, 2*inch])
+                        parents_table.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                            ('FONTSIZE', (0, 0), (-1, 0), 12),
+                            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                        ]))
+                        elements.append(parents_table)
+                        elements.append(Spacer(1, 20))
+
+                    # Children Section
+                    if "Children" in include_sections and report_data['children']:
+                        elements.append(Paragraph("Children", heading_style))
+                        children_data = [['Name', 'Age', 'Birth Year']]
+                        for child in report_data['children']:
+                            children_data.append([child['name'], str(child['age']), str(child['birth_year'])])
+
+                        children_table = Table(children_data, colWidths=[2*inch, 2*inch, 2*inch])
+                        children_table.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                        ]))
+                        elements.append(children_table)
+                        elements.append(Spacer(1, 20))
+
+                    # Assets & Debts Section
+                    if "Assets & Debts" in include_sections and report_data['debts']:
+                        elements.append(PageBreak())
+                        elements.append(Paragraph("Debts", heading_style))
+                        debts_data = [['Name', 'Principal', 'Interest Rate', 'Monthly Payment']]
+                        for debt in report_data['debts']:
+                            debts_data.append([
+                                debt['name'],
+                                f"${debt['principal']:,.2f}",
+                                f"{debt['interest_rate']*100:.2f}%",
+                                f"${debt['monthly_payment']:,.2f}"
+                            ])
+
+                        debts_table = Table(debts_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 1.5*inch])
+                        debts_table.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                        ]))
+                        elements.append(debts_table)
+                        elements.append(Spacer(1, 20))
+
+                    # Education Section
+                    if "Education" in include_sections and report_data['education']['529_plans']:
+                        elements.append(Paragraph("Education - 529 Plans", heading_style))
+                        edu_data = [['Beneficiary', 'Current Balance', 'Annual Contribution', 'State']]
+                        for plan in report_data['education']['529_plans']:
+                            edu_data.append([
+                                plan['beneficiary_name'],
+                                f"${plan['current_balance']:,.2f}",
+                                f"${plan['annual_contribution']:,.2f}",
+                                plan.get('state', 'N/A')
+                            ])
+
+                        edu_table = Table(edu_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 1.5*inch])
+                        edu_table.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                        ]))
+                        elements.append(edu_table)
+
+                    # Build PDF
+                    doc.build(elements)
+                    output.seek(0)
+
+                    st.download_button(
+                        label="📥 Download PDF Report",
+                        data=output,
+                        file_name=f"{report_name}.pdf",
+                        mime="application/pdf"
+                    )
+                    st.success("✅ PDF report generated successfully!")
+
+                elif report_format == "Excel (.xlsx)":
                     # Create Excel workbook
                     output = io.BytesIO()
 
