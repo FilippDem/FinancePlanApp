@@ -2792,13 +2792,10 @@ def main():
         ("👶 Children", children_tab, True),
         ("🏠 House Portfolio", house_tab, True),
         ("🗓️ Timeline", timeline_tab, True),
-        ("💼 Portfolio Allocation", portfolio_allocation_tab, st.session_state.get('show_portfolio_allocation', False)),
         ("📈 Economy", economy_tab, True),
         ("🖼️ Retirement", retirement_tab, True),
         ("🏥 Healthcare & Insurance", healthcare_insurance_tab, st.session_state.get('show_healthcare', False)),
         ("💳 Debt Management", debt_management_tab, st.session_state.get('show_debt', False)),
-        ("🎓 Education Funding", education_funding_tab, st.session_state.get('show_education', False)),
-        ("💼 Tax Optimization", tax_optimization_tab, st.session_state.get('show_tax', False)),
         ("📊 Analysis & Cashflow", combined_analysis_cashflow_tab, True),
         ("🦢 Black Swan Events", black_swan_tab, True),
         ("📄 Export Reports", report_export_tab, st.session_state.get('show_export', True)),
@@ -5517,6 +5514,72 @@ def test_unemployment_scenario(percentiles_data, config):
     return event_results
 
 
+def test_hyperinflation_scenario(percentiles_data, config):
+    """
+    Test hyperinflation scenario with elevated inflation rate.
+
+    Args:
+        percentiles_data: Dict containing percentile data
+        config: Dict with 'inflation_years' and 'inflation_rate' keys
+
+    Returns:
+        Dict with event name and results for each percentile
+    """
+    percentiles = percentiles_data['percentiles']
+    years = percentiles_data['years']
+    scenario = percentiles_data['scenario']
+    percentile_names = ['10th', '25th', '50th', '75th', '90th']
+
+    inflation_years = config.get('inflation_years', 5)
+    inflation_rate = config.get('inflation_rate', 0.15)  # 15% inflation
+
+    event_results = {'event': f'Hyperinflation: {int(inflation_rate*100)}% for {inflation_years} Years (Worst Year)'}
+
+    for pct_name in percentile_names:
+        pct_values = percentiles[pct_name]
+        worst_final_nw = float('inf')
+        worst_year = None
+
+        # Try each year as the hyperinflation start
+        for inflation_start_idx in range(len(years) - inflation_years):
+            net_worth = pct_values[inflation_start_idx]
+
+            # Simulate hyperinflation period plus recovery
+            for future_idx in range(inflation_start_idx, len(years)):
+                year_offset = future_idx - inflation_start_idx
+
+                # Calculate cashflow impact
+                if future_idx < len(pct_values) - 1:
+                    normal_cashflow = (pct_values[future_idx + 1] - pct_values[future_idx]) - (pct_values[future_idx] * scenario.investment_return)
+
+                    # During hyperinflation, expenses increase dramatically
+                    if year_offset < inflation_years:
+                        # Expenses increase with hyperinflation, income may lag
+                        expense_increase = (st.session_state.parentX_income + st.session_state.parentY_income) * 0.3 * ((1 + inflation_rate) ** year_offset)
+                        reduced_cashflow = normal_cashflow - expense_increase
+                    else:
+                        reduced_cashflow = normal_cashflow
+                else:
+                    reduced_cashflow = 0
+
+                investment_return = net_worth * scenario.investment_return
+                net_worth = net_worth + reduced_cashflow + investment_return
+
+            # Track worst case
+            if net_worth < worst_final_nw:
+                worst_final_nw = net_worth
+                worst_year = years[inflation_start_idx]
+
+        status = "✅" if worst_final_nw > 0 else "❌"
+        event_results[pct_name] = {
+            'status': status,
+            'worst_year': worst_year,
+            'final_nw': worst_final_nw
+        }
+
+    return event_results
+
+
 def black_swan_tab():
     """Black Swan Events stress testing tab"""
     st.header("🦢 Black Swan Events Analysis")
@@ -5592,6 +5655,39 @@ def black_swan_tab():
 
             config = {'loss_percent': loss_percent}
             event_results = test_net_worth_loss_scenario(percentiles_data, config)
+            black_swan_results.append(event_results)
+
+            # Hyperinflation Scenario
+            st.markdown("---")
+            st.markdown("### 📈 Hyperinflation Scenario")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                hyperinflation_rate = st.slider(
+                    "Inflation Rate (%)",
+                    min_value=5,
+                    max_value=30,
+                    value=15,
+                    step=1,
+                    help="Annual inflation rate during hyperinflation period"
+                )
+            with col2:
+                hyperinflation_years = st.slider(
+                    "Duration (Years)",
+                    min_value=2,
+                    max_value=10,
+                    value=5,
+                    step=1,
+                    help="How many years of hyperinflation to test"
+                )
+
+            st.markdown(f"*Finding the worst year to experience {hyperinflation_years} years of {hyperinflation_rate}% inflation*")
+
+            config = {
+                'inflation_years': hyperinflation_years,
+                'inflation_rate': hyperinflation_rate / 100
+            }
+            event_results = test_hyperinflation_scenario(percentiles_data, config)
             black_swan_results.append(event_results)
 
         # TIER 2: Moderate Scenarios
