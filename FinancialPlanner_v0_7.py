@@ -5183,7 +5183,7 @@ def combined_analysis_cashflow_tab():
         st.session_state.mc_normalize_to_today_dollars = st.checkbox(
             "Normalize to Today's Dollars",
             value=st.session_state.mc_normalize_to_today_dollars,
-            help="Adjust all future values to today's purchasing power"
+            help="Adjusts all future values to reflect today's purchasing power by removing the effect of inflation. This reveals your actual wealth accumulation over time — if the line goes up, you're genuinely getting wealthier, not just keeping pace with rising prices. For example, $1M in 2050 might look impressive, but normalized to today's dollars shows what that money can actually buy in current terms."
         )
 
     # Variability Settings
