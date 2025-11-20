@@ -1954,7 +1954,17 @@ def initialize_session_state():
                 'real_estate': 3.0,  # REITs
                 'other': 0.0
             },
-            'major_purchases': [],
+            'major_purchases': [
+                {
+                    'name': "Olivia's Wedding",
+                    'year': current_year + 18,
+                    'amount': 32000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                }
+            ],
             'recurring_expenses': [
                 {
                     'name': 'Family Vehicle',
@@ -2080,7 +2090,17 @@ def initialize_session_state():
                 'real_estate': 5.0,  # REITs
                 'other': 3.0  # Commodities
             },
-            'major_purchases': [],
+            'major_purchases': [
+                {
+                    'name': "Isabella's Wedding Reception",
+                    'year': current_year + 12,
+                    'amount': 75000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                }
+            ],
             'recurring_expenses': [
                 {
                     'name': 'Luxury Vehicles',
@@ -2284,7 +2304,17 @@ def initialize_session_state():
                 'real_estate': 3.0,  # REITs
                 'other': 0.0
             },
-            'major_purchases': [],
+            'major_purchases': [
+                {
+                    'name': "Adult Child's Wedding Gift",
+                    'year': current_year + 3,
+                    'amount': 25000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                }
+            ],
             'recurring_expenses': [
                 {
                     'name': 'Healthcare Premiums',
@@ -5011,347 +5041,185 @@ def combined_analysis_cashflow_tab():
                         else:
                             st.metric("In College", "None")
 
-            # Key insights
-            st.markdown("---")
-            st.subheader("📌 Key Insights")
+    # Simulation Settings
+    st.subheader("⚙️ Simulation Settings")
 
-            col1, col2, col3 = st.columns(3)
+    col1, col2, col3 = st.columns(3)
 
-            # Find peak expense year
-            peak_expense_data = max(cashflow_data, key=lambda x: x['total_expenses'])
-            with col1:
-                st.metric(
-                    "Peak Expense Year",
-                    f"{peak_expense_data['year']}",
-                    f"${peak_expense_data['total_expenses']:,.0f}"
-                )
+    with col1:
+        st.session_state.mc_start_year = st.number_input(
+            "Start Year",
+            min_value=st.session_state.current_year,
+            max_value=2100,
+            value=int(st.session_state.mc_start_year),
+            key="mc_start"
+        )
 
-            # Find worst cashflow year
-            worst_cashflow_data = min(cashflow_data, key=lambda x: x['cashflow'])
-            with col2:
-                st.metric(
-                    "Worst Cashflow Year",
-                    f"{worst_cashflow_data['year']}",
-                    f"${worst_cashflow_data['cashflow']:,.0f}"
-                )
+        st.number_input(
+            "Projection Years",
+            min_value=1,
+            max_value=80,
+            value=int(st.session_state.mc_years),
+            key="mc_years"
+        )
 
-            # Count deficit years
-            deficit_years = sum(1 for d in cashflow_data if d['cashflow'] < 0)
-            with col3:
-                st.metric(
-                    "Deficit Years",
-                    f"{deficit_years} years",
-                    "⚠️" if deficit_years > 5 else "✅"
-                )
+    with col2:
+        st.session_state.mc_simulations = st.number_input(
+            "Number of Simulations",
+            min_value=100,
+            max_value=10000,
+            value=int(st.session_state.mc_simulations),
+            step=100,
+            key="mc_sims"
+        )
 
-        with tab2:
-            st.subheader("Critical Years - Detailed Breakdown")
+        st.session_state.mc_use_historical = st.checkbox(
+            "Use Historical Returns",
+            value=st.session_state.mc_use_historical,
+            help="Use actual historical S&P 500 returns instead of random generation"
+        )
 
-            # Create DataFrame for table
-            table_data = []
-            for d in cashflow_data:
-                # Format children status
-                if d['children_in_college']:
-                    children_status = ", ".join(d['children_in_college']) + " (college)"
+    with col3:
+        st.session_state.mc_normalize_to_today_dollars = st.checkbox(
+            "Normalize to Today's Dollars",
+            value=st.session_state.mc_normalize_to_today_dollars,
+            help="Adjust all future values to today's purchasing power"
+        )
+        st.session_state.mc_return_variability_negative = st.number_input(
+            "Negative (%)",
+            min_value=0.0,
+            max_value=100.0,
+            value=float(st.session_state.mc_return_variability_negative),
+            step=1.0,
+            key="return_var_neg"
+        )
+        st.info("🎲 Monte Carlo simulation is running with simplified calculations for web stability")
+
+        # Simplified Monte Carlo for web
+        scenario = st.session_state.economic_scenarios[st.session_state.active_scenario]
+
+        num_sims = min(st.session_state.mc_simulations, 1000)  # Cap at 1000 for web performance
+        results = []
+        income_results = []
+        expense_results = []
+        cashflow_results = []
+
+        # Starting values
+        initial_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
+
+        # Run simulations
+        progress_bar = st.progress(0)
+        for sim in range(num_sims):
+            sim_results = []
+            sim_income = []
+            sim_expenses = []
+            sim_cashflow = []
+            net_worth = initial_net_worth
+
+            for year_offset in range(st.session_state.mc_years):
+                year = st.session_state.mc_start_year + year_offset
+
+                # Calculate income
+                parentX_working = (year - (st.session_state.current_year - st.session_state.parentX_age)) < st.session_state.parentX_retirement_age
+                parentY_working = (year - (st.session_state.current_year - st.session_state.parentY_age)) < st.session_state.parentY_retirement_age
+
+                income = 0
+                if parentX_working:
+                    # Use job changes if available
+                    parentX_year_income = get_income_for_year(
+                        st.session_state.parentX_income,
+                        st.session_state.parentX_raise,
+                        st.session_state.parentX_job_changes,
+                        st.session_state.current_year,
+                        year
+                    )
+                    income += parentX_year_income
                 else:
-                    child_ages = []
-                    for child in st.session_state.children_list:
-                        age = d['year'] - child['birth_year']
-                        if 0 <= age <= 21:
-                            child_ages.append(f"{child['name']} ({age})")
-                    children_status = ", ".join(child_ages) if child_ages else "None"
+                    ss_benefit = st.session_state.parentX_ss_benefit * 12
+                    if st.session_state.ss_insolvency_enabled and year >= 2034:
+                        ss_benefit *= (1 - st.session_state.ss_shortfall_percentage / 100)
+                    income += ss_benefit
 
-                # Format events
-                event_notes = []
-                for event_type, *event_data in d['events']:
-                    if event_type == 'job_change':
-                        event_notes.append(f"💼 {event_data[0]} → ${event_data[1]:,.0f}")
-                    elif event_type == 'college':
-                        event_notes.append(f"🎓 College")
-                    elif event_type == 'retirement':
-                        event_notes.append(f"🏖️ {event_data[0]} retires")
-                event_str = "; ".join(event_notes) if event_notes else ""
+                if parentY_working:
+                    # Use job changes if available
+                    parentY_year_income = get_income_for_year(
+                        st.session_state.parentY_income,
+                        st.session_state.parentY_raise,
+                        st.session_state.parentY_job_changes,
+                        st.session_state.current_year,
+                        year
+                    )
+                    income += parentY_year_income
+                else:
+                    ss_benefit = st.session_state.parentY_ss_benefit * 12
+                    if st.session_state.ss_insolvency_enabled and year >= 2034:
+                        ss_benefit *= (1 - st.session_state.ss_shortfall_percentage / 100)
+                    income += ss_benefit
 
-                table_data.append({
-                    'Year': d['year'],
-                    'Ages': f"{d['parent1_age']}/{d['parent2_age']}",
-                    'Income': d['total_income'],
-                    'Expenses': d['total_expenses'],
-                    'Cashflow': d['cashflow'],
-                    'Net Worth': d['net_worth'],
-                    'Children': children_status,
-                    'Events': event_str
-                })
+                # Add variability to income
+                if use_asymmetric:
+                    if np.random.random() > 0.5:
+                        income *= (1 + np.random.uniform(0, st.session_state.mc_income_variability_positive / 100))
+                    else:
+                        income *= (1 - np.random.uniform(0, st.session_state.mc_income_variability_negative / 100))
+                else:
+                    income *= (1 + np.random.uniform(-st.session_state.mc_income_variability / 100, st.session_state.mc_income_variability / 100))
 
-            df = pd.DataFrame(table_data)
+    # Variability Settings
+    st.subheader("📊 Variability Settings (for Traditional Simulations)")
 
-            # Add filtering
-            st.markdown("**Filter by:**")
-            col1, col2, col3 = st.columns(3)
+    use_asymmetric = st.checkbox("Use Asymmetric Variability", value=True, help="Set different positive and negative variability ranges")
 
-            with col1:
-                show_deficit_only = st.checkbox("Show deficit years only")
-            with col2:
-                show_college_only = st.checkbox("Show college years only")
-            with col3:
-                show_events_only = st.checkbox("Show event years only")
-
-            # Apply filters
-            filtered_df = df.copy()
-            if show_deficit_only:
-                filtered_df = filtered_df[filtered_df['Cashflow'] < 0]
-            if show_college_only:
-                filtered_df = filtered_df[filtered_df['Children'].str.contains('college', na=False)]
-            if show_events_only:
-                filtered_df = filtered_df[filtered_df['Events'] != '']
-
-            # Format currency columns for display
-            display_df = filtered_df.copy()
-            display_df['Income'] = display_df['Income'].apply(lambda x: f"${x:,.0f}")
-            display_df['Expenses'] = display_df['Expenses'].apply(lambda x: f"${x:,.0f}")
-            display_df['Cashflow'] = display_df['Cashflow'].apply(lambda x: f"${x:,.0f}")
-            display_df['Net Worth'] = display_df['Net Worth'].apply(lambda x: f"${x:,.0f}")
-
-            st.dataframe(
-                display_df,
-                use_container_width=True,
-                height=600,
-                hide_index=True
-            )
-
-            st.download_button(
-                label="📥 Download as CSV",
-                data=filtered_df.to_csv(index=False),
-                file_name=f"lifetime_cashflow_{st.session_state.current_year}.csv",
-                mime="text/csv"
-            )
-
-        with tab3:
-            st.subheader("Life Stage Summary")
-
-            # Define life stages
-            parent1_retirement_year = st.session_state.current_year + (st.session_state.parentX_retirement_age - st.session_state.parentX_age)
-            parent2_retirement_year = st.session_state.current_year + (st.session_state.parentY_retirement_age - st.session_state.parentY_age)
-            retirement_year = min(parent1_retirement_year, parent2_retirement_year)
-
-            # Find first and last college years
-            college_years = [d['year'] for d in cashflow_data if d['children_in_college']]
-            if college_years:
-                first_college_year = min(college_years)
-                last_college_year = max(college_years)
-            else:
-                first_college_year = None
-                last_college_year = None
-
-            # Phase 1: Pre-college working years
-            if first_college_year:
-                phase1_data = [d for d in cashflow_data if d['year'] < first_college_year]
-            else:
-                phase1_data = [d for d in cashflow_data if d['year'] < retirement_year]
-
-            if phase1_data:
-                st.markdown("### 🏠 Phase 1: Building Wealth (Pre-College)")
-                col1, col2 = st.columns(2)
-
-                with col1:
-                    st.markdown(f"**Duration**: {len(phase1_data)} years ({phase1_data[0]['year']} - {phase1_data[-1]['year']})")
-                    st.markdown(f"**Your Ages**: {phase1_data[0]['parent1_age']}-{phase1_data[-1]['parent1_age']} / {phase1_data[0]['parent2_age']}-{phase1_data[-1]['parent2_age']}")
-
-                    avg_income = sum(d['total_income'] for d in phase1_data) / len(phase1_data)
-                    avg_expenses = sum(d['total_expenses'] for d in phase1_data) / len(phase1_data)
-                    avg_savings = avg_income - avg_expenses
-
-                    st.metric("Average Annual Income", f"${avg_income:,.0f}")
-                    st.metric("Average Annual Expenses", f"${avg_expenses:,.0f}")
-                    st.metric("Average Annual Savings", f"${avg_savings:,.0f}")
-
-                with col2:
-                    start_nw = phase1_data[0]['net_worth']
-                    end_nw = phase1_data[-1]['net_worth']
-                    growth = end_nw - start_nw
-
-                    st.metric("Starting Net Worth", f"${start_nw:,.0f}")
-                    st.metric("Ending Net Worth", f"${end_nw:,.0f}")
-                    st.metric("Net Worth Growth", f"${growth:,.0f}", f"+{growth/start_nw*100:.0f}%")
-
-            # Phase 2: College years
-            if college_years:
-                phase2_data = [d for d in cashflow_data if first_college_year <= d['year'] <= last_college_year]
-
-                st.markdown("---")
-                st.markdown("### 🎓 Phase 2: College Years")
-                col1, col2 = st.columns(2)
-
-                with col1:
-                    st.markdown(f"**Duration**: {len(phase2_data)} years ({phase2_data[0]['year']} - {phase2_data[-1]['year']})")
-                    st.markdown(f"**Your Ages**: {phase2_data[0]['parent1_age']}-{phase2_data[-1]['parent1_age']} / {phase2_data[0]['parent2_age']}-{phase2_data[-1]['parent2_age']}")
-
-                    avg_income = sum(d['total_income'] for d in phase2_data) / len(phase2_data)
-                    avg_expenses = sum(d['total_expenses'] for d in phase2_data) / len(phase2_data)
-                    avg_savings = avg_income - avg_expenses
-
-                    st.metric("Average Annual Income", f"${avg_income:,.0f}")
-                    st.metric("Average Annual Expenses", f"${avg_expenses:,.0f}")
-                    st.metric("Average Annual Savings", f"${avg_savings:,.0f}")
-
-                    # Peak expense year
-                    peak = max(phase2_data, key=lambda x: x['total_expenses'])
-                    st.warning(f"**Peak**: {peak['year']} with ${peak['total_expenses']:,.0f} expenses")
-
-                with col2:
-                    start_nw = phase2_data[0]['net_worth']
-                    end_nw = phase2_data[-1]['net_worth']
-                    growth = end_nw - start_nw
-
-                    st.metric("Starting Net Worth", f"${start_nw:,.0f}")
-                    st.metric("Ending Net Worth", f"${end_nw:,.0f}")
-                    st.metric("Net Worth Growth", f"${growth:,.0f}")
-
-            # Phase 3: Empty nest (if applicable)
-            if last_college_year and last_college_year < retirement_year:
-                phase3_data = [d for d in cashflow_data if last_college_year < d['year'] < retirement_year]
-
-                if phase3_data:
-                    st.markdown("---")
-                    st.markdown("### 🚀 Phase 3: Empty Nest - Maximum Acceleration")
-                    col1, col2 = st.columns(2)
-
-                    with col1:
-                        st.markdown(f"**Duration**: {len(phase3_data)} years ({phase3_data[0]['year']} - {phase3_data[-1]['year']})")
-                        st.markdown(f"**Your Ages**: {phase3_data[0]['parent1_age']}-{phase3_data[-1]['parent1_age']} / {phase3_data[0]['parent2_age']}-{phase3_data[-1]['parent2_age']}")
-
-                        avg_income = sum(d['total_income'] for d in phase3_data) / len(phase3_data)
-                        avg_expenses = sum(d['total_expenses'] for d in phase3_data) / len(phase3_data)
-                        avg_savings = avg_income - avg_expenses
-
-                        st.metric("Average Annual Income", f"${avg_income:,.0f}")
-                        st.metric("Average Annual Expenses", f"${avg_expenses:,.0f}")
-                        st.metric("Average Annual Savings", f"${avg_savings:,.0f}", "🚀 Peak Savings!")
-
-                    with col2:
-                        start_nw = phase3_data[0]['net_worth']
-                        end_nw = phase3_data[-1]['net_worth']
-                        growth = end_nw - start_nw
-
-                        st.metric("Starting Net Worth", f"${start_nw:,.0f}")
-                        st.metric("Ending Net Worth", f"${end_nw:,.0f}")
-                        st.metric("Net Worth Growth", f"${growth:,.0f}")
-
-                        st.info("💡 **This is your critical wealth-building phase!** Maximize savings and investments.")
-
-            # Phase 4: Retirement
-            phase4_data = [d for d in cashflow_data if d['year'] >= retirement_year]
-
-            if phase4_data:
-                st.markdown("---")
-                st.markdown("### 🏖️ Phase 4: Retirement")
-                col1, col2 = st.columns(2)
-
-                with col1:
-                    st.markdown(f"**Duration**: {len(phase4_data)} years ({phase4_data[0]['year']} - {phase4_data[-1]['year']})")
-                    st.markdown(f"**Your Ages**: {phase4_data[0]['parent1_age']}-{phase4_data[-1]['parent1_age']} / {phase4_data[0]['parent2_age']}-{phase4_data[-1]['parent2_age']}")
-
-                    avg_income = sum(d['total_income'] for d in phase4_data) / len(phase4_data)
-                    avg_expenses = sum(d['total_expenses'] for d in phase4_data) / len(phase4_data)
-                    avg_cashflow = avg_income - avg_expenses
-
-                    st.metric("Average Annual Income", f"${avg_income:,.0f}", "SS Benefits")
-                    st.metric("Average Annual Expenses", f"${avg_expenses:,.0f}")
-                    st.metric("Average Annual Cashflow", f"${avg_cashflow:,.0f}")
-
-                with col2:
-                    start_nw = phase4_data[0]['net_worth']
-                    end_nw = phase4_data[-1]['net_worth']
-                    change = end_nw - start_nw
-
-                    st.metric("Retirement Net Worth", f"${start_nw:,.0f}")
-                    st.metric("Age 100 Net Worth", f"${end_nw:,.0f}")
-                    st.metric("Net Worth Change", f"${change:,.0f}")
-
-                    # Withdrawal rate
-                    if start_nw > 0:
-                        avg_annual_deficit = abs(avg_cashflow) if avg_cashflow < 0 else 0
-                        withdrawal_rate = (avg_annual_deficit / start_nw) * 100
-                        st.metric("Effective Withdrawal Rate", f"{withdrawal_rate:.1f}%")
-
-                        if withdrawal_rate > 4:
-                            st.warning("⚠️ Withdrawal rate exceeds 4% rule. Consider working longer or reducing expenses.")
-                        elif withdrawal_rate < 0:
-                            st.success("✅ No withdrawals needed! Living on SS + investment returns.")
-                        else:
-                            st.info(f"✅ Withdrawal rate within safe limits (4% rule).")
-
-    with main_tab2:
-        # Monte Carlo Simulation Section
-        st.markdown("Run comprehensive financial projections with Monte Carlo simulations to understand various possible outcomes.")
-
-        # Ensure Monte Carlo variables are initialized (defensive programming for old sessions)
-        if 'mc_start_year' not in st.session_state:
-            st.session_state.mc_start_year = datetime.now().year
-        if 'mc_years' not in st.session_state:
-            st.session_state.mc_years = 30
-        if 'mc_simulations' not in st.session_state:
-            st.session_state.mc_simulations = 1000
-        if 'mc_use_historical' not in st.session_state:
-            st.session_state.mc_use_historical = False
-        if 'mc_normalize_to_today_dollars' not in st.session_state:
-            st.session_state.mc_normalize_to_today_dollars = False
-        if 'mc_income_variability_positive' not in st.session_state:
-            st.session_state.mc_income_variability_positive = 10.0
-        if 'mc_income_variability_negative' not in st.session_state:
-            st.session_state.mc_income_variability_negative = 10.0
-        if 'mc_expense_variability_positive' not in st.session_state:
-            st.session_state.mc_expense_variability_positive = 5.0
-        if 'mc_expense_variability_negative' not in st.session_state:
-            st.session_state.mc_expense_variability_negative = 5.0
-        if 'mc_return_variability_positive' not in st.session_state:
-            st.session_state.mc_return_variability_positive = 15.0
-        if 'mc_return_variability_negative' not in st.session_state:
-            st.session_state.mc_return_variability_negative = 15.0
-
-        # Simulation Settings
-        st.subheader("⚙️ Simulation Settings")
-
+    if use_asymmetric:
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            st.session_state.mc_start_year = st.number_input(
-                "Start Year",
-                min_value=st.session_state.current_year,
-                max_value=2100,
-                value=int(st.session_state.mc_start_year),
-                key="mc_start"
+            st.markdown("**Income Variability**")
+            st.session_state.mc_income_variability_positive = st.number_input(
+                "Positive (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=float(st.session_state.mc_income_variability_positive),
+                step=1.0,
+                key="income_var_pos"
             )
-
-            st.number_input(
-                "Projection Years",
-                min_value=1,
-                max_value=80,
-                value=int(st.session_state.mc_years),
-                key="mc_years"
+            st.session_state.mc_income_variability_negative = st.number_input(
+                "Negative (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=float(st.session_state.mc_income_variability_negative),
+                step=1.0,
+                key="income_var_neg"
             )
 
         with col2:
-            st.session_state.mc_simulations = st.number_input(
-                "Number of Simulations",
-                min_value=100,
-                max_value=10000,
-                value=int(st.session_state.mc_simulations),
-                step=100,
-                key="mc_sims"
+            st.markdown("**Expense Variability**")
+            st.session_state.mc_expense_variability_positive = st.number_input(
+                "Positive (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=float(st.session_state.mc_expense_variability_positive),
+                step=1.0,
+                key="expense_var_pos"
             )
-
-            st.session_state.mc_use_historical = st.checkbox(
-                "Use Historical Returns",
-                value=st.session_state.mc_use_historical,
-                help="Use actual historical S&P 500 returns instead of random generation"
+            st.session_state.mc_expense_variability_negative = st.number_input(
+                "Negative (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=float(st.session_state.mc_expense_variability_negative),
+                step=1.0,
+                key="expense_var_neg"
             )
 
         with col3:
-            st.session_state.mc_normalize_to_today_dollars = st.checkbox(
-                "Normalize to Today's Dollars",
-                value=st.session_state.mc_normalize_to_today_dollars,
-                help="Adjust all future values to today's purchasing power"
+            st.markdown("**Return Variability**")
+            st.session_state.mc_return_variability_positive = st.number_input(
+                "Positive (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=float(st.session_state.mc_return_variability_positive),
+                step=1.0,
+                key="return_var_pos"
             )
 
         # Variability Settings
