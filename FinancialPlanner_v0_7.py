@@ -4326,13 +4326,22 @@ def timeline_tab():
 
     timeline_df = pd.DataFrame(timeline_data)
 
+    # Build dynamic location list including custom cities
+    available_locations = list(AVAILABLE_LOCATIONS_FAMILY)
+    if hasattr(st.session_state, 'custom_family_templates') and st.session_state.custom_family_templates:
+        # Add custom cities that aren't already in the list
+        custom_cities = list(st.session_state.custom_family_templates.keys())
+        for city in custom_cities:
+            if city not in available_locations:
+                available_locations.append(city)
+
     edited_timeline = st.data_editor(
         timeline_df,
         num_rows="dynamic",
         column_config={
             "State": st.column_config.SelectboxColumn(
                 "Location",
-                options=AVAILABLE_LOCATIONS_FAMILY,
+                options=available_locations,
                 required=True,
                 help="Select your living location - expenses will adjust automatically"
             ),
