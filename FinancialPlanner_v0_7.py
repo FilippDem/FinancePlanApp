@@ -2785,6 +2785,7 @@ def main():
         ("🗓️ Timeline", timeline_tab, True),
         ("📊 Analysis", combined_simulation_tab, True),
         ("💰 Lifetime Cashflow", lifetime_cashflow_tab, True),
+        ("🧪 Stress Test", stress_test_tab, True),
         ("📄 Export Reports", report_export_tab, st.session_state.get('show_export', True)),
         ("💾 Save/Load", save_load_tab, True)
     ]
@@ -5565,6 +5566,19 @@ def combined_simulation_tab():
 
             years = list(range(st.session_state.mc_start_year, st.session_state.mc_start_year + st.session_state.mc_years))
 
+            # Cache results for stress testing
+            st.session_state.mc_results_cached = {
+                'percentiles': {
+                    '10th': percentiles['10th'].tolist(),
+                    '25th': percentiles['25th'].tolist(),
+                    '50th': percentiles['50th'].tolist(),
+                    '75th': percentiles['75th'].tolist(),
+                    '90th': percentiles['90th'].tolist(),
+                },
+                'years': years,
+                'num_simulations': num_sims
+            }
+
             # Plot results
             st.subheader("📈 Monte Carlo Results")
 
@@ -6739,6 +6753,358 @@ def tax_optimization_tab():
         col1, col2 = st.columns(2)
         col1.metric("Active Tax Strategies", total_strategies)
         col2.metric("Estimated Annual Tax Savings", format_currency(total_annual_savings))
+
+# STRESS TEST TAB: Test financial resilience against rare adverse events
+def stress_test_tab():
+    """Stress Test Events - Test financial plan against rare adverse scenarios"""
+    st.header("🧪 Stress Test Events")
+
+    st.markdown("""
+    Test your financial plan's resilience against rare but severe adverse events.
+    Each scenario applies a specific stress event to your Monte Carlo percentile paths
+    and checks if your net worth remains positive through the end of the projection period.
+    """)
+
+    # Check if Monte Carlo results exist
+    if 'mc_results_cached' not in st.session_state or st.session_state.mc_results_cached is None:
+        st.warning("⚠️ Please run Monte Carlo Simulation first in the Analysis tab to generate baseline scenarios.")
+        st.info("💡 Go to **📊 Analysis** tab → Configure settings → Click **Run Monte Carlo Simulation**")
+        return
+
+    # Get Monte Carlo results
+    mc_data = st.session_state.mc_results_cached
+    percentiles_data = mc_data.get('percentiles', {})
+
+    if not percentiles_data:
+        st.error("No percentile data found. Please re-run Monte Carlo simulation.")
+        return
+
+    # Configuration
+    st.subheader("⚙️ Stress Test Configuration")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        test_net_worth_loss = st.checkbox("💥 50% Net Worth Loss", value=True,
+                                          help="Test impact of sudden 50% loss in net worth for both parents")
+        test_disabled_child = st.checkbox("👶 Disabled Child Birth", value=True,
+                                         help="Test impact of having a disabled child requiring one parent to retire")
+
+    with col2:
+        test_unemployment_p1 = st.checkbox("❌ Parent 1 Unemployment (3 years)", value=True,
+                                          help="Test 3-year forced unemployment for Parent 1")
+        test_unemployment_p2 = st.checkbox("❌ Parent 2 Unemployment (3 years)", value=True,
+                                          help="Test 3-year forced unemployment for Parent 2")
+
+    # Run button
+    if st.button("🧪 Run Stress Tests", type="primary", use_container_width=True):
+        with st.spinner("Running stress test scenarios..."):
+            # Run all stress tests
+            results = run_stress_tests(
+                percentiles_data,
+                test_net_worth_loss=test_net_worth_loss,
+                test_disabled_child=test_disabled_child,
+                test_unemployment_p1=test_unemployment_p1,
+                test_unemployment_p2=test_unemployment_p2
+            )
+
+            st.session_state.stress_test_results = results
+            st.success("✅ Stress tests complete!")
+
+    # Display results if available
+    if 'stress_test_results' in st.session_state and st.session_state.stress_test_results:
+        st.markdown("---")
+        st.subheader("📊 Stress Test Results")
+
+        display_stress_test_results(st.session_state.stress_test_results)
+
+
+def run_stress_tests(percentiles_data, test_net_worth_loss=True, test_disabled_child=True,
+                     test_unemployment_p1=True, test_unemployment_p2=True):
+    """Run all enabled stress tests and return results"""
+
+    results = []
+    percentile_keys = ['10th', '25th', '50th', '75th', '90th']
+
+    # Test 1: 50% Net Worth Loss
+    if test_net_worth_loss:
+        scenario_results = {
+            'name': '💥 50% Net Worth Loss',
+            'description': 'Sudden 50% loss in net worth (both parents)',
+            'type': 'sweep',  # Indicates we test across all years
+            'percentile_results': {}
+        }
+
+        for pct_key in percentile_keys:
+            if pct_key in percentiles_data:
+                result = test_net_worth_loss_scenario(percentiles_data[pct_key], pct_key)
+                scenario_results['percentile_results'][pct_key] = result
+
+        results.append(scenario_results)
+
+    # Test 2: Disabled Child scenarios (one for each child)
+    if test_disabled_child and st.session_state.children_list:
+        for i, child in enumerate(st.session_state.children_list):
+            scenario_results = {
+                'name': f'👶 Disabled Child: {child["name"]}',
+                'description': f'Birth of disabled {child["name"]} (one parent retires immediately)',
+                'type': 'fixed',
+                'percentile_results': {}
+            }
+
+            for pct_key in percentile_keys:
+                if pct_key in percentiles_data:
+                    result = test_disabled_child_scenario(percentiles_data[pct_key], pct_key, child)
+                    scenario_results['percentile_results'][pct_key] = result
+
+            results.append(scenario_results)
+
+    # Test 3: Parent 1 Unemployment
+    if test_unemployment_p1:
+        scenario_results = {
+            'name': f'❌ {st.session_state.parent1_name} Unemployment (3 years)',
+            'description': f'{st.session_state.parent1_name} loses job for 3 consecutive years',
+            'type': 'sweep',
+            'percentile_results': {}
+        }
+
+        for pct_key in percentile_keys:
+            if pct_key in percentiles_data:
+                result = test_unemployment_scenario(percentiles_data[pct_key], pct_key, parent=1)
+                scenario_results['percentile_results'][pct_key] = result
+
+        results.append(scenario_results)
+
+    # Test 4: Parent 2 Unemployment
+    if test_unemployment_p2:
+        scenario_results = {
+            'name': f'❌ {st.session_state.parent2_name} Unemployment (3 years)',
+            'description': f'{st.session_state.parent2_name} loses job for 3 consecutive years',
+            'type': 'sweep',
+            'percentile_results': {}
+        }
+
+        for pct_key in percentile_keys:
+            if pct_key in percentiles_data:
+                result = test_unemployment_scenario(percentiles_data[pct_key], pct_key, parent=2)
+                scenario_results['percentile_results'][pct_key] = result
+
+        results.append(scenario_results)
+
+    return results
+
+
+def test_net_worth_loss_scenario(baseline_path, percentile_key):
+    """Test 50% net worth loss applied at various years, find worst case"""
+
+    # Baseline path is a list of net worth values for each year
+    worst_year = None
+    worst_final_nw = float('inf')
+    worst_survived = True
+
+    # Try applying the shock at each year
+    for shock_year_idx in range(len(baseline_path)):
+        # Create a copy and apply 50% loss at this year
+        stressed_path = baseline_path[:shock_year_idx] + [baseline_path[shock_year_idx] * 0.5]
+
+        # Continue projection from this reduced amount
+        # Simplified: assume same growth pattern as baseline, but from reduced base
+        if shock_year_idx < len(baseline_path) - 1:
+            reduction_factor = stressed_path[shock_year_idx] / baseline_path[shock_year_idx] if baseline_path[shock_year_idx] != 0 else 0.5
+
+            for future_idx in range(shock_year_idx + 1, len(baseline_path)):
+                stressed_path.append(baseline_path[future_idx] * reduction_factor)
+
+        final_nw = stressed_path[-1]
+        survived = final_nw > 0
+
+        # Track worst case (lowest final net worth)
+        if final_nw < worst_final_nw:
+            worst_final_nw = final_nw
+            worst_year = st.session_state.mc_start_year + shock_year_idx
+            worst_survived = survived
+
+    return {
+        'survived': worst_survived,
+        'worst_year': worst_year,
+        'final_net_worth': worst_final_nw,
+        'details': f"Worst if event occurs in {worst_year}"
+    }
+
+
+def test_disabled_child_scenario(baseline_path, percentile_key, child):
+    """Test impact of disabled child birth - one parent retires immediately"""
+
+    # Child birth year
+    birth_year = child['birth_year']
+    event_year_idx = birth_year - st.session_state.mc_start_year
+
+    if event_year_idx < 0 or event_year_idx >= len(baseline_path):
+        # Event outside simulation window
+        return {
+            'survived': True,
+            'final_net_worth': baseline_path[-1] if baseline_path else 0,
+            'details': 'Event outside simulation window'
+        }
+
+    # Simplified model: reduce income by ~50% from birth year onward (one parent retires)
+    # And increase expenses by ~30% for care costs
+    income_reduction = 0.5
+    expense_increase = 1.3
+
+    # Net effect: approximately 50% reduction in savings rate
+    # Approximate by reducing net worth growth rate from event year forward
+    stressed_path = baseline_path[:event_year_idx]
+
+    for idx in range(event_year_idx, len(baseline_path)):
+        if idx == event_year_idx:
+            # Initial year: just copy
+            stressed_path.append(baseline_path[idx])
+        else:
+            # Reduce growth by approximating reduced savings
+            baseline_growth = baseline_path[idx] - baseline_path[idx-1]
+            stressed_growth = baseline_growth * 0.5  # Rough estimate
+            stressed_path.append(stressed_path[-1] + stressed_growth)
+
+    final_nw = stressed_path[-1]
+
+    return {
+        'survived': final_nw > 0,
+        'final_net_worth': final_nw,
+        'details': f'At birth in {birth_year}'
+    }
+
+
+def test_unemployment_scenario(baseline_path, percentile_key, parent=1):
+    """Test 3-year unemployment, find worst case timing"""
+
+    worst_year = None
+    worst_final_nw = float('inf')
+    worst_survived = True
+    unemployment_duration = 3
+
+    # Try unemployment starting at each year (except last 2 years where full 3 years can't fit)
+    for start_year_idx in range(len(baseline_path) - unemployment_duration):
+        stressed_path = []
+
+        for idx in range(len(baseline_path)):
+            if start_year_idx <= idx < start_year_idx + unemployment_duration:
+                # During unemployment: reduce income
+                # Simplified: assume this reduces net worth growth significantly
+                if idx == 0:
+                    stressed_path.append(baseline_path[idx])
+                else:
+                    baseline_growth = baseline_path[idx] - baseline_path[idx-1]
+                    # Lost income reduces growth (approximate 50% income loss = 50% growth reduction)
+                    stressed_growth = baseline_growth * 0.5
+                    stressed_path.append(stressed_path[-1] + stressed_growth)
+            else:
+                # Normal years
+                if idx == 0:
+                    stressed_path.append(baseline_path[idx])
+                elif idx < start_year_idx:
+                    stressed_path.append(baseline_path[idx])
+                else:
+                    # After unemployment: continue from stressed base
+                    baseline_growth = baseline_path[idx] - baseline_path[idx-1]
+                    reduction_at_unemployment_end = stressed_path[start_year_idx + unemployment_duration - 1] / baseline_path[start_year_idx + unemployment_duration - 1] if baseline_path[start_year_idx + unemployment_duration - 1] != 0 else 0.5
+                    stressed_path.append(stressed_path[-1] + (baseline_growth * reduction_at_unemployment_end))
+
+        final_nw = stressed_path[-1]
+        survived = final_nw > 0
+
+        if final_nw < worst_final_nw:
+            worst_final_nw = final_nw
+            worst_year = st.session_state.mc_start_year + start_year_idx
+            worst_survived = survived
+
+    return {
+        'survived': worst_survived,
+        'worst_year': worst_year,
+        'final_net_worth': worst_final_nw,
+        'details': f'Worst if starts in {worst_year}'
+    }
+
+
+def display_stress_test_results(results):
+    """Display stress test results in a stoplight table format"""
+
+    st.markdown("""
+    ### 🚦 Resilience Matrix
+    **Green** 🟢 = Plan survives (positive net worth at end)
+    **Red** 🔴 = Plan fails (negative net worth at end)
+    """)
+
+    # Build table data
+    table_data = []
+    percentile_keys = ['10th', '25th', '50th', '75th', '90th']
+
+    for scenario in results:
+        row = {
+            'Scenario': scenario['name'],
+            'Description': scenario['description']
+        }
+
+        # Add results for each percentile
+        for pct_key in percentile_keys:
+            if pct_key in scenario['percentile_results']:
+                result = scenario['percentile_results'][pct_key]
+
+                # Create cell content
+                survived = result['survived']
+                icon = "🟢" if survived else "🔴"
+
+                if scenario['type'] == 'sweep' and 'worst_year' in result:
+                    cell_content = f"{icon}\nYear: {result['worst_year']}\nFinal: ${result['final_net_worth']/1000:.0f}K"
+                else:
+                    cell_content = f"{icon}\nFinal: ${result['final_net_worth']/1000:.0f}K"
+
+                row[pct_key] = cell_content
+            else:
+                row[pct_key] = "N/A"
+
+        table_data.append(row)
+
+    # Create DataFrame
+    import pandas as pd
+    df = pd.DataFrame(table_data)
+
+    # Display as interactive table
+    st.dataframe(
+        df,
+        use_container_width=True,
+        height=min(400, len(table_data) * 100 + 100)
+    )
+
+    # Summary statistics
+    st.markdown("---")
+    st.subheader("📈 Summary")
+
+    total_tests = len(results) * len(percentile_keys)
+    passed_tests = sum(
+        1 for scenario in results
+        for pct_key in percentile_keys
+        if pct_key in scenario['percentile_results'] and scenario['percentile_results'][pct_key]['survived']
+    )
+
+    pass_rate = (passed_tests / total_tests * 100) if total_tests > 0 else 0
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric("Total Tests", total_tests)
+    with col2:
+        st.metric("Passed", f"{passed_tests} 🟢")
+    with col3:
+        st.metric("Pass Rate", f"{pass_rate:.1f}%")
+
+    # Recommendations
+    if pass_rate < 60:
+        st.error("⚠️ **High Risk**: Your financial plan shows significant vulnerability to adverse events. Consider increasing emergency reserves or reducing fixed expenses.")
+    elif pass_rate < 80:
+        st.warning("⚠️ **Moderate Risk**: Some scenarios show vulnerability. Consider stress-testing your assumptions and building larger safety margins.")
+    else:
+        st.success("✅ **Resilient Plan**: Your financial plan shows good resilience to adverse events. Continue monitoring and adjusting as circumstances change.")
 
 
 # NEW TAB 5: Report Export
