@@ -1599,6 +1599,7 @@ def initialize_session_state():
             'Transportation',
             'Entertainment & Activities',
             'Personal Care',
+            'Vacations & Travel',
             'Other Expenses'
         ]
 
@@ -1609,6 +1610,7 @@ def initialize_session_state():
             'Transportation': 12000.0,
             'Entertainment & Activities': 6000.0,
             'Personal Care': 3600.0,
+            'Vacations & Travel': 8000.0,  # Assumes 1-2 vacations per year
             'Other Expenses': 7200.0
         }
 
