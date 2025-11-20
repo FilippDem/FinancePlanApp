@@ -2390,6 +2390,9 @@ def initialize_session_state():
         # NEW: Custom location display names (for user-created cities)
         st.session_state.custom_location_display_names = {}
 
+        # NEW: Custom location coordinates (for world map visualization)
+        st.session_state.custom_location_coordinates = {}
+
         # NEW: Healthcare & Insurance
         st.session_state.health_insurances = []
         st.session_state.ltc_insurances = []
@@ -3475,6 +3478,36 @@ def family_expenses_tab():
             key="new_strategy_name_city"
         )
 
+        # Geographic coordinates for world map
+        st.markdown("---")
+        st.markdown("**🗺️ Geographic Coordinates (Optional)**")
+        st.markdown("Provide coordinates to display this city on the Timeline World Map visualization.")
+
+        coord_col1, coord_col2 = st.columns(2)
+        with coord_col1:
+            new_city_lat = st.number_input(
+                "Latitude",
+                min_value=-90.0,
+                max_value=90.0,
+                value=0.0,
+                step=0.1,
+                key="new_city_lat",
+                help="Latitude: -90 (South Pole) to +90 (North Pole). Use a mapping service to find coordinates."
+            )
+        with coord_col2:
+            new_city_lon = st.number_input(
+                "Longitude",
+                min_value=-180.0,
+                max_value=180.0,
+                value=0.0,
+                step=0.1,
+                key="new_city_lon",
+                help="Longitude: -180 to +180. Negative = West, Positive = East"
+            )
+
+        # Show link to help find coordinates
+        st.info("💡 Tip: Use [Google Maps](https://www.google.com/maps) or [LatLong.net](https://www.latlong.net/) to find coordinates for your city.")
+
         if creation_mode == "Copy from existing template":
             # Select template to copy
             all_templates = {**FAMILY_EXPENSE_TEMPLATES, **st.session_state.custom_family_templates}
@@ -3560,7 +3593,16 @@ def family_expenses_tab():
                 # Save the template
                 st.session_state.custom_family_templates[new_city_name][new_strategy_name_city] = new_template.copy()
 
+                # Save coordinates if provided (not at default 0,0)
+                if new_city_lat != 0.0 or new_city_lon != 0.0:
+                    st.session_state.custom_location_coordinates[new_city_name] = {
+                        'lat': new_city_lat,
+                        'lon': new_city_lon
+                    }
+
                 st.success(f"✅ Created new city: {new_city_name} - {new_strategy_name_city}!")
+                if new_city_lat != 0.0 or new_city_lon != 0.0:
+                    st.info(f"📍 Coordinates saved: {new_city_lat}°, {new_city_lon}° - City will appear on world map!")
                 st.balloons()
                 st.rerun()
 
@@ -4488,10 +4530,15 @@ def timeline_tab():
 
         for entry in sorted(st.session_state.state_timeline, key=lambda x: x.year):
             if entry.state not in seen_states:
+                # Check built-in coordinates first, then custom coordinates
+                coords = LOCATION_COORDINATES.get(entry.state)
+                if coords is None and hasattr(st.session_state, 'custom_location_coordinates'):
+                    coords = st.session_state.custom_location_coordinates.get(entry.state)
+
                 timeline_locations.append({
                     'state': entry.state,
                     'year': entry.year,
-                    'coords': LOCATION_COORDINATES.get(entry.state)
+                    'coords': coords
                 })
                 seen_states.add(entry.state)
 
@@ -4586,7 +4633,13 @@ def timeline_tab():
             loc = valid_locations[0]
             st.info(f"📍 You're staying in **{get_location_display_name(loc['state'])}** throughout the timeline. Add more locations in the table above to see your relocation journey on the map!")
         else:
-            st.warning("⚠️ No valid location coordinates found. Please ensure your timeline includes recognized locations.")
+            # Check if there are locations without coordinates
+            missing_coords = [loc['state'] for loc in timeline_locations if loc['coords'] is None]
+            if missing_coords:
+                st.warning(f"⚠️ The following custom cities are missing coordinates: **{', '.join(missing_coords)}**")
+                st.info("💡 To display custom cities on the world map, edit them in the Family Expenses tab and add their latitude/longitude coordinates.")
+            else:
+                st.warning("⚠️ No valid location coordinates found. Please ensure your timeline includes recognized locations.")
 
     # Show current and future states
     st.subheader("Timeline Summary")
