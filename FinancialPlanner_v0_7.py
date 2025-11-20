@@ -3868,12 +3868,21 @@ def children_tab():
     # Children expense templates preview
     st.subheader("📊 Children Expense Templates Preview")
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     with col1:
         preview_state = st.selectbox("Preview Location", AVAILABLE_LOCATIONS_CHILDREN, key="preview_state")
     with col2:
         preview_strategy = st.selectbox("Preview Strategy", ["Conservative", "Average", "High-end"], key="preview_strategy")
+
+    col3, col4 = st.columns(2)
     with col3:
+        preview_school_type = st.selectbox(
+            "K-12 School Type",
+            ["Public", "Private"],
+            key="preview_school_type",
+            help="Private schools typically add $10k-30k/year to education costs (ages 5-17)"
+        )
+    with col4:
         preview_college_type = st.selectbox(
             "College Type",
             ["Public", "Private"],
@@ -3883,6 +3892,27 @@ def children_tab():
 
     if preview_state in CHILDREN_EXPENSE_TEMPLATES and preview_strategy in CHILDREN_EXPENSE_TEMPLATES[preview_state]:
         template = CHILDREN_EXPENSE_TEMPLATES[preview_state][preview_strategy].copy()
+
+        # Adjust for private K-12 school (ages 5-17)
+        if preview_school_type == "Private":
+            # Add private school tuition based on location
+            private_school_costs = {
+                'Seattle': 20000,
+                'Sacramento': 15000,
+                'Houston': 12000,
+                'New York': 30000,
+                'San Francisco': 28000,
+                'Los Angeles': 22000,
+                'Portland': 18000,
+                'Auckland': 16000,
+                'Wellington': 15000
+            }
+            additional_tuition = private_school_costs.get(preview_state, 20000)
+
+            # Apply to ages 5-17 (indices 5-17)
+            for age in range(5, 18):
+                if age < len(template['Education']):
+                    template['Education'][age] += additional_tuition
 
         # Adjust education costs based on college type
         if preview_college_type == "Private":
@@ -3907,7 +3937,7 @@ def children_tab():
             name="Total Annual Expenses"
         ))
         fig.update_layout(
-            title=f"Total Annual Child Expenses by Age - {preview_state} {preview_strategy} ({preview_college_type} College)",
+            title=f"Total Annual Child Expenses by Age - {preview_state} {preview_strategy}<br>({preview_school_type} K-12, {preview_college_type} College)",
             xaxis_title="Child Age",
             yaxis_title="Annual Expenses ($)",
             height=400
