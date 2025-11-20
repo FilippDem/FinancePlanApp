@@ -1952,7 +1952,17 @@ def initialize_session_state():
                 'real_estate': 3.0,  # REITs
                 'other': 0.0
             },
-            'major_purchases': [],
+            'major_purchases': [
+                {
+                    'name': "Olivia's Wedding",
+                    'year': current_year + 18,
+                    'amount': 32000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                }
+            ],
             'recurring_expenses': [
                 {
                     'name': 'Family Vehicle',
@@ -2078,7 +2088,17 @@ def initialize_session_state():
                 'real_estate': 5.0,  # REITs
                 'other': 3.0  # Commodities
             },
-            'major_purchases': [],
+            'major_purchases': [
+                {
+                    'name': "Isabella's Wedding Reception",
+                    'year': current_year + 12,
+                    'amount': 75000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                }
+            ],
             'recurring_expenses': [
                 {
                     'name': 'Luxury Vehicles',
@@ -2282,7 +2302,17 @@ def initialize_session_state():
                 'real_estate': 3.0,  # REITs
                 'other': 0.0
             },
-            'major_purchases': [],
+            'major_purchases': [
+                {
+                    'name': "Adult Child's Wedding Gift",
+                    'year': current_year + 3,
+                    'amount': 25000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                }
+            ],
             'recurring_expenses': [
                 {
                     'name': 'Healthcare Premiums',
