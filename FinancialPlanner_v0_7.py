@@ -6755,6 +6755,7 @@ def tax_optimization_tab():
         col2.metric("Estimated Annual Tax Savings", format_currency(total_annual_savings))
 
 # STRESS TEST TAB: Test financial resilience against rare adverse events
+# STRESS TEST TAB: Test financial resilience against rare adverse events
 def stress_test_tab():
     """Stress Test Events - Test financial plan against rare adverse scenarios"""
     st.header("🧪 Stress Test Events")
@@ -6763,6 +6764,8 @@ def stress_test_tab():
     Test your financial plan's resilience against rare but severe adverse events.
     Each scenario applies a specific stress event to your Monte Carlo percentile paths
     and checks if your net worth remains positive through the end of the projection period.
+
+    **Scenarios are organized into three tiers based on impact severity and likelihood.**
     """)
 
     # Check if Monte Carlo results exist
@@ -6779,114 +6782,444 @@ def stress_test_tab():
         st.error("No percentile data found. Please re-run Monte Carlo simulation.")
         return
 
-    # Configuration
+    # Initialize session state for scenario configuration
+    if 'stress_test_config' not in st.session_state:
+        st.session_state.stress_test_config = {}
+
     st.subheader("⚙️ Stress Test Configuration")
 
-    col1, col2 = st.columns(2)
+    # Tier selection
+    st.markdown("### Select Scenario Tiers to Test")
+    tier_col1, tier_col2, tier_col3 = st.columns(3)
 
-    with col1:
-        test_net_worth_loss = st.checkbox("💥 50% Net Worth Loss", value=True,
-                                          help="Test impact of sudden 50% loss in net worth for both parents")
-        test_disabled_child = st.checkbox("👶 Disabled Child Birth", value=True,
-                                         help="Test impact of having a disabled child requiring one parent to retire")
+    with tier_col1:
+        test_tier1 = st.checkbox("🔴 **Tier 1: Critical Events**", value=True, help="High impact, moderate probability")
+    with tier_col2:
+        test_tier2 = st.checkbox("🟡 **Tier 2: Major Events**", value=True, help="Significant impact events")
+    with tier_col3:
+        test_tier3 = st.checkbox("🟢 **Tier 3: Important Events**", value=False, help="Moderate impact events")
 
-    with col2:
-        test_unemployment_p1 = st.checkbox("❌ Parent 1 Unemployment (3 years)", value=True,
-                                          help="Test 3-year forced unemployment for Parent 1")
-        test_unemployment_p2 = st.checkbox("❌ Parent 2 Unemployment (3 years)", value=True,
-                                          help="Test 3-year forced unemployment for Parent 2")
+    # TIER 1: CRITICAL EVENTS
+    tier1_scenarios = {}
+    if test_tier1:
+        with st.expander("🔴 Tier 1: Critical Events - Configure", expanded=False):
+            st.markdown("**High impact events with moderate probability**")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                # Critical Illness
+                tier1_scenarios['critical_illness'] = st.checkbox(
+                    "🏥 Critical Illness / Major Medical Event",
+                    value=True,
+                    help="Major medical event requiring expensive treatment"
+                )
+                if tier1_scenarios['critical_illness']:
+                    st.session_state.stress_test_config['illness_severity'] = st.slider(
+                        "Medical Cost Severity",
+                        min_value=50000,
+                        max_value=500000,
+                        value=200000,
+                        step=25000,
+                        format="$%d",
+                        help="Total medical costs over treatment period",
+                        key="illness_sev"
+                    )
+                    st.session_state.stress_test_config['illness_duration'] = st.slider(
+                        "Treatment Duration (years)",
+                        min_value=1,
+                        max_value=5,
+                        value=3,
+                        key="illness_dur"
+                    )
+
+                # Lost Decade
+                tier1_scenarios['lost_decade'] = st.checkbox(
+                    "📉 Lost Decade (Stagnant Markets)",
+                    value=True,
+                    help="Stock market returns 0-2% for 10 consecutive years"
+                )
+
+                # Career Collapse
+                tier1_scenarios['career_collapse'] = st.checkbox(
+                    "💼 Career Industry Collapse",
+                    value=True,
+                    help="Industry disruption forces career change at lower salary"
+                )
+                if tier1_scenarios['career_collapse']:
+                    st.session_state.stress_test_config['salary_reduction'] = st.slider(
+                        "Permanent Salary Reduction %",
+                        min_value=20,
+                        max_value=70,
+                        value=50,
+                        step=5,
+                        key="career_reduction"
+                    )
+
+            with col2:
+                # Long-Term Care
+                tier1_scenarios['long_term_care'] = st.checkbox(
+                    "🏥 Long-Term Care Need",
+                    value=True,
+                    help="One parent requires assisted living or nursing home care"
+                )
+                if tier1_scenarios['long_term_care']:
+                    st.session_state.stress_test_config['ltc_annual_cost'] = st.slider(
+                        "Annual LTC Cost",
+                        min_value=50000,
+                        max_value=150000,
+                        value=100000,
+                        step=10000,
+                        format="$%d",
+                        key="ltc_cost"
+                    )
+                    st.session_state.stress_test_config['ltc_duration'] = st.slider(
+                        "Care Duration (years)",
+                        min_value=3,
+                        max_value=15,
+                        value=8,
+                        key="ltc_duration"
+                    )
+
+                # Divorce/Separation
+                tier1_scenarios['divorce'] = st.checkbox(
+                    "💔 Divorce / Separation",
+                    value=True,
+                    help="Marriage ends, assets split, dual household expenses"
+                )
+                if tier1_scenarios['divorce']:
+                    st.session_state.stress_test_config['asset_split'] = st.slider(
+                        "Asset Split % (your share)",
+                        min_value=30,
+                        max_value=70,
+                        value=50,
+                        step=5,
+                        key="divorce_split"
+                    )
+
+    # TIER 2: MAJOR EVENTS
+    tier2_scenarios = {}
+    if test_tier2:
+        with st.expander("🟡 Tier 2: Major Events - Configure", expanded=False):
+            st.markdown("**Significant impact events**")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                # Major Home Disaster
+                tier2_scenarios['home_disaster'] = st.checkbox(
+                    "🏠 Major Home Disaster",
+                    value=True,
+                    help="Fire, flood, or other disaster requiring major repairs/rebuild"
+                )
+                if tier2_scenarios['home_disaster']:
+                    st.session_state.stress_test_config['disaster_cost'] = st.slider(
+                        "Uninsured Damage Cost",
+                        min_value=50000,
+                        max_value=300000,
+                        value=150000,
+                        step=25000,
+                        format="$%d",
+                        key="disaster_cost"
+                    )
+
+                # Failed Business Venture
+                tier2_scenarios['failed_business'] = st.checkbox(
+                    "💸 Failed Business Venture",
+                    value=True,
+                    help="Entrepreneurship attempt fails, capital lost, delayed return to employment"
+                )
+                if tier2_scenarios['failed_business']:
+                    st.session_state.stress_test_config['business_capital'] = st.slider(
+                        "Investment Capital Lost",
+                        min_value=25000,
+                        max_value=500000,
+                        value=100000,
+                        step=25000,
+                        format="$%d",
+                        key="biz_capital"
+                    )
+                    st.session_state.stress_test_config['business_years'] = st.slider(
+                        "Years Before Return to Employment",
+                        min_value=1,
+                        max_value=5,
+                        value=3,
+                        key="biz_years"
+                    )
+
+                # Unexpected Additional Children
+                tier2_scenarios['twins_triplets'] = st.checkbox(
+                    "👶👶 Unexpected Additional Children",
+                    value=True,
+                    help="Twins or triplets instead of single child"
+                )
+                if tier2_scenarios['twins_triplets']:
+                    st.session_state.stress_test_config['multiple_birth'] = st.selectbox(
+                        "Multiple Birth Type",
+                        options=["Twins", "Triplets"],
+                        key="multiple_type"
+                    )
+
+            with col2:
+                # Social Security Insolvency
+                tier2_scenarios['ss_insolvency'] = st.checkbox(
+                    "📊 Social Security Severe Insolvency",
+                    value=True,
+                    help="SS benefits cut more severely than baseline assumptions"
+                )
+                if tier2_scenarios['ss_insolvency']:
+                    st.session_state.stress_test_config['ss_cut_percent'] = st.slider(
+                        "Benefit Reduction %",
+                        min_value=30,
+                        max_value=75,
+                        value=50,
+                        step=5,
+                        key="ss_cut"
+                    )
+
+                # Child with Learning Disabilities
+                tier2_scenarios['learning_disability'] = st.checkbox(
+                    "🎓 Child with Learning Disabilities",
+                    value=True,
+                    help="Child requires expensive specialized education and extended support"
+                )
+                if tier2_scenarios['learning_disability']:
+                    st.session_state.stress_test_config['special_ed_annual'] = st.slider(
+                        "Annual Special Education Cost",
+                        min_value=15000,
+                        max_value=60000,
+                        value=40000,
+                        step=5000,
+                        format="$%d",
+                        key="special_ed"
+                    )
+
+    # TIER 3: IMPORTANT EVENTS
+    tier3_scenarios = {}
+    if test_tier3:
+        with st.expander("🟢 Tier 3: Important Events - Configure", expanded=False):
+            st.markdown("**Moderate impact events**")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                # Boomerang Adult Child
+                tier3_scenarios['boomerang_child'] = st.checkbox(
+                    "🏠 Boomerang Adult Child",
+                    value=True,
+                    help="Adult child moves back home, requiring financial support"
+                )
+                if tier3_scenarios['boomerang_child']:
+                    st.session_state.stress_test_config['boomerang_annual_cost'] = st.slider(
+                        "Annual Support Cost",
+                        min_value=10000,
+                        max_value=40000,
+                        value=20000,
+                        step=5000,
+                        format="$%d",
+                        key="boomerang_cost"
+                    )
+                    st.session_state.stress_test_config['boomerang_duration'] = st.slider(
+                        "Duration (years)",
+                        min_value=1,
+                        max_value=5,
+                        value=3,
+                        key="boomerang_years"
+                    )
+
+                # 50% Net Worth Loss (original scenario)
+                tier3_scenarios['net_worth_loss'] = st.checkbox(
+                    "💥 50% Net Worth Loss",
+                    value=True,
+                    help="Sudden market crash or major financial loss"
+                )
+
+            with col2:
+                # Graduate School Requirements
+                tier3_scenarios['grad_school'] = st.checkbox(
+                    "🎓 Graduate School Requirements",
+                    value=True,
+                    help="Child requires expensive graduate/professional school"
+                )
+                if tier3_scenarios['grad_school']:
+                    st.session_state.stress_test_config['grad_school_cost'] = st.slider(
+                        "Total Graduate School Cost",
+                        min_value=50000,
+                        max_value=400000,
+                        value=200000,
+                        step=25000,
+                        format="$%d",
+                        key="grad_cost"
+                    )
+                    st.session_state.stress_test_config['grad_school_years'] = st.slider(
+                        "Graduate School Duration",
+                        min_value=2,
+                        max_value=7,
+                        value=4,
+                        key="grad_years"
+                    )
+
+    # COMPOUND SCENARIOS
+    st.markdown("---")
+    st.subheader("🔗 Compound Scenarios")
+    st.markdown("Test multiple adverse events happening together")
+
+    enable_compound = st.checkbox("Enable Compound Scenario Testing", value=False,
+                                  help="Test combinations of 2-3 events occurring simultaneously")
+
+    compound_scenarios = []
+    if enable_compound:
+        # Build list of all enabled scenarios
+        all_scenarios = []
+        if test_tier1:
+            for key, enabled in tier1_scenarios.items():
+                if enabled:
+                    all_scenarios.append((key, get_scenario_display_name(key)))
+        if test_tier2:
+            for key, enabled in tier2_scenarios.items():
+                if enabled:
+                    all_scenarios.append((key, get_scenario_display_name(key)))
+        if test_tier3:
+            for key, enabled in tier3_scenarios.items():
+                if enabled:
+                    all_scenarios.append((key, get_scenario_display_name(key)))
+
+        if len(all_scenarios) < 2:
+            st.warning("Enable at least 2 scenarios above to create compound scenarios")
+        else:
+            st.markdown("**Create up to 3 compound scenario combinations:**")
+
+            scenario_names = [name for key, name in all_scenarios]
+            scenario_keys = [key for key, name in all_scenarios]
+
+            for i in range(3):
+                col1, col2, col3 = st.columns([1, 1, 1])
+
+                with col1:
+                    event1 = st.selectbox(
+                        f"Compound {i+1} - Event 1",
+                        options=["None"] + scenario_names,
+                        key=f"compound_{i}_event1"
+                    )
+
+                with col2:
+                    event2 = st.selectbox(
+                        f"Compound {i+1} - Event 2",
+                        options=["None"] + scenario_names,
+                        key=f"compound_{i}_event2"
+                    )
+
+                with col3:
+                    event3 = st.selectbox(
+                        f"Compound {i+1} - Event 3 (optional)",
+                        options=["None"] + scenario_names,
+                        key=f"compound_{i}_event3"
+                    )
+
+                # Convert display names back to keys
+                if event1 != "None" and event2 != "None":
+                    event1_key = scenario_keys[scenario_names.index(event1)]
+                    event2_key = scenario_keys[scenario_names.index(event2)]
+                    event3_key = scenario_keys[scenario_names.index(event3)] if event3 != "None" else None
+
+                    compound_name = f"{event1}"
+                    compound_events = [event1_key, event2_key]
+                    if event3_key:
+                        compound_name += f" + {event2} + {event3}"
+                        compound_events.append(event3_key)
+                    else:
+                        compound_name += f" + {event2}"
+
+                    compound_scenarios.append({
+                        'name': f"🔗 {compound_name}",
+                        'events': compound_events
+                    })
 
     # Run button
-    if st.button("🧪 Run Stress Tests", type="primary", use_container_width=True):
-        with st.spinner("Running stress test scenarios..."):
+    st.markdown("---")
+    if st.button("🧪 Run All Stress Tests", type="primary", use_container_width=True):
+        with st.spinner("Running comprehensive stress test scenarios... This may take a minute."):
+            # Combine all enabled scenarios
+            enabled_scenarios = {}
+            if test_tier1:
+                enabled_scenarios.update(tier1_scenarios)
+            if test_tier2:
+                enabled_scenarios.update(tier2_scenarios)
+            if test_tier3:
+                enabled_scenarios.update(tier3_scenarios)
+
             # Run all stress tests
-            results = run_stress_tests(
+            results = run_comprehensive_stress_tests(
                 percentiles_data,
-                test_net_worth_loss=test_net_worth_loss,
-                test_disabled_child=test_disabled_child,
-                test_unemployment_p1=test_unemployment_p1,
-                test_unemployment_p2=test_unemployment_p2
+                enabled_scenarios,
+                st.session_state.stress_test_config,
+                compound_scenarios
             )
 
             st.session_state.stress_test_results = results
-            st.success("✅ Stress tests complete!")
+            st.success(f"✅ Stress tests complete! {len(results)} scenarios tested.")
 
     # Display results if available
     if 'stress_test_results' in st.session_state and st.session_state.stress_test_results:
         st.markdown("---")
-        st.subheader("📊 Stress Test Results")
-
         display_stress_test_results(st.session_state.stress_test_results)
 
 
-def run_stress_tests(percentiles_data, test_net_worth_loss=True, test_disabled_child=True,
-                     test_unemployment_p1=True, test_unemployment_p2=True):
+def get_scenario_display_name(scenario_key):
+    """Get display name for scenario key"""
+    names = {
+        'critical_illness': '🏥 Critical Illness',
+        'lost_decade': '📉 Lost Decade',
+        'career_collapse': '💼 Career Collapse',
+        'long_term_care': '🏥 Long-Term Care',
+        'divorce': '💔 Divorce',
+        'home_disaster': '🏠 Home Disaster',
+        'failed_business': '💸 Failed Business',
+        'twins_triplets': '👶👶 Multiple Birth',
+        'ss_insolvency': '📊 SS Insolvency',
+        'learning_disability': '🎓 Learning Disability',
+        'boomerang_child': '🏠 Boomerang Child',
+        'net_worth_loss': '💥 Net Worth Loss',
+        'grad_school': '🎓 Graduate School'
+    }
+    return names.get(scenario_key, scenario_key)
+def run_comprehensive_stress_tests(percentiles_data, enabled_scenarios, config, compound_scenarios):
     """Run all enabled stress tests and return results"""
 
     results = []
     percentile_keys = ['10th', '25th', '50th', '75th', '90th']
 
-    # Test 1: 50% Net Worth Loss
-    if test_net_worth_loss:
+    # Run individual scenarios
+    for scenario_key, enabled in enabled_scenarios.items():
+        if not enabled:
+            continue
+
         scenario_results = {
-            'name': '💥 50% Net Worth Loss',
-            'description': 'Sudden 50% loss in net worth (both parents)',
-            'type': 'sweep',  # Indicates we test across all years
+            'name': get_scenario_display_name(scenario_key),
+            'description': get_scenario_description(scenario_key, config),
+            'type': get_scenario_type(scenario_key),
             'percentile_results': {}
         }
 
         for pct_key in percentile_keys:
             if pct_key in percentiles_data:
-                result = test_net_worth_loss_scenario(percentiles_data[pct_key], pct_key)
+                result = run_single_scenario(scenario_key, percentiles_data[pct_key], pct_key, config)
                 scenario_results['percentile_results'][pct_key] = result
 
         results.append(scenario_results)
 
-    # Test 2: Disabled Child scenarios (one for each child)
-    if test_disabled_child and st.session_state.children_list:
-        for i, child in enumerate(st.session_state.children_list):
-            scenario_results = {
-                'name': f'👶 Disabled Child: {child["name"]}',
-                'description': f'Birth of disabled {child["name"]} (one parent retires immediately)',
-                'type': 'fixed',
-                'percentile_results': {}
-            }
-
-            for pct_key in percentile_keys:
-                if pct_key in percentiles_data:
-                    result = test_disabled_child_scenario(percentiles_data[pct_key], pct_key, child)
-                    scenario_results['percentile_results'][pct_key] = result
-
-            results.append(scenario_results)
-
-    # Test 3: Parent 1 Unemployment
-    if test_unemployment_p1:
+    # Run compound scenarios
+    for compound in compound_scenarios:
         scenario_results = {
-            'name': f'❌ {st.session_state.parent1_name} Unemployment (3 years)',
-            'description': f'{st.session_state.parent1_name} loses job for 3 consecutive years',
-            'type': 'sweep',
+            'name': compound['name'],
+            'description': 'Multiple concurrent adverse events',
+            'type': 'compound',
             'percentile_results': {}
         }
 
         for pct_key in percentile_keys:
             if pct_key in percentiles_data:
-                result = test_unemployment_scenario(percentiles_data[pct_key], pct_key, parent=1)
-                scenario_results['percentile_results'][pct_key] = result
-
-        results.append(scenario_results)
-
-    # Test 4: Parent 2 Unemployment
-    if test_unemployment_p2:
-        scenario_results = {
-            'name': f'❌ {st.session_state.parent2_name} Unemployment (3 years)',
-            'description': f'{st.session_state.parent2_name} loses job for 3 consecutive years',
-            'type': 'sweep',
-            'percentile_results': {}
-        }
-
-        for pct_key in percentile_keys:
-            if pct_key in percentiles_data:
-                result = test_unemployment_scenario(percentiles_data[pct_key], pct_key, parent=2)
+                result = run_compound_scenario(compound['events'], percentiles_data[pct_key], pct_key, config)
                 scenario_results['percentile_results'][pct_key] = result
 
         results.append(scenario_results)
@@ -6894,187 +7227,650 @@ def run_stress_tests(percentiles_data, test_net_worth_loss=True, test_disabled_c
     return results
 
 
-def test_net_worth_loss_scenario(baseline_path, percentile_key):
-    """Test 50% net worth loss applied at various years, find worst case"""
+def run_single_scenario(scenario_key, baseline_path, percentile_key, config):
+    """Route to appropriate scenario test function"""
 
-    # Baseline path is a list of net worth values for each year
-    worst_year = None
-    worst_final_nw = float('inf')
-    worst_survived = True
-
-    # Try applying the shock at each year
-    for shock_year_idx in range(len(baseline_path)):
-        # Create a copy and apply 50% loss at this year
-        stressed_path = baseline_path[:shock_year_idx] + [baseline_path[shock_year_idx] * 0.5]
-
-        # Continue projection from this reduced amount
-        # Simplified: assume same growth pattern as baseline, but from reduced base
-        if shock_year_idx < len(baseline_path) - 1:
-            reduction_factor = stressed_path[shock_year_idx] / baseline_path[shock_year_idx] if baseline_path[shock_year_idx] != 0 else 0.5
-
-            for future_idx in range(shock_year_idx + 1, len(baseline_path)):
-                stressed_path.append(baseline_path[future_idx] * reduction_factor)
-
-        final_nw = stressed_path[-1]
-        survived = final_nw > 0
-
-        # Track worst case (lowest final net worth)
-        if final_nw < worst_final_nw:
-            worst_final_nw = final_nw
-            worst_year = st.session_state.mc_start_year + shock_year_idx
-            worst_survived = survived
-
-    return {
-        'survived': worst_survived,
-        'worst_year': worst_year,
-        'final_net_worth': worst_final_nw,
-        'details': f"Worst if event occurs in {worst_year}"
+    scenario_functions = {
+        'critical_illness': test_critical_illness_scenario,
+        'lost_decade': test_lost_decade_scenario,
+        'career_collapse': test_career_collapse_scenario,
+        'long_term_care': test_long_term_care_scenario,
+        'divorce': test_divorce_scenario,
+        'home_disaster': test_home_disaster_scenario,
+        'failed_business': test_failed_business_scenario,
+        'twins_triplets': test_twins_triplets_scenario,
+        'ss_insolvency': test_ss_insolvency_scenario,
+        'learning_disability': test_learning_disability_scenario,
+        'boomerang_child': test_boomerang_child_scenario,
+        'net_worth_loss': test_net_worth_loss_scenario,
+        'grad_school': test_grad_school_scenario
     }
 
+    func = scenario_functions.get(scenario_key)
+    if func:
+        return func(baseline_path, percentile_key, config)
+    else:
+        return {'survived': True, 'final_net_worth': baseline_path[-1], 'details': 'Not implemented'}
 
-def test_disabled_child_scenario(baseline_path, percentile_key, child):
-    """Test impact of disabled child birth - one parent retires immediately"""
 
-    # Child birth year
-    birth_year = child['birth_year']
-    event_year_idx = birth_year - st.session_state.mc_start_year
+def run_compound_scenario(event_keys, baseline_path, percentile_key, config):
+    """Run multiple scenarios combined"""
 
-    if event_year_idx < 0 or event_year_idx >= len(baseline_path):
-        # Event outside simulation window
-        return {
-            'survived': True,
-            'final_net_worth': baseline_path[-1] if baseline_path else 0,
-            'details': 'Event outside simulation window'
-        }
+    # Apply each scenario's impact sequentially
+    stressed_path = baseline_path.copy()
 
-    # Simplified model: reduce income by ~50% from birth year onward (one parent retires)
-    # And increase expenses by ~30% for care costs
-    income_reduction = 0.5
-    expense_increase = 1.3
+    worst_year = None
+    impact_description = []
 
-    # Net effect: approximately 50% reduction in savings rate
-    # Approximate by reducing net worth growth rate from event year forward
-    stressed_path = baseline_path[:event_year_idx]
+    for event_key in event_keys:
+        # Apply this event's impact
+        result = run_single_scenario(event_key, stressed_path, percentile_key, config)
 
-    for idx in range(event_year_idx, len(baseline_path)):
-        if idx == event_year_idx:
-            # Initial year: just copy
-            stressed_path.append(baseline_path[idx])
-        else:
-            # Reduce growth by approximating reduced savings
-            baseline_growth = baseline_path[idx] - baseline_path[idx-1]
-            stressed_growth = baseline_growth * 0.5  # Rough estimate
-            stressed_path.append(stressed_path[-1] + stressed_growth)
+        # Update the stressed path for next event
+        # Simplified: use the result's impact to modify path
+        if result.get('worst_year'):
+            impact_description.append(f"{event_key} in {result['worst_year']}")
+        stressed_path = apply_scenario_impact(event_key, stressed_path, config)
 
     final_nw = stressed_path[-1]
 
     return {
         'survived': final_nw > 0,
         'final_net_worth': final_nw,
-        'details': f'At birth in {birth_year}'
+        'details': f"Combined impact: {', '.join(impact_description[:2])}"
     }
 
 
-def test_unemployment_scenario(baseline_path, percentile_key, parent=1):
-    """Test 3-year unemployment, find worst case timing"""
+def apply_scenario_impact(scenario_key, baseline_path, config):
+    """Apply a scenario's impact to a path (helper for compound scenarios)"""
+
+    # Simplified impact application
+    # Real implementation would track year-by-year changes
+
+    if scenario_key == 'critical_illness':
+        cost = config.get('illness_severity', 200000)
+        duration = config.get('illness_duration', 3)
+        annual_cost = cost / duration
+
+        stressed = baseline_path.copy()
+        for i in range(min(duration, len(stressed))):
+            stressed[i] = max(0, stressed[i] - annual_cost * (i + 1))
+        return stressed
+
+    elif scenario_key == 'net_worth_loss':
+        # Apply 50% loss at worst year
+        mid_point = len(baseline_path) // 2
+        stressed = baseline_path.copy()
+        stressed[mid_point] = stressed[mid_point] * 0.5
+        reduction = 0.5
+        for i in range(mid_point + 1, len(stressed)):
+            stressed[i] = stressed[i] * reduction
+        return stressed
+
+    else:
+        # Default: reduce growth by 20%
+        return [val * 0.8 for val in baseline_path]
+
+
+# TIER 1 SCENARIO IMPLEMENTATIONS
+
+def test_critical_illness_scenario(baseline_path, percentile_key, config):
+    """Test major medical event with expensive treatment"""
+
+    total_cost = config.get('illness_severity', 200000)
+    duration = config.get('illness_duration', 3)
+    annual_cost = total_cost / duration
+
+    # Reduce income by 25% during treatment (one parent working less)
+    income_reduction = 0.25
 
     worst_year = None
     worst_final_nw = float('inf')
-    worst_survived = True
-    unemployment_duration = 3
 
-    # Try unemployment starting at each year (except last 2 years where full 3 years can't fit)
-    for start_year_idx in range(len(baseline_path) - unemployment_duration):
+    # Try illness starting at each year
+    for start_idx in range(len(baseline_path) - duration):
         stressed_path = []
 
         for idx in range(len(baseline_path)):
-            if start_year_idx <= idx < start_year_idx + unemployment_duration:
-                # During unemployment: reduce income
-                # Simplified: assume this reduces net worth growth significantly
+            if start_idx <= idx < start_idx + duration:
+                # During illness
                 if idx == 0:
-                    stressed_path.append(baseline_path[idx])
+                    stressed_path.append(baseline_path[idx] - annual_cost)
                 else:
                     baseline_growth = baseline_path[idx] - baseline_path[idx-1]
-                    # Lost income reduces growth (approximate 50% income loss = 50% growth reduction)
-                    stressed_growth = baseline_growth * 0.5
-                    stressed_path.append(stressed_path[-1] + stressed_growth)
+                    # Reduced growth due to lower income + medical costs
+                    stressed_growth = baseline_growth * (1 - income_reduction)
+                    stressed_path.append(max(0, stressed_path[-1] + stressed_growth - annual_cost))
             else:
                 # Normal years
                 if idx == 0:
                     stressed_path.append(baseline_path[idx])
-                elif idx < start_year_idx:
+                elif idx < start_idx:
                     stressed_path.append(baseline_path[idx])
                 else:
-                    # After unemployment: continue from stressed base
+                    # After illness: continue from reduced base
                     baseline_growth = baseline_path[idx] - baseline_path[idx-1]
-                    reduction_at_unemployment_end = stressed_path[start_year_idx + unemployment_duration - 1] / baseline_path[start_year_idx + unemployment_duration - 1] if baseline_path[start_year_idx + unemployment_duration - 1] != 0 else 0.5
-                    stressed_path.append(stressed_path[-1] + (baseline_growth * reduction_at_unemployment_end))
+                    reduction = stressed_path[start_idx + duration - 1] / baseline_path[start_idx + duration - 1] if baseline_path[start_idx + duration - 1] != 0 else 0.7
+                    stressed_path.append(stressed_path[-1] + (baseline_growth * reduction))
 
         final_nw = stressed_path[-1]
-        survived = final_nw > 0
-
         if final_nw < worst_final_nw:
             worst_final_nw = final_nw
-            worst_year = st.session_state.mc_start_year + start_year_idx
-            worst_survived = survived
+            worst_year = st.session_state.mc_start_year + start_idx
 
     return {
-        'survived': worst_survived,
+        'survived': worst_final_nw > 0,
         'worst_year': worst_year,
         'final_net_worth': worst_final_nw,
-        'details': f'Worst if starts in {worst_year}'
+        'details': f"${total_cost:,.0f} over {duration}yr, worst if starts {worst_year}"
     }
+
+
+def test_lost_decade_scenario(baseline_path, percentile_key, config):
+    """Test 10 years of near-zero market returns"""
+
+    decade_duration = 10
+    worst_year = None
+    worst_final_nw = float('inf')
+
+    # Try lost decade starting at each year
+    for start_idx in range(len(baseline_path) - decade_duration):
+        stressed_path = []
+
+        for idx in range(len(baseline_path)):
+            if start_idx <= idx < start_idx + decade_duration:
+                # During lost decade: minimal market growth (1% instead of normal)
+                if idx == 0:
+                    stressed_path.append(baseline_path[idx])
+                else:
+                    # Calculate what portion of baseline growth was market vs. contributions
+                    baseline_growth = baseline_path[idx] - baseline_path[idx-1]
+                    # Assume 70% of growth is market, 30% is contributions
+                    market_growth = baseline_growth * 0.7
+                    contribution_growth = baseline_growth * 0.3
+                    # Replace market growth with minimal growth
+                    stressed_growth = (market_growth * 0.1) + contribution_growth
+                    stressed_path.append(stressed_path[-1] + stressed_growth)
+            else:
+                if idx < start_idx:
+                    stressed_path.append(baseline_path[idx])
+                else:
+                    # After lost decade: normal growth from reduced base
+                    baseline_growth = baseline_path[idx] - baseline_path[idx-1]
+                    reduction = stressed_path[start_idx + decade_duration - 1] / baseline_path[start_idx + decade_duration - 1] if baseline_path[start_idx + decade_duration - 1] != 0 else 0.7
+                    stressed_path.append(stressed_path[-1] + (baseline_growth * reduction))
+
+        final_nw = stressed_path[-1]
+        if final_nw < worst_final_nw:
+            worst_final_nw = final_nw
+            worst_year = st.session_state.mc_start_year + start_idx
+
+    return {
+        'survived': worst_final_nw > 0,
+        'worst_year': worst_year,
+        'final_net_worth': worst_final_nw,
+        'details': f"10yr stagnation, worst if starts {worst_year}"
+    }
+
+
+def test_career_collapse_scenario(baseline_path, percentile_key, config):
+    """Test career disruption forcing salary reduction"""
+
+    salary_reduction_pct = config.get('salary_reduction', 50) / 100.0
+    career_change_age = 45  # Typical mid-career
+
+    # Find year when primary earner is around 45
+    change_year_idx = min(10, len(baseline_path) // 3)  # Simplified
+
+    stressed_path = baseline_path[:change_year_idx]
+
+    for idx in range(change_year_idx, len(baseline_path)):
+        baseline_growth = baseline_path[idx] - baseline_path[idx-1]
+        # Reduced growth due to lower income
+        stressed_growth = baseline_growth * (1 - salary_reduction_pct * 0.5)  # Impact is 50% of salary reduction
+        stressed_path.append(stressed_path[-1] + stressed_growth)
+
+    final_nw = stressed_path[-1]
+    change_year = st.session_state.mc_start_year + change_year_idx
+
+    return {
+        'survived': final_nw > 0,
+        'worst_year': change_year,
+        'final_net_worth': final_nw,
+        'details': f"{salary_reduction_pct*100:.0f}% salary cut at {change_year}"
+    }
+
+
+def test_long_term_care_scenario(baseline_path, percentile_key, config):
+    """Test long-term care need for one parent"""
+
+    annual_cost = config.get('ltc_annual_cost', 100000)
+    duration = config.get('ltc_duration', 8)
+
+    # LTC typically starts after age 75
+    # Assume starts in last third of projection
+    start_idx = max(0, len(baseline_path) - duration - 5)
+
+    stressed_path = baseline_path[:start_idx]
+
+    for idx in range(start_idx, min(start_idx + duration, len(baseline_path))):
+        baseline_growth = baseline_path[idx] - baseline_path[idx-1] if idx > 0 else 0
+        stressed_path.append(max(0, stressed_path[-1] + baseline_growth - annual_cost))
+
+    # Continue after LTC if path continues
+    for idx in range(len(stressed_path), len(baseline_path)):
+        baseline_growth = baseline_path[idx] - baseline_path[idx-1]
+        reduction = stressed_path[-1] / baseline_path[len(stressed_path)-1] if baseline_path[len(stressed_path)-1] != 0 else 0.6
+        stressed_path.append(stressed_path[-1] + (baseline_growth * reduction))
+
+    final_nw = stressed_path[-1]
+    start_year = st.session_state.mc_start_year + start_idx
+
+    return {
+        'survived': final_nw > 0,
+        'worst_year': start_year,
+        'final_net_worth': final_nw,
+        'details': f"${annual_cost:,.0f}/yr for {duration}yr starting {start_year}"
+    }
+
+
+def test_divorce_scenario(baseline_path, percentile_key, config):
+    """Test divorce with asset split and increased expenses"""
+
+    asset_split_pct = config.get('asset_split', 50) / 100.0
+    divorce_year_idx = min(15, len(baseline_path) // 2)  # Assume mid-life
+
+    # Apply asset split
+    stressed_path = baseline_path[:divorce_year_idx]
+    stressed_path[divorce_year_idx-1] = stressed_path[divorce_year_idx-1] * asset_split_pct
+
+    # After divorce: higher expenses due to maintaining separate household
+    # Reduces savings rate by ~30%
+    for idx in range(divorce_year_idx, len(baseline_path)):
+        baseline_growth = baseline_path[idx] - baseline_path[idx-1]
+        stressed_growth = baseline_growth * 0.7  # 30% reduction in savings rate
+        stressed_path.append(stressed_path[-1] + stressed_growth)
+
+    final_nw = stressed_path[-1]
+    divorce_year = st.session_state.mc_start_year + divorce_year_idx
+
+    return {
+        'survived': final_nw > 0,
+        'worst_year': divorce_year,
+        'final_net_worth': final_nw,
+        'details': f"{asset_split_pct*100:.0f}% asset split in {divorce_year}"
+    }
+
+
+# TIER 2 SCENARIO IMPLEMENTATIONS
+
+def test_home_disaster_scenario(baseline_path, percentile_key, config):
+    """Test major home disaster with uninsured costs"""
+
+    disaster_cost = config.get('disaster_cost', 150000)
+
+    # Try disaster at various years
+    worst_year = None
+    worst_final_nw = float('inf')
+
+    for disaster_idx in range(len(baseline_path)):
+        stressed_path = baseline_path.copy()
+        stressed_path[disaster_idx] = max(0, stressed_path[disaster_idx] - disaster_cost)
+
+        # Continue projection from reduced amount
+        if disaster_idx < len(baseline_path) - 1:
+            reduction = stressed_path[disaster_idx] / baseline_path[disaster_idx] if baseline_path[disaster_idx] != 0 else 0.7
+            for future_idx in range(disaster_idx + 1, len(baseline_path)):
+                stressed_path[future_idx] = baseline_path[future_idx] * reduction
+
+        final_nw = stressed_path[-1]
+        if final_nw < worst_final_nw:
+            worst_final_nw = final_nw
+            worst_year = st.session_state.mc_start_year + disaster_idx
+
+    return {
+        'survived': worst_final_nw > 0,
+        'worst_year': worst_year,
+        'final_net_worth': worst_final_nw,
+        'details': f"${disaster_cost:,.0f} damage, worst in {worst_year}"
+    }
+
+
+def test_failed_business_scenario(baseline_path, percentile_key, config):
+    """Test failed entrepreneurship attempt"""
+
+    capital_lost = config.get('business_capital', 100000)
+    years_duration = config.get('business_years', 3)
+
+    # Try business at various start years
+    worst_year = None
+    worst_final_nw = float('inf')
+
+    for start_idx in range(len(baseline_path) - years_duration):
+        stressed_path = []
+
+        for idx in range(len(baseline_path)):
+            if idx == start_idx:
+                # Initial capital investment
+                stressed_path.append(max(0, baseline_path[idx] - capital_lost))
+            elif start_idx < idx < start_idx + years_duration:
+                # During business attempt: no income, living off savings
+                baseline_growth = baseline_path[idx] - baseline_path[idx-1]
+                # Negative growth (burning savings)
+                stressed_growth = baseline_growth * -0.3
+                stressed_path.append(max(0, stressed_path[-1] + stressed_growth))
+            else:
+                if idx < start_idx:
+                    stressed_path.append(baseline_path[idx])
+                else:
+                    # After business: return to work at possibly lower salary
+                    baseline_growth = baseline_path[idx] - baseline_path[idx-1]
+                    reduction = stressed_path[start_idx + years_duration - 1] / baseline_path[start_idx + years_duration - 1] if baseline_path[start_idx + years_duration - 1] != 0 else 0.4
+                    stressed_path.append(stressed_path[-1] + (baseline_growth * reduction * 0.8))
+
+        final_nw = stressed_path[-1]
+        if final_nw < worst_final_nw:
+            worst_final_nw = final_nw
+            worst_year = st.session_state.mc_start_year + start_idx
+
+    return {
+        'survived': worst_final_nw > 0,
+        'worst_year': worst_year,
+        'final_net_worth': worst_final_nw,
+        'details': f"${capital_lost:,.0f} + {years_duration}yr lost, worst if starts {worst_year}"
+    }
+
+
+def test_twins_triplets_scenario(baseline_path, percentile_key, config):
+    """Test unexpected multiple birth"""
+
+    multiple_type = config.get('multiple_birth', 'Twins')
+    multiplier = 2 if multiple_type == 'Twins' else 3
+
+    if not st.session_state.children_list:
+        return {'survived': True, 'final_net_worth': baseline_path[-1], 'details': 'No children defined'}
+
+    # Use first child's birth year
+    child = st.session_state.children_list[0]
+    birth_year = child['birth_year']
+    event_year_idx = birth_year - st.session_state.mc_start_year
+
+    if event_year_idx < 0 or event_year_idx >= len(baseline_path):
+        return {'survived': True, 'final_net_worth': baseline_path[-1], 'details': 'Event outside window'}
+
+    # Increased childcare and education costs for 18 years
+    stressed_path = baseline_path[:event_year_idx]
+
+    for idx in range(event_year_idx, min(event_year_idx + 18, len(baseline_path))):
+        baseline_growth = baseline_path[idx] - baseline_path[idx-1] if idx > event_year_idx else 0
+        # Reduce growth due to (multiplier-1) additional children
+        cost_multiplier = (multiplier - 1) * 30000  # Additional annual cost per extra child
+        stressed_path.append(max(0, baseline_path[idx] - cost_multiplier * (idx - event_year_idx + 1) * 0.1))
+
+    # After age 18
+    for idx in range(len(stressed_path), len(baseline_path)):
+        baseline_growth = baseline_path[idx] - baseline_path[idx-1]
+        reduction = stressed_path[-1] / baseline_path[len(stressed_path)-1] if baseline_path[len(stressed_path)-1] != 0 else 0.7
+        stressed_path.append(stressed_path[-1] + (baseline_growth * reduction))
+
+    final_nw = stressed_path[-1]
+
+    return {
+        'survived': final_nw > 0,
+        'final_net_worth': final_nw,
+        'details': f"{multiple_type} born in {birth_year}"
+    }
+
+
+def test_ss_insolvency_scenario(baseline_path, percentile_key, config):
+    """Test severe Social Security benefit cuts"""
+
+    cut_percent = config.get('ss_cut_percent', 50) / 100.0
+
+    # SS cuts affect retirement years
+    # Assume retirement starts in last third of projection
+    retirement_start_idx = (len(baseline_path) * 2) // 3
+
+    stressed_path = baseline_path[:retirement_start_idx]
+
+    # Reduced income from SS during retirement
+    for idx in range(retirement_start_idx, len(baseline_path)):
+        baseline_growth = baseline_path[idx] - baseline_path[idx-1]
+        # Reduce growth rate due to lower SS income
+        stressed_growth = baseline_growth - (baseline_growth * cut_percent * 0.3)
+        stressed_path.append(stressed_path[-1] + stressed_growth)
+
+    final_nw = stressed_path[-1]
+    retirement_year = st.session_state.mc_start_year + retirement_start_idx
+
+    return {
+        'survived': final_nw > 0,
+        'final_net_worth': final_nw,
+        'details': f"{cut_percent*100:.0f}% SS cut starting {retirement_year}"
+    }
+
+
+def test_learning_disability_scenario(baseline_path, percentile_key, config):
+    """Test child with learning disabilities requiring special education"""
+
+    annual_cost = config.get('special_ed_annual', 40000)
+
+    if not st.session_state.children_list:
+        return {'survived': True, 'final_net_worth': baseline_path[-1], 'details': 'No children defined'}
+
+    child = st.session_state.children_list[0]
+    birth_year = child['birth_year']
+
+    # Special education typically age 5-22 (17 years)
+    start_year = birth_year + 5
+    duration = 17
+    start_idx = start_year - st.session_state.mc_start_year
+
+    if start_idx < 0:
+        start_idx = 0
+
+    stressed_path = baseline_path[:start_idx]
+
+    for idx in range(start_idx, min(start_idx + duration, len(baseline_path))):
+        baseline_growth = baseline_path[idx] - baseline_path[idx-1] if idx > 0 else 0
+        stressed_path.append(max(0, baseline_path[idx] - annual_cost))
+
+    for idx in range(len(stressed_path), len(baseline_path)):
+        baseline_growth = baseline_path[idx] - baseline_path[idx-1]
+        reduction = stressed_path[-1] / baseline_path[len(stressed_path)-1] if baseline_path[len(stressed_path)-1] != 0 else 0.75
+        stressed_path.append(stressed_path[-1] + (baseline_growth * reduction))
+
+    final_nw = stressed_path[-1]
+
+    return {
+        'survived': final_nw > 0,
+        'final_net_worth': final_nw,
+        'details': f"${annual_cost:,.0f}/yr for {duration}yr"
+    }
+
+
+# TIER 3 SCENARIO IMPLEMENTATIONS
+
+def test_boomerang_child_scenario(baseline_path, percentile_key, config):
+    """Test adult child returning home requiring support"""
+
+    annual_cost = config.get('boomerang_annual_cost', 20000)
+    duration = config.get('boomerang_duration', 3)
+
+    # Typically happens when parent is 50-65, child is 25-30
+    # Use later portion of projection
+    start_idx = max(0, len(baseline_path) // 2)
+
+    stressed_path = baseline_path[:start_idx]
+
+    for idx in range(start_idx, min(start_idx + duration, len(baseline_path))):
+        baseline_growth = baseline_path[idx] - baseline_path[idx-1] if idx > 0 else 0
+        stressed_path.append(max(0, baseline_path[idx] - annual_cost))
+
+    for idx in range(len(stressed_path), len(baseline_path)):
+        baseline_growth = baseline_path[idx] - baseline_path[idx-1]
+        reduction = stressed_path[-1] / baseline_path[len(stressed_path)-1] if baseline_path[len(stressed_path)-1] != 0 else 0.85
+        stressed_path.append(stressed_path[-1] + (baseline_growth * reduction))
+
+    final_nw = stressed_path[-1]
+    start_year = st.session_state.mc_start_year + start_idx
+
+    return {
+        'survived': final_nw > 0,
+        'final_net_worth': final_nw,
+        'details': f"${annual_cost:,.0f}/yr for {duration}yr starting {start_year}"
+    }
+
+
+def test_net_worth_loss_scenario(baseline_path, percentile_key):
+    """Test 50% net worth loss (original scenario)"""
+
+    worst_year = None
+    worst_final_nw = float('inf')
+
+    for shock_year_idx in range(len(baseline_path)):
+        stressed_path = baseline_path[:shock_year_idx] + [baseline_path[shock_year_idx] * 0.5]
+
+        if shock_year_idx < len(baseline_path) - 1:
+            reduction_factor = 0.5
+            for future_idx in range(shock_year_idx + 1, len(baseline_path)):
+                stressed_path.append(baseline_path[future_idx] * reduction_factor)
+
+        final_nw = stressed_path[-1]
+        if final_nw < worst_final_nw:
+            worst_final_nw = final_nw
+            worst_year = st.session_state.mc_start_year + shock_year_idx
+
+    return {
+        'survived': worst_final_nw > 0,
+        'worst_year': worst_year,
+        'final_net_worth': worst_final_nw,
+        'details': f"Worst if occurs in {worst_year}"
+    }
+
+
+def test_grad_school_scenario(baseline_path, percentile_key, config):
+    """Test graduate school costs"""
+
+    total_cost = config.get('grad_school_cost', 200000)
+    duration = config.get('grad_school_years', 4)
+    annual_cost = total_cost / duration
+
+    if not st.session_state.children_list:
+        return {'survived': True, 'final_net_worth': baseline_path[-1], 'details': 'No children defined'}
+
+    child = st.session_state.children_list[0]
+    birth_year = child['birth_year']
+
+    # Grad school typically starts age 22
+    grad_start_year = birth_year + 22
+    start_idx = grad_start_year - st.session_state.mc_start_year
+
+    if start_idx < 0 or start_idx >= len(baseline_path):
+        return {'survived': True, 'final_net_worth': baseline_path[-1], 'details': 'Event outside window'}
+
+    stressed_path = baseline_path[:start_idx]
+
+    for idx in range(start_idx, min(start_idx + duration, len(baseline_path))):
+        baseline_growth = baseline_path[idx] - baseline_path[idx-1] if idx > 0 else 0
+        stressed_path.append(max(0, baseline_path[idx] - annual_cost))
+
+    for idx in range(len(stressed_path), len(baseline_path)):
+        baseline_growth = baseline_path[idx] - baseline_path[idx-1]
+        reduction = stressed_path[-1] / baseline_path[len(stressed_path)-1] if baseline_path[len(stressed_path)-1] != 0 else 0.8
+        stressed_path.append(stressed_path[-1] + (baseline_growth * reduction))
+
+    final_nw = stressed_path[-1]
+
+    return {
+        'survived': final_nw > 0,
+        'final_net_worth': final_nw,
+        'details': f"${total_cost:,.0f} over {duration}yr starting {grad_start_year}"
+    }
+
+
+def get_scenario_description(scenario_key, config):
+    """Get detailed description for a scenario"""
+
+    descriptions = {
+        'critical_illness': f"Major medical event costing ${config.get('illness_severity', 200000):,.0f} over {config.get('illness_duration', 3)} years",
+        'lost_decade': "10 years of near-zero market returns",
+        'career_collapse': f"{config.get('salary_reduction', 50)}% permanent salary reduction due to industry disruption",
+        'long_term_care': f"Long-term care costing ${config.get('ltc_annual_cost', 100000):,.0f}/year for {config.get('ltc_duration', 8)} years",
+        'divorce': f"Divorce with {config.get('asset_split', 50)}% asset split and increased household expenses",
+        'home_disaster': f"Major home disaster with ${config.get('disaster_cost', 150000):,.0f} in uninsured damage",
+        'failed_business': f"Failed business venture: ${config.get('business_capital', 100000):,.0f} lost over {config.get('business_years', 3)} years",
+        'twins_triplets': f"Unexpected {config.get('multiple_birth', 'Twins')} instead of single child",
+        'ss_insolvency': f"Social Security benefits cut by {config.get('ss_cut_percent', 50)}%",
+        'learning_disability': f"Child with learning disabilities requiring ${config.get('special_ed_annual', 40000):,.0f}/year special education",
+        'boomerang_child': f"Adult child returns home, ${config.get('boomerang_annual_cost', 20000):,.0f}/year for {config.get('boomerang_duration', 3)} years",
+        'net_worth_loss': "Sudden 50% loss in net worth (market crash)",
+        'grad_school': f"Graduate school costing ${config.get('grad_school_cost', 200000):,.0f} over {config.get('grad_school_years', 4)} years"
+    }
+    return descriptions.get(scenario_key, "Adverse financial event")
+
+
+def get_scenario_type(scenario_key):
+    """Get scenario type (sweep, fixed, or compound)"""
+
+    sweep_scenarios = ['critical_illness', 'lost_decade', 'home_disaster', 'failed_business', 'net_worth_loss']
+
+    if scenario_key in sweep_scenarios:
+        return 'sweep'
+    else:
+        return 'fixed'
 
 
 def display_stress_test_results(results):
     """Display stress test results in a stoplight table format"""
 
+    st.markdown("---")
+    st.subheader("📊 Stress Test Results")
+
     st.markdown("""
     ### 🚦 Resilience Matrix
-    **Green** 🟢 = Plan survives (positive net worth at end)
+    **Green** 🟢 = Plan survives (positive net worth at end)  
     **Red** 🔴 = Plan fails (negative net worth at end)
     """)
 
-    # Build table data
-    table_data = []
-    percentile_keys = ['10th', '25th', '50th', '75th', '90th']
+    # Separate by tier
+    tier1_results = []
+    tier2_results = []
+    tier3_results = []
+    compound_results = []
 
     for scenario in results:
-        row = {
-            'Scenario': scenario['name'],
-            'Description': scenario['description']
-        }
-
-        # Add results for each percentile
-        for pct_key in percentile_keys:
-            if pct_key in scenario['percentile_results']:
-                result = scenario['percentile_results'][pct_key]
-
-                # Create cell content
-                survived = result['survived']
-                icon = "🟢" if survived else "🔴"
-
-                if scenario['type'] == 'sweep' and 'worst_year' in result:
-                    cell_content = f"{icon}\nYear: {result['worst_year']}\nFinal: ${result['final_net_worth']/1000:.0f}K"
-                else:
-                    cell_content = f"{icon}\nFinal: ${result['final_net_worth']/1000:.0f}K"
-
-                row[pct_key] = cell_content
+        name = scenario['name']
+        if '🔗' in name:
+            compound_results.append(scenario)
+        elif any(emoji in name for emoji in ['🏥', '📉', '💼', '💔']):
+            tier1_results.append(scenario)
+        elif any(emoji in name for emoji in ['🏠', '💸', '👶👶', '📊', '🎓']):
+            if '🎓' in name and 'Learning' not in name:
+                tier3_results.append(scenario)
             else:
-                row[pct_key] = "N/A"
+                tier2_results.append(scenario)
+        else:
+            tier3_results.append(scenario)
 
-        table_data.append(row)
+    percentile_keys = ['10th', '25th', '50th', '75th', '90th']
 
-    # Create DataFrame
-    import pandas as pd
-    df = pd.DataFrame(table_data)
+    # Display each tier
+    if tier1_results:
+        st.markdown("#### 🔴 Tier 1: Critical Events")
+        display_tier_table(tier1_results, percentile_keys)
 
-    # Display as interactive table
-    st.dataframe(
-        df,
-        use_container_width=True,
-        height=min(400, len(table_data) * 100 + 100)
-    )
+    if tier2_results:
+        st.markdown("#### 🟡 Tier 2: Major Events")
+        display_tier_table(tier2_results, percentile_keys)
+
+    if tier3_results:
+        st.markdown("#### 🟢 Tier 3: Important Events")
+        display_tier_table(tier3_results, percentile_keys)
+
+    if compound_results:
+        st.markdown("#### 🔗 Compound Scenarios")
+        display_tier_table(compound_results, percentile_keys)
 
     # Summary statistics
     st.markdown("---")
@@ -7089,25 +7885,117 @@ def display_stress_test_results(results):
 
     pass_rate = (passed_tests / total_tests * 100) if total_tests > 0 else 0
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        st.metric("Total Tests", total_tests)
+        st.metric("Total Scenarios", len(results))
     with col2:
-        st.metric("Passed", f"{passed_tests} 🟢")
+        st.metric("Total Tests", total_tests)
     with col3:
+        st.metric("Passed", f"{passed_tests} 🟢")
+    with col4:
         st.metric("Pass Rate", f"{pass_rate:.1f}%")
 
     # Recommendations
+    st.markdown("### 💡 Risk Assessment")
+
     if pass_rate < 60:
-        st.error("⚠️ **High Risk**: Your financial plan shows significant vulnerability to adverse events. Consider increasing emergency reserves or reducing fixed expenses.")
+        st.error("""
+        ⚠️ **HIGH RISK**: Your financial plan shows significant vulnerability to adverse events.
+
+        **Recommendations:**
+        - Increase emergency fund to 12-18 months of expenses
+        - Consider reducing fixed expenses and debt obligations
+        - Diversify income sources
+        - Review and increase insurance coverage (life, disability, long-term care)
+        - Build larger safety margins in retirement projections
+        """)
     elif pass_rate < 80:
-        st.warning("⚠️ **Moderate Risk**: Some scenarios show vulnerability. Consider stress-testing your assumptions and building larger safety margins.")
+        st.warning("""
+        ⚠️ **MODERATE RISK**: Some scenarios show vulnerability.
+
+        **Recommendations:**
+        - Maintain 6-12 month emergency fund
+        - Review scenarios that failed and build specific contingency plans
+        - Consider additional insurance for major risks
+        - Stress-test major financial decisions
+        - Build flexibility into long-term commitments
+        """)
     else:
-        st.success("✅ **Resilient Plan**: Your financial plan shows good resilience to adverse events. Continue monitoring and adjusting as circumstances change.")
+        st.success("""
+        ✅ **RESILIENT PLAN**: Your financial plan shows good resilience to adverse events.
+
+        **Continue to:**
+        - Monitor and adjust as circumstances change
+        - Review scenarios annually
+        - Maintain emergency reserves
+        - Keep insurance coverage current
+        - Stay disciplined with savings and spending
+        """)
+
+    # Identify biggest vulnerabilities
+    st.markdown("### 🎯 Identified Vulnerabilities")
+
+    failed_scenarios = []
+    for scenario in results:
+        failed_count = sum(
+            1 for pct_key in percentile_keys
+            if pct_key in scenario['percentile_results'] and not scenario['percentile_results'][pct_key]['survived']
+        )
+        if failed_count > 0:
+            failed_scenarios.append((scenario['name'], failed_count, scenario['description']))
+
+    if failed_scenarios:
+        failed_scenarios.sort(key=lambda x: x[1], reverse=True)
+
+        st.markdown("**Scenarios with highest failure rates:**")
+        for name, count, desc in failed_scenarios[:5]:
+            pct_failed = (count / len(percentile_keys)) * 100
+            st.markdown(f"- **{name}**: {pct_failed:.0f}% failure rate - {desc}")
+    else:
+        st.success("No vulnerabilities identified - all scenarios passed!")
 
 
-# NEW TAB 5: Report Export
+def display_tier_table(scenarios, percentile_keys):
+    """Display a tier's results as a table"""
+
+    import pandas as pd
+
+    table_data = []
+
+    for scenario in scenarios:
+        row = {
+            'Scenario': scenario['name'],
+            'Description': scenario['description'][:80] + "..." if len(scenario['description']) > 80 else scenario['description']
+        }
+
+        for pct_key in percentile_keys:
+            if pct_key in scenario['percentile_results']:
+                result = scenario['percentile_results'][pct_key]
+
+                survived = result['survived']
+                icon = "🟢" if survived else "🔴"
+
+                if scenario.get('type') == 'sweep' and 'worst_year' in result:
+                    cell_content = f"{icon} {result['worst_year']}\n${result['final_net_worth']/1000:.0f}K"
+                else:
+                    cell_content = f"{icon}\n${result['final_net_worth']/1000:.0f}K"
+
+                row[pct_key] = cell_content
+            else:
+                row[pct_key] = "N/A"
+
+        table_data.append(row)
+
+    df = pd.DataFrame(table_data)
+
+    st.dataframe(
+        df,
+        use_container_width=True,
+        height=min(400, len(table_data) * 80 + 100)
+    )
+
+
 def report_export_tab():
     """PDF/Excel Report Export Tab"""
     st.header("📄 Export Financial Reports")
