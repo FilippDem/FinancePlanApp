@@ -5835,24 +5835,8 @@ def stress_test_tab():
 
     st.info(f"📊 Analyzing {len(years)} years across 5 percentiles (10th, 25th, 50th, 75th, 90th)")
 
-    # Tier Selection
-    st.markdown("---")
-    st.subheader("🎯 Select Stress Test Tier")
-
-    tier_options = {
-        "Tier 1: Basic Scenarios": 1,
-        "Tier 2: Moderate Scenarios": 2,
-        "Tier 3: Comprehensive Analysis": 3,
-        "All Tiers": 0
-    }
-
-    selected_tier_name = st.radio(
-        "Choose test tier:",
-        options=list(tier_options.keys()),
-        help="Tier 1: Quick basic tests | Tier 2: Family & employment | Tier 3: All scenarios combined"
-    )
-
-    selected_tier = tier_options[selected_tier_name]
+    # Run all tiers automatically
+    selected_tier = 0  # 0 = All Tiers
 
     # Define percentile names for iteration
     percentile_names = ['10th', '25th', '50th', '75th', '90th']
