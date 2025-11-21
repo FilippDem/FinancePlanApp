@@ -2944,7 +2944,7 @@ def main():
         ("🏥 Healthcare & Insurance", healthcare_insurance_tab, st.session_state.get('show_healthcare', False)),
         ("💳 Debt Management", debt_management_tab, st.session_state.get('show_debt', False)),
         ("📊 Analysis & Cashflow", combined_analysis_cashflow_tab, True),
-        ("🦢 Black Swan Events", black_swan_tab, True),
+        ("🧪 Stress Test", stress_test_tab, True),
         ("📄 Export Reports", report_export_tab, st.session_state.get('show_export', True)),
         ("💾 Save/Load", save_load_tab, True)
     ]
@@ -5563,7 +5563,7 @@ def combined_analysis_cashflow_tab():
         else:
             st.success("✅ Your plan shows strong resilience to market uncertainty!")
 
-        st.info("💡 **Next Step:** Use the Black Swan Events tab to stress-test against catastrophic scenarios.")
+        st.info("💡 **Next Step:** Use the Stress Test tab to test against catastrophic scenarios.")
     else:
         st.info("⏸️ Click 'Run Monte Carlo Simulation' above to see probabilistic outcomes and success rates.")
 
@@ -5813,9 +5813,9 @@ def test_hyperinflation_scenario(percentiles_data, config):
     return event_results
 
 
-def black_swan_tab():
-    """Black Swan Events stress testing tab"""
-    st.header("🦢 Black Swan Events Analysis")
+def stress_test_tab():
+    """Stress testing tab for catastrophic scenarios"""
+    st.header("🧪 Stress Test Analysis")
     st.markdown("""
     Stress-test your financial plan against rare catastrophic events.
     This analysis shows whether your plan can withstand worst-case scenarios across different Monte Carlo percentiles.
@@ -5858,9 +5858,9 @@ def black_swan_tab():
     percentile_names = ['10th', '25th', '50th', '75th', '90th']
 
     # Store results for stoplight table
-    black_swan_results = []
+    stress_test_results = []
 
-    with st.spinner("🔍 Analyzing black swan scenarios... This may take a moment."):
+    with st.spinner("🔍 Analyzing stress test scenarios... This may take a moment."):
 
         # TIER 1: Basic Scenarios
         if selected_tier == 1 or selected_tier == 0:
@@ -5888,7 +5888,7 @@ def black_swan_tab():
 
             config = {'loss_percent': loss_percent}
             event_results = test_net_worth_loss_scenario(percentiles_data, config)
-            black_swan_results.append(event_results)
+            stress_test_results.append(event_results)
 
             # Hyperinflation Scenario
             st.markdown("---")
@@ -5921,7 +5921,7 @@ def black_swan_tab():
                 'inflation_rate': hyperinflation_rate / 100
             }
             event_results = test_hyperinflation_scenario(percentiles_data, config)
-            black_swan_results.append(event_results)
+            stress_test_results.append(event_results)
 
         # TIER 2: Moderate Scenarios
         if selected_tier == 2 or selected_tier == 0:
@@ -5946,7 +5946,7 @@ def black_swan_tab():
                     }
 
                     event_results = test_disabled_child_scenario(percentiles_data, config)
-                    black_swan_results.append(event_results)
+                    stress_test_results.append(event_results)
 
             # Unemployment Scenarios
             st.markdown("### 💼 Forced Unemployment")
@@ -5961,7 +5961,7 @@ def black_swan_tab():
                 }
 
                 event_results = test_unemployment_scenario(percentiles_data, config)
-                black_swan_results.append(event_results)
+                stress_test_results.append(event_results)
 
         # TIER 3: Comprehensive Analysis
         if selected_tier == 3 or selected_tier == 0:
@@ -6019,16 +6019,16 @@ def black_swan_tab():
                         'final_nw': worst_final_nw
                     }
 
-                black_swan_results.append(event_results)
+                stress_test_results.append(event_results)
 
     # Display Stoplight Table
     st.markdown("---")
-    st.markdown("## 🚦 Black Swan Event Stoplight Analysis")
+    st.markdown("## 🚦 Stress Test Stoplight Analysis")
     st.markdown("**Green ✅**: Plan survives | **Red ❌**: Plan fails")
 
     # Create DataFrame for display
     table_data = []
-    for result in black_swan_results:
+    for result in stress_test_results:
         row = {'Event': result['event']}
         for pct_name in percentile_names:
             if pct_name in result:
@@ -6052,7 +6052,7 @@ def black_swan_tab():
     st.markdown("---")
     st.markdown("## 📋 Detailed Results")
 
-    for result in black_swan_results:
+    for result in stress_test_results:
         with st.expander(f"🔍 {result['event']}", expanded=False):
             detail_data = []
             for pct_name in percentile_names:
@@ -6075,10 +6075,10 @@ def black_swan_tab():
     st.markdown("---")
     st.markdown("## 📊 Summary Statistics")
 
-    total_scenarios = len(black_swan_results) * len(percentile_names)
+    total_scenarios = len(stress_test_results) * len(percentile_names)
     passed_scenarios = 0
 
-    for result in black_swan_results:
+    for result in stress_test_results:
         for pct_name in percentile_names:
             if pct_name in result and isinstance(result[pct_name], dict):
                 if result[pct_name]['status'] == "✅":
@@ -6095,13 +6095,13 @@ def black_swan_tab():
         st.metric("Overall Success Rate", f"{success_rate:.1f}%")
 
     if success_rate >= 80:
-        st.success("✅ **Excellent!** Your financial plan is highly resilient to black swan events.")
+        st.success("✅ **Excellent!** Your financial plan is highly resilient to stress test scenarios.")
     elif success_rate >= 60:
         st.info("⚠️ **Good** - Your plan handles most scenarios but consider building more buffer.")
     elif success_rate >= 40:
         st.warning("⚠️ **Moderate Risk** - Your plan struggles with many catastrophic scenarios. Consider increasing savings or reducing expenses.")
     else:
-        st.error("❌ **High Risk** - Your plan is vulnerable to black swan events. Significant adjustments recommended.")
+        st.error("❌ **High Risk** - Your plan is vulnerable to stress test scenarios. Significant adjustments recommended.")
 
 
 def save_load_tab():
