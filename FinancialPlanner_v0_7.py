@@ -6524,152 +6524,282 @@ def stress_test_tab():
 
     st.info(f"📊 Analyzing {len(years)} years across 5 percentiles (10th, 25th, 50th, 75th, 90th)")
 
-    # Run all tiers automatically
-    selected_tier = 0  # 0 = All Tiers
-
     # Define percentile names for iteration
     percentile_names = ['10th', '25th', '50th', '75th', '90th']
 
     # Store results for stoplight table
     stress_test_results = []
 
-    with st.spinner("🔍 Analyzing stress test scenarios... This may take a moment."):
+    # Prepare percentiles_data for all tests
+    percentiles_data = {
+        'percentiles': percentiles,
+        'years': years,
+        'scenario': scenario
+    }
 
-        # TIER 1: Basic Scenarios
-        if selected_tier == 1 or selected_tier == 0:
-            st.markdown("---")
-            st.markdown("## 🥉 Tier 1: Basic Scenarios")
+    # Individual Stress Tests Section
+    st.markdown("---")
+    st.markdown("## 📋 Individual Stress Tests")
+    st.markdown("*Configure and run individual stress test scenarios*")
 
-            # Configurable Net Worth Loss
-            st.markdown("### 💥 Market Crash Scenario")
-            loss_percent = st.slider(
-                "Net Worth Loss Percentage",
-                min_value=10,
-                max_value=90,
-                value=50,
-                step=5,
-                help="Test how your plan handles a market crash of this magnitude"
+    with st.spinner("🔍 Analyzing individual stress test scenarios..."):
+
+        # Market Crash Scenario
+        st.markdown("---")
+        st.markdown("### 💥 Market Crash Scenario")
+        loss_percent = st.slider(
+            "Net Worth Loss Percentage",
+            min_value=10,
+            max_value=90,
+            value=50,
+            step=5,
+            help="Test how your plan handles a market crash of this magnitude",
+            key="market_crash_slider"
+        )
+
+        st.markdown(f"*Finding the worst year to experience a {loss_percent}% market crash for each percentile*")
+
+        config = {'loss_percent': loss_percent}
+        event_results = test_net_worth_loss_scenario(percentiles_data, config)
+        stress_test_results.append(event_results)
+
+        # Hyperinflation Scenario
+        st.markdown("---")
+        st.markdown("### 📈 Hyperinflation Scenario")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            hyperinflation_rate = st.slider(
+                "Inflation Rate (%)",
+                min_value=5,
+                max_value=30,
+                value=15,
+                step=1,
+                help="Annual inflation rate during hyperinflation period",
+                key="hyperinflation_rate_slider"
+            )
+        with col2:
+            hyperinflation_years = st.slider(
+                "Duration (Years)",
+                min_value=2,
+                max_value=10,
+                value=5,
+                step=1,
+                help="How many years of hyperinflation to test",
+                key="hyperinflation_years_slider"
             )
 
-            st.markdown(f"*Finding the worst year to experience a {loss_percent}% market crash for each percentile*")
+        st.markdown(f"*Finding the worst year to experience {hyperinflation_years} years of {hyperinflation_rate}% inflation*")
 
-            percentiles_data = {
-                'percentiles': percentiles,
-                'years': years,
-                'scenario': scenario
-            }
+        config = {
+            'inflation_years': hyperinflation_years,
+            'inflation_rate': hyperinflation_rate / 100
+        }
+        event_results = test_hyperinflation_scenario(percentiles_data, config)
+        stress_test_results.append(event_results)
 
-            config = {'loss_percent': loss_percent}
-            event_results = test_net_worth_loss_scenario(percentiles_data, config)
-            stress_test_results.append(event_results)
-
-            # Hyperinflation Scenario
+        # Disabled Child Scenarios
+        if st.session_state.children_list:
             st.markdown("---")
-            st.markdown("### 📈 Hyperinflation Scenario")
+            st.markdown("### 👶 Disabled Child Birth (Parent Retires Immediately)")
+            st.markdown("*Testing if one parent can immediately retire to care for a disabled child*")
 
-            col1, col2 = st.columns(2)
-            with col1:
-                hyperinflation_rate = st.slider(
-                    "Inflation Rate (%)",
-                    min_value=5,
-                    max_value=30,
-                    value=15,
-                    step=1,
-                    help="Annual inflation rate during hyperinflation period"
-                )
-            with col2:
-                hyperinflation_years = st.slider(
-                    "Duration (Years)",
-                    min_value=2,
-                    max_value=10,
-                    value=5,
-                    step=1,
-                    help="How many years of hyperinflation to test"
-                )
+            for child_idx, child in enumerate(st.session_state.children_list):
+                child_birth_year = child['birth_year']
 
-            st.markdown(f"*Finding the worst year to experience {hyperinflation_years} years of {hyperinflation_rate}% inflation*")
-
-            config = {
-                'inflation_years': hyperinflation_years,
-                'inflation_rate': hyperinflation_rate / 100
-            }
-            event_results = test_hyperinflation_scenario(percentiles_data, config)
-            stress_test_results.append(event_results)
-
-        # TIER 2: Moderate Scenarios
-        if selected_tier == 2 or selected_tier == 0:
-            st.markdown("---")
-            st.markdown("## 🥈 Tier 2: Moderate Scenarios")
-
-            # Disabled Child Scenarios
-            if st.session_state.children_list:
-                st.markdown("### 👶 Disabled Child Birth (Parent Retires Immediately)")
-                st.markdown("*Testing if one parent can immediately retire to care for a disabled child*")
-
-                for child_idx, child in enumerate(st.session_state.children_list):
-                    child_birth_year = child['birth_year']
-
-                    config = {
-                        'child_idx': child_idx,
-                        'child_birth_year': child_birth_year
-                    }
-
-                    event_results = test_disabled_child_scenario(percentiles_data, config)
-                    stress_test_results.append(event_results)
-
-            # Unemployment Scenarios
-            st.markdown("### 💼 Forced Unemployment")
-            st.markdown("*Testing 3-year unemployment periods at the worst possible time*")
-
-            for parent_name, parent_income in [(st.session_state.parent1_name, st.session_state.parentX_income),
-                                                (st.session_state.parent2_name, st.session_state.parentY_income)]:
                 config = {
-                    'parent_name': parent_name,
-                    'parent_income': parent_income,
-                    'duration_years': 3
+                    'child_idx': child_idx,
+                    'child_birth_year': child_birth_year
                 }
 
-                event_results = test_unemployment_scenario(percentiles_data, config)
+                event_results = test_disabled_child_scenario(percentiles_data, config)
                 stress_test_results.append(event_results)
 
-        # TIER 3: Comprehensive Analysis
-        if selected_tier == 3 or selected_tier == 0:
-            st.markdown("---")
-            st.markdown("## 🥇 Tier 3: Comprehensive Analysis")
-            st.markdown("*Testing compound scenarios and worst-case combinations*")
+        # Unemployment Scenarios
+        st.markdown("---")
+        st.markdown("### 💼 Forced Unemployment")
+        st.markdown("*Testing 3-year unemployment periods at the worst possible time*")
 
-            # Compound Scenario: Market Crash + Unemployment
-            st.markdown("### ⚡ Compound: 30% Market Crash + 2 Year Unemployment")
+        for parent_name, parent_income in [(st.session_state.parent1_name, st.session_state.parentX_income),
+                                            (st.session_state.parent2_name, st.session_state.parentY_income)]:
+            config = {
+                'parent_name': parent_name,
+                'parent_income': parent_income,
+                'duration_years': 3
+            }
 
-            for parent_name, parent_income in [(st.session_state.parent1_name, st.session_state.parentX_income),
-                                                (st.session_state.parent2_name, st.session_state.parentY_income)]:
+            event_results = test_unemployment_scenario(percentiles_data, config)
+            stress_test_results.append(event_results)
 
-                event_results = {'event': f'30% Crash + {parent_name} Unemployed 2 Yrs'}
+    # Compound Stress Tests Section
+    st.markdown("---")
+    st.markdown("## ⚡ Compound Stress Tests")
+    st.markdown("*Combine multiple stress scenarios to test worst-case situations*")
 
+    st.markdown("""
+    Select which individual stress tests to combine. The compound test will apply all selected scenarios
+    simultaneously and find the worst possible year for this combination to occur.
+    """)
+
+    # Create checkboxes for each stress test type
+    st.markdown("### Select Scenarios to Combine:")
+
+    compound_col1, compound_col2 = st.columns(2)
+
+    with compound_col1:
+        include_market_crash = st.checkbox(
+            "💥 Market Crash",
+            value=False,
+            help="Include market crash in compound scenario"
+        )
+        if include_market_crash:
+            compound_crash_percent = st.slider(
+                "Market Crash Loss %",
+                min_value=10,
+                max_value=90,
+                value=30,
+                step=5,
+                key="compound_crash_slider"
+            )
+
+        include_hyperinflation = st.checkbox(
+            "📈 Hyperinflation",
+            value=False,
+            help="Include hyperinflation in compound scenario"
+        )
+        if include_hyperinflation:
+            compound_inflation_rate = st.slider(
+                "Compound Inflation Rate (%)",
+                min_value=5,
+                max_value=30,
+                value=10,
+                step=1,
+                key="compound_inflation_rate_slider"
+            )
+            compound_inflation_years = st.slider(
+                "Compound Inflation Duration (Years)",
+                min_value=2,
+                max_value=10,
+                value=3,
+                step=1,
+                key="compound_inflation_years_slider"
+            )
+
+    with compound_col2:
+        include_unemployment = st.checkbox(
+            "💼 Unemployment",
+            value=False,
+            help="Include unemployment in compound scenario"
+        )
+        if include_unemployment:
+            compound_unemployment_parent = st.selectbox(
+                "Which Parent Loses Job",
+                options=[st.session_state.parent1_name, st.session_state.parent2_name],
+                key="compound_unemployment_parent"
+            )
+            compound_unemployment_years = st.slider(
+                "Unemployment Duration (Years)",
+                min_value=1,
+                max_value=5,
+                value=2,
+                step=1,
+                key="compound_unemployment_years_slider"
+            )
+
+        include_disabled_child = st.checkbox(
+            "👶 Disabled Child",
+            value=False,
+            help="Include disabled child scenario (parent retires)"
+        )
+        if include_disabled_child and st.session_state.children_list:
+            compound_child = st.selectbox(
+                "Which Child",
+                options=[child['name'] for child in st.session_state.children_list],
+                key="compound_child_select"
+            )
+
+    # Run compound test if at least 2 scenarios are selected
+    num_selected = sum([include_market_crash, include_hyperinflation, include_unemployment, include_disabled_child])
+
+    if num_selected >= 2:
+        st.markdown("---")
+        if st.button("🔥 Run Compound Stress Test", type="primary", use_container_width=True):
+            with st.spinner("🔍 Running compound stress test... This may take a moment."):
+                # Build scenario description
+                scenario_parts = []
+                if include_market_crash:
+                    scenario_parts.append(f"{compound_crash_percent}% Crash")
+                if include_hyperinflation:
+                    scenario_parts.append(f"{compound_inflation_years}yr {compound_inflation_rate}% Inflation")
+                if include_unemployment:
+                    scenario_parts.append(f"{compound_unemployment_parent} Unemployed {compound_unemployment_years}yr")
+                if include_disabled_child:
+                    scenario_parts.append(f"Disabled {compound_child}")
+
+                event_name = "Compound: " + " + ".join(scenario_parts)
+
+                event_results = {'event': event_name}
+
+                # Run compound simulation for each percentile
                 for pct_name in percentile_names:
                     pct_values = percentiles[pct_name]
                     worst_final_nw = float('inf')
                     worst_year = None
 
                     # Try each year as the compound event start
-                    for event_start_idx in range(len(years) - 2):
-                        # Apply 30% crash
-                        net_worth = pct_values[event_start_idx] * 0.7
+                    max_duration = max(
+                        compound_inflation_years if include_hyperinflation else 0,
+                        compound_unemployment_years if include_unemployment else 0,
+                        1
+                    )
 
-                        # Simulate 2 years of unemployment plus recovery
+                    for event_start_idx in range(len(years) - max_duration):
+                        # Start with base net worth
+                        net_worth = pct_values[event_start_idx]
+
+                        # Apply market crash immediately
+                        if include_market_crash:
+                            net_worth *= (1 - compound_crash_percent / 100)
+
+                        # Get unemployment parent income
+                        unemployment_parent_income = 0
+                        if include_unemployment:
+                            if compound_unemployment_parent == st.session_state.parent1_name:
+                                unemployment_parent_income = st.session_state.parentX_income
+                            else:
+                                unemployment_parent_income = st.session_state.parentY_income
+
+                        # Get disabled child parent income (assuming parent 2 retires)
+                        disabled_child_parent_income = 0
+                        if include_disabled_child:
+                            disabled_child_parent_income = st.session_state.parentY_income
+
+                        # Simulate future years with combined impacts
                         for future_idx in range(event_start_idx, len(years)):
                             year_offset = future_idx - event_start_idx
 
-                            # Calculate cashflow impact
+                            # Calculate normal cashflow
                             if future_idx < len(pct_values) - 1:
                                 normal_cashflow = (pct_values[future_idx + 1] - pct_values[future_idx]) - (pct_values[future_idx] * scenario.investment_return)
 
-                                # During unemployment (first 2 years), lose this parent's income
-                                if year_offset < 2:
-                                    income_loss = parent_income * ((1 + scenario.inflation_rate) ** year_offset)
-                                    reduced_cashflow = normal_cashflow - income_loss
-                                else:
-                                    reduced_cashflow = normal_cashflow
+                                # Apply hyperinflation impact (increased expenses)
+                                if include_hyperinflation and year_offset < compound_inflation_years:
+                                    # Estimate expense impact as 40% of normal cashflow affected by extra inflation
+                                    extra_inflation = (compound_inflation_rate / 100) - scenario.inflation_rate
+                                    hyperinflation_expense_increase = abs(normal_cashflow) * 0.4 * extra_inflation * (year_offset + 1)
+                                    normal_cashflow -= hyperinflation_expense_increase
+
+                                # Apply unemployment income loss
+                                if include_unemployment and year_offset < compound_unemployment_years:
+                                    income_loss = unemployment_parent_income * ((1 + scenario.inflation_rate) ** year_offset)
+                                    normal_cashflow -= income_loss
+
+                                # Apply disabled child income loss (parent retires permanently)
+                                if include_disabled_child:
+                                    income_loss = disabled_child_parent_income * ((1 + scenario.inflation_rate) ** year_offset)
+                                    normal_cashflow -= income_loss
+
+                                reduced_cashflow = normal_cashflow
                             else:
                                 reduced_cashflow = 0
 
@@ -6689,6 +6819,11 @@ def stress_test_tab():
                     }
 
                 stress_test_results.append(event_results)
+                st.success(f"✅ Compound test '{event_name}' completed!")
+    elif num_selected == 1:
+        st.info("ℹ️ Please select at least 2 scenarios to create a compound stress test.")
+    else:
+        st.info("ℹ️ Select scenarios above to create a compound stress test.")
 
     # Display Stoplight Table
     st.markdown("---")
