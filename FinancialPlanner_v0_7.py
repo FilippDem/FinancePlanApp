@@ -7655,6 +7655,9 @@ def report_export_tab():
     if st.button("🚀 Generate Report", type="primary"):
         with st.spinner("Generating your financial report..."):
             try:
+                # Calculate lifetime cashflow projections
+                cashflow_projections = calculate_lifetime_cashflow()
+
                 # Prepare report data
                 report_data = {
                     "metadata": {
@@ -7697,7 +7700,10 @@ def report_export_tab():
                     },
                     "houses": [asdict(h) for h in st.session_state.houses] if hasattr(st.session_state, 'houses') else [],
                     "major_purchases": [asdict(mp) for mp in st.session_state.major_purchases] if hasattr(st.session_state, 'major_purchases') else [],
-                    "recurring_expenses": [asdict(re) for re in st.session_state.recurring_expenses] if hasattr(st.session_state, 'recurring_expenses') else []
+                    "recurring_expenses": [asdict(re) for re in st.session_state.recurring_expenses] if hasattr(st.session_state, 'recurring_expenses') else [],
+                    "state_timeline": [asdict(st_entry) for st_entry in st.session_state.state_timeline] if hasattr(st.session_state, 'state_timeline') else [],
+                    "cashflow_projections": cashflow_projections,
+                    "monte_carlo_results": st.session_state.mc_results if hasattr(st.session_state, 'mc_results') and st.session_state.mc_results else None
                 }
 
                 if report_format == "PDF (.pdf)":
@@ -7969,6 +7975,88 @@ def report_export_tab():
                             elements.append(recurring_table)
                             elements.append(Spacer(1, 20))
 
+                    # State Timeline Section
+                    if "Timeline" in include_sections and report_data.get('state_timeline'):
+                        elements.append(Paragraph("State & Cost-of-Living Timeline", heading_style))
+                        timeline_data = [['Year', 'State/Location', 'Spending Strategy']]
+                        for entry in report_data['state_timeline']:
+                            timeline_data.append([
+                                str(entry.get('year', 'N/A')),
+                                entry.get('state', 'N/A'),
+                                entry.get('spending_strategy', 'N/A')
+                            ])
+
+                        if len(timeline_data) > 1:
+                            timeline_table = Table(timeline_data, colWidths=[1.5*inch, 2.5*inch, 2.5*inch])
+                            timeline_table.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                            ]))
+                            elements.append(timeline_table)
+                            elements.append(Spacer(1, 20))
+
+                    # Cashflow Projection Summary Section
+                    if "Timeline" in include_sections and report_data.get('cashflow_projections'):
+                        elements.append(Paragraph("Lifetime Financial Projection Summary", heading_style))
+
+                        cashflow_proj = report_data['cashflow_projections']
+
+                        # Calculate key metrics
+                        final_year = cashflow_proj[-1]
+                        retirement_years = [y for y in cashflow_proj if y['parent1_age'] >= st.session_state.parentX_retirement_age or y['parent2_age'] >= st.session_state.parentY_retirement_age]
+
+                        min_net_worth_year = min(cashflow_proj, key=lambda x: x['net_worth'])
+                        max_net_worth_year = max(cashflow_proj, key=lambda x: x['net_worth'])
+
+                        avg_income_working = sum(y['total_income'] for y in cashflow_proj if y['parent1_age'] < st.session_state.parentX_retirement_age or y['parent2_age'] < st.session_state.parentY_retirement_age) / len([y for y in cashflow_proj if y['parent1_age'] < st.session_state.parentX_retirement_age or y['parent2_age'] < st.session_state.parentY_retirement_age]) if len([y for y in cashflow_proj if y['parent1_age'] < st.session_state.parentX_retirement_age or y['parent2_age'] < st.session_state.parentY_retirement_age]) > 0 else 0
+
+                        avg_expenses = sum(y['total_expenses'] for y in cashflow_proj) / len(cashflow_proj)
+
+                        summary_text = f"""
+                        <b>Planning Horizon:</b> {cashflow_proj[0]['year']} - {final_year['year']} ({len(cashflow_proj)} years)<br/>
+                        <b>Final Net Worth (Year {final_year['year']}):</b> ${final_year['net_worth']:,.0f}<br/>
+                        <b>Minimum Net Worth:</b> ${min_net_worth_year['net_worth']:,.0f} (Year {min_net_worth_year['year']})<br/>
+                        <b>Maximum Net Worth:</b> ${max_net_worth_year['net_worth']:,.0f} (Year {max_net_worth_year['year']})<br/>
+                        <b>Average Annual Income (Working Years):</b> ${avg_income_working:,.0f}<br/>
+                        <b>Average Annual Expenses (Lifetime):</b> ${avg_expenses:,.0f}<br/>
+                        <b>Retirement Years Covered:</b> {len(retirement_years)} years
+                        """
+                        elements.append(Paragraph(summary_text, styles['Normal']))
+                        elements.append(Spacer(1, 12))
+
+                        # Add note about detailed data
+                        note_text = "<i>Note: Full year-by-year cashflow projections with detailed expense breakdowns are available in the Excel export. The Excel file includes comprehensive data on income, expenses, net worth trajectory, and all expense categories for each year of your financial plan.</i>"
+                        elements.append(Paragraph(note_text, styles['Normal']))
+                        elements.append(Spacer(1, 20))
+
+                    # Monte Carlo Results Summary
+                    if report_data.get('monte_carlo_results'):
+                        elements.append(Paragraph("Monte Carlo Simulation Results", heading_style))
+
+                        mc_results = report_data['monte_carlo_results']
+                        final_year_idx = -1
+
+                        mc_summary_text = f"""
+                        <b>Simulation Scenario:</b> {mc_results.get('scenario', 'N/A')}<br/>
+                        <b>Number of Simulations:</b> 1,000<br/>
+                        <b>Final Year Net Worth Percentiles:</b><br/>
+                        • 10th Percentile: ${mc_results['percentiles']['10th'][final_year_idx]:,.0f}<br/>
+                        • 25th Percentile: ${mc_results['percentiles']['25th'][final_year_idx]:,.0f}<br/>
+                        • Median (50th): ${mc_results['percentiles']['50th'][final_year_idx]:,.0f}<br/>
+                        • 75th Percentile: ${mc_results['percentiles']['75th'][final_year_idx]:,.0f}<br/>
+                        • 90th Percentile: ${mc_results['percentiles']['90th'][final_year_idx]:,.0f}
+                        """
+                        elements.append(Paragraph(mc_summary_text, styles['Normal']))
+                        elements.append(Spacer(1, 12))
+
+                        note_text = "<i>Note: Complete Monte Carlo results with year-by-year percentile data are available in the Excel export.</i>"
+                        elements.append(Paragraph(note_text, styles['Normal']))
+                        elements.append(Spacer(1, 20))
+
                     # Build PDF
                     doc.build(elements)
                     output.seek(0)
@@ -8025,6 +8113,66 @@ def report_export_tab():
                         if "Healthcare" in include_sections and st.session_state.health_insurances:
                             healthcare_df = pd.DataFrame(report_data["healthcare"]["health_insurances"])
                             healthcare_df.to_excel(writer, sheet_name='Healthcare', index=False)
+
+                        # Houses Sheet
+                        if report_data.get("houses"):
+                            houses_df = pd.DataFrame(report_data["houses"])
+                            houses_df.to_excel(writer, sheet_name='Houses', index=False)
+
+                        # Major Purchases Sheet
+                        if report_data.get("major_purchases"):
+                            major_purchases_df = pd.DataFrame(report_data["major_purchases"])
+                            major_purchases_df.to_excel(writer, sheet_name='Major Purchases', index=False)
+
+                        # Recurring Expenses Sheet
+                        if report_data.get("recurring_expenses"):
+                            recurring_df = pd.DataFrame(report_data["recurring_expenses"])
+                            recurring_df.to_excel(writer, sheet_name='Recurring Expenses', index=False)
+
+                        # State Timeline Sheet
+                        if "Timeline" in include_sections and report_data.get("state_timeline"):
+                            timeline_df = pd.DataFrame(report_data["state_timeline"])
+                            timeline_df.to_excel(writer, sheet_name='State Timeline', index=False)
+
+                        # Cashflow Projections Sheet - THIS IS THE KEY DATA!
+                        if "Timeline" in include_sections and report_data.get("cashflow_projections"):
+                            # Simplify the cashflow data for Excel (remove nested dicts)
+                            cashflow_simple = []
+                            for year_data in report_data["cashflow_projections"]:
+                                cashflow_simple.append({
+                                    'Year': year_data['year'],
+                                    'Parent1 Age': year_data['parent1_age'],
+                                    'Parent2 Age': year_data['parent2_age'],
+                                    'Parent1 Income': year_data['parent1_income'],
+                                    'Parent2 Income': year_data['parent2_income'],
+                                    'Social Security': year_data['ss_income'],
+                                    'Total Income': year_data['total_income'],
+                                    'Base Expenses': year_data['base_expenses'],
+                                    'Children Expenses': year_data['children_expenses'],
+                                    'Healthcare Expenses': year_data['healthcare_expenses'],
+                                    'House Expenses': year_data['house_expenses'],
+                                    'Recurring Expenses': year_data['recurring_expenses'],
+                                    'Major Purchases': year_data['major_purchases'],
+                                    'Total Expenses': year_data['total_expenses'],
+                                    'Cashflow': year_data['cashflow'],
+                                    'Net Worth': year_data['net_worth']
+                                })
+                            cashflow_df = pd.DataFrame(cashflow_simple)
+                            cashflow_df.to_excel(writer, sheet_name='Cashflow Projections', index=False)
+
+                        # Monte Carlo Results Sheet
+                        if report_data.get("monte_carlo_results"):
+                            mc_results = report_data["monte_carlo_results"]
+                            mc_data = {
+                                'Year': mc_results['years'],
+                                '10th Percentile': mc_results['percentiles']['10th'],
+                                '25th Percentile': mc_results['percentiles']['25th'],
+                                'Median (50th)': mc_results['percentiles']['50th'],
+                                '75th Percentile': mc_results['percentiles']['75th'],
+                                '90th Percentile': mc_results['percentiles']['90th']
+                            }
+                            mc_df = pd.DataFrame(mc_data)
+                            mc_df.to_excel(writer, sheet_name='Monte Carlo Results', index=False)
 
                     output.seek(0)
 
