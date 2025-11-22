@@ -1596,6 +1596,8 @@ class EconomicParameters:
     healthcare_inflation_rate: float  # Healthcare-specific inflation
     use_historical_returns: bool = False  # Use historical average instead of custom
     use_historical_inflation: bool = False  # Use historical average instead of custom
+    use_historical_expense_growth: bool = False  # Use historical average for expense growth
+    use_historical_healthcare_inflation: bool = False  # Use historical average for healthcare inflation
 
 
 @dataclass
@@ -1896,7 +1898,9 @@ def initialize_session_state():
             expense_growth_rate=0.02,  # 2% default
             healthcare_inflation_rate=0.045,  # 4.5% default
             use_historical_returns=False,
-            use_historical_inflation=False
+            use_historical_inflation=False,
+            use_historical_expense_growth=False,
+            use_historical_healthcare_inflation=False
         )
 
         # Houses
@@ -2174,7 +2178,7 @@ def initialize_session_state():
                     'spending_strategy': 'Average'
                 }
             ],
-            'economic_params': asdict(EconomicParameters(0.08, 0.02, 0.02, 0.04, False, False)),
+            'economic_params': asdict(EconomicParameters(0.08, 0.02, 0.02, 0.04, False, False, False, False)),
             'ss_insolvency_enabled': True,
             'ss_shortfall_percentage': 30.0
         }
@@ -2425,16 +2429,16 @@ def initialize_session_state():
                 },
                 {
                     'year': current_year + 12,
-                    'state': 'California',  # Using California as proxy for Denver/Colorado
+                    'state': 'Sacramento',  # California city with expense data
                     'spending_strategy': 'Conservative'  # Cost-conscious after career change
                 },
                 {
                     'year': current_year + 18,
-                    'state': 'California',
+                    'state': 'Sacramento',
                     'spending_strategy': 'Average'  # Back to normal spending
                 }
             ],
-            'economic_params': asdict(EconomicParameters(0.06, 0.03, 0.02, 0.045, False, False)),
+            'economic_params': asdict(EconomicParameters(0.06, 0.03, 0.02, 0.045, False, False, False, False)),
             'ss_insolvency_enabled': True,
             'ss_shortfall_percentage': 30.0
         }
@@ -2705,7 +2709,7 @@ def initialize_session_state():
                     'spending_strategy': 'Average'  # Lower cost of living abroad
                 }
             ],
-            'economic_params': asdict(EconomicParameters(0.06, 0.03, 0.02, 0.045, False, False)),
+            'economic_params': asdict(EconomicParameters(0.06, 0.03, 0.02, 0.045, False, False, False, False)),
             'ss_insolvency_enabled': True,
             'ss_shortfall_percentage': 30.0
         }
@@ -2887,7 +2891,7 @@ def initialize_session_state():
                     'spending_strategy': 'High-end'  # Principal salary, established career
                 }
             ],
-            'economic_params': asdict(EconomicParameters(0.04, 0.03, 0.02, 0.05, False, False)),
+            'economic_params': asdict(EconomicParameters(0.04, 0.03, 0.02, 0.05, False, False, False, False)),
             'ss_insolvency_enabled': True,
             'ss_shortfall_percentage': 30.0
         }
@@ -3116,11 +3120,11 @@ def initialize_session_state():
                 },
                 {
                     'year': current_year + 12,
-                    'state': 'California',  # Using CA to represent RV lifestyle (no specific state)
+                    'state': 'Los Angeles',  # California city with expense data for RV lifestyle
                     'spending_strategy': 'Conservative'  # Full-time RV travel
                 }
             ],
-            'economic_params': asdict(EconomicParameters(0.04, 0.03, 0.02, 0.05, False, False)),
+            'economic_params': asdict(EconomicParameters(0.04, 0.03, 0.02, 0.05, False, False, False, False)),
             'ss_insolvency_enabled': True,
             'ss_shortfall_percentage': 30.0
         }
@@ -4866,6 +4870,8 @@ def economy_tab():
     stats = get_historical_return_stats()
     historical_return = stats['mean']
     historical_inflation = 0.03  # Historical US average ~3%
+    historical_expense_growth = 0.02  # Historical average ~2% (close to inflation)
+    historical_healthcare_inflation = 0.055  # Historical average ~5.5% (healthcare grows faster than general inflation)
 
     # Investment Returns Section
     st.subheader("📊 Investment Returns")
@@ -4928,27 +4934,61 @@ def economy_tab():
     # Other Parameters Section
     st.subheader("⚙️ Additional Parameters")
 
-    col1, col2 = st.columns(2)
+    # Expense Growth Rate
+    st.markdown("#### 📈 Expense Growth Rate")
+    col1, col2 = st.columns([1, 2])
 
     with col1:
-        params.expense_growth_rate = st.number_input(
-            "Expense Growth Rate (%)",
-            min_value=-5.0,
-            max_value=20.0,
-            value=float(params.expense_growth_rate * 100),
-            step=0.1,
-            help="Annual growth rate for expenses (separate from inflation)"
-        ) / 100.0
+        expense_growth_mode = st.radio(
+            "Expense Growth Source",
+            ["Historical Average", "Custom Value"],
+            index=0 if params.use_historical_expense_growth else 1,
+            key="expense_growth_mode"
+        )
+        params.use_historical_expense_growth = (expense_growth_mode == "Historical Average")
 
     with col2:
-        params.healthcare_inflation_rate = st.number_input(
-            "Healthcare Inflation (%)",
-            min_value=-5.0,
-            max_value=30.0,
-            value=float(params.healthcare_inflation_rate * 100),
-            step=0.5,
-            help="Healthcare costs typically grow faster than general inflation"
-        ) / 100.0
+        if params.use_historical_expense_growth:
+            st.info(f"📈 Using historical average: **{historical_expense_growth*100:.1f}%**")
+            st.caption("Long-term average expense growth rate (typically close to inflation)")
+            params.expense_growth_rate = historical_expense_growth
+        else:
+            params.expense_growth_rate = st.number_input(
+                "Annual Expense Growth Rate (%)",
+                min_value=-5.0,
+                max_value=20.0,
+                value=float(params.expense_growth_rate * 100),
+                step=0.1,
+                help="Annual growth rate for expenses (separate from inflation)"
+            ) / 100.0
+
+    # Healthcare Inflation
+    st.markdown("#### 🏥 Healthcare Inflation")
+    col1, col2 = st.columns([1, 2])
+
+    with col1:
+        healthcare_inflation_mode = st.radio(
+            "Healthcare Inflation Source",
+            ["Historical Average", "Custom Value"],
+            index=0 if params.use_historical_healthcare_inflation else 1,
+            key="healthcare_inflation_mode"
+        )
+        params.use_historical_healthcare_inflation = (healthcare_inflation_mode == "Historical Average")
+
+    with col2:
+        if params.use_historical_healthcare_inflation:
+            st.info(f"📈 Using historical average: **{historical_healthcare_inflation*100:.1f}%**")
+            st.caption("Healthcare costs historically grow faster than general inflation")
+            params.healthcare_inflation_rate = historical_healthcare_inflation
+        else:
+            params.healthcare_inflation_rate = st.number_input(
+                "Annual Healthcare Inflation (%)",
+                min_value=-5.0,
+                max_value=30.0,
+                value=float(params.healthcare_inflation_rate * 100),
+                step=0.5,
+                help="Healthcare costs typically grow faster than general inflation"
+            ) / 100.0
 
     # Summary Box
     st.divider()
@@ -4962,9 +5002,11 @@ def economy_tab():
         st.metric("Inflation Rate", f"{params.inflation_rate*100:.2f}%",
                  help="Historical" if params.use_historical_inflation else "Custom")
     with col3:
-        st.metric("Expense Growth", f"{params.expense_growth_rate*100:.2f}%")
+        st.metric("Expense Growth", f"{params.expense_growth_rate*100:.2f}%",
+                 help="Historical" if params.use_historical_expense_growth else "Custom")
     with col4:
-        st.metric("Healthcare Inflation", f"{params.healthcare_inflation_rate*100:.2f}%")
+        st.metric("Healthcare Inflation", f"{params.healthcare_inflation_rate*100:.2f}%",
+                 help="Historical" if params.use_historical_healthcare_inflation else "Custom")
 
     # Historical Market Data Reference
     st.divider()
