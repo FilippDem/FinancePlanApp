@@ -23,7 +23,7 @@ except ImportError:
 
 # Set page configuration
 st.set_page_config(
-    page_title="Financial Planning Application v0.71",
+    page_title="Financial Planning Application v0.72",
     page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -1589,12 +1589,13 @@ class RecurringExpense:
 
 
 @dataclass
-class EconomicScenario:
-    name: str
-    investment_return: float
-    inflation_rate: float
-    expense_growth_rate: float
-    healthcare_inflation_rate: float
+class EconomicParameters:
+    investment_return: float  # Annual return rate (e.g., 0.06 = 6%)
+    inflation_rate: float  # Annual inflation (e.g., 0.03 = 3%)
+    expense_growth_rate: float  # Expense growth separate from inflation
+    healthcare_inflation_rate: float  # Healthcare-specific inflation
+    use_historical_returns: bool = False  # Use historical average instead of custom
+    use_historical_inflation: bool = False  # Use historical average instead of custom
 
 
 @dataclass
@@ -1651,22 +1652,6 @@ class StateTimelineEntry:
     spending_strategy: str = "Average"
 
 
-# NEW: Portfolio Allocation dataclass
-@dataclass
-class PortfolioAllocation:
-    stocks: float = 60.0
-    bonds: float = 30.0
-    cash: float = 5.0
-    real_estate: float = 5.0
-    other: float = 0.0
-
-    def total(self) -> float:
-        return self.stocks + self.bonds + self.cash + self.real_estate + self.other
-
-    def is_valid(self) -> bool:
-        return abs(self.total() - 100.0) < 0.01
-
-
 # NEW: Healthcare & Insurance dataclasses
 @dataclass
 class HealthInsurance:
@@ -1719,51 +1704,6 @@ class Debt:
     forgiveness_years: int = 0
 
 
-# NEW: Education Funding dataclasses
-@dataclass
-class Plan529:
-    name: str
-    beneficiary: str  # Child name or "TBD"
-    current_balance: float
-    monthly_contribution: float
-    state: str  # For state tax deduction calculation
-    investment_return: float = 0.07
-    age_based_allocation: bool = True
-    contribution_end_age: int = 18
-
-@dataclass
-class EducationGoal:
-    beneficiary: str
-    institution_type: str  # "Public In-State", "Public Out-of-State", "Private", "Community College"
-    estimated_annual_cost: float
-    years_of_college: int = 4
-    start_year: int = 2043
-    scholarship_amount: float = 0.0
-    grants_amount: float = 0.0
-    student_loans_allowed: bool = False
-    max_parent_contribution: float = 0.0
-
-
-# NEW: Tax Optimization dataclasses
-@dataclass
-class TaxStrategy:
-    name: str
-    strategy_type: str  # "Roth Conversion", "Tax Loss Harvesting", "Charitable Giving", "HSA Max"
-    annual_amount: float
-    start_year: int
-    end_year: int
-    estimated_tax_savings: float = 0.0
-    notes: str = ""
-
-@dataclass
-class RetirementWithdrawal:
-    year: int
-    account_type: str  # "401k", "IRA", "Roth IRA", "Taxable", "HSA"
-    amount: float
-    tax_rate: float
-    purpose: str = "Living Expenses"
-
-
 # Currency formatting function with automatic scaling
 def format_currency(value, force_full=False, context="general"):
     """
@@ -1807,31 +1747,6 @@ def format_currency(value, force_full=False, context="general"):
         return f"${value:,.0f}"
 
 
-def convert_old_portfolio_format(portfolio_dict: dict) -> dict:
-    """Convert old 7-field portfolio format to new 5-field format for backward compatibility"""
-    # Check if this is the old format (has us_stocks, international_stocks, etc.)
-    if 'us_stocks' in portfolio_dict or 'international_stocks' in portfolio_dict:
-        # Old format - convert to new
-        us_stocks = portfolio_dict.get('us_stocks', 0.0)
-        international_stocks = portfolio_dict.get('international_stocks', 0.0)
-        bonds = portfolio_dict.get('bonds', 0.0)
-        reits = portfolio_dict.get('reits', 0.0)
-        commodities = portfolio_dict.get('commodities', 0.0)
-        cash = portfolio_dict.get('cash', 0.0)
-        crypto = portfolio_dict.get('crypto', 0.0)
-
-        # Combine into new format
-        return {
-            'stocks': us_stocks + international_stocks,
-            'bonds': bonds,
-            'cash': cash,
-            'real_estate': reits,
-            'other': commodities + crypto
-        }
-    else:
-        # Already in new format
-        return portfolio_dict
-
 
 # Initialize session state
 def initialize_session_state():
@@ -1849,9 +1764,6 @@ def initialize_session_state():
         st.session_state.state_timeline = [
             StateTimelineEntry(datetime.now().year, "Seattle", "Average")
         ]
-
-        # NEW: Portfolio allocation
-        st.session_state.portfolio_allocation = PortfolioAllocation()
 
         # Parent X data
         st.session_state.parentX_age = 35
@@ -1993,14 +1905,16 @@ def initialize_session_state():
             )
         ]
 
-        # Economic scenarios
-        st.session_state.economic_scenarios = {
-            'Conservative': EconomicScenario('Conservative', 0.04, 0.03, 0.02, 0.05),
-            'Moderate': EconomicScenario('Moderate', 0.06, 0.025, 0.02, 0.045),
-            'Aggressive': EconomicScenario('Aggressive', 0.08, 0.02, 0.02, 0.04)
-        }
-
-        st.session_state.active_scenario = 'Moderate'
+        # Economic parameters
+        # Default to moderate assumptions with custom values
+        st.session_state.economic_params = EconomicParameters(
+            investment_return=0.06,  # 6% default
+            inflation_rate=0.03,  # 3% default
+            expense_growth_rate=0.02,  # 2% default
+            healthcare_inflation_rate=0.045,  # 4.5% default
+            use_historical_returns=False,
+            use_historical_inflation=False
+        )
 
         # Houses
         st.session_state.houses = [
@@ -2169,13 +2083,6 @@ def initialize_session_state():
                     ]
                 }
             ],
-            'portfolio_allocation': {
-                'stocks': 85.0,  # US + International
-                'bonds': 5.0,
-                'cash': 3.0,
-                'real_estate': 5.0,  # REITs
-                'other': 2.0  # Crypto
-            },
             'major_purchases': [
                 {
                     'name': 'Sabbatical Year Living Expenses',
@@ -2284,7 +2191,7 @@ def initialize_session_state():
                     'spending_strategy': 'Average'
                 }
             ],
-            'active_scenario': 'Aggressive',
+            'economic_params': asdict(EconomicParameters(0.08, 0.02, 0.02, 0.04, False, False)),
             'ss_insolvency_enabled': True,
             'ss_shortfall_percentage': 30.0
         }
@@ -2422,13 +2329,6 @@ def initialize_session_state():
                     ]
                 }
             ],
-            'portfolio_allocation': {
-                'stocks': 80.0,  # US + International
-                'bonds': 15.0,
-                'cash': 2.0,
-                'real_estate': 3.0,  # REITs
-                'other': 0.0
-            },
             'major_purchases': [
                 {
                     'name': "Olivia's Wedding",
@@ -2551,7 +2451,7 @@ def initialize_session_state():
                     'spending_strategy': 'Average'  # Back to normal spending
                 }
             ],
-            'active_scenario': 'Moderate',
+            'economic_params': asdict(EconomicParameters(0.06, 0.03, 0.02, 0.045, False, False)),
             'ss_insolvency_enabled': True,
             'ss_shortfall_percentage': 30.0
         }
@@ -2690,21 +2590,9 @@ def initialize_session_state():
                     'property_tax_rate': 0.006,
                     'home_insurance': 3800.0,
                     'maintenance_rate': 0.012,
-                    'upkeep_costs': 18000.0,
-                    'owner': 'Shared',
-                    'timeline': [
-                        {'year': current_year + 3, 'status': 'Own_Live', 'rental_income': 0.0},
-                        {'year': current_year + 12, 'status': 'Sold', 'rental_income': 0.0}  # Sell before moving abroad
-                    ]
+                    'upkeep_costs': 18000.0
                 }
             ],
-            'portfolio_allocation': {
-                'stocks': 70.0,  # US + International
-                'bonds': 20.0,
-                'cash': 2.0,
-                'real_estate': 5.0,  # REITs
-                'other': 3.0  # Commodities
-            },
             'major_purchases': [
                 {
                     'name': "Isabella's Wedding Reception",
@@ -2834,7 +2722,7 @@ def initialize_session_state():
                     'spending_strategy': 'Average'  # Lower cost of living abroad
                 }
             ],
-            'active_scenario': 'Moderate',
+            'economic_params': asdict(EconomicParameters(0.06, 0.03, 0.02, 0.045, False, False)),
             'ss_insolvency_enabled': True,
             'ss_shortfall_percentage': 30.0
         }
@@ -2927,27 +2815,6 @@ def initialize_session_state():
                     'property_tax_rate': 0.0085,
                     'home_insurance': 1300.0,
                     'maintenance_rate': 0.01,
-                    'upkeep_costs': 4000.0,
-                    'owner': 'ParentX',
-                    'timeline': [
-                        {'year': current_year + 12, 'status': 'Own_Live', 'rental_income': 0.0}  # Vacation home
-                    ]
-                }
-            ],
-            'portfolio_allocation': {
-                'stocks': 80.0,  # US + International
-                'bonds': 15.0,
-                'cash': 5.0,
-                'real_estate': 0.0,
-                'other': 0.0
-            },
-            'major_purchases': [
-                {
-                    'name': 'Masters Degree in Education Administration',
-                    'year': current_year + 4,
-                    'amount': 42000.0,
-                    'financing_years': 0,
-                    'interest_rate': 0.0,
                     'asset_type': 'Expense',
                     'appreciation_rate': 0.0
                 },
@@ -3037,7 +2904,7 @@ def initialize_session_state():
                     'spending_strategy': 'High-end'  # Principal salary, established career
                 }
             ],
-            'active_scenario': 'Conservative',
+            'economic_params': asdict(EconomicParameters(0.04, 0.03, 0.02, 0.05, False, False)),
             'ss_insolvency_enabled': True,
             'ss_shortfall_percentage': 30.0
         }
@@ -3138,34 +3005,6 @@ def initialize_session_state():
                     'property_tax_rate': 0.0081,
                     'home_insurance': 1100.0,
                     'maintenance_rate': 0.011,
-                    'upkeep_costs': 3800.0,
-                    'owner': 'Shared',
-                    'timeline': [
-                        {'year': current_year + 8, 'status': 'Own_Live', 'rental_income': 0.0}  # Summer retreat
-                    ]
-                }
-            ],
-            'portfolio_allocation': {
-                'stocks': 65.0,  # US + International
-                'bonds': 30.0,
-                'cash': 2.0,
-                'real_estate': 3.0,  # REITs
-                'other': 0.0
-            },
-            'major_purchases': [
-                {
-                    'name': "First Adult Child's Wedding Gift",
-                    'year': current_year + 3,
-                    'amount': 25000.0,
-                    'financing_years': 0,
-                    'interest_rate': 0.0,
-                    'asset_type': 'Expense',
-                    'appreciation_rate': 0.0
-                },
-                {
-                    'name': "Second Adult Child's Wedding Gift",
-                    'year': current_year + 6,
-                    'amount': 28000.0,
                     'financing_years': 0,
                     'interest_rate': 0.0,
                     'asset_type': 'Expense',
@@ -3298,7 +3137,7 @@ def initialize_session_state():
                     'spending_strategy': 'Conservative'  # Full-time RV travel
                 }
             ],
-            'active_scenario': 'Conservative',
+            'economic_params': asdict(EconomicParameters(0.04, 0.03, 0.02, 0.05, False, False)),
             'ss_insolvency_enabled': True,
             'ss_shortfall_percentage': 30.0
         }
@@ -3330,28 +3169,11 @@ def initialize_session_state():
         st.session_state.debt_payoff_strategy = "Avalanche"  # "Avalanche", "Snowball", "Minimum Only"
         st.session_state.extra_debt_payment = 0.0
 
-        # NEW: Education Funding
-        st.session_state.plan529_accounts = []
-        st.session_state.education_goals = []
-        st.session_state.coverdell_esa = 0.0
-        st.session_state.utma_ugma_balance = 0.0
-
-        # NEW: Tax Optimization
-        st.session_state.tax_strategies = []
-        st.session_state.retirement_withdrawals = []
-        st.session_state.roth_conversion_amount = 0.0
-        st.session_state.charitable_contributions = 0.0
-        st.session_state.qcd_enabled = False  # Qualified Charitable Distribution
-        st.session_state.tax_bracket = 0.22    # Federal marginal tax bracket
-
         # Tab visibility settings
         st.session_state.show_family_expenses = False  # Off by default (advanced template management)
         st.session_state.show_recurring_expenses = True  # On by default
-        st.session_state.show_portfolio_allocation = False  # Off by default
         st.session_state.show_healthcare = False  # Off by default
         st.session_state.show_debt = False  # Off by default
-        st.session_state.show_education = False  # Off by default
-        st.session_state.show_tax = False  # Off by default
         st.session_state.show_export = True  # On by default
 
         st.session_state.initialized = True
@@ -3702,7 +3524,7 @@ def main():
     """Main application function"""
     initialize_session_state()
 
-    st.title("💰 Financial Planning Suite v0.71")
+    st.title("💰 Financial Planning Suite v0.72")
 
     # Build tab list dynamically based on visibility settings
     tab_configs = [
@@ -3834,13 +3656,6 @@ def parent_settings_tab():
         )
 
         st.checkbox(
-            "💼 Portfolio Allocation",
-            value=st.session_state.get('show_portfolio_allocation', False),
-            key='show_portfolio_allocation',
-            help="Configure asset allocation (stocks, bonds, cash, real estate)"
-        )
-
-        st.checkbox(
             "🏥 Healthcare & Insurance",
             value=st.session_state.get('show_healthcare', False),
             key='show_healthcare',
@@ -3855,20 +3670,6 @@ def parent_settings_tab():
         )
 
     with col2:
-        st.checkbox(
-            "🎓 Education Funding",
-            value=st.session_state.get('show_education', False),
-            key='show_education',
-            help="Plan 529 accounts, college costs, and scholarships"
-        )
-
-        st.checkbox(
-            "💼 Tax Optimization",
-            value=st.session_state.get('show_tax', False),
-            key='show_tax',
-            help="Optimize Roth conversions, QCDs, and withdrawal sequencing"
-        )
-
         st.checkbox(
             "📄 Export Reports",
             value=st.session_state.get('show_export', True),
@@ -3895,7 +3696,7 @@ def parent_settings_tab():
     3. **Family Expenses**: Define annual expenses, taxes, major purchases
     4. **Children**: Add children and configure their education expenses
     5. **Houses**: Track property ownership, mortgages, and timelines
-    6. **Economy**: Select economic scenario (Conservative/Moderate/Aggressive)
+    6. **Economy**: Configure market returns and inflation assumptions
     7. **Timeline**: Review consolidated timeline and plan relocations
     8. **Analysis**: Run Monte Carlo simulations to project future outcomes
     9. **Save/Load**: Save scenarios for future reference
@@ -3903,11 +3704,8 @@ def parent_settings_tab():
     #### Optional Advanced Features
 
     Enable in Settings → Tab Visibility to access:
-    - **Portfolio Allocation**: Define investment mix across asset classes
     - **Healthcare & Insurance**: Plan Medicare, HSA, and long-term care costs
     - **Debt Management**: Track loans and optimize payoff strategies
-    - **Education Funding**: Manage 529 plans and college savings
-    - **Tax Optimization**: Plan Roth conversions and withdrawal strategies
     - **Export Reports**: Generate Excel/CSV/JSON reports
 
     #### Key Capabilities
@@ -5085,170 +4883,124 @@ def house_tab():
                 st.rerun()
 
 
-def portfolio_allocation_tab():
-    """NEW: Portfolio allocation tab"""
-    st.header("💼 Portfolio Allocation")
+def economy_tab():
+    """Economy parameters configuration tab"""
+    st.header("📈 Economy & Market Parameters")
 
     st.markdown("""
-    Define how your investment portfolio is allocated across different asset classes.
-    This helps track your diversification and risk profile.
+    Configure the economic assumptions used in your financial projections.
+    You can use historical averages or specify custom values for returns and inflation.
     """)
 
-    col1, col2 = st.columns([2, 1])
+    params = st.session_state.economic_params
 
-    with col1:
-        st.subheader("Asset Allocation")
+    # Calculate historical stats
+    stats = get_historical_return_stats()
+    historical_return = stats['mean']
+    historical_inflation = 0.03  # Historical US average ~3%
 
-        allocation = st.session_state.portfolio_allocation
-
-        allocation.stocks = st.slider(
-            "📈 Stocks (%)",
-            min_value=0.0,
-            max_value=100.0,
-            value=float(allocation.stocks),
-            step=0.5,
-            key="alloc_stocks"
-        )
-
-        allocation.bonds = st.slider(
-            "📊 Bonds (%)",
-            min_value=0.0,
-            max_value=100.0,
-            value=float(allocation.bonds),
-            step=0.5,
-            key="alloc_bonds"
-        )
-
-        allocation.cash = st.slider(
-            "💵 Cash (%)",
-            min_value=0.0,
-            max_value=100.0,
-            value=float(allocation.cash),
-            step=0.5,
-            key="alloc_cash"
-        )
-
-        allocation.real_estate = st.slider(
-            "🏠 Real Estate (%)",
-            min_value=0.0,
-            max_value=100.0,
-            value=float(allocation.real_estate),
-            step=0.5,
-            key="alloc_real_estate"
-        )
-
-        allocation.other = st.slider(
-            "🔧 Other (%)",
-            min_value=0.0,
-            max_value=100.0,
-            value=float(allocation.other),
-            step=0.5,
-            key="alloc_other"
-        )
-
-    with col2:
-        st.subheader("Allocation Summary")
-
-        total_allocation = allocation.total()
-
-        if allocation.is_valid():
-            st.success(f"✅ Total: {total_allocation:.1f}%")
-        else:
-            st.error(f"❌ Total: {total_allocation:.1f}%")
-            st.warning("Allocation should total 100%")
-
-        # Pie chart
-        fig = go.Figure(data=[go.Pie(
-            labels=['Stocks', 'Bonds', 'Cash', 'Real Estate', 'Other'],
-            values=[allocation.stocks, allocation.bonds, allocation.cash, allocation.real_estate, allocation.other],
-            hole=.3
-        )])
-        fig.update_layout(title="Portfolio Allocation", height=400)
-        st.plotly_chart(fig, use_container_width=True)
-
-        # Breakdown table
-        st.markdown("### Breakdown")
-        breakdown_df = pd.DataFrame({
-            'Asset Class': ['Stocks', 'Bonds', 'Cash', 'Real Estate', 'Other'],
-            'Allocation %': [allocation.stocks, allocation.bonds, allocation.cash, allocation.real_estate, allocation.other]
-        })
-        st.dataframe(breakdown_df, use_container_width=True, hide_index=True)
-
-
-def economy_tab():
-    """Economy scenarios tab"""
-    st.header("📈 Economy & Market Scenarios")
-
-    st.subheader("Economic Scenarios")
-
-    scenario_names = list(st.session_state.economic_scenarios.keys())
+    # Investment Returns Section
+    st.subheader("📊 Investment Returns")
 
     col1, col2 = st.columns([1, 2])
 
     with col1:
-        st.session_state.active_scenario = st.selectbox(
-            "Active Scenario",
-            scenario_names,
-            index=scenario_names.index(st.session_state.active_scenario) if st.session_state.active_scenario in scenario_names else 0
+        return_mode = st.radio(
+            "Return Source",
+            ["Historical Average", "Custom Value"],
+            index=0 if params.use_historical_returns else 1,
+            key="return_mode"
         )
+        params.use_historical_returns = (return_mode == "Historical Average")
 
     with col2:
-        active = st.session_state.economic_scenarios[st.session_state.active_scenario]
-        st.info(f"**{active.name}**: {active.investment_return*100:.1f}% return, {active.inflation_rate*100:.1f}% inflation")
+        if params.use_historical_returns:
+            st.info(f"📈 Using historical S&P 500 average: **{historical_return*100:.2f}%**")
+            st.caption(f"Based on {stats['total_years']} years of data (1924-2023)")
+            params.investment_return = historical_return
+        else:
+            params.investment_return = st.number_input(
+                "Annual Investment Return (%)",
+                min_value=-20.0,
+                max_value=50.0,
+                value=float(params.investment_return * 100),
+                step=0.5,
+                help="Expected annual return on your investment portfolio"
+            ) / 100.0
 
-    # Display all scenarios
-    for scenario_name, scenario in st.session_state.economic_scenarios.items():
-        with st.expander(f"📊 {scenario_name} Scenario" + (" ⭐ (Active)" if scenario_name == st.session_state.active_scenario else "")):
-            col1, col2, col3, col4 = st.columns(4)
+    # Inflation Section
+    st.subheader("💸 Inflation")
 
-            with col1:
-                new_inv_return = st.number_input(
-                    "Investment Return (%)",
-                    min_value=-20.0,
-                    max_value=50.0,
-                    value=float(scenario.investment_return * 100),
-                    step=0.5,
-                    key=f"scenario_{scenario_name}_return"
-                )
-                scenario.investment_return = new_inv_return / 100.0
+    col1, col2 = st.columns([1, 2])
 
-            with col2:
-                new_inflation = st.number_input(
-                    "Inflation Rate (%)",
-                    min_value=-5.0,
-                    max_value=20.0,
-                    value=float(scenario.inflation_rate * 100),
-                    step=0.1,
-                    key=f"scenario_{scenario_name}_inflation"
-                )
-                scenario.inflation_rate = new_inflation / 100.0
+    with col1:
+        inflation_mode = st.radio(
+            "Inflation Source",
+            ["Historical Average", "Custom Value"],
+            index=0 if params.use_historical_inflation else 1,
+            key="inflation_mode"
+        )
+        params.use_historical_inflation = (inflation_mode == "Historical Average")
 
-            with col3:
-                new_expense_growth = st.number_input(
-                    "Expense Growth (%)",
-                    min_value=-5.0,
-                    max_value=20.0,
-                    value=float(scenario.expense_growth_rate * 100),
-                    step=0.1,
-                    key=f"scenario_{scenario_name}_expense"
-                )
-                scenario.expense_growth_rate = new_expense_growth / 100.0
+    with col2:
+        if params.use_historical_inflation:
+            st.info(f"📈 Using historical US average: **{historical_inflation*100:.1f}%**")
+            st.caption("Long-term historical average inflation rate")
+            params.inflation_rate = historical_inflation
+        else:
+            params.inflation_rate = st.number_input(
+                "Annual Inflation Rate (%)",
+                min_value=-5.0,
+                max_value=20.0,
+                value=float(params.inflation_rate * 100),
+                step=0.1,
+                help="Expected annual inflation rate for general expenses"
+            ) / 100.0
 
-            with col4:
-                new_healthcare_inflation = st.number_input(
-                    "Healthcare Inflation (%)",
-                    min_value=-5.0,
-                    max_value=30.0,
-                    value=float(scenario.healthcare_inflation_rate * 100),
-                    step=0.5,
-                    key=f"scenario_{scenario_name}_healthcare"
-                )
-                scenario.healthcare_inflation_rate = new_healthcare_inflation / 100.0
+    # Other Parameters Section
+    st.subheader("⚙️ Additional Parameters")
 
-    # Historical Market Data
-    st.subheader("📜 Historical S&P 500 Returns")
+    col1, col2 = st.columns(2)
 
-    stats = get_historical_return_stats()
+    with col1:
+        params.expense_growth_rate = st.number_input(
+            "Expense Growth Rate (%)",
+            min_value=-5.0,
+            max_value=20.0,
+            value=float(params.expense_growth_rate * 100),
+            step=0.1,
+            help="Annual growth rate for expenses (separate from inflation)"
+        ) / 100.0
+
+    with col2:
+        params.healthcare_inflation_rate = st.number_input(
+            "Healthcare Inflation (%)",
+            min_value=-5.0,
+            max_value=30.0,
+            value=float(params.healthcare_inflation_rate * 100),
+            step=0.5,
+            help="Healthcare costs typically grow faster than general inflation"
+        ) / 100.0
+
+    # Summary Box
+    st.divider()
+    st.subheader("📋 Current Parameters Summary")
+
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Investment Return", f"{params.investment_return*100:.2f}%",
+                 help="Historical" if params.use_historical_returns else "Custom")
+    with col2:
+        st.metric("Inflation Rate", f"{params.inflation_rate*100:.2f}%",
+                 help="Historical" if params.use_historical_inflation else "Custom")
+    with col3:
+        st.metric("Expense Growth", f"{params.expense_growth_rate*100:.2f}%")
+    with col4:
+        st.metric("Healthcare Inflation", f"{params.healthcare_inflation_rate*100:.2f}%")
+
+    # Historical Market Data Reference
+    st.divider()
+    st.subheader("📜 Historical S&P 500 Returns Reference")
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -6189,8 +5941,8 @@ def combined_analysis_cashflow_tab():
     # Run Monte Carlo Simulation Button
     if st.button("🎲 Run Monte Carlo Simulation", type="primary", use_container_width=True, key="run_mc_v071"):
         with st.spinner("Running Monte Carlo simulation... This may take a minute."):
-            # Import necessary libraries
-            scenario = st.session_state.economic_scenarios[st.session_state.active_scenario]
+            # Get economic parameters
+            scenario = st.session_state.economic_params
 
             num_sims = min(st.session_state.mc_simulations, 1000)
             all_sim_results = []
@@ -6992,11 +6744,10 @@ def save_load_tab():
                 'expenses': st.session_state.expenses,
                 'children_list': st.session_state.children_list,
                 'houses': [asdict(h) for h in st.session_state.houses],
-                'portfolio_allocation': asdict(st.session_state.portfolio_allocation),
                 'major_purchases': [asdict(mp) for mp in st.session_state.major_purchases],
                 'recurring_expenses': [asdict(re) for re in st.session_state.recurring_expenses],
                 'state_timeline': [asdict(st) for st in st.session_state.state_timeline],
-                'active_scenario': st.session_state.active_scenario,
+                'economic_params': asdict(st.session_state.economic_params),
                 'ss_insolvency_enabled': st.session_state.ss_insolvency_enabled,
                 'ss_shortfall_percentage': st.session_state.ss_shortfall_percentage,
             }
@@ -7029,16 +6780,14 @@ def save_load_tab():
                                     house_dict['timeline'] = [HouseTimelineEntry(**entry) for entry in house_dict['timeline']]
                                 houses.append(House(**house_dict))
                             st.session_state.houses = houses
-                        elif key == 'portfolio_allocation':
-                            # Convert old format to new format if needed
-                            converted_value = convert_old_portfolio_format(value)
-                            st.session_state.portfolio_allocation = PortfolioAllocation(**converted_value)
                         elif key == 'major_purchases':
                             st.session_state.major_purchases = [MajorPurchase(**mp) for mp in value]
                         elif key == 'recurring_expenses':
                             st.session_state.recurring_expenses = [RecurringExpense(**re) for re in value]
                         elif key == 'state_timeline':
                             st.session_state.state_timeline = [StateTimelineEntry(**st_entry) for st_entry in value]
+                        elif key == 'economic_params':
+                            st.session_state.economic_params = EconomicParameters(**value)
                         else:
                             st.session_state[key] = value
 
@@ -7086,11 +6835,10 @@ def save_load_tab():
                 'expenses': st.session_state.expenses,
                 'children_list': st.session_state.children_list,
                 'houses': [asdict(h) for h in st.session_state.houses],
-                'portfolio_allocation': asdict(st.session_state.portfolio_allocation),
                 'major_purchases': [asdict(mp) for mp in st.session_state.major_purchases],
                 'recurring_expenses': [asdict(re) for re in st.session_state.recurring_expenses],
                 'state_timeline': [asdict(st_entry) for st_entry in st.session_state.state_timeline],
-                'active_scenario': st.session_state.active_scenario,
+                'economic_params': asdict(st.session_state.economic_params),
                 'ss_insolvency_enabled': st.session_state.ss_insolvency_enabled,
                 'ss_shortfall_percentage': st.session_state.ss_shortfall_percentage,
             }
@@ -7124,16 +6872,14 @@ def save_load_tab():
                                 house_dict['timeline'] = [HouseTimelineEntry(**entry) for entry in house_dict['timeline']]
                             houses.append(House(**house_dict))
                         st.session_state.houses = houses
-                    elif key == 'portfolio_allocation':
-                        # Convert old format to new format if needed
-                        converted_value = convert_old_portfolio_format(value)
-                        st.session_state.portfolio_allocation = PortfolioAllocation(**converted_value)
                     elif key == 'major_purchases':
                         st.session_state.major_purchases = [MajorPurchase(**mp) for mp in value]
                     elif key == 'recurring_expenses':
                         st.session_state.recurring_expenses = [RecurringExpense(**re) for re in value]
                     elif key == 'state_timeline':
                         st.session_state.state_timeline = [StateTimelineEntry(**st_entry) for st_entry in value]
+                    elif key == 'economic_params':
+                        st.session_state.economic_params = EconomicParameters(**value)
                     else:
                         st.session_state[key] = value
 
@@ -7538,444 +7284,6 @@ def debt_management_tab():
             fig = px.pie(debt_df, values='Balance', names='Debt', title='Debt Breakdown by Balance')
             st.plotly_chart(fig, use_container_width=True)
 
-
-# NEW TAB 3: Education Funding
-def education_funding_tab():
-    """Education Funding and 529 Planning Tab"""
-    st.header("🎓 Education Funding Planner")
-
-    st.markdown("""
-    Plan for college expenses with 529 plans, Coverdell ESAs, and other education savings vehicles.
-    Project costs and funding gaps for each child.
-    """)
-
-    # Ensure education variables are initialized (defensive programming for old sessions)
-    if 'plan529_accounts' not in st.session_state:
-        st.session_state.plan529_accounts = []
-    if 'education_goals' not in st.session_state:
-        st.session_state.education_goals = []
-    if 'coverdell_esa' not in st.session_state:
-        st.session_state.coverdell_esa = 0.0
-    if 'utma_ugma_balance' not in st.session_state:
-        st.session_state.utma_ugma_balance = 0.0
-
-    # 529 Plan Management
-    st.subheader("💰 529 College Savings Plans")
-
-    if st.button("➕ Add 529 Account"):
-        new_529 = Plan529(
-            name="529 Plan",
-            beneficiary="Child 1",
-            current_balance=5000.0,
-            monthly_contribution=250.0,
-            state="Seattle",
-            investment_return=0.07,
-            age_based_allocation=True,
-            contribution_end_age=18
-        )
-        st.session_state.plan529_accounts.append(new_529)
-        st.rerun()
-
-    for idx, plan in enumerate(st.session_state.plan529_accounts):
-        with st.expander(f"🎓 {plan.name} - Beneficiary: {plan.beneficiary}"):
-            col1, col2, col3 = st.columns([3, 3, 1])
-
-            with col1:
-                plan.name = st.text_input(f"Plan Name##529_{idx}", value=plan.name)
-                plan.beneficiary = st.text_input(f"Beneficiary##529_{idx}", value=plan.beneficiary)
-                plan.state = st.selectbox(
-                    f"State (for tax deductions)##529_{idx}",
-                    AVAILABLE_LOCATIONS_FAMILY[:7],  # US locations
-                    index=AVAILABLE_LOCATIONS_FAMILY[:7].index(plan.state) if plan.state in AVAILABLE_LOCATIONS_FAMILY[:7] else 0
-                )
-                plan.age_based_allocation = st.checkbox(
-                    f"Age-Based Asset Allocation##529_{idx}",
-                    value=plan.age_based_allocation,
-                    help="Automatically adjusts from aggressive to conservative as beneficiary ages"
-                )
-
-            with col2:
-                plan.current_balance = st.number_input(
-                    f"Current Balance##529_{idx}",
-                    min_value=0.0,
-                    value=float(plan.current_balance),
-                    step=1000.0
-                )
-                plan.monthly_contribution = st.number_input(
-                    f"Monthly Contribution##529_{idx}",
-                    min_value=0.0,
-                    value=float(plan.monthly_contribution),
-                    step=50.0
-                )
-                plan.investment_return = st.number_input(
-                    f"Expected Annual Return (%)##529_{idx}",
-                    min_value=0.0,
-                    max_value=20.0,
-                    value=float(plan.investment_return * 100),
-                    step=0.5
-                ) / 100
-                plan.contribution_end_age = st.number_input(
-                    f"Stop Contributing at Age##529_{idx}",
-                    min_value=0,
-                    max_value=30,
-                    value=int(plan.contribution_end_age),
-                    step=1
-                )
-
-            with col3:
-                if st.button(f"🗑️##529_{idx}"):
-                    st.session_state.plan529_accounts.pop(idx)
-                    st.rerun()
-
-            st.session_state.plan529_accounts[idx] = plan
-
-    # Education Goals
-    st.subheader("🎯 Education Goals")
-
-    if st.button("➕ Add Education Goal"):
-        new_goal = EducationGoal(
-            beneficiary="Child 1",
-            institution_type="Public In-State",
-            estimated_annual_cost=15000.0,
-            years_of_college=4,
-            start_year=st.session_state.current_year + 13,
-            scholarship_amount=5000.0,
-            grants_amount=2000.0,
-            student_loans_allowed=False,
-            max_parent_contribution=50000.0
-        )
-        st.session_state.education_goals.append(new_goal)
-        st.rerun()
-
-    for idx, goal in enumerate(st.session_state.education_goals):
-        with st.expander(f"🎓 {goal.beneficiary} - {goal.institution_type}"):
-            col1, col2, col3 = st.columns([3, 3, 1])
-
-            with col1:
-                goal.beneficiary = st.text_input(f"Student Name##goal{idx}", value=goal.beneficiary)
-                goal.institution_type = st.selectbox(
-                    f"Institution Type##goal{idx}",
-                    ["Public In-State", "Public Out-of-State", "Private", "Community College", "Trade School"],
-                    index=["Public In-State", "Public Out-of-State", "Private", "Community College", "Trade School"].index(goal.institution_type) if goal.institution_type in ["Public In-State", "Public Out-of-State", "Private", "Community College", "Trade School"] else 0
-                )
-                goal.estimated_annual_cost = st.number_input(
-                    f"Estimated Annual Cost (Today's Dollars)##goal{idx}",
-                    min_value=0.0,
-                    value=float(goal.estimated_annual_cost),
-                    step=1000.0,
-                    help="Total cost including tuition, room, board, books"
-                )
-
-            with col2:
-                goal.years_of_college = st.number_input(
-                    f"Years of College##goal{idx}",
-                    min_value=1,
-                    max_value=8,
-                    value=int(goal.years_of_college),
-                    step=1
-                )
-                goal.start_year = st.number_input(
-                    f"College Start Year##goal{idx}",
-                    min_value=st.session_state.current_year,
-                    max_value=st.session_state.current_year + 50,
-                    value=int(goal.start_year),
-                    step=1
-                )
-                goal.scholarship_amount = st.number_input(
-                    f"Expected Annual Scholarship##goal{idx}",
-                    min_value=0.0,
-                    value=float(goal.scholarship_amount),
-                    step=500.0
-                )
-                goal.grants_amount = st.number_input(
-                    f"Expected Annual Grants##goal{idx}",
-                    min_value=0.0,
-                    value=float(goal.grants_amount),
-                    step=500.0
-                )
-
-            with col3:
-                if st.button(f"🗑️##goal{idx}"):
-                    st.session_state.education_goals.pop(idx)
-                    st.rerun()
-
-            goal.student_loans_allowed = st.checkbox(
-                f"Student Loans Allowed##goal{idx}",
-                value=goal.student_loans_allowed
-            )
-            goal.max_parent_contribution = st.number_input(
-                f"Maximum Parent Contribution (Total)##goal{idx}",
-                min_value=0.0,
-                value=float(goal.max_parent_contribution),
-                step=5000.0
-            )
-
-            st.session_state.education_goals[idx] = goal
-
-    # Education Funding Summary
-    if st.session_state.education_goals:
-        st.subheader("📊 Education Funding Summary")
-
-        total_529_balance = sum([p.current_balance for p in st.session_state.plan529_accounts])
-        total_education_need = sum([g.estimated_annual_cost * g.years_of_college for g in st.session_state.education_goals])
-        total_scholarships_grants = sum([(g.scholarship_amount + g.grants_amount) * g.years_of_college for g in st.session_state.education_goals])
-
-        net_need = total_education_need - total_scholarships_grants
-        funding_gap = net_need - total_529_balance
-
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Total 529 Balance", format_currency(total_529_balance))
-        col2.metric("Total Education Cost", format_currency(total_education_need))
-        col3.metric("Scholarships & Grants", format_currency(total_scholarships_grants))
-        col4.metric("Funding Gap", format_currency(funding_gap),
-                   delta="Surplus" if funding_gap < 0 else "Deficit")
-
-
-# NEW TAB 4: Tax Optimization
-def tax_optimization_tab():
-    """Tax Optimization Strategies Tab"""
-    st.header("💼 Tax Optimization Strategies")
-
-    st.markdown("""
-    Implement tax-efficient strategies to minimize lifetime tax burden and maximize retirement income.
-    Includes Roth conversions, tax-loss harvesting, charitable giving, and withdrawal sequencing.
-    """)
-
-    # Ensure tax variables are initialized (defensive programming for old sessions)
-    if 'tax_strategies' not in st.session_state:
-        st.session_state.tax_strategies = []
-    if 'retirement_withdrawals' not in st.session_state:
-        st.session_state.retirement_withdrawals = []
-    if 'roth_conversion_amount' not in st.session_state:
-        st.session_state.roth_conversion_amount = 0.0
-    if 'charitable_contributions' not in st.session_state:
-        st.session_state.charitable_contributions = 0.0
-    if 'qcd_enabled' not in st.session_state:
-        st.session_state.qcd_enabled = False
-    if 'tax_bracket' not in st.session_state:
-        st.session_state.tax_bracket = 0.22
-
-    # Current Tax Situation
-    st.subheader("📊 Current Tax Situation")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        tax_brackets = [0.10, 0.12, 0.22, 0.24, 0.32, 0.35, 0.37]
-        try:
-            bracket_index = tax_brackets.index(st.session_state.tax_bracket)
-        except ValueError:
-            # Default to 22% if current bracket is invalid
-            bracket_index = 2
-
-        st.session_state.tax_bracket = st.selectbox(
-            "Federal Marginal Tax Bracket",
-            tax_brackets,
-            index=bracket_index,
-            format_func=lambda x: f"{x*100:.0f}%"
-        )
-    with col2:
-        st.session_state.state_tax_rate = st.number_input(
-            "State Tax Rate (%)",
-            min_value=0.0,
-            max_value=15.0,
-            value=float(st.session_state.state_tax_rate * 100),
-            step=0.1
-        ) / 100
-    with col3:
-        combined_rate = st.session_state.tax_bracket + st.session_state.state_tax_rate
-        st.metric("Combined Marginal Rate", f"{combined_rate*100:.1f}%")
-
-    # Tax Strategies
-    st.subheader("💡 Tax Optimization Strategies")
-
-    if st.button("➕ Add Tax Strategy"):
-        new_strategy = TaxStrategy(
-            name="New Strategy",
-            strategy_type="Roth Conversion",
-            annual_amount=10000.0,
-            start_year=st.session_state.current_year,
-            end_year=st.session_state.current_year + 10,
-            estimated_tax_savings=0.0,
-            notes=""
-        )
-        st.session_state.tax_strategies.append(new_strategy)
-        st.rerun()
-
-    for idx, strategy in enumerate(st.session_state.tax_strategies):
-        with st.expander(f"💼 {strategy.name} ({strategy.strategy_type})"):
-            col1, col2, col3 = st.columns([3, 3, 1])
-
-            with col1:
-                strategy.name = st.text_input(f"Strategy Name##tax{idx}", value=strategy.name)
-                strategy.strategy_type = st.selectbox(
-                    f"Strategy Type##tax{idx}",
-                    ["Roth Conversion", "Tax Loss Harvesting", "Charitable Giving", "HSA Maximization",
-                     "Qualified Charitable Distribution", "Tax Gain Harvesting", "Backdoor Roth"],
-                    index=["Roth Conversion", "Tax Loss Harvesting", "Charitable Giving", "HSA Maximization",
-                           "Qualified Charitable Distribution", "Tax Gain Harvesting", "Backdoor Roth"].index(strategy.strategy_type) if strategy.strategy_type in ["Roth Conversion", "Tax Loss Harvesting", "Charitable Giving", "HSA Maximization", "Qualified Charitable Distribution", "Tax Gain Harvesting", "Backdoor Roth"] else 0
-                )
-                strategy.annual_amount = st.number_input(
-                    f"Annual Amount##tax{idx}",
-                    min_value=0.0,
-                    value=float(strategy.annual_amount),
-                    step=1000.0,
-                    help="Annual amount for this strategy"
-                )
-
-            with col2:
-                strategy.start_year = st.number_input(
-                    f"Start Year##tax{idx}",
-                    min_value=st.session_state.current_year,
-                    max_value=st.session_state.current_year + 50,
-                    value=int(strategy.start_year),
-                    step=1
-                )
-                strategy.end_year = st.number_input(
-                    f"End Year##tax{idx}",
-                    min_value=st.session_state.current_year,
-                    max_value=st.session_state.current_year + 50,
-                    value=int(strategy.end_year),
-                    step=1
-                )
-                strategy.estimated_tax_savings = st.number_input(
-                    f"Estimated Annual Tax Savings##tax{idx}",
-                    min_value=0.0,
-                    value=float(strategy.estimated_tax_savings),
-                    step=100.0,
-                    help="Estimated tax savings per year"
-                )
-
-            with col3:
-                if st.button(f"🗑️##tax{idx}"):
-                    st.session_state.tax_strategies.pop(idx)
-                    st.rerun()
-
-            strategy.notes = st.text_area(
-                f"Notes##tax{idx}",
-                value=strategy.notes,
-                height=60,
-                help="Additional notes about this strategy"
-            )
-
-            st.session_state.tax_strategies[idx] = strategy
-
-    # Roth Conversion Ladder
-    st.subheader("🪜 Roth Conversion Ladder Planning")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.session_state.roth_conversion_amount = st.number_input(
-            "Annual Roth Conversion Amount",
-            min_value=0.0,
-            value=float(st.session_state.roth_conversion_amount),
-            step=1000.0,
-            help="Amount to convert from Traditional IRA/401k to Roth IRA annually"
-        )
-    with col2:
-        tax_on_conversion = st.session_state.roth_conversion_amount * st.session_state.tax_bracket
-        st.metric("Estimated Tax on Conversion", format_currency(tax_on_conversion))
-
-    st.info("💡 **Roth Conversion Strategy**: Convert traditional retirement accounts to Roth IRA in low-income years to minimize taxes and create tax-free retirement income.")
-
-    # Charitable Giving
-    st.subheader("❤️ Charitable Giving Strategies")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.session_state.charitable_contributions = st.number_input(
-            "Annual Charitable Contributions",
-            min_value=0.0,
-            value=float(st.session_state.charitable_contributions),
-            step=500.0
-        )
-    with col2:
-        st.session_state.qcd_enabled = st.checkbox(
-            "Use QCD (Age 70½+)",
-            value=st.session_state.qcd_enabled,
-            help="Qualified Charitable Distribution from IRA (up to $105,000/year for 2025)"
-        )
-    with col3:
-        if st.session_state.charitable_contributions > 0:
-            tax_savings = st.session_state.charitable_contributions * st.session_state.tax_bracket
-            st.metric("Estimated Tax Savings", format_currency(tax_savings))
-
-    # Withdrawal Sequencing
-    st.subheader("💰 Retirement Withdrawal Sequencing")
-
-    st.markdown("""
-    **Recommended Withdrawal Sequence** (Tax-Efficient):
-    1. **RMDs (Required Minimum Distributions)** - Must take to avoid penalties
-    2. **Taxable Accounts** - Long-term capital gains (lower rate)
-    3. **Tax-Deferred (401k/IRA)** - Fill up to top of current tax bracket
-    4. **Roth IRA** - Tax-free, save for last
-    5. **HSA** - Tax-free for medical expenses, ultimate flexibility
-    """)
-
-    if st.button("➕ Add Planned Withdrawal"):
-        new_withdrawal = RetirementWithdrawal(
-            year=st.session_state.current_year,
-            account_type="401k",
-            amount=40000.0,
-            tax_rate=0.22,
-            purpose="Living Expenses"
-        )
-        st.session_state.retirement_withdrawals.append(new_withdrawal)
-        st.rerun()
-
-    for idx, withdrawal in enumerate(st.session_state.retirement_withdrawals):
-        with st.expander(f"💰 Year {withdrawal.year} - {withdrawal.account_type}: {format_currency(withdrawal.amount)}"):
-            col1, col2, col3 = st.columns([3, 3, 1])
-
-            with col1:
-                withdrawal.year = st.number_input(
-                    f"Year##wd{idx}",
-                    min_value=st.session_state.current_year,
-                    max_value=st.session_state.current_year + 50,
-                    value=int(withdrawal.year),
-                    step=1
-                )
-                withdrawal.account_type = st.selectbox(
-                    f"Account Type##wd{idx}",
-                    ["401k", "Traditional IRA", "Roth IRA", "Taxable Brokerage", "HSA", "Pension"],
-                    index=["401k", "Traditional IRA", "Roth IRA", "Taxable Brokerage", "HSA", "Pension"].index(withdrawal.account_type) if withdrawal.account_type in ["401k", "Traditional IRA", "Roth IRA", "Taxable Brokerage", "HSA", "Pension"] else 0
-                )
-
-            with col2:
-                withdrawal.amount = st.number_input(
-                    f"Withdrawal Amount##wd{idx}",
-                    min_value=0.0,
-                    value=float(withdrawal.amount),
-                    step=1000.0
-                )
-                withdrawal.tax_rate = st.number_input(
-                    f"Tax Rate (%)##wd{idx}",
-                    min_value=0.0,
-                    max_value=50.0,
-                    value=float(withdrawal.tax_rate * 100),
-                    step=1.0
-                ) / 100
-
-            with col3:
-                if st.button(f"🗑️##wd{idx}"):
-                    st.session_state.retirement_withdrawals.pop(idx)
-                    st.rerun()
-
-            withdrawal.purpose = st.text_input(f"Purpose##wd{idx}", value=withdrawal.purpose)
-
-            after_tax_amount = withdrawal.amount * (1 - withdrawal.tax_rate)
-            st.metric("After-Tax Amount", format_currency(after_tax_amount))
-
-            st.session_state.retirement_withdrawals[idx] = withdrawal
-
-    # Tax Savings Summary
-    if st.session_state.tax_strategies:
-        st.subheader("📊 Tax Optimization Summary")
-
-        total_annual_savings = sum([s.estimated_tax_savings for s in st.session_state.tax_strategies])
-        total_strategies = len(st.session_state.tax_strategies)
-
-        col1, col2 = st.columns(2)
-        col1.metric("Active Tax Strategies", total_strategies)
-        col2.metric("Estimated Annual Tax Savings", format_currency(total_annual_savings))
-
-
 # NEW TAB 5: Report Export
 def report_export_tab():
     """PDF/Excel Report Export Tab"""
@@ -8073,12 +7381,7 @@ def report_export_tab():
                         "health_insurances": [asdict(h) for h in st.session_state.health_insurances],
                         "ltc_insurances": [asdict(l) for l in st.session_state.ltc_insurances],
                         "hsa_balance": st.session_state.hsa_balance
-                    },
-                    "education": {
-                        "529_plans": [asdict(p) for p in st.session_state.plan529_accounts],
-                        "goals": [asdict(g) for g in st.session_state.education_goals]
-                    },
-                    "tax_strategies": [asdict(t) for t in st.session_state.tax_strategies]
+                    }
                 }
 
                 if report_format == "PDF (.pdf)":
@@ -8287,16 +7590,6 @@ def report_export_tab():
                             healthcare_df = pd.DataFrame(report_data["healthcare"]["health_insurances"])
                             healthcare_df.to_excel(writer, sheet_name='Healthcare', index=False)
 
-                        # Education Sheet
-                        if "Education" in include_sections and st.session_state.plan529_accounts:
-                            education_df = pd.DataFrame(report_data["education"]["529_plans"])
-                            education_df.to_excel(writer, sheet_name='Education_529', index=False)
-
-                        # Tax Strategies Sheet
-                        if "Tax Strategies" in include_sections and st.session_state.tax_strategies:
-                            tax_df = pd.DataFrame(report_data["tax_strategies"])
-                            tax_df.to_excel(writer, sheet_name='Tax_Strategies', index=False)
-
                     output.seek(0)
 
                     st.download_button(
@@ -8399,27 +7692,6 @@ def display_sidebar():
         st.metric("Number of Properties", len(st.session_state.houses))
 
         st.divider()
-
-        # Portfolio Allocation
-        st.subheader("Portfolio Mix")
-        allocation = st.session_state.portfolio_allocation
-
-        if allocation.is_valid():
-            st.success("✅ Balanced (100%)")
-        else:
-            st.error(f"⚠️ {allocation.total():.1f}%")
-
-        st.write(f"📈 Stocks: {allocation.stocks:.1f}%")
-        st.write(f"📊 Bonds: {allocation.bonds:.1f}%")
-        st.write(f"💵 Cash: {allocation.cash:.1f}%")
-        st.write(f"🏠 RE: {allocation.real_estate:.1f}%")
-        st.write(f"🔧 Other: {allocation.other:.1f}%")
-
-        st.divider()
-
-        # Active Scenario
-        st.subheader("Active Scenario")
-        st.info(st.session_state.active_scenario)
 
         # Current State
         current_state, current_strategy = get_state_for_year(st.session_state.current_year)

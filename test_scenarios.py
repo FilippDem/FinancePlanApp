@@ -40,11 +40,11 @@ def test_scenario(name, test_func):
 # Import dataclasses from the main file
 print("\n📦 Importing dataclasses...")
 try:
-    from FinancialPlannerV15_ClaudeCodeV import (
+    from FinancialPlanner_v0_7 import (
         HealthInsurance, LongTermCareInsurance, HealthExpense,
         Debt, Plan529, EducationGoal, TaxStrategy, RetirementWithdrawal,
         format_currency, PortfolioAllocation, House, HouseTimelineEntry,
-        StateTimelineEntry, MajorPurchase, RecurringExpense, EconomicScenario
+        StateTimelineEntry, MajorPurchase, RecurringExpense, EconomicParameters
     )
     print("✅ All dataclasses imported successfully")
 except ImportError as e:
