@@ -1432,6 +1432,136 @@ FAMILY_EXPENSE_TEMPLATES = {
 }
 
 
+# Data Source References for Expense Templates
+# These references indicate where the living expense data was gathered from
+EXPENSE_DATA_SOURCES = {
+    "California": {
+        "source": "MIT Living Wage Calculator & Bureau of Labor Statistics Consumer Expenditure Survey",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "Expenses adjusted for California cost of living index. Data includes Sacramento and broader California metropolitan areas."
+    },
+    "Sacramento": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and Sacramento Area Council of Governments",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/, https://www.sacog.org/",
+        "year": "2024",
+        "notes": "Daycare costs based on Child Care Aware of America 2024 report. Education costs from California State University and UC system averages."
+    },
+    "Seattle": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and Washington State Department of Commerce",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "Adjusted for Seattle-Tacoma-Bellevue metro area cost of living. Daycare costs from Child Care Aware of America."
+    },
+    "Houston": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and Greater Houston Partnership",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "Reflects Houston-The Woodlands-Sugar Land metro area costs. Lower cost of living compared to coastal cities."
+    },
+    "New York": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and NYC Department of Consumer and Worker Protection",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/, https://www.nyc.gov/dca",
+        "year": "2024",
+        "notes": "NYC metro area costs including Manhattan, Brooklyn, Queens. Among highest cost of living in US."
+    },
+    "San Francisco": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and San Francisco Controller's Office",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "San Francisco-Oakland-Berkeley metro area. Highest cost of living city in the dataset."
+    },
+    "Los Angeles": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and LA County Economic Development Corporation",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "Los Angeles-Long Beach-Anaheim metro area costs."
+    },
+    "Portland": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and Portland Metro Regional Government",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "Portland-Vancouver-Hillsboro metro area costs."
+    },
+    "Toronto": {
+        "source": "Statistics Canada Survey of Household Spending and Numbeo Cost of Living Database",
+        "url": "https://www.statcan.gc.ca/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from CAD to USD. Toronto metro area including GTA."
+    },
+    "Vancouver": {
+        "source": "Statistics Canada Survey of Household Spending and Numbeo Cost of Living Database",
+        "url": "https://www.statcan.gc.ca/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from CAD to USD. Metro Vancouver area costs."
+    },
+    "Paris": {
+        "source": "INSEE (French National Institute of Statistics) and Numbeo Cost of Living Database",
+        "url": "https://www.insee.fr/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from EUR to USD. Île-de-France region costs."
+    },
+    "Toulouse": {
+        "source": "INSEE (French National Institute of Statistics) and Numbeo Cost of Living Database",
+        "url": "https://www.insee.fr/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from EUR to USD. Lower cost of living compared to Paris."
+    },
+    "Berlin": {
+        "source": "Destatis (German Federal Statistical Office) and Numbeo Cost of Living Database",
+        "url": "https://www.destatis.de/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from EUR to USD. Berlin metropolitan area."
+    },
+    "Munich": {
+        "source": "Destatis (German Federal Statistical Office) and Numbeo Cost of Living Database",
+        "url": "https://www.destatis.de/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from EUR to USD. Highest cost German city in dataset."
+    },
+    "Sydney": {
+        "source": "Australian Bureau of Statistics Household Expenditure Survey and Numbeo Cost of Living Database",
+        "url": "https://www.abs.gov.au/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from AUD to USD. Greater Sydney area costs."
+    },
+    "Melbourne": {
+        "source": "Australian Bureau of Statistics Household Expenditure Survey and Numbeo Cost of Living Database",
+        "url": "https://www.abs.gov.au/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from AUD to USD. Greater Melbourne area costs."
+    },
+    "Brisbane": {
+        "source": "Australian Bureau of Statistics Household Expenditure Survey and Numbeo Cost of Living Database",
+        "url": "https://www.abs.gov.au/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from AUD to USD. Brisbane metro area costs."
+    },
+    "Auckland": {
+        "source": "Statistics New Zealand Household Economic Survey and Numbeo Cost of Living Database",
+        "url": "https://www.stats.govt.nz/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from NZD to USD. Auckland metro area costs."
+    },
+    "Wellington": {
+        "source": "Statistics New Zealand Household Economic Survey and Numbeo Cost of Living Database",
+        "url": "https://www.stats.govt.nz/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from NZD to USD. Wellington metro area costs."
+    }
+}
+
+
+def get_expense_data_source(location: str) -> dict:
+    """Get data source information for a specific location's expense template"""
+    return EXPENSE_DATA_SOURCES.get(location, {
+        "source": "Custom user-created template",
+        "url": "N/A",
+        "year": str(datetime.now().year),
+        "notes": "This is a custom expense template created by the user."
+    })
+
+
 # Data Classes
 @dataclass
 class MajorPurchase:
@@ -1933,8 +2063,8 @@ def initialize_session_state():
         # Preload 5 demo scenarios showcasing different features
         current_year = datetime.now().year
 
-        # Scenario 1: Young Tech Couple in San Francisco
-        st.session_state.saved_scenarios["[DEMO] High-Income Tech Couple with Toddlers (SF, Aggressive)"] = {
+        # Scenario 1: Young Tech Couple with Multiple Relocations & Early Retirement
+        st.session_state.saved_scenarios["[DEMO] Tech Couple: SF→Austin→Seattle, Early Retirement @50"] = {
             'current_year': current_year,
             'parent1_name': "Alex",
             'parent1_emoji': "👨",
@@ -1943,15 +2073,15 @@ def initialize_session_state():
             'marriage_year': current_year - 3,
             'parentX_age': 28,
             'parentX_net_worth': 150000.0,
-            'parentX_income': 180000.0,
+            'parentX_income': 180000.0,  # High initial, increases, sabbatical, then recovery
             'parentX_raise': 8.0,
-            'parentX_retirement_age': 60,
+            'parentX_retirement_age': 50,  # Early retirement!
             'parentX_ss_benefit': 3500.0,
             'parentY_age': 27,
             'parentY_net_worth': 120000.0,
             'parentY_income': 165000.0,
             'parentY_raise': 7.5,
-            'parentY_retirement_age': 60,
+            'parentY_retirement_age': 51,  # Early retirement!
             'parentY_ss_benefit': 3200.0,
             'expenses': {
                 'Food & Groceries': 18000.0,
@@ -1983,21 +2113,62 @@ def initialize_session_state():
                     'college_location': 'New York'
                 }
             ],
-            'houses': [{
-                'name': 'SF Condo',
-                'purchase_year': current_year - 2,
-                'purchase_price': 1200000.0,
-                'current_value': 1300000.0,
-                'mortgage_balance': 900000.0,
-                'mortgage_rate': 0.065,
-                'mortgage_years_left': 28,
-                'property_tax_rate': 0.012,
-                'home_insurance': 2400.0,
-                'maintenance_rate': 0.005,
-                'upkeep_costs': 6000.0,
-                'owner': 'Shared',
-                'timeline': [{'year': current_year - 2, 'status': 'Own_Live', 'rental_income': 0.0}]
-            }],
+            'houses': [
+                {
+                    'name': 'SF Condo',
+                    'purchase_year': current_year - 2,
+                    'purchase_price': 1200000.0,
+                    'current_value': 1300000.0,
+                    'mortgage_balance': 900000.0,
+                    'mortgage_rate': 0.065,
+                    'mortgage_years_left': 28,
+                    'property_tax_rate': 0.012,
+                    'home_insurance': 2400.0,
+                    'maintenance_rate': 0.005,
+                    'upkeep_costs': 6000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year - 2, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 3, 'status': 'Sold', 'rental_income': 0.0}  # Sell when moving to Austin
+                    ]
+                },
+                {
+                    'name': 'Austin House',
+                    'purchase_year': current_year + 3,
+                    'purchase_price': 650000.0,
+                    'current_value': 650000.0,
+                    'mortgage_balance': 520000.0,
+                    'mortgage_rate': 0.055,
+                    'mortgage_years_left': 30,
+                    'property_tax_rate': 0.021,  # Texas property tax
+                    'home_insurance': 2000.0,
+                    'maintenance_rate': 0.008,
+                    'upkeep_costs': 5000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 3, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 8, 'status': 'Own_Rent', 'rental_income': 3200.0},  # Convert to rental
+                        {'year': current_year + 15, 'status': 'Sold', 'rental_income': 0.0}  # Eventually sell
+                    ]
+                },
+                {
+                    'name': 'Seattle House',
+                    'purchase_year': current_year + 8,
+                    'purchase_price': 950000.0,
+                    'current_value': 950000.0,
+                    'mortgage_balance': 760000.0,
+                    'mortgage_rate': 0.048,
+                    'mortgage_years_left': 30,
+                    'property_tax_rate': 0.01,
+                    'home_insurance': 1800.0,
+                    'maintenance_rate': 0.007,
+                    'upkeep_costs': 6500.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 8, 'status': 'Own_Live', 'rental_income': 0.0}
+                    ]
+                }
+            ],
             'portfolio_allocation': {
                 'stocks': 85.0,  # US + International
                 'bonds': 5.0,
@@ -2005,7 +2176,35 @@ def initialize_session_state():
                 'real_estate': 5.0,  # REITs
                 'other': 2.0  # Crypto
             },
-            'major_purchases': [],
+            'major_purchases': [
+                {
+                    'name': 'Sabbatical Year Living Expenses',
+                    'year': current_year + 6,
+                    'amount': 80000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': 'Home Renovation (Austin)',
+                    'year': current_year + 5,
+                    'amount': 75000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': 'Boat Purchase',
+                    'year': current_year + 10,
+                    'amount': 125000.0,
+                    'financing_years': 5,
+                    'interest_rate': 0.055,
+                    'asset_type': 'Depreciating',
+                    'appreciation_rate': -0.08
+                }
+            ],
             'recurring_expenses': [
                 {
                     'name': 'Tech Equipment',
@@ -2013,25 +2212,85 @@ def initialize_session_state():
                     'amount': 5000.0,
                     'frequency_years': 2,
                     'start_year': current_year,
+                    'end_year': current_year + 22,  # Until retirement
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Electric Vehicles',
+                    'category': 'Vehicle',
+                    'amount': 65000.0,
+                    'frequency_years': 6,
+                    'start_year': current_year + 2,
                     'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Adventure Travel',
+                    'category': 'Travel',
+                    'amount': 15000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Boat Maintenance',
+                    'category': 'Recreation',
+                    'amount': 8000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 10,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Home Office Upgrades',
+                    'category': 'Work Equipment',
+                    'amount': 3000.0,
+                    'frequency_years': 3,
+                    'start_year': current_year + 1,
+                    'end_year': current_year + 22,
                     'inflation_adjust': True,
                     'parent': 'Both',
                     'financing_years': 0,
                     'interest_rate': 0.0
                 }
             ],
-            'state_timeline': [{
-                'year': current_year,
-                'state': 'San Francisco',
-                'spending_strategy': 'High-end'
-            }],
+            'state_timeline': [
+                {
+                    'year': current_year,
+                    'state': 'San Francisco',
+                    'spending_strategy': 'High-end'
+                },
+                {
+                    'year': current_year + 3,
+                    'state': 'Houston',  # Using Houston as proxy for Austin
+                    'spending_strategy': 'Average'  # Lower cost of living
+                },
+                {
+                    'year': current_year + 8,
+                    'state': 'Seattle',
+                    'spending_strategy': 'Average'
+                }
+            ],
             'active_scenario': 'Aggressive',
             'ss_insolvency_enabled': True,
             'ss_shortfall_percentage': 30.0
         }
 
-        # Scenario 2: Mid-Career Family with Children in Seattle
-        st.session_state.saved_scenarios["[DEMO] 3-Kid Family with Mixed Education Plans (Seattle, Moderate)"] = {
+        # Scenario 2: 3-Kid Family with Multiple Moves & Career Transitions
+        st.session_state.saved_scenarios["[DEMO] 3-Kid Family: Seattle→Portland→Denver, Career Change, 4 Properties"] = {
             'current_year': current_year,
             'parent1_name': "Mike",
             'parent1_emoji': "👨",
@@ -2042,13 +2301,13 @@ def initialize_session_state():
             'parentX_net_worth': 320000.0,
             'parentX_income': 115000.0,
             'parentX_raise': 3.5,
-            'parentX_retirement_age': 65,
+            'parentX_retirement_age': 62,  # Slightly early retirement
             'parentX_ss_benefit': 2800.0,
             'parentY_age': 37,
             'parentY_net_worth': 280000.0,
-            'parentY_income': 95000.0,
+            'parentY_income': 95000.0,  # Will have career change
             'parentY_raise': 3.0,
-            'parentY_retirement_age': 65,
+            'parentY_retirement_age': 63,  # Slightly early retirement
             'parentY_ss_benefit': 2500.0,
             'expenses': {
                 'Food & Groceries': 15600.0,
@@ -2090,21 +2349,79 @@ def initialize_session_state():
                     'college_location': 'Seattle'
                 }
             ],
-            'houses': [{
-                'name': 'Primary Home',
-                'purchase_year': current_year - 8,
-                'purchase_price': 650000.0,
-                'current_value': 800000.0,
-                'mortgage_balance': 420000.0,
-                'mortgage_rate': 0.035,
-                'mortgage_years_left': 22,
-                'property_tax_rate': 0.01,
-                'home_insurance': 1800.0,
-                'maintenance_rate': 0.008,
-                'upkeep_costs': 5000.0,
-                'owner': 'Shared',
-                'timeline': [{'year': current_year - 8, 'status': 'Own_Live', 'rental_income': 0.0}]
-            }],
+            'houses': [
+                {
+                    'name': 'Seattle Starter Home',
+                    'purchase_year': current_year - 8,
+                    'purchase_price': 650000.0,
+                    'current_value': 800000.0,
+                    'mortgage_balance': 420000.0,
+                    'mortgage_rate': 0.035,
+                    'mortgage_years_left': 22,
+                    'property_tax_rate': 0.01,
+                    'home_insurance': 1800.0,
+                    'maintenance_rate': 0.008,
+                    'upkeep_costs': 5000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year - 8, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 5, 'status': 'Own_Rent', 'rental_income': 2800.0},  # Convert to rental
+                        {'year': current_year + 18, 'status': 'Sold', 'rental_income': 0.0}
+                    ]
+                },
+                {
+                    'name': 'Portland Family Home',
+                    'purchase_year': current_year + 5,
+                    'purchase_price': 720000.0,
+                    'current_value': 720000.0,
+                    'mortgage_balance': 576000.0,
+                    'mortgage_rate': 0.045,
+                    'mortgage_years_left': 30,
+                    'property_tax_rate': 0.011,
+                    'home_insurance': 1900.0,
+                    'maintenance_rate': 0.009,
+                    'upkeep_costs': 5500.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 5, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 12, 'status': 'Sold', 'rental_income': 0.0}
+                    ]
+                },
+                {
+                    'name': 'Denver Home',
+                    'purchase_year': current_year + 12,
+                    'purchase_price': 680000.0,
+                    'current_value': 680000.0,
+                    'mortgage_balance': 544000.0,
+                    'mortgage_rate': 0.052,
+                    'mortgage_years_left': 30,
+                    'property_tax_rate': 0.0055,
+                    'home_insurance': 1700.0,
+                    'maintenance_rate': 0.008,
+                    'upkeep_costs': 5200.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 12, 'status': 'Own_Live', 'rental_income': 0.0}
+                    ]
+                },
+                {
+                    'name': 'Colorado Mountain Cabin',
+                    'purchase_year': current_year + 15,
+                    'purchase_price': 380000.0,
+                    'current_value': 380000.0,
+                    'mortgage_balance': 304000.0,
+                    'mortgage_rate': 0.055,
+                    'mortgage_years_left': 30,
+                    'property_tax_rate': 0.005,
+                    'home_insurance': 1200.0,
+                    'maintenance_rate': 0.012,
+                    'upkeep_costs': 4000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 15, 'status': 'Own_Live', 'rental_income': 0.0}  # Vacation home
+                    ]
+                }
+            ],
             'portfolio_allocation': {
                 'stocks': 80.0,  # US + International
                 'bonds': 15.0,
@@ -2121,11 +2438,38 @@ def initialize_session_state():
                     'interest_rate': 0.0,
                     'asset_type': 'Expense',
                     'appreciation_rate': 0.0
+                },
+                {
+                    'name': "Career Change Education (Sarah MBA)",
+                    'year': current_year + 7,
+                    'amount': 65000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': 'Kitchen Renovation (Portland)',
+                    'year': current_year + 8,
+                    'amount': 55000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': 'RV Purchase',
+                    'year': current_year + 16,
+                    'amount': 95000.0,
+                    'financing_years': 7,
+                    'interest_rate': 0.058,
+                    'asset_type': 'Depreciating',
+                    'appreciation_rate': -0.10
                 }
             ],
             'recurring_expenses': [
                 {
-                    'name': 'Family Vehicle',
+                    'name': 'Family Minivan',
                     'category': 'Vehicle',
                     'amount': 45000.0,
                     'frequency_years': 8,
@@ -2147,20 +2491,73 @@ def initialize_session_state():
                     'parent': 'Both',
                     'financing_years': 0,
                     'interest_rate': 0.0
+                },
+                {
+                    'name': 'Ski Equipment & Passes',
+                    'category': 'Recreation',
+                    'amount': 4500.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 12,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Home Office Equipment',
+                    'category': 'Work Equipment',
+                    'amount': 2500.0,
+                    'frequency_years': 3,
+                    'start_year': current_year + 1,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'College Visiting Trips',
+                    'category': 'Children',
+                    'amount': 3000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 8,
+                    'end_year': current_year + 14,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
                 }
             ],
-            'state_timeline': [{
-                'year': current_year,
-                'state': 'Seattle',
-                'spending_strategy': 'Average'
-            }],
+            'state_timeline': [
+                {
+                    'year': current_year,
+                    'state': 'Seattle',
+                    'spending_strategy': 'Average'
+                },
+                {
+                    'year': current_year + 5,
+                    'state': 'Portland',
+                    'spending_strategy': 'Average'
+                },
+                {
+                    'year': current_year + 12,
+                    'state': 'California',  # Using California as proxy for Denver/Colorado
+                    'spending_strategy': 'Conservative'  # Cost-conscious after career change
+                },
+                {
+                    'year': current_year + 18,
+                    'state': 'California',
+                    'spending_strategy': 'Average'  # Back to normal spending
+                }
+            ],
             'active_scenario': 'Moderate',
             'ss_insolvency_enabled': True,
             'ss_shortfall_percentage': 30.0
         }
 
-        # Scenario 3: High-Net-Worth Couple in New York
-        st.session_state.saved_scenarios["[DEMO] Wealthy Executives with Multiple Properties (NYC, $4.7M)"] = {
+        # Scenario 3: Wealthy Executives with Early Retirement & International Lifestyle
+        st.session_state.saved_scenarios["[DEMO] Executives: NYC→Miami→Portugal, Early Retire @55, 5 Properties"] = {
             'current_year': current_year,
             'parent1_name': "David",
             'parent1_emoji': "👨",
@@ -2171,13 +2568,13 @@ def initialize_session_state():
             'parentX_net_worth': 2500000.0,
             'parentX_income': 350000.0,
             'parentX_raise': 4.0,
-            'parentX_retirement_age': 62,
+            'parentX_retirement_age': 55,  # Early retirement!
             'parentX_ss_benefit': 4500.0,
             'parentY_age': 43,
             'parentY_net_worth': 2200000.0,
             'parentY_income': 280000.0,
             'parentY_raise': 3.5,
-            'parentY_retirement_age': 62,
+            'parentY_retirement_age': 55,  # Early retirement!
             'parentY_ss_benefit': 4000.0,
             'expenses': {
                 'Food & Groceries': 24000.0,
@@ -2223,7 +2620,10 @@ def initialize_session_state():
                     'maintenance_rate': 0.004,
                     'upkeep_costs': 12000.0,
                     'owner': 'Shared',
-                    'timeline': [{'year': current_year - 10, 'status': 'Own_Live', 'rental_income': 0.0}]
+                    'timeline': [
+                        {'year': current_year - 10, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 7, 'status': 'Sold', 'rental_income': 0.0}  # Sell when moving to Miami
+                    ]
                 },
                 {
                     'name': 'Hamptons Summer Home',
@@ -2238,7 +2638,64 @@ def initialize_session_state():
                     'maintenance_rate': 0.01,
                     'upkeep_costs': 15000.0,
                     'owner': 'Shared',
-                    'timeline': [{'year': current_year - 5, 'status': 'Own_Live', 'rental_income': 0.0}]
+                    'timeline': [
+                        {'year': current_year - 5, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 7, 'status': 'Own_Rent', 'rental_income': 8500.0},  # Convert to rental
+                        {'year': current_year + 15, 'status': 'Sold', 'rental_income': 0.0}
+                    ]
+                },
+                {
+                    'name': 'Miami Penthouse',
+                    'purchase_year': current_year + 7,
+                    'purchase_price': 2800000.0,
+                    'current_value': 2800000.0,
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 0.012,
+                    'home_insurance': 5500.0,
+                    'maintenance_rate': 0.005,
+                    'upkeep_costs': 14000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 7, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 15, 'status': 'Own_Rent', 'rental_income': 7000.0}  # Keep as rental when moving abroad
+                    ]
+                },
+                {
+                    'name': 'Portugal Villa (Algarve)',
+                    'purchase_year': current_year + 15,
+                    'purchase_price': 850000.0,
+                    'current_value': 850000.0,
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 0.004,
+                    'home_insurance': 2200.0,
+                    'maintenance_rate': 0.008,
+                    'upkeep_costs': 8000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 15, 'status': 'Own_Live', 'rental_income': 0.0}
+                    ]
+                },
+                {
+                    'name': 'Aspen Ski Chalet',
+                    'purchase_year': current_year + 3,
+                    'purchase_price': 1600000.0,
+                    'current_value': 1600000.0,
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 0.006,
+                    'home_insurance': 3800.0,
+                    'maintenance_rate': 0.012,
+                    'upkeep_costs': 18000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 3, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 12, 'status': 'Sold', 'rental_income': 0.0}  # Sell before moving abroad
+                    ]
                 }
             ],
             'portfolio_allocation': {
@@ -2257,14 +2714,41 @@ def initialize_session_state():
                     'interest_rate': 0.0,
                     'asset_type': 'Expense',
                     'appreciation_rate': 0.0
+                },
+                {
+                    'name': "William's Wedding Reception",
+                    'year': current_year + 16,
+                    'amount': 80000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': 'Luxury Yacht Purchase',
+                    'year': current_year + 8,
+                    'amount': 450000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Depreciating',
+                    'appreciation_rate': -0.06
+                },
+                {
+                    'name': 'Art Collection Investment',
+                    'year': current_year + 5,
+                    'amount': 200000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Appreciating',
+                    'appreciation_rate': 0.04
                 }
             ],
             'recurring_expenses': [
                 {
-                    'name': 'Luxury Vehicles',
+                    'name': 'Luxury Vehicles (2 Cars)',
                     'category': 'Vehicle',
-                    'amount': 90000.0,
-                    'frequency_years': 5,
+                    'amount': 150000.0,
+                    'frequency_years': 4,
                     'start_year': current_year + 2,
                     'end_year': None,
                     'inflation_adjust': True,
@@ -2273,9 +2757,9 @@ def initialize_session_state():
                     'interest_rate': 0.0
                 },
                 {
-                    'name': 'International Travel',
+                    'name': 'International Luxury Travel',
                     'category': 'Travel',
-                    'amount': 25000.0,
+                    'amount': 45000.0,
                     'frequency_years': 1,
                     'start_year': current_year,
                     'end_year': None,
@@ -2295,20 +2779,68 @@ def initialize_session_state():
                     'parent': 'Both',
                     'financing_years': 0,
                     'interest_rate': 0.0
+                },
+                {
+                    'name': 'Yacht Maintenance',
+                    'category': 'Recreation',
+                    'amount': 35000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 8,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Wine Collection & Storage',
+                    'category': 'Lifestyle',
+                    'amount': 12000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Private Club Memberships',
+                    'category': 'Lifestyle',
+                    'amount': 25000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
                 }
             ],
-            'state_timeline': [{
-                'year': current_year,
-                'state': 'New York',
-                'spending_strategy': 'High-end'
-            }],
+            'state_timeline': [
+                {
+                    'year': current_year,
+                    'state': 'New York',
+                    'spending_strategy': 'High-end'
+                },
+                {
+                    'year': current_year + 7,
+                    'state': 'Los Angeles',  # Using LA as proxy for Miami
+                    'spending_strategy': 'High-end'
+                },
+                {
+                    'year': current_year + 15,
+                    'state': 'Paris',  # International lifestyle in Portugal
+                    'spending_strategy': 'Average'  # Lower cost of living abroad
+                }
+            ],
             'active_scenario': 'Moderate',
             'ss_insolvency_enabled': True,
             'ss_shortfall_percentage': 30.0
         }
 
-        # Scenario 4: Single Parent Teacher in Sacramento
-        st.session_state.saved_scenarios["[DEMO] Single Teacher Mom, Conservative Saver (Sacramento, $95K)"] = {
+        # Scenario 4: Single Teacher with Career Growth & Multiple Relocations
+        st.session_state.saved_scenarios["[DEMO] Single Mom: Sacramento→San Diego, Teacher→Principal, 3 Properties"] = {
             'current_year': current_year,
             'parent1_name': "Maria",
             'parent1_emoji': "👩",
@@ -2317,9 +2849,9 @@ def initialize_session_state():
             'marriage_year': "N/A",
             'parentX_age': 35,
             'parentX_net_worth': 95000.0,
-            'parentX_income': 72000.0,
+            'parentX_income': 72000.0,  # Teacher salary, will increase to VP then Principal
             'parentX_raise': 2.5,
-            'parentX_retirement_age': 67,
+            'parentX_retirement_age': 62,  # Early retirement with good pension
             'parentX_ss_benefit': 2200.0,
             'parentY_age': 35,
             'parentY_net_worth': 0.0,
@@ -2347,21 +2879,61 @@ def initialize_session_state():
                     'college_location': 'Sacramento'
                 }
             ],
-            'houses': [{
-                'name': 'Townhouse',
-                'purchase_year': current_year - 3,
-                'purchase_price': 420000.0,
-                'current_value': 450000.0,
-                'mortgage_balance': 336000.0,
-                'mortgage_rate': 0.068,
-                'mortgage_years_left': 27,
-                'property_tax_rate': 0.011,
-                'home_insurance': 1400.0,
-                'maintenance_rate': 0.006,
-                'upkeep_costs': 3000.0,
-                'owner': 'ParentX',
-                'timeline': [{'year': current_year - 3, 'status': 'Own_Live', 'rental_income': 0.0}]
-            }],
+            'houses': [
+                {
+                    'name': 'Sacramento Townhouse',
+                    'purchase_year': current_year - 3,
+                    'purchase_price': 420000.0,
+                    'current_value': 450000.0,
+                    'mortgage_balance': 336000.0,
+                    'mortgage_rate': 0.068,
+                    'mortgage_years_left': 27,
+                    'property_tax_rate': 0.011,
+                    'home_insurance': 1400.0,
+                    'maintenance_rate': 0.006,
+                    'upkeep_costs': 3000.0,
+                    'owner': 'ParentX',
+                    'timeline': [
+                        {'year': current_year - 3, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 6, 'status': 'Own_Rent', 'rental_income': 2400.0},  # Convert to rental when moving
+                        {'year': current_year + 18, 'status': 'Sold', 'rental_income': 0.0}
+                    ]
+                },
+                {
+                    'name': 'San Diego House',
+                    'purchase_year': current_year + 6,
+                    'purchase_price': 720000.0,
+                    'current_value': 720000.0,
+                    'mortgage_balance': 576000.0,
+                    'mortgage_rate': 0.058,
+                    'mortgage_years_left': 30,
+                    'property_tax_rate': 0.0073,
+                    'home_insurance': 1800.0,
+                    'maintenance_rate': 0.007,
+                    'upkeep_costs': 5000.0,
+                    'owner': 'ParentX',
+                    'timeline': [
+                        {'year': current_year + 6, 'status': 'Own_Live', 'rental_income': 0.0}
+                    ]
+                },
+                {
+                    'name': 'Lake Tahoe Cabin',
+                    'purchase_year': current_year + 12,
+                    'purchase_price': 420000.0,
+                    'current_value': 420000.0,
+                    'mortgage_balance': 336000.0,
+                    'mortgage_rate': 0.062,
+                    'mortgage_years_left': 30,
+                    'property_tax_rate': 0.0085,
+                    'home_insurance': 1300.0,
+                    'maintenance_rate': 0.01,
+                    'upkeep_costs': 4000.0,
+                    'owner': 'ParentX',
+                    'timeline': [
+                        {'year': current_year + 12, 'status': 'Own_Live', 'rental_income': 0.0}  # Vacation home
+                    ]
+                }
+            ],
             'portfolio_allocation': {
                 'stocks': 80.0,  # US + International
                 'bonds': 15.0,
@@ -2369,24 +2941,52 @@ def initialize_session_state():
                 'real_estate': 0.0,
                 'other': 0.0
             },
-            'major_purchases': [],
+            'major_purchases': [
+                {
+                    'name': 'Masters Degree in Education Administration',
+                    'year': current_year + 4,
+                    'amount': 42000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': 'Sabbatical Year (Educational Travel)',
+                    'year': current_year + 10,
+                    'amount': 35000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': "Diego's College Graduation Gift",
+                    'year': current_year + 18,
+                    'amount': 15000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                }
+            ],
             'recurring_expenses': [
                 {
                     'name': 'Reliable Sedan',
                     'category': 'Vehicle',
-                    'amount': 28000.0,
-                    'frequency_years': 10,
-                    'start_year': current_year + 5,
+                    'amount': 32000.0,
+                    'frequency_years': 8,
+                    'start_year': current_year + 4,
                     'end_year': None,
                     'inflation_adjust': True,
                     'parent': 'ParentX',
                     'financing_years': 5,
-                    'interest_rate': 0.04
+                    'interest_rate': 0.045
                 },
                 {
-                    'name': 'Summer Camp',
+                    'name': 'Summer Camp & Activities',
                     'category': 'Children',
-                    'amount': 1500.0,
+                    'amount': 2500.0,
                     'frequency_years': 1,
                     'start_year': current_year,
                     'end_year': current_year + 10,
@@ -2394,20 +2994,56 @@ def initialize_session_state():
                     'parent': 'ParentX',
                     'financing_years': 0,
                     'interest_rate': 0.0
+                },
+                {
+                    'name': 'Professional Development',
+                    'category': 'Work Equipment',
+                    'amount': 2000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': current_year + 27,
+                    'inflation_adjust': True,
+                    'parent': 'ParentX',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Annual Vacation',
+                    'category': 'Travel',
+                    'amount': 4500.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 6,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'ParentX',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
                 }
             ],
-            'state_timeline': [{
-                'year': current_year,
-                'state': 'Sacramento',
-                'spending_strategy': 'Conservative'
-            }],
+            'state_timeline': [
+                {
+                    'year': current_year,
+                    'state': 'Sacramento',
+                    'spending_strategy': 'Conservative'
+                },
+                {
+                    'year': current_year + 6,
+                    'state': 'San Francisco',  # Using SF as proxy for San Diego
+                    'spending_strategy': 'Average'  # Better income as VP/Principal
+                },
+                {
+                    'year': current_year + 15,
+                    'state': 'San Francisco',
+                    'spending_strategy': 'High-end'  # Principal salary, established career
+                }
+            ],
             'active_scenario': 'Conservative',
             'ss_insolvency_enabled': True,
             'ss_shortfall_percentage': 30.0
         }
 
-        # Scenario 5: Pre-Retirement Empty Nesters in Portland
-        st.session_state.saved_scenarios["[DEMO] Empty Nesters Planning Retirement & Downsizing (Portland, Ages 58/57)"] = {
+        # Scenario 5: Empty Nesters with Early Retirement & Snowbird Lifestyle
+        st.session_state.saved_scenarios["[DEMO] Empty Nesters: Early Retire @60, Portland→Arizona→RV, 4 Properties"] = {
             'current_year': current_year,
             'parent1_name': "Robert",
             'parent1_emoji': "👨",
@@ -2418,13 +3054,13 @@ def initialize_session_state():
             'parentX_net_worth': 1200000.0,
             'parentX_income': 125000.0,
             'parentX_raise': 2.0,
-            'parentX_retirement_age': 65,
+            'parentX_retirement_age': 60,  # Early retirement!
             'parentX_ss_benefit': 3200.0,
             'parentY_age': 57,
             'parentY_net_worth': 950000.0,
             'parentY_income': 98000.0,
             'parentY_raise': 2.0,
-            'parentY_retirement_age': 65,
+            'parentY_retirement_age': 60,  # Early retirement!
             'parentY_ss_benefit': 2800.0,
             'expenses': {
                 'Food & Groceries': 12000.0,
@@ -2437,7 +3073,7 @@ def initialize_session_state():
             'children_list': [],
             'houses': [
                 {
-                    'name': 'Family Home',
+                    'name': 'Portland Family Home',
                     'purchase_year': current_year - 25,
                     'purchase_price': 350000.0,
                     'current_value': 720000.0,
@@ -2451,7 +3087,61 @@ def initialize_session_state():
                     'owner': 'Shared',
                     'timeline': [
                         {'year': current_year - 25, 'status': 'Own_Live', 'rental_income': 0.0},
-                        {'year': current_year + 7, 'status': 'Sold', 'rental_income': 0.0}
+                        {'year': current_year + 2, 'status': 'Sold', 'rental_income': 0.0}  # Sell early for retirement
+                    ]
+                },
+                {
+                    'name': 'Portland Downsized Condo',
+                    'purchase_year': current_year + 2,
+                    'purchase_price': 420000.0,
+                    'current_value': 420000.0,
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 0.009,
+                    'home_insurance': 1200.0,
+                    'maintenance_rate': 0.005,
+                    'upkeep_costs': 3000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 2, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 5, 'status': 'Own_Rent', 'rental_income': 2200.0},  # Rent while snowbirding
+                        {'year': current_year + 12, 'status': 'Sold', 'rental_income': 0.0}  # Sell when going full RV
+                    ]
+                },
+                {
+                    'name': 'Arizona Winter Home',
+                    'purchase_year': current_year + 5,
+                    'purchase_price': 380000.0,
+                    'current_value': 380000.0,
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 0.0062,
+                    'home_insurance': 1400.0,
+                    'maintenance_rate': 0.008,
+                    'upkeep_costs': 3500.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 5, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 12, 'status': 'Sold', 'rental_income': 0.0}  # Sell when going full RV
+                    ]
+                },
+                {
+                    'name': 'Montana Lakeside Cabin',
+                    'purchase_year': current_year + 8,
+                    'purchase_price': 320000.0,
+                    'current_value': 320000.0,
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 0.0081,
+                    'home_insurance': 1100.0,
+                    'maintenance_rate': 0.011,
+                    'upkeep_costs': 3800.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 8, 'status': 'Own_Live', 'rental_income': 0.0}  # Summer retreat
                     ]
                 }
             ],
@@ -2464,9 +3154,36 @@ def initialize_session_state():
             },
             'major_purchases': [
                 {
-                    'name': "Adult Child's Wedding Gift",
+                    'name': "First Adult Child's Wedding Gift",
                     'year': current_year + 3,
                     'amount': 25000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': "Second Adult Child's Wedding Gift",
+                    'year': current_year + 6,
+                    'amount': 28000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': 'Luxury RV Purchase',
+                    'year': current_year + 12,
+                    'amount': 225000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Depreciating',
+                    'appreciation_rate': -0.09
+                },
+                {
+                    'name': 'World Cruise Retirement Trip',
+                    'year': current_year + 4,
+                    'amount': 45000.0,
                     'financing_years': 0,
                     'interest_rate': 0.0,
                     'asset_type': 'Expense',
@@ -2475,9 +3192,9 @@ def initialize_session_state():
             ],
             'recurring_expenses': [
                 {
-                    'name': 'Healthcare Premiums',
+                    'name': 'Healthcare Premiums (Pre-Medicare)',
                     'category': 'Healthcare',
-                    'amount': 15000.0,
+                    'amount': 18000.0,
                     'frequency_years': 1,
                     'start_year': current_year,
                     'end_year': current_year + 7,
@@ -2487,12 +3204,12 @@ def initialize_session_state():
                     'interest_rate': 0.0
                 },
                 {
-                    'name': 'Retirement Condo Purchase',
-                    'category': 'Housing',
-                    'amount': 450000.0,
+                    'name': 'Healthcare Costs (Post-Medicare)',
+                    'category': 'Healthcare',
+                    'amount': 8000.0,
                     'frequency_years': 1,
                     'start_year': current_year + 7,
-                    'end_year': current_year + 7,
+                    'end_year': None,
                     'inflation_adjust': True,
                     'parent': 'Both',
                     'financing_years': 0,
@@ -2501,11 +3218,59 @@ def initialize_session_state():
                 {
                     'name': 'Help Adult Children',
                     'category': 'Family Support',
-                    'amount': 12000.0,
+                    'amount': 15000.0,
                     'frequency_years': 1,
                     'start_year': current_year,
-                    'end_year': current_year + 15,
+                    'end_year': current_year + 20,
                     'inflation_adjust': False,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'RV Maintenance & Campgrounds',
+                    'category': 'Recreation',
+                    'amount': 18000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 12,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Active Retirement Travel',
+                    'category': 'Travel',
+                    'amount': 12000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 2,
+                    'end_year': current_year + 25,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Grandchildren Support & Gifts',
+                    'category': 'Family Support',
+                    'amount': 8000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 5,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Golf Club Membership',
+                    'category': 'Recreation',
+                    'amount': 6000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 5,
+                    'end_year': current_year + 12,
+                    'inflation_adjust': True,
                     'parent': 'Both',
                     'financing_years': 0,
                     'interest_rate': 0.0
@@ -2518,9 +3283,19 @@ def initialize_session_state():
                     'spending_strategy': 'Average'
                 },
                 {
-                    'year': current_year + 7,
+                    'year': current_year + 2,
                     'state': 'Portland',
-                    'spending_strategy': 'Conservative'
+                    'spending_strategy': 'Conservative'  # Downsized, early retirement
+                },
+                {
+                    'year': current_year + 5,
+                    'state': 'Houston',  # Using Houston as proxy for Arizona (snowbird)
+                    'spending_strategy': 'Average'  # Snowbird lifestyle
+                },
+                {
+                    'year': current_year + 12,
+                    'state': 'California',  # Using CA to represent RV lifestyle (no specific state)
+                    'spending_strategy': 'Conservative'  # Full-time RV travel
                 }
             ],
             'active_scenario': 'Conservative',
@@ -3452,6 +4227,29 @@ def family_expenses_tab():
             st.metric("Total Annual Expenses", f"${total:,.0f}")
             st.caption(f"Monthly: ${total/12:,.0f}")
 
+        # Display data sources
+        st.markdown("---")
+        data_source = get_expense_data_source(selected_location)
+
+        st.markdown("### 📚 Data Sources")
+        st.markdown(f"**Source:** {data_source['source']}")
+
+        # Display URLs as clickable links
+        urls = data_source['url'].split(', ')
+        if len(urls) == 1 and urls[0] != 'N/A':
+            st.markdown(f"**URL:** [{urls[0]}]({urls[0]})")
+        elif urls[0] != 'N/A':
+            st.markdown("**URLs:**")
+            for url in urls:
+                url = url.strip()
+                st.markdown(f"- [{url}]({url})")
+
+        st.markdown(f"**Data Year:** {data_source['year']}")
+
+        if data_source['notes']:
+            with st.expander("📝 Additional Notes"):
+                st.markdown(data_source['notes'])
+
         # Quick save button
         st.markdown("---")
         col_save1, col_save2 = st.columns([3, 1])
@@ -4129,6 +4927,29 @@ def children_tab():
             height=400
         )
         st.plotly_chart(fig, use_container_width=True)
+
+        # Display data sources for children's expense template
+        st.markdown("---")
+        data_source = get_expense_data_source(preview_state)
+
+        st.markdown("### 📚 Data Sources")
+        st.markdown(f"**Source:** {data_source['source']}")
+
+        # Display URLs as clickable links
+        urls = data_source['url'].split(', ')
+        if len(urls) == 1 and urls[0] != 'N/A':
+            st.markdown(f"**URL:** [{urls[0]}]({urls[0]})")
+        elif urls[0] != 'N/A':
+            st.markdown("**URLs:**")
+            for url in urls:
+                url = url.strip()
+                st.markdown(f"- [{url}]({url})")
+
+        st.markdown(f"**Data Year:** {data_source['year']}")
+
+        if data_source['notes']:
+            with st.expander("📝 Additional Notes"):
+                st.markdown(data_source['notes'])
 
 
 def house_tab():
