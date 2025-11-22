@@ -1929,7 +1929,7 @@ def initialize_session_state():
         # Monte Carlo settings
         st.session_state.mc_start_year = datetime.now().year
         st.session_state.mc_years = 30
-        st.session_state.mc_simulations = 1000
+        st.session_state.mc_simulations = 100
         st.session_state.mc_income_variability = 10.0
         st.session_state.mc_expense_variability = 5.0
         st.session_state.mc_return_variability = 15.0
@@ -5970,51 +5970,51 @@ def combined_analysis_cashflow_tab():
     **Focus:** Net worth trajectories and probability of success (not income/expense details - see Section 1 for that).
     """)
 
-    with st.expander("⚙️ Simulation Settings", expanded=False):
+    st.subheader("⚙️ Simulation Settings")
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.session_state.mc_start_year = st.number_input("Start Year", min_value=st.session_state.current_year, max_value=2100, value=int(st.session_state.mc_start_year), key="mc_start_v071")
+        st.number_input("Projection Years", min_value=1, max_value=80, value=int(st.session_state.mc_years), key="mc_years_v071")
+
+    with col2:
+        st.session_state.mc_simulations = st.number_input("Number of Simulations", min_value=100, max_value=10000, value=int(st.session_state.mc_simulations), step=100, key="mc_sims_v071")
+        st.session_state.mc_use_historical = st.checkbox("Use Historical Returns", value=st.session_state.mc_use_historical, help="Use actual historical S&P 500 returns instead of random generation", key="mc_hist_v071")
+
+    with col3:
+        st.session_state.mc_normalize_to_today_dollars = st.checkbox(
+            "Normalize to Today's Dollars",
+            value=st.session_state.mc_normalize_to_today_dollars,
+            help="Adjusts all future values to reflect today's purchasing power by removing the effect of inflation. This reveals your actual wealth accumulation over time — if the line goes up, you're genuinely getting wealthier, not just keeping pace with rising prices. For example, $1M in 2050 might look impressive, but normalized to today's dollars shows what that money can actually buy in current terms.",
+            key="mc_norm_v071"
+        )
+
+    st.markdown("---")
+    st.subheader("📊 Variability Settings")
+    use_asymmetric = st.checkbox("Use Asymmetric Variability", value=True, help="Set different positive and negative variability ranges", key="mc_asym_v071")
+
+    if use_asymmetric:
         col1, col2, col3 = st.columns(3)
-
         with col1:
-            st.session_state.mc_start_year = st.number_input("Start Year", min_value=st.session_state.current_year, max_value=2100, value=int(st.session_state.mc_start_year), key="mc_start_v071")
-            st.number_input("Projection Years", min_value=1, max_value=80, value=int(st.session_state.mc_years), key="mc_years_v071")
-
+            st.markdown("**Income Variability**")
+            st.session_state.mc_income_variability_positive = st.number_input("Positive (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_income_variability_positive), step=1.0, key="income_var_pos_v071")
+            st.session_state.mc_income_variability_negative = st.number_input("Negative (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_income_variability_negative), step=1.0, key="income_var_neg_v071")
         with col2:
-            st.session_state.mc_simulations = st.number_input("Number of Simulations", min_value=100, max_value=10000, value=int(st.session_state.mc_simulations), step=100, key="mc_sims_v071")
-            st.session_state.mc_use_historical = st.checkbox("Use Historical Returns", value=st.session_state.mc_use_historical, help="Use actual historical S&P 500 returns instead of random generation", key="mc_hist_v071")
-
+            st.markdown("**Expense Variability**")
+            st.session_state.mc_expense_variability_positive = st.number_input("Positive (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_expense_variability_positive), step=1.0, key="expense_var_pos_v071")
+            st.session_state.mc_expense_variability_negative = st.number_input("Negative (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_expense_variability_negative), step=1.0, key="expense_var_neg_v071")
         with col3:
-            st.session_state.mc_normalize_to_today_dollars = st.checkbox(
-                "Normalize to Today's Dollars",
-                value=st.session_state.mc_normalize_to_today_dollars,
-                help="Adjusts all future values to reflect today's purchasing power by removing the effect of inflation. This reveals your actual wealth accumulation over time — if the line goes up, you're genuinely getting wealthier, not just keeping pace with rising prices. For example, $1M in 2050 might look impressive, but normalized to today's dollars shows what that money can actually buy in current terms.",
-                key="mc_norm_v071"
-            )
-
-        st.markdown("---")
-        st.subheader("📊 Variability Settings")
-        use_asymmetric = st.checkbox("Use Asymmetric Variability", value=True, help="Set different positive and negative variability ranges", key="mc_asym_v071")
-
-        if use_asymmetric:
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.markdown("**Income Variability**")
-                st.session_state.mc_income_variability_positive = st.number_input("Positive (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_income_variability_positive), step=1.0, key="income_var_pos_v071")
-                st.session_state.mc_income_variability_negative = st.number_input("Negative (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_income_variability_negative), step=1.0, key="income_var_neg_v071")
-            with col2:
-                st.markdown("**Expense Variability**")
-                st.session_state.mc_expense_variability_positive = st.number_input("Positive (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_expense_variability_positive), step=1.0, key="expense_var_pos_v071")
-                st.session_state.mc_expense_variability_negative = st.number_input("Negative (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_expense_variability_negative), step=1.0, key="expense_var_neg_v071")
-            with col3:
-                st.markdown("**Return Variability**")
-                st.session_state.mc_return_variability_positive = st.number_input("Positive (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_return_variability_positive), step=1.0, key="return_var_pos_v071")
-                st.session_state.mc_return_variability_negative = st.number_input("Negative (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_return_variability_negative), step=1.0, key="return_var_neg_v071")
-        else:
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.session_state.mc_income_variability = st.slider("Income Variability (%)", 0.0, 100.0, 10.0, key="income_var_v071")
-            with col2:
-                st.session_state.mc_expense_variability = st.slider("Expense Variability (%)", 0.0, 100.0, 5.0, key="expense_var_v071")
-            with col3:
-                st.session_state.mc_return_variability = st.slider("Return Variability (%)", 0.0, 100.0, 15.0, key="return_var_v071")
+            st.markdown("**Return Variability**")
+            st.session_state.mc_return_variability_positive = st.number_input("Positive (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_return_variability_positive), step=1.0, key="return_var_pos_v071")
+            st.session_state.mc_return_variability_negative = st.number_input("Negative (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_return_variability_negative), step=1.0, key="return_var_neg_v071")
+    else:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.session_state.mc_income_variability = st.slider("Income Variability (%)", 0.0, 100.0, 10.0, key="income_var_v071")
+        with col2:
+            st.session_state.mc_expense_variability = st.slider("Expense Variability (%)", 0.0, 100.0, 5.0, key="expense_var_v071")
+        with col3:
+            st.session_state.mc_return_variability = st.slider("Return Variability (%)", 0.0, 100.0, 15.0, key="return_var_v071")
 
     # Run Monte Carlo Simulation Button
     if st.button("🎲 Run Monte Carlo Simulation", type="primary", use_container_width=True, key="run_mc_v071"):
@@ -6370,6 +6370,57 @@ def test_disabled_child_scenario(percentiles_data, config):
     return event_results
 
 
+def find_worst_case_disabled_child(percentiles_data, children_list):
+    """
+    Determine which child scenario results in the worst financial outcome.
+
+    Args:
+        percentiles_data: Dict containing percentile data
+        children_list: List of children with their information
+
+    Returns:
+        Dict with 'child_idx', 'child_name', and 'child_birth_year' for worst case
+    """
+    if not children_list:
+        return None
+
+    percentile_names = ['10th', '25th', '50th', '75th', '90th']
+    worst_child = None
+    worst_avg_final_nw = float('inf')
+
+    for child_idx, child in enumerate(children_list):
+        child_birth_year = child['birth_year']
+
+        # Run scenario for this child
+        config = {
+            'child_idx': child_idx,
+            'child_birth_year': child_birth_year
+        }
+        results = test_disabled_child_scenario(percentiles_data, config)
+
+        # Calculate average final net worth across all percentiles
+        total_nw = 0
+        valid_percentiles = 0
+        for pct_name in percentile_names:
+            if pct_name in results and isinstance(results[pct_name], dict):
+                total_nw += results[pct_name]['final_nw']
+                valid_percentiles += 1
+
+        if valid_percentiles > 0:
+            avg_final_nw = total_nw / valid_percentiles
+
+            # Track the worst case (lowest average net worth)
+            if avg_final_nw < worst_avg_final_nw:
+                worst_avg_final_nw = avg_final_nw
+                worst_child = {
+                    'child_idx': child_idx,
+                    'child_name': child['name'],
+                    'child_birth_year': child_birth_year
+                }
+
+    return worst_child
+
+
 def test_unemployment_scenario(percentiles_data, config):
     """
     Test forced unemployment scenario.
@@ -6709,14 +6760,8 @@ def stress_test_tab():
         include_disabled_child = st.checkbox(
             "👶 Disabled Child",
             value=False,
-            help="Include disabled child scenario (parent retires)"
+            help="Include disabled child scenario (parent retires) - worst case child will be automatically selected"
         )
-        if include_disabled_child and st.session_state.children_list:
-            compound_child = st.selectbox(
-                "Which Child",
-                options=[child['name'] for child in st.session_state.children_list],
-                key="compound_child_select"
-            )
 
     # Run compound test if at least 2 scenarios are selected
     num_selected = sum([include_market_crash, include_hyperinflation, include_unemployment, include_disabled_child])
@@ -6725,6 +6770,11 @@ def stress_test_tab():
         st.markdown("---")
         if st.button("🔥 Run Compound Stress Test", type="primary", use_container_width=True):
             with st.spinner("🔍 Running compound stress test... This may take a moment."):
+                # Determine worst-case child if disabled child scenario is included
+                worst_case_child = None
+                if include_disabled_child and st.session_state.children_list:
+                    worst_case_child = find_worst_case_disabled_child(percentiles_data, st.session_state.children_list)
+
                 # Build scenario description
                 scenario_parts = []
                 if include_market_crash:
@@ -6733,8 +6783,8 @@ def stress_test_tab():
                     scenario_parts.append(f"{compound_inflation_years}yr {compound_inflation_rate}% Inflation")
                 if include_unemployment:
                     scenario_parts.append(f"{compound_unemployment_parent} Unemployed {compound_unemployment_years}yr")
-                if include_disabled_child:
-                    scenario_parts.append(f"Disabled {compound_child}")
+                if include_disabled_child and worst_case_child:
+                    scenario_parts.append(f"Disabled {worst_case_child['child_name']} (Worst Case)")
 
                 event_name = "Compound: " + " + ".join(scenario_parts)
 
