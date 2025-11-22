@@ -23,7 +23,7 @@ except ImportError:
 
 # Set page configuration
 st.set_page_config(
-    page_title="Financial Planning Application v0.72",
+    page_title="Financial Planning Application v0.73",
     page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -1687,23 +1687,6 @@ class HealthExpense:
     affected_person: str  # "Parent 1", "Parent 2", "Both"
 
 
-# NEW: Debt Management dataclasses
-@dataclass
-class Debt:
-    name: str
-    debt_type: str  # "Student Loan", "Credit Card", "Auto Loan", "Personal Loan", "Medical Debt"
-    principal: float
-    interest_rate: float
-    monthly_payment: float
-    minimum_payment: float
-    start_date: str
-    owner: str  # "Parent 1", "Parent 2", "Shared"
-    interest_type: str = "Fixed"  # "Fixed", "Variable"
-    income_based_repayment: bool = False
-    forgiveness_eligible: bool = False
-    forgiveness_years: int = 0
-
-
 # Currency formatting function with automatic scaling
 def format_currency(value, force_full=False, context="general"):
     """
@@ -3164,16 +3147,10 @@ def initialize_session_state():
         st.session_state.medicare_part_d_premium = 55.0    # Average estimate
         st.session_state.medigap_premium = 150.0           # Average estimate
 
-        # NEW: Debt Management
-        st.session_state.debts = []
-        st.session_state.debt_payoff_strategy = "Avalanche"  # "Avalanche", "Snowball", "Minimum Only"
-        st.session_state.extra_debt_payment = 0.0
-
         # Tab visibility settings
         st.session_state.show_family_expenses = False  # Off by default (advanced template management)
         st.session_state.show_recurring_expenses = True  # On by default
         st.session_state.show_healthcare = False  # Off by default
-        st.session_state.show_debt = False  # Off by default
         st.session_state.show_export = True  # On by default
 
         st.session_state.initialized = True
@@ -3524,7 +3501,7 @@ def main():
     """Main application function"""
     initialize_session_state()
 
-    st.title("💰 Financial Planning Suite v0.72")
+    st.title("💰 Financial Planning Suite v0.73")
 
     # Build tab list dynamically based on visibility settings
     tab_configs = [
@@ -3539,7 +3516,6 @@ def main():
         ("📈 Economy", economy_tab, True),
         ("🖼️ Retirement", retirement_tab, True),
         ("🏥 Healthcare & Insurance", healthcare_insurance_tab, st.session_state.get('show_healthcare', False)),
-        ("💳 Debt Management", debt_management_tab, st.session_state.get('show_debt', False)),
         ("📊 Analysis & Cashflow", combined_analysis_cashflow_tab, True),
         ("🧪 Stress Test", stress_test_tab, True),
         ("📄 Export Reports", report_export_tab, st.session_state.get('show_export', True)),
@@ -3662,13 +3638,6 @@ def parent_settings_tab():
             help="Plan Medicare, HSA, long-term care, and health insurance"
         )
 
-        st.checkbox(
-            "💳 Debt Management",
-            value=st.session_state.get('show_debt', False),
-            key='show_debt',
-            help="Track student loans, credit cards, and payoff strategies"
-        )
-
     with col2:
         st.checkbox(
             "📄 Export Reports",
@@ -3705,7 +3674,6 @@ def parent_settings_tab():
 
     Enable in Settings → Tab Visibility to access:
     - **Healthcare & Insurance**: Plan Medicare, HSA, and long-term care costs
-    - **Debt Management**: Track loans and optimize payoff strategies
     - **Export Reports**: Generate Excel/CSV/JSON reports
 
     #### Key Capabilities
@@ -7109,181 +7077,6 @@ def healthcare_insurance_tab():
     col3.metric("Total Insurance Cost", format_currency(total_annual_premium + total_ltc_premium))
 
 
-# NEW TAB 2: Debt Management
-def debt_management_tab():
-    """Comprehensive Debt Management Tab"""
-    st.header("💳 Debt Management")
-
-    st.markdown("""
-    Manage all debts including student loans, credit cards, auto loans, and personal loans.
-    Track payoff strategies and visualize debt-free timeline.
-    """)
-
-    # Ensure debt variables are initialized (defensive programming for old sessions)
-    if 'debts' not in st.session_state:
-        st.session_state.debts = []
-    if 'debt_payoff_strategy' not in st.session_state:
-        st.session_state.debt_payoff_strategy = "Avalanche"
-    if 'extra_debt_payment' not in st.session_state:
-        st.session_state.extra_debt_payment = 0.0
-
-    # Debt Payoff Strategy
-    st.subheader("📊 Debt Payoff Strategy")
-    col1, col2 = st.columns(2)
-    with col1:
-        # Map short form to full form for display
-        strategy_options = ["Avalanche (Highest Interest First)", "Snowball (Smallest Balance First)", "Minimum Payments Only"]
-        strategy_map = {"Avalanche": 0, "Snowball": 1, "Minimum Only": 2}
-        # Handle both short and long forms
-        if "Avalanche" in st.session_state.debt_payoff_strategy:
-            current_index = 0
-        elif "Snowball" in st.session_state.debt_payoff_strategy:
-            current_index = 1
-        else:
-            current_index = 2
-
-        st.session_state.debt_payoff_strategy = st.selectbox(
-            "Payoff Strategy",
-            strategy_options,
-            index=current_index
-        )
-    with col2:
-        st.session_state.extra_debt_payment = st.number_input(
-            "Extra Monthly Payment (Applied to Strategy)",
-            min_value=0.0,
-            value=float(st.session_state.extra_debt_payment),
-            step=100.0,
-            help="Additional amount beyond minimum payments"
-        )
-
-    # Add New Debt
-    st.subheader("➕ Add New Debt")
-
-    if st.button("Add Debt"):
-        new_debt = Debt(
-            name="New Debt",
-            debt_type="Student Loan",
-            principal=25000.0,
-            interest_rate=0.045,
-            monthly_payment=250.0,
-            minimum_payment=250.0,
-            start_date=f"{st.session_state.current_year}-01-01",
-            owner="Parent 1",
-            interest_type="Fixed",
-            income_based_repayment=False,
-            forgiveness_eligible=False,
-            forgiveness_years=0
-        )
-        st.session_state.debts.append(new_debt)
-        st.rerun()
-
-    # Display All Debts
-    st.subheader("📋 Current Debts")
-
-    if not st.session_state.debts:
-        st.info("No debts added yet. Click 'Add Debt' to get started.")
-
-    for idx, debt in enumerate(st.session_state.debts):
-        with st.expander(f"💰 {debt.name} ({debt.debt_type}) - {format_currency(debt.principal)} @ {debt.interest_rate*100:.2f}%"):
-            col1, col2, col3, col4 = st.columns([3, 3, 3, 1])
-
-            with col1:
-                debt.name = st.text_input(f"Debt Name##debt{idx}", value=debt.name)
-                debt.debt_type = st.selectbox(
-                    f"Debt Type##debt{idx}",
-                    ["Student Loan", "Credit Card", "Auto Loan", "Personal Loan", "Medical Debt", "Mortgage", "Other"],
-                    index=["Student Loan", "Credit Card", "Auto Loan", "Personal Loan", "Medical Debt", "Mortgage", "Other"].index(debt.debt_type) if debt.debt_type in ["Student Loan", "Credit Card", "Auto Loan", "Personal Loan", "Medical Debt", "Mortgage", "Other"] else 0
-                )
-                debt.owner = st.selectbox(
-                    f"Owner##debt{idx}",
-                    ["Parent 1", "Parent 2", "Shared"],
-                    index=["Parent 1", "Parent 2", "Shared"].index(debt.owner) if debt.owner in ["Parent 1", "Parent 2", "Shared"] else 0
-                )
-
-            with col2:
-                debt.principal = st.number_input(
-                    f"Current Balance##debt{idx}",
-                    min_value=0.0,
-                    value=float(debt.principal),
-                    step=1000.0
-                )
-                debt.interest_rate = st.number_input(
-                    f"Interest Rate (%)##debt{idx}",
-                    min_value=0.0,
-                    max_value=100.0,
-                    value=float(debt.interest_rate * 100),
-                    step=0.1
-                ) / 100
-                debt.interest_type = st.selectbox(
-                    f"Interest Type##debt{idx}",
-                    ["Fixed", "Variable"],
-                    index=["Fixed", "Variable"].index(debt.interest_type) if debt.interest_type in ["Fixed", "Variable"] else 0
-                )
-
-            with col3:
-                debt.monthly_payment = st.number_input(
-                    f"Monthly Payment##debt{idx}",
-                    min_value=0.0,
-                    value=float(debt.monthly_payment),
-                    step=50.0
-                )
-                debt.minimum_payment = st.number_input(
-                    f"Minimum Payment##debt{idx}",
-                    min_value=0.0,
-                    value=float(debt.minimum_payment),
-                    step=25.0
-                )
-
-                # Student Loan Specific
-                if debt.debt_type == "Student Loan":
-                    debt.income_based_repayment = st.checkbox(
-                        f"Income-Based Repayment##debt{idx}",
-                        value=debt.income_based_repayment
-                    )
-                    debt.forgiveness_eligible = st.checkbox(
-                        f"Forgiveness Eligible (PSLF/IDR)##debt{idx}",
-                        value=debt.forgiveness_eligible
-                    )
-                    if debt.forgiveness_eligible:
-                        debt.forgiveness_years = st.number_input(
-                            f"Years Until Forgiveness##debt{idx}",
-                            min_value=0,
-                            max_value=25,
-                            value=int(debt.forgiveness_years),
-                            step=1
-                        )
-
-            with col4:
-                if st.button(f"🗑️##debt{idx}"):
-                    st.session_state.debts.pop(idx)
-                    st.rerun()
-
-            st.session_state.debts[idx] = debt
-
-    # Debt Summary
-    if st.session_state.debts:
-        st.subheader("📊 Debt Summary")
-
-        total_debt = sum([d.principal for d in st.session_state.debts])
-        total_monthly_payment = sum([d.monthly_payment for d in st.session_state.debts])
-        weighted_avg_rate = sum([d.principal * d.interest_rate for d in st.session_state.debts]) / total_debt if total_debt > 0 else 0
-
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Total Debt", format_currency(total_debt))
-        col2.metric("Total Monthly Payment", format_currency(total_monthly_payment))
-        col3.metric("Weighted Avg. Interest Rate", f"{weighted_avg_rate*100:.2f}%")
-        col4.metric("Monthly + Extra", format_currency(total_monthly_payment + st.session_state.extra_debt_payment))
-
-        # Debt Breakdown Chart
-        if st.session_state.debts:
-            debt_df = pd.DataFrame([
-                {"Debt": d.name, "Balance": d.principal, "Type": d.debt_type, "Rate": d.interest_rate*100}
-                for d in st.session_state.debts
-            ])
-
-            fig = px.pie(debt_df, values='Balance', names='Debt', title='Debt Breakdown by Balance')
-            st.plotly_chart(fig, use_container_width=True)
-
 # NEW TAB 5: Report Export
 def report_export_tab():
     """PDF/Excel Report Export Tab"""
@@ -7307,9 +7100,8 @@ def report_export_tab():
 
         include_sections = st.multiselect(
             "Include Sections",
-            ["Summary", "Income & Expenses", "Assets & Debts", "Children", "Healthcare",
-             "Education", "Tax Strategies", "Monte Carlo Analysis", "Timeline"],
-            default=["Summary", "Income & Expenses", "Assets & Debts", "Monte Carlo Analysis"]
+            ["Summary", "Income & Expenses", "Children", "Healthcare", "Timeline"],
+            default=["Summary", "Income & Expenses"]
         )
 
     with col2:
@@ -7352,9 +7144,7 @@ def report_export_tab():
                         "combined_income": st.session_state.parentX_income + st.session_state.parentY_income,
                         "total_expenses": sum(st.session_state.expenses.values()),
                         "num_children": len(st.session_state.children_list),
-                        "num_houses": len(st.session_state.houses),
-                        "total_debt": sum([d.principal for d in st.session_state.debts]),
-                        "total_529_balance": sum([p.current_balance for p in st.session_state.plan529_accounts])
+                        "num_houses": len(st.session_state.houses)
                     },
                     "parents": {
                         "parent1": {
@@ -7376,7 +7166,6 @@ def report_export_tab():
                     },
                     "expenses": st.session_state.expenses,
                     "children": [{"name": c["name"], "age": st.session_state.current_year - c["birth_year"], "birth_year": c["birth_year"]} for c in st.session_state.children_list],
-                    "debts": [asdict(d) for d in st.session_state.debts],
                     "healthcare": {
                         "health_insurances": [asdict(h) for h in st.session_state.health_insurances],
                         "ltc_insurances": [asdict(l) for l in st.session_state.ltc_insurances],
@@ -7435,9 +7224,7 @@ def report_export_tab():
                             ['Combined Income', f"${report_data['summary']['combined_income']:,.2f}"],
                             ['Total Expenses', f"${report_data['summary']['total_expenses']:,.2f}"],
                             ['Number of Children', str(report_data['summary']['num_children'])],
-                            ['Number of Properties', str(report_data['summary']['num_houses'])],
-                            ['Total Debt', f"${report_data['summary']['total_debt']:,.2f}"],
-                            ['Total 529 Balance', f"${report_data['summary']['total_529_balance']:,.2f}"]
+                            ['Number of Properties', str(report_data['summary']['num_houses'])]
                         ]
                         summary_table = Table(summary_data, colWidths=[3*inch, 3*inch])
                         summary_table.setStyle(TableStyle([
@@ -7497,52 +7284,6 @@ def report_export_tab():
                         elements.append(children_table)
                         elements.append(Spacer(1, 20))
 
-                    # Assets & Debts Section
-                    if "Assets & Debts" in include_sections and report_data['debts']:
-                        elements.append(PageBreak())
-                        elements.append(Paragraph("Debts", heading_style))
-                        debts_data = [['Name', 'Principal', 'Interest Rate', 'Monthly Payment']]
-                        for debt in report_data['debts']:
-                            debts_data.append([
-                                debt['name'],
-                                f"${debt['principal']:,.2f}",
-                                f"{debt['interest_rate']*100:.2f}%",
-                                f"${debt['monthly_payment']:,.2f}"
-                            ])
-
-                        debts_table = Table(debts_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 1.5*inch])
-                        debts_table.setStyle(TableStyle([
-                            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-                        ]))
-                        elements.append(debts_table)
-                        elements.append(Spacer(1, 20))
-
-                    # Education Section
-                    if "Education" in include_sections and report_data['education']['529_plans']:
-                        elements.append(Paragraph("Education - 529 Plans", heading_style))
-                        edu_data = [['Beneficiary', 'Current Balance', 'Annual Contribution', 'State']]
-                        for plan in report_data['education']['529_plans']:
-                            edu_data.append([
-                                plan['beneficiary_name'],
-                                f"${plan['current_balance']:,.2f}",
-                                f"${plan['annual_contribution']:,.2f}",
-                                plan.get('state', 'N/A')
-                            ])
-
-                        edu_table = Table(edu_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 1.5*inch])
-                        edu_table.setStyle(TableStyle([
-                            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-                        ]))
-                        elements.append(edu_table)
-
                     # Build PDF
                     doc.build(elements)
                     output.seek(0)
@@ -7574,11 +7315,6 @@ def report_export_tab():
                             expenses_df = pd.DataFrame([report_data["expenses"]]).T
                             expenses_df.columns = ["Annual Amount"]
                             expenses_df.to_excel(writer, sheet_name='Expenses')
-
-                        # Debts Sheet
-                        if "Assets & Debts" in include_sections and st.session_state.debts:
-                            debts_df = pd.DataFrame(report_data["debts"])
-                            debts_df.to_excel(writer, sheet_name='Debts', index=False)
 
                         # Children Sheet
                         if "Children" in include_sections and st.session_state.children_list:
@@ -7625,17 +7361,6 @@ def report_export_tab():
                             "text/csv"
                         )
 
-                    # Debts CSV
-                    if "Assets & Debts" in include_sections and st.session_state.debts:
-                        debts_df = pd.DataFrame(report_data["debts"])
-                        debts_csv = debts_df.to_csv(index=False)
-                        st.download_button(
-                            "Download Debts.csv",
-                            debts_csv,
-                            f"{report_name}_debts.csv",
-                            "text/csv"
-                        )
-
                     st.success("✅ CSV files ready for download!")
 
             except Exception as e:
@@ -7655,14 +7380,6 @@ def report_export_tab():
         col1.metric("Combined Net Worth", format_currency(total_net_worth))
         col2.metric("Combined Annual Income", format_currency(total_income))
         col3.metric("Total Annual Expenses", format_currency(total_expenses))
-
-        if st.session_state.debts:
-            total_debt = sum([d.principal for d in st.session_state.debts])
-            col1.metric("Total Debt", format_currency(total_debt))
-
-        if st.session_state.plan529_accounts:
-            total_529 = sum([p.current_balance for p in st.session_state.plan529_accounts])
-            col2.metric("Total 529 Balance", format_currency(total_529))
 
         if st.session_state.children_list:
             col3.metric("Number of Children", len(st.session_state.children_list))
