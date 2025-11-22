@@ -21,6 +21,7 @@ A comprehensive web-based financial planning application that helps families pla
 - **🎓 Education Funding**: 529 plan tracking, college cost projections, scholarship/grant management, and funding gap analysis
 - **💼 Tax Optimization**: Roth conversions, QCD strategies, withdrawal sequencing, and tax-loss harvesting
 - **📄 Report Export**: Generate professional Excel, CSV, or JSON reports of your complete financial plan
+- **📚 Data Source Transparency**: All living expense estimates now include clear references to data sources (MIT Living Wage Calculator, BLS Consumer Expenditure Survey, national statistics offices, etc.)
 
 ### Supported Locations
 

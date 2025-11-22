@@ -1432,6 +1432,136 @@ FAMILY_EXPENSE_TEMPLATES = {
 }
 
 
+# Data Source References for Expense Templates
+# These references indicate where the living expense data was gathered from
+EXPENSE_DATA_SOURCES = {
+    "California": {
+        "source": "MIT Living Wage Calculator & Bureau of Labor Statistics Consumer Expenditure Survey",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "Expenses adjusted for California cost of living index. Data includes Sacramento and broader California metropolitan areas."
+    },
+    "Sacramento": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and Sacramento Area Council of Governments",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/, https://www.sacog.org/",
+        "year": "2024",
+        "notes": "Daycare costs based on Child Care Aware of America 2024 report. Education costs from California State University and UC system averages."
+    },
+    "Seattle": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and Washington State Department of Commerce",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "Adjusted for Seattle-Tacoma-Bellevue metro area cost of living. Daycare costs from Child Care Aware of America."
+    },
+    "Houston": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and Greater Houston Partnership",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "Reflects Houston-The Woodlands-Sugar Land metro area costs. Lower cost of living compared to coastal cities."
+    },
+    "New York": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and NYC Department of Consumer and Worker Protection",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/, https://www.nyc.gov/dca",
+        "year": "2024",
+        "notes": "NYC metro area costs including Manhattan, Brooklyn, Queens. Among highest cost of living in US."
+    },
+    "San Francisco": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and San Francisco Controller's Office",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "San Francisco-Oakland-Berkeley metro area. Highest cost of living city in the dataset."
+    },
+    "Los Angeles": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and LA County Economic Development Corporation",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "Los Angeles-Long Beach-Anaheim metro area costs."
+    },
+    "Portland": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and Portland Metro Regional Government",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "Portland-Vancouver-Hillsboro metro area costs."
+    },
+    "Toronto": {
+        "source": "Statistics Canada Survey of Household Spending and Numbeo Cost of Living Database",
+        "url": "https://www.statcan.gc.ca/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from CAD to USD. Toronto metro area including GTA."
+    },
+    "Vancouver": {
+        "source": "Statistics Canada Survey of Household Spending and Numbeo Cost of Living Database",
+        "url": "https://www.statcan.gc.ca/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from CAD to USD. Metro Vancouver area costs."
+    },
+    "Paris": {
+        "source": "INSEE (French National Institute of Statistics) and Numbeo Cost of Living Database",
+        "url": "https://www.insee.fr/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from EUR to USD. Île-de-France region costs."
+    },
+    "Toulouse": {
+        "source": "INSEE (French National Institute of Statistics) and Numbeo Cost of Living Database",
+        "url": "https://www.insee.fr/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from EUR to USD. Lower cost of living compared to Paris."
+    },
+    "Berlin": {
+        "source": "Destatis (German Federal Statistical Office) and Numbeo Cost of Living Database",
+        "url": "https://www.destatis.de/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from EUR to USD. Berlin metropolitan area."
+    },
+    "Munich": {
+        "source": "Destatis (German Federal Statistical Office) and Numbeo Cost of Living Database",
+        "url": "https://www.destatis.de/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from EUR to USD. Highest cost German city in dataset."
+    },
+    "Sydney": {
+        "source": "Australian Bureau of Statistics Household Expenditure Survey and Numbeo Cost of Living Database",
+        "url": "https://www.abs.gov.au/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from AUD to USD. Greater Sydney area costs."
+    },
+    "Melbourne": {
+        "source": "Australian Bureau of Statistics Household Expenditure Survey and Numbeo Cost of Living Database",
+        "url": "https://www.abs.gov.au/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from AUD to USD. Greater Melbourne area costs."
+    },
+    "Brisbane": {
+        "source": "Australian Bureau of Statistics Household Expenditure Survey and Numbeo Cost of Living Database",
+        "url": "https://www.abs.gov.au/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from AUD to USD. Brisbane metro area costs."
+    },
+    "Auckland": {
+        "source": "Statistics New Zealand Household Economic Survey and Numbeo Cost of Living Database",
+        "url": "https://www.stats.govt.nz/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from NZD to USD. Auckland metro area costs."
+    },
+    "Wellington": {
+        "source": "Statistics New Zealand Household Economic Survey and Numbeo Cost of Living Database",
+        "url": "https://www.stats.govt.nz/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from NZD to USD. Wellington metro area costs."
+    }
+}
+
+
+def get_expense_data_source(location: str) -> dict:
+    """Get data source information for a specific location's expense template"""
+    return EXPENSE_DATA_SOURCES.get(location, {
+        "source": "Custom user-created template",
+        "url": "N/A",
+        "year": str(datetime.now().year),
+        "notes": "This is a custom expense template created by the user."
+    })
+
+
 # Data Classes
 @dataclass
 class MajorPurchase:
@@ -4097,6 +4227,29 @@ def family_expenses_tab():
             st.metric("Total Annual Expenses", f"${total:,.0f}")
             st.caption(f"Monthly: ${total/12:,.0f}")
 
+        # Display data sources
+        st.markdown("---")
+        data_source = get_expense_data_source(selected_location)
+
+        st.markdown("### 📚 Data Sources")
+        st.markdown(f"**Source:** {data_source['source']}")
+
+        # Display URLs as clickable links
+        urls = data_source['url'].split(', ')
+        if len(urls) == 1 and urls[0] != 'N/A':
+            st.markdown(f"**URL:** [{urls[0]}]({urls[0]})")
+        elif urls[0] != 'N/A':
+            st.markdown("**URLs:**")
+            for url in urls:
+                url = url.strip()
+                st.markdown(f"- [{url}]({url})")
+
+        st.markdown(f"**Data Year:** {data_source['year']}")
+
+        if data_source['notes']:
+            with st.expander("📝 Additional Notes"):
+                st.markdown(data_source['notes'])
+
         # Quick save button
         st.markdown("---")
         col_save1, col_save2 = st.columns([3, 1])
@@ -4774,6 +4927,29 @@ def children_tab():
             height=400
         )
         st.plotly_chart(fig, use_container_width=True)
+
+        # Display data sources for children's expense template
+        st.markdown("---")
+        data_source = get_expense_data_source(preview_state)
+
+        st.markdown("### 📚 Data Sources")
+        st.markdown(f"**Source:** {data_source['source']}")
+
+        # Display URLs as clickable links
+        urls = data_source['url'].split(', ')
+        if len(urls) == 1 and urls[0] != 'N/A':
+            st.markdown(f"**URL:** [{urls[0]}]({urls[0]})")
+        elif urls[0] != 'N/A':
+            st.markdown("**URLs:**")
+            for url in urls:
+                url = url.strip()
+                st.markdown(f"- [{url}]({url})")
+
+        st.markdown(f"**Data Year:** {data_source['year']}")
+
+        if data_source['notes']:
+            with st.expander("📝 Additional Notes"):
+                st.markdown(data_source['notes'])
 
 
 def house_tab():
