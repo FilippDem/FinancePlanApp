@@ -5418,35 +5418,73 @@ def combined_analysis_cashflow_tab():
                         income *= (1 + np.random.uniform(-st.session_state.mc_income_variability / 100, st.session_state.mc_income_variability / 100))
 
                     # Calculate base expenses
-                    state, strategy = get_state_for_year(year)
-                    base_expenses = sum(st.session_state.expenses.values())
-                    children_expenses = calculate_children_expenses(year)
-
-                    # Calculate house expenses (property tax, insurance, maintenance, upkeep)
-                    house_expenses = 0
                     years_from_now = year - st.session_state.current_year
-                    if 'houses' in st.session_state:
-                        for house in st.session_state.houses:
-                            # Check if the house is owned during this year based on timeline
-                            is_owned = False
-                            for timeline_entry in house.timeline:
-                                if timeline_entry.year <= year:
-                                    if timeline_entry.status in ["Own_Live", "Own_Rent"]:
-                                        is_owned = True
-                                    elif timeline_entry.status == "Sold":
-                                        is_owned = False
+                    base_expenses_dict = get_state_based_family_expenses(year)
+                    base_expenses = sum(base_expenses_dict.values())
+                    base_expenses *= (1.03 ** years_from_now)  # 3% inflation
 
-                            if is_owned:
-                                # Calculate house value with appreciation
-                                current_house_value = house.current_value * (1.03 ** years_from_now)
+                    # Children expenses (same calculation as deterministic cashflow)
+                    children_expenses = 0
+                    for child in st.session_state.children_list:
+                        child_exp = get_child_expenses(child, year, st.session_state.current_year)
+                        child_total = sum(child_exp.values())
+                        children_expenses += child_total
 
-                                # Property tax + insurance + maintenance + upkeep
-                                house_expenses += current_house_value * house.property_tax_rate
-                                house_expenses += house.home_insurance * (1.03 ** years_from_now)
-                                house_expenses += current_house_value * house.maintenance_rate
-                                house_expenses += house.upkeep_costs * (1.03 ** years_from_now)
+                    # Recurring expenses
+                    recurring_expenses_total = 0
+                    for recurring in st.session_state.recurring_expenses:
+                        if year >= recurring.start_year:
+                            if recurring.end_year is None or year <= recurring.end_year:
+                                years_since_start = year - recurring.start_year
+                                if years_since_start % recurring.frequency_years == 0:
+                                    expense_amount = recurring.amount
+                                    if recurring.inflation_adjust:
+                                        expense_amount *= (1.03 ** years_from_now)
+                                    recurring_expenses_total += expense_amount
 
-                    total_expenses = base_expenses + children_expenses + house_expenses
+                    # One-time major purchases
+                    major_purchase_expenses = 0
+                    for purchase in st.session_state.major_purchases:
+                        if purchase.year == year:
+                            major_purchase_expenses += purchase.amount
+
+                    # Healthcare costs
+                    healthcare_expenses = 0
+                    parent1_age = st.session_state.parentX_age + (year - st.session_state.current_year)
+                    parent2_age = st.session_state.parentY_age + (year - st.session_state.current_year)
+
+                    if 'health_insurances' in st.session_state:
+                        for insurance in st.session_state.health_insurances:
+                            if insurance.covered_by in ["Parent 1", "Both", "Family"] and insurance.start_age <= parent1_age <= insurance.end_age:
+                                healthcare_expenses += insurance.monthly_premium * 12
+                            elif insurance.covered_by == "Parent 2" and insurance.start_age <= parent2_age <= insurance.end_age:
+                                healthcare_expenses += insurance.monthly_premium * 12
+                            elif insurance.covered_by in ["Both", "Family"]:
+                                if (insurance.start_age <= parent1_age <= insurance.end_age) or (insurance.start_age <= parent2_age <= insurance.end_age):
+                                    healthcare_expenses += insurance.monthly_premium * 12
+
+                    # Medicare costs (age 65+)
+                    medicare_expenses = 0
+                    if 'medicare_part_b_premium' in st.session_state:
+                        if parent1_age >= 65:
+                            medicare_expenses += st.session_state.medicare_part_b_premium * 12
+                            medicare_expenses += st.session_state.get('medicare_part_d_premium', 55.0) * 12
+                            medicare_expenses += st.session_state.get('medigap_premium', 150.0) * 12
+                        if parent2_age >= 65:
+                            medicare_expenses += st.session_state.medicare_part_b_premium * 12
+                            medicare_expenses += st.session_state.get('medicare_part_d_premium', 55.0) * 12
+                            medicare_expenses += st.session_state.get('medigap_premium', 150.0) * 12
+                    healthcare_expenses += medicare_expenses
+
+                    # Long-term care insurance premiums
+                    if 'ltc_insurances' in st.session_state:
+                        for ltc in st.session_state.ltc_insurances:
+                            if ltc.covered_person == "Parent 1" and parent1_age >= ltc.start_age:
+                                healthcare_expenses += ltc.monthly_premium * 12
+                            elif ltc.covered_person == "Parent 2" and parent2_age >= ltc.start_age:
+                                healthcare_expenses += ltc.monthly_premium * 12
+
+                    total_expenses = base_expenses + children_expenses + recurring_expenses_total + major_purchase_expenses + healthcare_expenses
 
                     # Add variability to expenses
                     if use_asymmetric:
