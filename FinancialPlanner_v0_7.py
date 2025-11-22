@@ -15,7 +15,7 @@ try:
     from reportlab.lib.pagesizes import letter, A4
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Image
     from reportlab.lib import colors
     REPORTLAB_AVAILABLE = True
 except ImportError:
@@ -31,7 +31,7 @@ except ImportError:
 
 # Set page configuration
 st.set_page_config(
-    page_title="Financial Planning Application v0.74",
+    page_title="Financial Planning Application v0.75",
     page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -3545,11 +3545,39 @@ def calculate_monthly_house_payment(house):
     return monthly_payment + monthly_property_tax + monthly_insurance
 
 
+def plotly_fig_to_image(fig, width=6*inch, height=4*inch):
+    """
+    Convert a Plotly figure to a ReportLab Image object for PDF inclusion.
+
+    Args:
+        fig: Plotly figure object
+        width: Width of image in PDF (default 6 inches)
+        height: Height of image in PDF (default 4 inches)
+
+    Returns:
+        ReportLab Image object or None if conversion fails
+    """
+    try:
+        # Export figure to bytes (PNG format)
+        img_bytes = fig.to_image(format="png", width=800, height=600, scale=2)
+
+        # Create BytesIO object from bytes
+        img_buffer = io.BytesIO(img_bytes)
+
+        # Create ReportLab Image object
+        img = Image(img_buffer, width=width, height=height)
+        return img
+    except Exception as e:
+        # If kaleido is not installed or conversion fails, return None
+        print(f"Warning: Could not convert chart to image: {e}")
+        return None
+
+
 def main():
     """Main application function"""
     initialize_session_state()
 
-    st.title("💰 Financial Planning Suite v0.74")
+    st.title("💰 Financial Planning Suite v0.75")
 
     # Build tab list dynamically based on visibility settings
     tab_configs = [
@@ -7655,6 +7683,9 @@ def report_export_tab():
     if st.button("🚀 Generate Report", type="primary"):
         with st.spinner("Generating your financial report..."):
             try:
+                # Calculate lifetime cashflow projections
+                cashflow_projections = calculate_lifetime_cashflow()
+
                 # Prepare report data
                 report_data = {
                     "metadata": {
@@ -7694,7 +7725,13 @@ def report_export_tab():
                         "health_insurances": [asdict(h) for h in st.session_state.health_insurances],
                         "ltc_insurances": [asdict(l) for l in st.session_state.ltc_insurances],
                         "hsa_balance": st.session_state.hsa_balance
-                    }
+                    },
+                    "houses": [asdict(h) for h in st.session_state.houses] if hasattr(st.session_state, 'houses') else [],
+                    "major_purchases": [asdict(mp) for mp in st.session_state.major_purchases] if hasattr(st.session_state, 'major_purchases') else [],
+                    "recurring_expenses": [asdict(re) for re in st.session_state.recurring_expenses] if hasattr(st.session_state, 'recurring_expenses') else [],
+                    "state_timeline": [asdict(st_entry) for st_entry in st.session_state.state_timeline] if hasattr(st.session_state, 'state_timeline') else [],
+                    "cashflow_projections": cashflow_projections,
+                    "monte_carlo_results": st.session_state.mc_results if hasattr(st.session_state, 'mc_results') and st.session_state.mc_results else None
                 }
 
                 if report_format == "PDF (.pdf)":
@@ -7808,6 +7845,395 @@ def report_export_tab():
                         elements.append(children_table)
                         elements.append(Spacer(1, 20))
 
+                    # Expenses Section
+                    if "Income & Expenses" in include_sections and report_data.get('expenses'):
+                        elements.append(Paragraph("Annual Expense Breakdown", heading_style))
+
+                        # Create detailed expense table
+                        expenses = report_data['expenses']
+                        expense_data = [['Category', 'Annual Amount']]
+
+                        # Add all expense categories
+                        for category, amount in expenses.items():
+                            if amount > 0:
+                                # Format category name (replace underscores with spaces, title case)
+                                formatted_category = category.replace('_', ' ').title()
+                                expense_data.append([formatted_category, f"${amount:,.2f}"])
+
+                        # Add total row
+                        total_expenses = sum(expenses.values())
+                        expense_data.append(['Total Annual Expenses', f"${total_expenses:,.2f}"])
+
+                        if len(expense_data) > 1:  # More than just header
+                            expense_table = Table(expense_data, colWidths=[3.5*inch, 2.5*inch])
+                            expense_table.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                                ('BACKGROUND', (0, 1), (-1, -2), colors.beige),
+                                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+                                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                                ('LINEABOVE', (0, -1), (-1, -1), 2, colors.black),
+                                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                            ]))
+                            elements.append(expense_table)
+                            elements.append(Spacer(1, 12))
+
+                            # Generate and add expense breakdown pie chart
+                            try:
+                                # Prepare data for pie chart (exclude total row)
+                                expense_categories = []
+                                expense_amounts = []
+                                for category, amount in expenses.items():
+                                    if amount > 0:
+                                        formatted_category = category.replace('_', ' ').title()
+                                        expense_categories.append(formatted_category)
+                                        expense_amounts.append(amount)
+
+                                if expense_categories:
+                                    # Create pie chart
+                                    expense_pie_fig = go.Figure(data=[go.Pie(
+                                        labels=expense_categories,
+                                        values=expense_amounts,
+                                        hole=0.3
+                                    )])
+                                    expense_pie_fig.update_layout(
+                                        title="Annual Expense Distribution",
+                                        height=400,
+                                        showlegend=True
+                                    )
+
+                                    # Convert to image and add to PDF
+                                    expense_chart_img = plotly_fig_to_image(expense_pie_fig, width=5*inch, height=3.5*inch)
+                                    if expense_chart_img:
+                                        elements.append(expense_chart_img)
+                                        elements.append(Spacer(1, 12))
+                            except Exception as e:
+                                # If chart generation fails, just skip it
+                                pass
+
+                            elements.append(Spacer(1, 20))
+
+                    # Healthcare Section
+                    if "Healthcare" in include_sections and report_data.get('healthcare'):
+                        healthcare = report_data['healthcare']
+
+                        # Health Insurance
+                        if healthcare.get('health_insurances'):
+                            elements.append(Paragraph("Health Insurance Coverage", heading_style))
+                            for idx, insurance in enumerate(healthcare['health_insurances'], 1):
+                                insurance_data = [
+                                    ['Field', 'Value'],
+                                    ['Policy Type', insurance.get('policy_type', 'N/A')],
+                                    ['Annual Premium', f"${insurance.get('annual_premium', 0):,.2f}"],
+                                    ['Annual Deductible', f"${insurance.get('annual_deductible', 0):,.2f}"],
+                                    ['Annual OOP Max', f"${insurance.get('annual_oop_max', 0):,.2f}"]
+                                ]
+
+                                insurance_table = Table(insurance_data, colWidths=[2.5*inch, 3.5*inch])
+                                insurance_table.setStyle(TableStyle([
+                                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                                ]))
+                                elements.append(insurance_table)
+                                elements.append(Spacer(1, 12))
+
+                        # HSA Balance
+                        if healthcare.get('hsa_balance', 0) > 0:
+                            hsa_text = f"<b>HSA Balance:</b> ${healthcare['hsa_balance']:,.2f}"
+                            elements.append(Paragraph(hsa_text, styles['Normal']))
+                            elements.append(Spacer(1, 20))
+
+                    # Houses/Properties Section
+                    if report_data.get('houses'):
+                        elements.append(Paragraph("Real Estate Properties", heading_style))
+                        for idx, house in enumerate(report_data['houses'], 1):
+                            house_name = house.get('name', f'Property {idx}')
+                            elements.append(Paragraph(f"<b>{house_name}</b>", styles['Heading3']))
+
+                            house_data = [
+                                ['Field', 'Value'],
+                                ['Purchase Year', str(house.get('purchase_year', 'N/A'))],
+                                ['Purchase Price', f"${house.get('purchase_price', 0):,.2f}"],
+                                ['Down Payment', f"${house.get('down_payment', 0):,.2f}"],
+                                ['Interest Rate', f"{house.get('interest_rate', 0):.2f}%"],
+                                ['Loan Term', f"{house.get('loan_term_years', 0)} years"],
+                                ['Property Tax Rate', f"{house.get('property_tax_rate', 0):.3f}%"],
+                                ['Home Insurance', f"${house.get('home_insurance_annual', 0):,.2f}"],
+                                ['Maintenance Rate', f"{house.get('maintenance_rate', 0):.2f}%"],
+                                ['Upkeep Rate', f"{house.get('upkeep_rate', 0):.2f}%"],
+                                ['Owner', house.get('owner', 'N/A')]
+                            ]
+
+                            house_table = Table(house_data, colWidths=[2.5*inch, 3.5*inch])
+                            house_table.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                            ]))
+                            elements.append(house_table)
+                            elements.append(Spacer(1, 12))
+
+                    # Major Purchases Section
+                    if report_data.get('major_purchases'):
+                        elements.append(Paragraph("Major Purchases", heading_style))
+                        major_purchases_data = [['Item', 'Year', 'Cost', 'Owner']]
+                        for mp in report_data['major_purchases']:
+                            major_purchases_data.append([
+                                mp.get('item_name', 'N/A'),
+                                str(mp.get('purchase_year', 'N/A')),
+                                f"${mp.get('cost', 0):,.2f}",
+                                mp.get('owner', 'N/A')
+                            ])
+
+                        if len(major_purchases_data) > 1:
+                            mp_table = Table(major_purchases_data, colWidths=[2*inch, 1.5*inch, 1.5*inch, 1.5*inch])
+                            mp_table.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('ALIGN', (2, 0), (2, -1), 'RIGHT'),
+                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                            ]))
+                            elements.append(mp_table)
+                            elements.append(Spacer(1, 20))
+
+                    # Recurring Expenses Section
+                    if report_data.get('recurring_expenses'):
+                        elements.append(Paragraph("Recurring Expenses", heading_style))
+                        recurring_data = [['Description', 'Amount', 'Start Year', 'End Year', 'Owner']]
+                        for re in report_data['recurring_expenses']:
+                            recurring_data.append([
+                                re.get('description', 'N/A'),
+                                f"${re.get('annual_amount', 0):,.2f}",
+                                str(re.get('start_year', 'N/A')),
+                                str(re.get('end_year', 'N/A')),
+                                re.get('owner', 'N/A')
+                            ])
+
+                        if len(recurring_data) > 1:
+                            recurring_table = Table(recurring_data, colWidths=[2*inch, 1.2*inch, 1.2*inch, 1.2*inch, 1*inch])
+                            recurring_table.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                            ]))
+                            elements.append(recurring_table)
+                            elements.append(Spacer(1, 20))
+
+                    # State Timeline Section
+                    if "Timeline" in include_sections and report_data.get('state_timeline'):
+                        elements.append(Paragraph("State & Cost-of-Living Timeline", heading_style))
+                        timeline_data = [['Year', 'State/Location', 'Spending Strategy']]
+                        for entry in report_data['state_timeline']:
+                            timeline_data.append([
+                                str(entry.get('year', 'N/A')),
+                                entry.get('state', 'N/A'),
+                                entry.get('spending_strategy', 'N/A')
+                            ])
+
+                        if len(timeline_data) > 1:
+                            timeline_table = Table(timeline_data, colWidths=[1.5*inch, 2.5*inch, 2.5*inch])
+                            timeline_table.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                            ]))
+                            elements.append(timeline_table)
+                            elements.append(Spacer(1, 20))
+
+                    # Cashflow Projection Summary Section
+                    if "Timeline" in include_sections and report_data.get('cashflow_projections'):
+                        elements.append(Paragraph("Lifetime Financial Projection Summary", heading_style))
+
+                        cashflow_proj = report_data['cashflow_projections']
+
+                        # Calculate key metrics
+                        final_year = cashflow_proj[-1]
+                        retirement_years = [y for y in cashflow_proj if y['parent1_age'] >= st.session_state.parentX_retirement_age or y['parent2_age'] >= st.session_state.parentY_retirement_age]
+
+                        min_net_worth_year = min(cashflow_proj, key=lambda x: x['net_worth'])
+                        max_net_worth_year = max(cashflow_proj, key=lambda x: x['net_worth'])
+
+                        avg_income_working = sum(y['total_income'] for y in cashflow_proj if y['parent1_age'] < st.session_state.parentX_retirement_age or y['parent2_age'] < st.session_state.parentY_retirement_age) / len([y for y in cashflow_proj if y['parent1_age'] < st.session_state.parentX_retirement_age or y['parent2_age'] < st.session_state.parentY_retirement_age]) if len([y for y in cashflow_proj if y['parent1_age'] < st.session_state.parentX_retirement_age or y['parent2_age'] < st.session_state.parentY_retirement_age]) > 0 else 0
+
+                        avg_expenses = sum(y['total_expenses'] for y in cashflow_proj) / len(cashflow_proj)
+
+                        summary_text = f"""
+                        <b>Planning Horizon:</b> {cashflow_proj[0]['year']} - {final_year['year']} ({len(cashflow_proj)} years)<br/>
+                        <b>Final Net Worth (Year {final_year['year']}):</b> ${final_year['net_worth']:,.0f}<br/>
+                        <b>Minimum Net Worth:</b> ${min_net_worth_year['net_worth']:,.0f} (Year {min_net_worth_year['year']})<br/>
+                        <b>Maximum Net Worth:</b> ${max_net_worth_year['net_worth']:,.0f} (Year {max_net_worth_year['year']})<br/>
+                        <b>Average Annual Income (Working Years):</b> ${avg_income_working:,.0f}<br/>
+                        <b>Average Annual Expenses (Lifetime):</b> ${avg_expenses:,.0f}<br/>
+                        <b>Retirement Years Covered:</b> {len(retirement_years)} years
+                        """
+                        elements.append(Paragraph(summary_text, styles['Normal']))
+                        elements.append(Spacer(1, 12))
+
+                        # Add note about detailed data
+                        note_text = "<i>Note: Full year-by-year cashflow projections with detailed expense breakdowns are available in the Excel export. The Excel file includes comprehensive data on income, expenses, net worth trajectory, and all expense categories for each year of your financial plan.</i>"
+                        elements.append(Paragraph(note_text, styles['Normal']))
+                        elements.append(Spacer(1, 12))
+
+                        # Generate and add cashflow chart
+                        try:
+                            years = [d['year'] for d in cashflow_proj]
+                            income = [d['total_income'] for d in cashflow_proj]
+                            expenses = [d['total_expenses'] for d in cashflow_proj]
+                            net_worth = [d['net_worth'] for d in cashflow_proj]
+
+                            # Create cashflow chart with dual y-axis
+                            from plotly.subplots import make_subplots
+                            cashflow_fig = make_subplots(
+                                specs=[[{"secondary_y": True}]]
+                            )
+
+                            # Add income and expenses on primary y-axis
+                            cashflow_fig.add_trace(
+                                go.Scatter(x=years, y=income, mode='lines', name='Income',
+                                          line=dict(color='green', width=2)),
+                                secondary_y=False
+                            )
+                            cashflow_fig.add_trace(
+                                go.Scatter(x=years, y=expenses, mode='lines', name='Expenses',
+                                          line=dict(color='red', width=2)),
+                                secondary_y=False
+                            )
+
+                            # Add net worth on secondary y-axis
+                            cashflow_fig.add_trace(
+                                go.Scatter(x=years, y=net_worth, mode='lines', name='Net Worth',
+                                          line=dict(color='blue', width=2, dash='dot')),
+                                secondary_y=True
+                            )
+
+                            cashflow_fig.update_xaxes(title_text="Year")
+                            cashflow_fig.update_yaxes(title_text="Income/Expenses ($)", secondary_y=False)
+                            cashflow_fig.update_yaxes(title_text="Net Worth ($)", secondary_y=True)
+                            cashflow_fig.update_layout(
+                                title="Lifetime Income, Expenses, and Net Worth",
+                                height=500,
+                                showlegend=True,
+                                hovermode='x unified'
+                            )
+
+                            # Convert to image and add to PDF
+                            chart_img = plotly_fig_to_image(cashflow_fig, width=6.5*inch, height=4*inch)
+                            if chart_img:
+                                elements.append(chart_img)
+                                elements.append(Spacer(1, 12))
+                        except Exception as e:
+                            # If chart generation fails, just skip it
+                            pass
+
+                        elements.append(Spacer(1, 20))
+
+                    # Monte Carlo Results Summary
+                    if report_data.get('monte_carlo_results'):
+                        elements.append(Paragraph("Monte Carlo Simulation Results", heading_style))
+
+                        mc_results = report_data['monte_carlo_results']
+                        final_year_idx = -1
+
+                        mc_summary_text = f"""
+                        <b>Simulation Scenario:</b> {mc_results.get('scenario', 'N/A')}<br/>
+                        <b>Number of Simulations:</b> 1,000<br/>
+                        <b>Final Year Net Worth Percentiles:</b><br/>
+                        • 10th Percentile: ${mc_results['percentiles']['10th'][final_year_idx]:,.0f}<br/>
+                        • 25th Percentile: ${mc_results['percentiles']['25th'][final_year_idx]:,.0f}<br/>
+                        • Median (50th): ${mc_results['percentiles']['50th'][final_year_idx]:,.0f}<br/>
+                        • 75th Percentile: ${mc_results['percentiles']['75th'][final_year_idx]:,.0f}<br/>
+                        • 90th Percentile: ${mc_results['percentiles']['90th'][final_year_idx]:,.0f}
+                        """
+                        elements.append(Paragraph(mc_summary_text, styles['Normal']))
+                        elements.append(Spacer(1, 12))
+
+                        note_text = "<i>Note: Complete Monte Carlo results with year-by-year percentile data are available in the Excel export.</i>"
+                        elements.append(Paragraph(note_text, styles['Normal']))
+                        elements.append(Spacer(1, 12))
+
+                        # Generate and add Monte Carlo chart
+                        try:
+                            mc_years = mc_results['years']
+                            percentiles = mc_results['percentiles']
+
+                            # Create Monte Carlo percentile fan chart
+                            mc_fig = go.Figure()
+
+                            # Add percentile bands
+                            mc_fig.add_trace(go.Scatter(
+                                x=mc_years, y=percentiles['90th'],
+                                mode='lines', name='90th Percentile',
+                                line=dict(color='rgba(0,100,255,0.2)', width=1)
+                            ))
+                            mc_fig.add_trace(go.Scatter(
+                                x=mc_years, y=percentiles['75th'],
+                                mode='lines', name='75th Percentile',
+                                line=dict(color='rgba(0,150,255,0.3)', width=1),
+                                fill='tonexty', fillcolor='rgba(0,100,255,0.1)'
+                            ))
+                            mc_fig.add_trace(go.Scatter(
+                                x=mc_years, y=percentiles['50th'],
+                                mode='lines', name='Median (50th)',
+                                line=dict(color='blue', width=3)
+                            ))
+                            mc_fig.add_trace(go.Scatter(
+                                x=mc_years, y=percentiles['25th'],
+                                mode='lines', name='25th Percentile',
+                                line=dict(color='rgba(255,150,0,0.3)', width=1),
+                                fill='tonexty', fillcolor='rgba(100,150,255,0.1)'
+                            ))
+                            mc_fig.add_trace(go.Scatter(
+                                x=mc_years, y=percentiles['10th'],
+                                mode='lines', name='10th Percentile',
+                                line=dict(color='rgba(255,0,0,0.3)', width=1),
+                                fill='tonexty', fillcolor='rgba(255,100,0,0.1)'
+                            ))
+
+                            # Add zero line
+                            mc_fig.add_hline(y=0, line_dash="dash", line_color="red")
+
+                            mc_fig.update_layout(
+                                title="Net Worth Trajectories: Monte Carlo Simulation",
+                                xaxis_title="Year",
+                                yaxis_title="Net Worth ($)",
+                                height=500,
+                                showlegend=True,
+                                hovermode='x unified'
+                            )
+
+                            # Convert to image and add to PDF
+                            mc_chart_img = plotly_fig_to_image(mc_fig, width=6.5*inch, height=4*inch)
+                            if mc_chart_img:
+                                elements.append(mc_chart_img)
+                                elements.append(Spacer(1, 12))
+                        except Exception as e:
+                            # If chart generation fails, just skip it
+                            pass
+
+                        elements.append(Spacer(1, 20))
+
                     # Build PDF
                     doc.build(elements)
                     output.seek(0)
@@ -7864,6 +8290,66 @@ def report_export_tab():
                         if "Healthcare" in include_sections and st.session_state.health_insurances:
                             healthcare_df = pd.DataFrame(report_data["healthcare"]["health_insurances"])
                             healthcare_df.to_excel(writer, sheet_name='Healthcare', index=False)
+
+                        # Houses Sheet
+                        if report_data.get("houses"):
+                            houses_df = pd.DataFrame(report_data["houses"])
+                            houses_df.to_excel(writer, sheet_name='Houses', index=False)
+
+                        # Major Purchases Sheet
+                        if report_data.get("major_purchases"):
+                            major_purchases_df = pd.DataFrame(report_data["major_purchases"])
+                            major_purchases_df.to_excel(writer, sheet_name='Major Purchases', index=False)
+
+                        # Recurring Expenses Sheet
+                        if report_data.get("recurring_expenses"):
+                            recurring_df = pd.DataFrame(report_data["recurring_expenses"])
+                            recurring_df.to_excel(writer, sheet_name='Recurring Expenses', index=False)
+
+                        # State Timeline Sheet
+                        if "Timeline" in include_sections and report_data.get("state_timeline"):
+                            timeline_df = pd.DataFrame(report_data["state_timeline"])
+                            timeline_df.to_excel(writer, sheet_name='State Timeline', index=False)
+
+                        # Cashflow Projections Sheet - THIS IS THE KEY DATA!
+                        if "Timeline" in include_sections and report_data.get("cashflow_projections"):
+                            # Simplify the cashflow data for Excel (remove nested dicts)
+                            cashflow_simple = []
+                            for year_data in report_data["cashflow_projections"]:
+                                cashflow_simple.append({
+                                    'Year': year_data['year'],
+                                    'Parent1 Age': year_data['parent1_age'],
+                                    'Parent2 Age': year_data['parent2_age'],
+                                    'Parent1 Income': year_data['parent1_income'],
+                                    'Parent2 Income': year_data['parent2_income'],
+                                    'Social Security': year_data['ss_income'],
+                                    'Total Income': year_data['total_income'],
+                                    'Base Expenses': year_data['base_expenses'],
+                                    'Children Expenses': year_data['children_expenses'],
+                                    'Healthcare Expenses': year_data['healthcare_expenses'],
+                                    'House Expenses': year_data['house_expenses'],
+                                    'Recurring Expenses': year_data['recurring_expenses'],
+                                    'Major Purchases': year_data['major_purchases'],
+                                    'Total Expenses': year_data['total_expenses'],
+                                    'Cashflow': year_data['cashflow'],
+                                    'Net Worth': year_data['net_worth']
+                                })
+                            cashflow_df = pd.DataFrame(cashflow_simple)
+                            cashflow_df.to_excel(writer, sheet_name='Cashflow Projections', index=False)
+
+                        # Monte Carlo Results Sheet
+                        if report_data.get("monte_carlo_results"):
+                            mc_results = report_data["monte_carlo_results"]
+                            mc_data = {
+                                'Year': mc_results['years'],
+                                '10th Percentile': mc_results['percentiles']['10th'],
+                                '25th Percentile': mc_results['percentiles']['25th'],
+                                'Median (50th)': mc_results['percentiles']['50th'],
+                                '75th Percentile': mc_results['percentiles']['75th'],
+                                '90th Percentile': mc_results['percentiles']['90th']
+                            }
+                            mc_df = pd.DataFrame(mc_data)
+                            mc_df.to_excel(writer, sheet_name='Monte Carlo Results', index=False)
 
                     output.seek(0)
 
