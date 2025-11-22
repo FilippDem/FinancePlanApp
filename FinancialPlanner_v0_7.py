@@ -5404,16 +5404,26 @@ def calculate_lifetime_cashflow():
         # Base family expenses (state-based with inflation)
         years_from_now = year - st.session_state.current_year
         base_expenses_dict = get_state_based_family_expenses(year)
-        base_expenses = sum(base_expenses_dict.values())
-        base_expenses *= (1.03 ** years_from_now)  # 3% inflation
+
+        # Apply inflation to each category in the breakdown
+        base_expenses_dict_inflated = {k: v * (1.03 ** years_from_now) for k, v in base_expenses_dict.items()}
+        base_expenses = sum(base_expenses_dict_inflated.values())
 
         # Children expenses (state-based)
         children_expenses = 0
         children_in_college = []
+        children_expense_details = []  # Store detailed breakdown per child
         for child in st.session_state.children_list:
             child_exp = get_child_expenses(child, year, st.session_state.current_year)
             child_total = sum(child_exp.values())
             children_expenses += child_total
+
+            # Store detailed breakdown for this child (only if there are expenses)
+            if child_total > 0:
+                children_expense_details.append({
+                    'child_name': child['name'],
+                    'expenses': child_exp.copy()
+                })
 
             # Track who's in college
             child_age = year - child['birth_year']
@@ -5422,6 +5432,7 @@ def calculate_lifetime_cashflow():
 
         # Recurring expenses
         recurring_expenses_total = 0
+        recurring_expense_details = []  # Store detailed breakdown
         for recurring in st.session_state.recurring_expenses:
             # Check if this expense occurs this year
             if year >= recurring.start_year:
@@ -5434,11 +5445,22 @@ def calculate_lifetime_cashflow():
                             expense_amount *= (1.03 ** years_from_now)
                         recurring_expenses_total += expense_amount
 
+                        # Store details
+                        recurring_expense_details.append({
+                            'name': recurring.name,
+                            'amount': expense_amount
+                        })
+
         # One-time major purchases
         major_purchase_expenses = 0
+        major_purchase_details = []  # Store detailed breakdown
         for purchase in st.session_state.major_purchases:
             if purchase.year == year:
                 major_purchase_expenses += purchase.amount
+                major_purchase_details.append({
+                    'name': purchase.name,
+                    'amount': purchase.amount
+                })
 
         # Healthcare costs
         healthcare_expenses = 0
@@ -5480,6 +5502,7 @@ def calculate_lifetime_cashflow():
 
         # House expenses (property tax, insurance, maintenance, upkeep)
         house_expenses = 0
+        house_expense_details = []  # Store detailed breakdown
         if 'houses' in st.session_state:
             for house in st.session_state.houses:
                 # Check if the house is owned during this year based on timeline
@@ -5497,16 +5520,29 @@ def calculate_lifetime_cashflow():
                     current_house_value = house.current_value * (1.03 ** years_from_now)
 
                     # Property tax (based on current house value)
-                    house_expenses += current_house_value * house.property_tax_rate
+                    property_tax = current_house_value * house.property_tax_rate
+                    house_expenses += property_tax
 
                     # Home insurance (with inflation)
-                    house_expenses += house.home_insurance * (1.03 ** years_from_now)
+                    home_insurance = house.home_insurance * (1.03 ** years_from_now)
+                    house_expenses += home_insurance
 
                     # Maintenance (based on current house value)
-                    house_expenses += current_house_value * house.maintenance_rate
+                    maintenance = current_house_value * house.maintenance_rate
+                    house_expenses += maintenance
 
                     # Upkeep costs (with inflation)
-                    house_expenses += house.upkeep_costs * (1.03 ** years_from_now)
+                    upkeep = house.upkeep_costs * (1.03 ** years_from_now)
+                    house_expenses += upkeep
+
+                    # Store breakdown
+                    house_expense_details.append({
+                        'name': house.name,
+                        'property_tax': property_tax,
+                        'home_insurance': home_insurance,
+                        'maintenance': maintenance,
+                        'upkeep': upkeep
+                    })
 
         total_expenses = base_expenses + children_expenses + recurring_expenses_total + major_purchase_expenses + healthcare_expenses + house_expenses
 
@@ -5547,9 +5583,16 @@ def calculate_lifetime_cashflow():
             'ss_income': ss_income,
             'total_income': total_income,
             'base_expenses': base_expenses,
+            'base_expenses_breakdown': base_expenses_dict_inflated,
             'children_expenses': children_expenses,
+            'children_expense_details': children_expense_details,
             'healthcare_expenses': healthcare_expenses,
             'house_expenses': house_expenses,
+            'house_expense_details': house_expense_details,
+            'recurring_expenses': recurring_expenses_total,
+            'recurring_expense_details': recurring_expense_details,
+            'major_purchases': major_purchase_expenses,
+            'major_purchase_details': major_purchase_details,
             'total_expenses': total_expenses,
             'cashflow': cashflow,
             'net_worth': cumulative_net_worth,
@@ -5754,15 +5797,82 @@ def combined_analysis_cashflow_tab():
                                 expense_breakdown.append({'Category': 'Children Expenses', 'Amount': year_data['children_expenses']})
                             if year_data.get('healthcare_expenses', 0) > 0:
                                 expense_breakdown.append({'Category': 'Healthcare & Insurance', 'Amount': year_data['healthcare_expenses']})
+                            if year_data.get('house_expenses', 0) > 0:
+                                expense_breakdown.append({'Category': 'House Expenses', 'Amount': year_data['house_expenses']})
+                            if year_data.get('recurring_expenses', 0) > 0:
+                                expense_breakdown.append({'Category': 'Recurring Expenses', 'Amount': year_data['recurring_expenses']})
+                            if year_data.get('major_purchases', 0) > 0:
+                                expense_breakdown.append({'Category': 'One-Time Major Purchases', 'Amount': year_data['major_purchases']})
 
                             if expense_breakdown:
                                 expense_df = pd.DataFrame(expense_breakdown)
-                                expense_fig = go.Figure(data=[go.Pie(labels=expense_df['Category'], values=expense_df['Amount'], hole=0.3, marker_colors=['#e74c3c', '#c0392b', '#9b59b6'])])
+                                expense_fig = go.Figure(data=[go.Pie(labels=expense_df['Category'], values=expense_df['Amount'], hole=0.3, marker_colors=['#e74c3c', '#c0392b', '#9b59b6', '#8e44ad', '#d35400', '#e67e22'])])
                                 expense_fig.update_layout(height=300, showlegend=True)
                                 st.plotly_chart(expense_fig, use_container_width=True)
                                 expense_df['Amount'] = expense_df['Amount'].apply(lambda x: f"${x:,.0f}")
                                 st.dataframe(expense_df, hide_index=True, use_container_width=True)
                                 st.metric("Total Expenses", f"${year_data['total_expenses']:,.0f}")
+
+                                # Detailed subcategory breakdowns
+                                st.markdown("---")
+                                st.markdown("#### 📋 Detailed Subcategory Breakdown")
+
+                                # Family Living Expenses breakdown
+                                if year_data['base_expenses'] > 0 and year_data.get('base_expenses_breakdown'):
+                                    with st.expander("🏠 Family Living Expenses Details", expanded=False):
+                                        family_breakdown = year_data['base_expenses_breakdown']
+                                        family_df = pd.DataFrame([
+                                            {'Subcategory': k, 'Amount': f"${v:,.0f}"}
+                                            for k, v in family_breakdown.items() if v > 0
+                                        ])
+                                        if not family_df.empty:
+                                            st.dataframe(family_df, hide_index=True, use_container_width=True)
+
+                                # Children Expenses breakdown
+                                if year_data['children_expenses'] > 0 and year_data.get('children_expense_details'):
+                                    with st.expander("👶 Children Expenses Details", expanded=False):
+                                        for child_detail in year_data['children_expense_details']:
+                                            st.markdown(f"**{child_detail['child_name']}**")
+                                            child_df = pd.DataFrame([
+                                                {'Subcategory': k, 'Amount': f"${v:,.0f}"}
+                                                for k, v in child_detail['expenses'].items() if v > 0
+                                            ])
+                                            if not child_df.empty:
+                                                st.dataframe(child_df, hide_index=True, use_container_width=True)
+                                            st.markdown("")  # Add spacing
+
+                                # House Expenses breakdown
+                                if year_data.get('house_expenses', 0) > 0 and year_data.get('house_expense_details'):
+                                    with st.expander("🏡 House Expenses Details", expanded=False):
+                                        for house_detail in year_data['house_expense_details']:
+                                            st.markdown(f"**{house_detail['name']}**")
+                                            house_df = pd.DataFrame([
+                                                {'Subcategory': 'Property Tax', 'Amount': f"${house_detail['property_tax']:,.0f}"},
+                                                {'Subcategory': 'Home Insurance', 'Amount': f"${house_detail['home_insurance']:,.0f}"},
+                                                {'Subcategory': 'Maintenance', 'Amount': f"${house_detail['maintenance']:,.0f}"},
+                                                {'Subcategory': 'Upkeep', 'Amount': f"${house_detail['upkeep']:,.0f}"}
+                                            ])
+                                            st.dataframe(house_df, hide_index=True, use_container_width=True)
+                                            st.markdown("")  # Add spacing
+
+                                # Recurring Expenses breakdown
+                                if year_data.get('recurring_expenses', 0) > 0 and year_data.get('recurring_expense_details'):
+                                    with st.expander("🔁 Recurring Expenses Details", expanded=False):
+                                        recurring_df = pd.DataFrame([
+                                            {'Item': item['name'], 'Amount': f"${item['amount']:,.0f}"}
+                                            for item in year_data['recurring_expense_details']
+                                        ])
+                                        st.dataframe(recurring_df, hide_index=True, use_container_width=True)
+
+                                # One-Time Major Purchases breakdown
+                                if year_data.get('major_purchases', 0) > 0 and year_data.get('major_purchase_details'):
+                                    with st.expander("🛒 One-Time Major Purchases Details", expanded=False):
+                                        purchases_df = pd.DataFrame([
+                                            {'Item': item['name'], 'Amount': f"${item['amount']:,.0f}"}
+                                            for item in year_data['major_purchase_details']
+                                        ])
+                                        st.dataframe(purchases_df, hide_index=True, use_container_width=True)
+
                             else:
                                 st.info("No expenses for this year")
 
@@ -6498,10 +6608,6 @@ def stress_test_tab():
 
                 for child_idx, child in enumerate(st.session_state.children_list):
                     child_birth_year = child['birth_year']
-
-                    # Skip if birth year is in the past
-                    if child_birth_year < st.session_state.current_year:
-                        continue
 
                     config = {
                         'child_idx': child_idx,
