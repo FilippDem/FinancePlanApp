@@ -5568,31 +5568,46 @@ def calculate_lifetime_cashflow():
 
         # Healthcare costs
         healthcare_expenses = 0
+        healthcare_expense_details = {}  # Store detailed breakdown
 
         # Health insurance premiums (pre-Medicare, includes early retirement)
         if 'health_insurances' in st.session_state:
             for insurance in st.session_state.health_insurances:
                 # Check if this insurance applies to either parent based on age
+                annual_premium = 0
                 if insurance.covered_by in ["Parent 1", "Both", "Family"] and insurance.start_age <= parent1_age <= insurance.end_age:
-                    healthcare_expenses += insurance.monthly_premium * 12
+                    annual_premium = insurance.monthly_premium * 12
                 elif insurance.covered_by == "Parent 2" and insurance.start_age <= parent2_age <= insurance.end_age:
-                    healthcare_expenses += insurance.monthly_premium * 12
+                    annual_premium = insurance.monthly_premium * 12
                 elif insurance.covered_by in ["Both", "Family"]:
                     # For Both/Family, check if either parent is in age range
                     if (insurance.start_age <= parent1_age <= insurance.end_age) or (insurance.start_age <= parent2_age <= insurance.end_age):
-                        healthcare_expenses += insurance.monthly_premium * 12
+                        annual_premium = insurance.monthly_premium * 12
+
+                if annual_premium > 0:
+                    healthcare_expenses += annual_premium
+                    key = f"Health Insurance ({insurance.covered_by})"
+                    healthcare_expense_details[key] = healthcare_expense_details.get(key, 0) + annual_premium
 
         # Medicare costs (age 65+)
         medicare_expenses = 0
         if 'medicare_part_b_premium' in st.session_state:
             if parent1_age >= 65:
-                medicare_expenses += st.session_state.medicare_part_b_premium * 12
-                medicare_expenses += st.session_state.get('medicare_part_d_premium', 55.0) * 12
-                medicare_expenses += st.session_state.get('medigap_premium', 150.0) * 12
+                part_b = st.session_state.medicare_part_b_premium * 12
+                part_d = st.session_state.get('medicare_part_d_premium', 55.0) * 12
+                medigap = st.session_state.get('medigap_premium', 150.0) * 12
+                medicare_expenses += part_b + part_d + medigap
+                healthcare_expense_details[f"Medicare Part B ({st.session_state.parent1_name})"] = part_b
+                healthcare_expense_details[f"Medicare Part D ({st.session_state.parent1_name})"] = part_d
+                healthcare_expense_details[f"Medigap ({st.session_state.parent1_name})"] = medigap
             if parent2_age >= 65:
-                medicare_expenses += st.session_state.medicare_part_b_premium * 12
-                medicare_expenses += st.session_state.get('medicare_part_d_premium', 55.0) * 12
-                medicare_expenses += st.session_state.get('medigap_premium', 150.0) * 12
+                part_b = st.session_state.medicare_part_b_premium * 12
+                part_d = st.session_state.get('medicare_part_d_premium', 55.0) * 12
+                medigap = st.session_state.get('medigap_premium', 150.0) * 12
+                medicare_expenses += part_b + part_d + medigap
+                healthcare_expense_details[f"Medicare Part B ({st.session_state.parent2_name})"] = part_b
+                healthcare_expense_details[f"Medicare Part D ({st.session_state.parent2_name})"] = part_d
+                healthcare_expense_details[f"Medigap ({st.session_state.parent2_name})"] = medigap
 
         healthcare_expenses += medicare_expenses
 
@@ -5600,9 +5615,13 @@ def calculate_lifetime_cashflow():
         if 'ltc_insurances' in st.session_state:
             for ltc in st.session_state.ltc_insurances:
                 if ltc.covered_person == "Parent 1" and parent1_age >= ltc.start_age:
-                    healthcare_expenses += ltc.monthly_premium * 12
+                    ltc_annual = ltc.monthly_premium * 12
+                    healthcare_expenses += ltc_annual
+                    healthcare_expense_details[f"Long-term Care ({st.session_state.parent1_name})"] = ltc_annual
                 elif ltc.covered_person == "Parent 2" and parent2_age >= ltc.start_age:
-                    healthcare_expenses += ltc.monthly_premium * 12
+                    ltc_annual = ltc.monthly_premium * 12
+                    healthcare_expenses += ltc_annual
+                    healthcare_expense_details[f"Long-term Care ({st.session_state.parent2_name})"] = ltc_annual
 
         # House expenses (property tax, insurance, maintenance, upkeep)
         house_expenses = 0
@@ -5691,6 +5710,7 @@ def calculate_lifetime_cashflow():
             'children_expenses': children_expenses,
             'children_expense_details': children_expense_details,
             'healthcare_expenses': healthcare_expenses,
+            'healthcare_expense_details': healthcare_expense_details,
             'house_expenses': house_expenses,
             'house_expense_details': house_expense_details,
             'recurring_expenses': recurring_expenses_total,
@@ -5919,66 +5939,160 @@ def combined_analysis_cashflow_tab():
 
                                 # Detailed subcategory breakdowns
                                 st.markdown("---")
-                                st.markdown("#### 📋 Detailed Subcategory Breakdown")
+                                st.markdown("#### 📋 Detailed Expense Breakdown - All Line Items")
 
                                 # Family Living Expenses breakdown
                                 if year_data['base_expenses'] > 0 and year_data.get('base_expenses_breakdown'):
-                                    with st.expander("🏠 Family Living Expenses Details", expanded=False):
+                                    with st.expander("🏠 Family Living Expenses Details", expanded=True):
                                         family_breakdown = year_data['base_expenses_breakdown']
                                         family_df = pd.DataFrame([
-                                            {'Subcategory': k, 'Amount': f"${v:,.0f}"}
+                                            {'Category': k, 'Amount': f"${v:,.0f}"}
                                             for k, v in family_breakdown.items() if v > 0
                                         ])
                                         if not family_df.empty:
                                             st.dataframe(family_df, hide_index=True, use_container_width=True)
+                                            st.markdown(f"**Family Total: ${sum(family_breakdown.values()):,.0f}**")
 
                                 # Children Expenses breakdown
                                 if year_data['children_expenses'] > 0 and year_data.get('children_expense_details'):
-                                    with st.expander("👶 Children Expenses Details", expanded=False):
+                                    with st.expander("👶 Children Expenses Details (Per Child)", expanded=True):
                                         for child_detail in year_data['children_expense_details']:
-                                            st.markdown(f"**{child_detail['child_name']}**")
+                                            st.markdown(f"### {child_detail['child_name']}")
                                             child_df = pd.DataFrame([
-                                                {'Subcategory': k, 'Amount': f"${v:,.0f}"}
+                                                {'Category': k, 'Amount': f"${v:,.0f}"}
                                                 for k, v in child_detail['expenses'].items() if v > 0
                                             ])
                                             if not child_df.empty:
                                                 st.dataframe(child_df, hide_index=True, use_container_width=True)
+                                                child_total = sum(child_detail['expenses'].values())
+                                                st.markdown(f"**{child_detail['child_name']} Total: ${child_total:,.0f}**")
                                             st.markdown("")  # Add spacing
+
+                                        # Show total for all children
+                                        total_children = sum(sum(child['expenses'].values()) for child in year_data['children_expense_details'])
+                                        st.markdown(f"### **All Children Total: ${total_children:,.0f}**")
+
+                                # Healthcare Expenses breakdown
+                                if year_data.get('healthcare_expenses', 0) > 0 and year_data.get('healthcare_expense_details'):
+                                    with st.expander("🏥 Healthcare & Insurance Details", expanded=True):
+                                        healthcare_breakdown = year_data['healthcare_expense_details']
+                                        healthcare_df = pd.DataFrame([
+                                            {'Category': k, 'Amount': f"${v:,.0f}"}
+                                            for k, v in healthcare_breakdown.items() if v > 0
+                                        ])
+                                        if not healthcare_df.empty:
+                                            st.dataframe(healthcare_df, hide_index=True, use_container_width=True)
+                                            st.markdown(f"**Healthcare Total: ${sum(healthcare_breakdown.values()):,.0f}**")
 
                                 # House Expenses breakdown
                                 if year_data.get('house_expenses', 0) > 0 and year_data.get('house_expense_details'):
-                                    with st.expander("🏡 House Expenses Details", expanded=False):
+                                    with st.expander("🏡 House Expenses Details", expanded=True):
                                         for house_detail in year_data['house_expense_details']:
-                                            st.markdown(f"**{house_detail['name']}**")
+                                            st.markdown(f"### {house_detail['name']}")
                                             house_df = pd.DataFrame([
-                                                {'Subcategory': 'Property Tax', 'Amount': f"${house_detail['property_tax']:,.0f}"},
-                                                {'Subcategory': 'Home Insurance', 'Amount': f"${house_detail['home_insurance']:,.0f}"},
-                                                {'Subcategory': 'Maintenance', 'Amount': f"${house_detail['maintenance']:,.0f}"},
-                                                {'Subcategory': 'Upkeep', 'Amount': f"${house_detail['upkeep']:,.0f}"}
+                                                {'Category': 'Property Tax', 'Amount': f"${house_detail['property_tax']:,.0f}"},
+                                                {'Category': 'Home Insurance', 'Amount': f"${house_detail['home_insurance']:,.0f}"},
+                                                {'Category': 'Maintenance', 'Amount': f"${house_detail['maintenance']:,.0f}"},
+                                                {'Category': 'Upkeep', 'Amount': f"${house_detail['upkeep']:,.0f}"}
                                             ])
                                             st.dataframe(house_df, hide_index=True, use_container_width=True)
+                                            house_total = house_detail['property_tax'] + house_detail['home_insurance'] + house_detail['maintenance'] + house_detail['upkeep']
+                                            st.markdown(f"**{house_detail['name']} Total: ${house_total:,.0f}**")
                                             st.markdown("")  # Add spacing
+
+                                        # Show total for all houses
+                                        if len(year_data['house_expense_details']) > 1:
+                                            total_houses = sum(
+                                                h['property_tax'] + h['home_insurance'] + h['maintenance'] + h['upkeep']
+                                                for h in year_data['house_expense_details']
+                                            )
+                                            st.markdown(f"### **All Houses Total: ${total_houses:,.0f}**")
 
                                 # Recurring Expenses breakdown
                                 if year_data.get('recurring_expenses', 0) > 0 and year_data.get('recurring_expense_details'):
-                                    with st.expander("🔁 Recurring Expenses Details", expanded=False):
+                                    with st.expander("🔁 Recurring Expenses Details", expanded=True):
                                         recurring_df = pd.DataFrame([
                                             {'Item': item['name'], 'Amount': f"${item['amount']:,.0f}"}
                                             for item in year_data['recurring_expense_details']
                                         ])
                                         st.dataframe(recurring_df, hide_index=True, use_container_width=True)
+                                        total_recurring = sum(item['amount'] for item in year_data['recurring_expense_details'])
+                                        st.markdown(f"**Recurring Total: ${total_recurring:,.0f}**")
 
                                 # One-Time Major Purchases breakdown
                                 if year_data.get('major_purchases', 0) > 0 and year_data.get('major_purchase_details'):
-                                    with st.expander("🛒 One-Time Major Purchases Details", expanded=False):
+                                    with st.expander("🛒 One-Time Major Purchases Details", expanded=True):
                                         purchases_df = pd.DataFrame([
                                             {'Item': item['name'], 'Amount': f"${item['amount']:,.0f}"}
                                             for item in year_data['major_purchase_details']
                                         ])
                                         st.dataframe(purchases_df, hide_index=True, use_container_width=True)
+                                        total_purchases = sum(item['amount'] for item in year_data['major_purchase_details'])
+                                        st.markdown(f"**Purchases Total: ${total_purchases:,.0f}**")
 
                             else:
                                 st.info("No expenses for this year")
+
+                        # Comprehensive expense summary table
+                        if expense_breakdown:
+                            st.markdown("---")
+                            st.markdown("#### 💰 Complete Expense Summary")
+
+                            # Build comprehensive summary
+                            summary_data = []
+
+                            # Family expenses
+                            if year_data['base_expenses'] > 0 and year_data.get('base_expenses_breakdown'):
+                                summary_data.append({'Category': '🏠 FAMILY LIVING EXPENSES', 'Amount': f"${year_data['base_expenses']:,.0f}"})
+                                for k, v in year_data['base_expenses_breakdown'].items():
+                                    if v > 0:
+                                        summary_data.append({'Category': f"   • {k}", 'Amount': f"${v:,.0f}"})
+
+                            # Children expenses
+                            if year_data['children_expenses'] > 0 and year_data.get('children_expense_details'):
+                                summary_data.append({'Category': '👶 CHILDREN EXPENSES', 'Amount': f"${year_data['children_expenses']:,.0f}"})
+                                for child_detail in year_data['children_expense_details']:
+                                    child_total = sum(child_detail['expenses'].values())
+                                    summary_data.append({'Category': f"   {child_detail['child_name']}:", 'Amount': f"${child_total:,.0f}"})
+                                    for k, v in child_detail['expenses'].items():
+                                        if v > 0:
+                                            summary_data.append({'Category': f"      • {k}", 'Amount': f"${v:,.0f}"})
+
+                            # Healthcare expenses
+                            if year_data.get('healthcare_expenses', 0) > 0 and year_data.get('healthcare_expense_details'):
+                                summary_data.append({'Category': '🏥 HEALTHCARE & INSURANCE', 'Amount': f"${year_data['healthcare_expenses']:,.0f}"})
+                                for k, v in year_data['healthcare_expense_details'].items():
+                                    if v > 0:
+                                        summary_data.append({'Category': f"   • {k}", 'Amount': f"${v:,.0f}"})
+
+                            # House expenses
+                            if year_data.get('house_expenses', 0) > 0 and year_data.get('house_expense_details'):
+                                summary_data.append({'Category': '🏡 HOUSE EXPENSES', 'Amount': f"${year_data['house_expenses']:,.0f}"})
+                                for house_detail in year_data['house_expense_details']:
+                                    house_total = house_detail['property_tax'] + house_detail['home_insurance'] + house_detail['maintenance'] + house_detail['upkeep']
+                                    summary_data.append({'Category': f"   {house_detail['name']}:", 'Amount': f"${house_total:,.0f}"})
+                                    summary_data.append({'Category': f"      • Property Tax", 'Amount': f"${house_detail['property_tax']:,.0f}"})
+                                    summary_data.append({'Category': f"      • Home Insurance", 'Amount': f"${house_detail['home_insurance']:,.0f}"})
+                                    summary_data.append({'Category': f"      • Maintenance", 'Amount': f"${house_detail['maintenance']:,.0f}"})
+                                    summary_data.append({'Category': f"      • Upkeep", 'Amount': f"${house_detail['upkeep']:,.0f}"})
+
+                            # Recurring expenses
+                            if year_data.get('recurring_expenses', 0) > 0 and year_data.get('recurring_expense_details'):
+                                summary_data.append({'Category': '🔁 RECURRING EXPENSES', 'Amount': f"${year_data['recurring_expenses']:,.0f}"})
+                                for item in year_data['recurring_expense_details']:
+                                    summary_data.append({'Category': f"   • {item['name']}", 'Amount': f"${item['amount']:,.0f}"})
+
+                            # Major purchases
+                            if year_data.get('major_purchases', 0) > 0 and year_data.get('major_purchase_details'):
+                                summary_data.append({'Category': '🛒 ONE-TIME PURCHASES', 'Amount': f"${year_data['major_purchases']:,.0f}"})
+                                for item in year_data['major_purchase_details']:
+                                    summary_data.append({'Category': f"   • {item['name']}", 'Amount': f"${item['amount']:,.0f}"})
+
+                            # Display the comprehensive summary
+                            if summary_data:
+                                summary_df = pd.DataFrame(summary_data)
+                                st.dataframe(summary_df, hide_index=True, use_container_width=True, height=min(600, len(summary_data) * 35 + 38))
+                                st.markdown(f"### **TOTAL EXPENSES: ${year_data['total_expenses']:,.0f}**")
 
                         # Show summary metrics
                         st.markdown("#### 📈 Year Summary")
