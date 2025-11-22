@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Comprehensive test script for Financial Planning Application v0.72
+Comprehensive test script for Financial Planning Application v0.74
 Tests demo scenarios with varied economic conditions to ensure stability
 """
 
@@ -13,7 +13,7 @@ import numpy as np
 
 # Import from main application
 print("=" * 80)
-print("ECONOMIC STABILITY TESTING - Financial Planning Suite v0.72")
+print("ECONOMIC STABILITY TESTING - Financial Planning Suite v0.74")
 print("=" * 80)
 
 # Define dataclasses for testing (matching the app structure)

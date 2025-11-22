@@ -23,7 +23,7 @@ except ImportError:
 
 # Set page configuration
 st.set_page_config(
-    page_title="Financial Planning Application v0.73",
+    page_title="Financial Planning Application v0.74",
     page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -3510,7 +3510,7 @@ def main():
     """Main application function"""
     initialize_session_state()
 
-    st.title("💰 Financial Planning Suite v0.73")
+    st.title("💰 Financial Planning Suite v0.74")
 
     # Build tab list dynamically based on visibility settings
     tab_configs = [

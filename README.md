@@ -15,7 +15,7 @@ A comprehensive web-based financial planning application that helps families pla
 - **Save/Load Scenarios**: Store and compare different planning scenarios
 - **Global Cost-of-Living**: Support for 14 locations across 5 countries
 
-### Key Features in v0.7 🎉
+### Key Features in v0.74 🎉
 - **🏥 Healthcare & Insurance Planning**: Model Medicare, HSA accounts, long-term care insurance, and health insurance costs
 - **💳 Comprehensive Debt Management**: Track student loans, credit cards, auto loans with payoff strategies (Avalanche/Snowball)
 - **🎓 Education Funding**: 529 plan tracking, college cost projections, scholarship/grant management, and funding gap analysis
@@ -221,7 +221,7 @@ FinancePlanApp/
 
 ## Version History
 
-### v0.7 (Current)
+### v0.74 (Current)
 - 🏥 Healthcare & Insurance Planning (Medicare, HSA, LTC)
 - 💳 Comprehensive Debt Management (Student loans, credit cards, payoff strategies)
 - 🎓 Education Funding (529 plans, college cost projections)
@@ -235,7 +235,7 @@ FinancePlanApp/
 - Support for importing past scenarios with automatic year adjustment
 
 ### Earlier Versions
-- Pre-v0.7: Legacy versioning system (V2-V16)
+- Pre-v0.74: Legacy versioning system (V2-V16, v0.7-v0.73)
 - Migrated from PyQt6 desktop to web-based Streamlit interface
 
 ## Contributing
