@@ -1756,6 +1756,7 @@ def initialize_session_state():
         st.session_state.parentX_income = 95000.0
         st.session_state.parentX_raise = 3.5
         st.session_state.parentX_retirement_age = 65
+        st.session_state.parentX_death_age = 100
         st.session_state.parentX_ss_benefit = 2500.0
         st.session_state.parentX_job_changes = pd.DataFrame({
             'Year': [datetime.now().year + 2, datetime.now().year + 7],
@@ -1768,6 +1769,7 @@ def initialize_session_state():
         st.session_state.parentY_income = 85000.0
         st.session_state.parentY_raise = 3.2
         st.session_state.parentY_retirement_age = 65
+        st.session_state.parentY_death_age = 100
         st.session_state.parentY_ss_benefit = 2200.0
         st.session_state.parentY_job_changes = pd.DataFrame({
             'Year': [datetime.now().year + 3, datetime.now().year + 8],
@@ -1932,7 +1934,10 @@ def initialize_session_state():
 
         # Monte Carlo settings
         st.session_state.mc_start_year = datetime.now().year
-        st.session_state.mc_years = 30
+        # Default to running until both parents reach their death age
+        parent1_years_left = st.session_state.parentX_death_age - st.session_state.parentX_age
+        parent2_years_left = st.session_state.parentY_death_age - st.session_state.parentY_age
+        st.session_state.mc_years = max(parent1_years_left, parent2_years_left)
         st.session_state.mc_simulations = 100
         st.session_state.mc_income_variability = 10.0
         st.session_state.mc_expense_variability = 5.0
@@ -3762,6 +3767,15 @@ def parent_x_tab():
         )
         st.caption(f"Annual: {format_currency(st.session_state.parentX_ss_benefit * 12, force_full=False)}")
 
+        st.session_state.parentX_death_age = st.number_input(
+            "Expected Death Age",
+            min_value=int(st.session_state.parentX_age),
+            max_value=120,
+            value=int(st.session_state.parentX_death_age),
+            step=1,
+            key="parentX_death_age_input"
+        )
+
     st.subheader("Job Changes / Income Adjustments")
     st.markdown("Plan for promotions, career changes, or income adjustments")
     st.caption("💡 Tip: Click '+' to add rows, enter Year and New Income, changes save automatically")
@@ -3866,6 +3880,15 @@ def parent_y_tab():
             key="parentY_ss_benefit_input"
         )
         st.caption(f"Annual: {format_currency(st.session_state.parentY_ss_benefit * 12, force_full=False)}")
+
+        st.session_state.parentY_death_age = st.number_input(
+            "Expected Death Age",
+            min_value=int(st.session_state.parentY_age),
+            max_value=120,
+            value=int(st.session_state.parentY_death_age),
+            step=1,
+            key="parentY_death_age_input"
+        )
 
     st.subheader("Job Changes / Income Adjustments")
     st.markdown("Plan for promotions, career changes, or income adjustments")
@@ -5163,10 +5186,10 @@ def timeline_tab():
     if len(edited_timeline) > 0:
         st.subheader("Timeline Visualization")
 
-        # Calculate when both parents reach age 100
-        parent1_100_year = (st.session_state.current_year - st.session_state.parentX_age) + 100
-        parent2_100_year = (st.session_state.current_year - st.session_state.parentY_age) + 100
-        end_year = max(parent1_100_year, parent2_100_year)
+        # Calculate when both parents reach their death age
+        parent1_death_year = (st.session_state.current_year - st.session_state.parentX_age) + st.session_state.parentX_death_age
+        parent2_death_year = (st.session_state.current_year - st.session_state.parentY_age) + st.session_state.parentY_death_age
+        end_year = max(parent1_death_year, parent2_death_year)
 
         # Create timeline data for all years from current to end
         all_years = list(range(st.session_state.current_year, end_year + 1))
@@ -5245,7 +5268,7 @@ def timeline_tab():
         st.plotly_chart(fig, use_container_width=True)
 
         # Show key milestones
-        st.markdown(f"**Timeline extends to {end_year}** ({st.session_state.parent1_name} age 100: {parent1_100_year}, {st.session_state.parent2_name} age 100: {parent2_100_year})")
+        st.markdown(f"**Timeline extends to {end_year}** ({st.session_state.parent1_name} age {st.session_state.parentX_death_age}: {parent1_death_year}, {st.session_state.parent2_name} age {st.session_state.parentY_death_age}: {parent2_death_year})")
 
         # Add world map visualization
         st.markdown("---")
@@ -5391,10 +5414,10 @@ def calculate_lifetime_cashflow():
     Returns:
         list: List of dictionaries with year-by-year financial data
     """
-    # Calculate timeline end (when younger parent reaches 100)
-    parent1_100_year = (st.session_state.current_year - st.session_state.parentX_age) + 100
-    parent2_100_year = (st.session_state.current_year - st.session_state.parentY_age) + 100
-    timeline_end = max(parent1_100_year, parent2_100_year)
+    # Calculate timeline end (when both parents reach their death age)
+    parent1_death_year = (st.session_state.current_year - st.session_state.parentX_age) + st.session_state.parentX_death_age
+    parent2_death_year = (st.session_state.current_year - st.session_state.parentY_age) + st.session_state.parentY_death_age
+    timeline_end = max(parent1_death_year, parent2_death_year)
 
     results = []
     cumulative_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
