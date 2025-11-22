@@ -871,7 +871,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 10000,
             'Entertainment & Activities': 4800,
             'Personal Care': 2400,
-            'Other Expenses': 6000
+            'Utilities': 2400,  # Electricity, Water, Gas (~$200/mo)
+            'Internet & Phone': 1800,  # Internet + Cellphones (~$150/mo)
+            'Subscriptions': 600,  # Streaming services, music, etc. (~$50/mo)
+            'Other Expenses': 1200
         },
         "Average": {
             'Food & Groceries': 18000,
@@ -879,7 +882,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 13000,
             'Entertainment & Activities': 7200,
             'Personal Care': 3600,
-            'Other Expenses': 8400
+            'Utilities': 3000,  # Electricity, Water, Gas (~$250/mo)
+            'Internet & Phone': 2400,  # Internet + Cellphones (~$200/mo)
+            'Subscriptions': 1200,  # Streaming services, music, etc. (~$100/mo)
+            'Other Expenses': 1800
         },
         "High-end": {
             'Food & Groceries': 24000,
@@ -887,7 +893,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 18000,
             'Entertainment & Activities': 12000,
             'Personal Care': 6000,
-            'Other Expenses': 12000
+            'Utilities': 4200,  # Electricity, Water, Gas (~$350/mo)
+            'Internet & Phone': 3600,  # Internet + Cellphones (~$300/mo)
+            'Subscriptions': 2400,  # Streaming services, music, etc. (~$200/mo)
+            'Other Expenses': 1800
         }
     },
     "Seattle": {
@@ -897,7 +906,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 9000,
             'Entertainment & Activities': 4200,
             'Personal Care': 2100,
-            'Other Expenses': 5400
+            'Utilities': 2160,
+            'Internet & Phone': 1620,
+            'Subscriptions': 540,
+            'Other Expenses': 1080
         },
         "Average": {
             'Food & Groceries': 16800,
@@ -905,7 +917,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 12000,
             'Entertainment & Activities': 6600,
             'Personal Care': 3000,
-            'Other Expenses': 7800
+            'Utilities': 3120,
+            'Internet & Phone': 2340,
+            'Subscriptions': 1170,
+            'Other Expenses': 1170
         },
         "High-end": {
             'Food & Groceries': 22800,
@@ -913,7 +928,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 16800,
             'Entertainment & Activities': 10800,
             'Personal Care': 5400,
-            'Other Expenses': 10800
+            'Utilities': 4320,
+            'Internet & Phone': 3240,
+            'Subscriptions': 1620,
+            'Other Expenses': 1620
         }
     },
     "Houston": {
@@ -923,7 +941,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 8400,
             'Entertainment & Activities': 3900,
             'Personal Care': 1800,
-            'Other Expenses': 5100
+            'Utilities': 2040,
+            'Internet & Phone': 1530,
+            'Subscriptions': 510,
+            'Other Expenses': 1020
         },
         "Average": {
             'Food & Groceries': 15600,
@@ -931,7 +952,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 11400,
             'Entertainment & Activities': 6000,
             'Personal Care': 2700,
-            'Other Expenses': 7200
+            'Utilities': 2880,
+            'Internet & Phone': 2160,
+            'Subscriptions': 1080,
+            'Other Expenses': 1080
         },
         "High-end": {
             'Food & Groceries': 21000,
@@ -939,7 +963,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 15600,
             'Entertainment & Activities': 9600,
             'Personal Care': 4800,
-            'Other Expenses': 10200
+            'Utilities': 4080,
+            'Internet & Phone': 3060,
+            'Subscriptions': 1530,
+            'Other Expenses': 1530
         }
     },
     # Major US Cities
@@ -950,7 +977,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 13000,
             'Entertainment & Activities': 6240,
             'Personal Care': 3120,
-            'Other Expenses': 7800
+            'Utilities': 3120,
+            'Internet & Phone': 2340,
+            'Subscriptions': 780,
+            'Other Expenses': 1560
         },
         "Average": {
             'Food & Groceries': 23400,
@@ -958,7 +988,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 16900,
             'Entertainment & Activities': 9360,
             'Personal Care': 4680,
-            'Other Expenses': 10920
+            'Utilities': 4368,
+            'Internet & Phone': 3276,
+            'Subscriptions': 1638,
+            'Other Expenses': 1638
         },
         "High-end": {
             'Food & Groceries': 31200,
@@ -966,7 +999,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 23400,
             'Entertainment & Activities': 15600,
             'Personal Care': 7800,
-            'Other Expenses': 15600
+            'Utilities': 6240,
+            'Internet & Phone': 4680,
+            'Subscriptions': 2340,
+            'Other Expenses': 2340
         }
     },
     "San Francisco": {
@@ -976,7 +1012,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 11500,
             'Entertainment & Activities': 5520,
             'Personal Care': 2760,
-            'Other Expenses': 6900
+            'Utilities': 2760,
+            'Internet & Phone': 2070,
+            'Subscriptions': 690,
+            'Other Expenses': 1380
         },
         "Average": {
             'Food & Groceries': 20700,
@@ -984,7 +1023,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 14950,
             'Entertainment & Activities': 8280,
             'Personal Care': 4140,
-            'Other Expenses': 9660
+            'Utilities': 3864,
+            'Internet & Phone': 2898,
+            'Subscriptions': 1449,
+            'Other Expenses': 1449
         },
         "High-end": {
             'Food & Groceries': 27600,
@@ -992,7 +1034,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 20700,
             'Entertainment & Activities': 13800,
             'Personal Care': 6900,
-            'Other Expenses': 13800
+            'Utilities': 5520,
+            'Internet & Phone': 4140,
+            'Subscriptions': 2070,
+            'Other Expenses': 2070
         }
     },
     "Los Angeles": {
@@ -1002,7 +1047,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 9500,
             'Entertainment & Activities': 4560,
             'Personal Care': 2280,
-            'Other Expenses': 5700
+            'Utilities': 2280,
+            'Internet & Phone': 1710,
+            'Subscriptions': 570,
+            'Other Expenses': 1140
         },
         "Average": {
             'Food & Groceries': 17100,
@@ -1010,7 +1058,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 12350,
             'Entertainment & Activities': 6840,
             'Personal Care': 3420,
-            'Other Expenses': 7980
+            'Utilities': 3192,
+            'Internet & Phone': 2394,
+            'Subscriptions': 1197,
+            'Other Expenses': 1197
         },
         "High-end": {
             'Food & Groceries': 22800,
@@ -1018,7 +1069,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 17100,
             'Entertainment & Activities': 11400,
             'Personal Care': 5700,
-            'Other Expenses': 11400
+            'Utilities': 4560,
+            'Internet & Phone': 3420,
+            'Subscriptions': 1710,
+            'Other Expenses': 1710
         }
     },
     "Portland": {
@@ -1028,7 +1082,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 8500,
             'Entertainment & Activities': 4080,
             'Personal Care': 2040,
-            'Other Expenses': 5100
+            'Utilities': 2040,
+            'Internet & Phone': 1530,
+            'Subscriptions': 510,
+            'Other Expenses': 1020
         },
         "Average": {
             'Food & Groceries': 15300,
@@ -1036,7 +1093,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 11050,
             'Entertainment & Activities': 6120,
             'Personal Care': 3060,
-            'Other Expenses': 7140
+            'Utilities': 2856,
+            'Internet & Phone': 2142,
+            'Subscriptions': 1071,
+            'Other Expenses': 1071
         },
         "High-end": {
             'Food & Groceries': 20400,
@@ -1044,7 +1104,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 15300,
             'Entertainment & Activities': 10200,
             'Personal Care': 5100,
-            'Other Expenses': 10200
+            'Utilities': 4080,
+            'Internet & Phone': 3060,
+            'Subscriptions': 1530,
+            'Other Expenses': 1530
         }
     },
     # International Cities (in USD equivalent for simplicity)
@@ -1058,7 +1121,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 9000,
             'Entertainment & Activities': 4320,
             'Personal Care': 2160,
-            'Other Expenses': 5400
+            'Utilities': 2160,
+            'Internet & Phone': 1620,
+            'Subscriptions': 540,
+            'Other Expenses': 1080
         },
         "Average": {
             'Food & Groceries': 16200,
@@ -1066,7 +1132,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 11700,
             'Entertainment & Activities': 6480,
             'Personal Care': 3240,
-            'Other Expenses': 7560
+            'Utilities': 3024,
+            'Internet & Phone': 2268,
+            'Subscriptions': 1134,
+            'Other Expenses': 1134
         },
         "High-end": {
             'Food & Groceries': 21600,
@@ -1074,7 +1143,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 16200,
             'Entertainment & Activities': 10800,
             'Personal Care': 5400,
-            'Other Expenses': 10800
+            'Utilities': 4320,
+            'Internet & Phone': 3240,
+            'Subscriptions': 1620,
+            'Other Expenses': 1620
         }
     },
     "Vancouver": {
@@ -1084,7 +1156,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 9500,
             'Entertainment & Activities': 4560,
             'Personal Care': 2280,
-            'Other Expenses': 5700
+            'Utilities': 2280,
+            'Internet & Phone': 1710,
+            'Subscriptions': 570,
+            'Other Expenses': 1140
         },
         "Average": {
             'Food & Groceries': 17100,
@@ -1092,7 +1167,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 12350,
             'Entertainment & Activities': 6840,
             'Personal Care': 3420,
-            'Other Expenses': 7980
+            'Utilities': 3192,
+            'Internet & Phone': 2394,
+            'Subscriptions': 1197,
+            'Other Expenses': 1197
         },
         "High-end": {
             'Food & Groceries': 22800,
@@ -1100,7 +1178,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 17100,
             'Entertainment & Activities': 11400,
             'Personal Care': 5700,
-            'Other Expenses': 11400
+            'Utilities': 4560,
+            'Internet & Phone': 3420,
+            'Subscriptions': 1710,
+            'Other Expenses': 1710
         }
     },
     "Paris": {
@@ -1110,7 +1191,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 7500,
             'Entertainment & Activities': 3600,
             'Personal Care': 1800,
-            'Other Expenses': 4500
+            'Utilities': 1800,
+            'Internet & Phone': 1350,
+            'Subscriptions': 450,
+            'Other Expenses': 900
         },
         "Average": {
             'Food & Groceries': 13500,
@@ -1118,7 +1202,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 9750,
             'Entertainment & Activities': 5400,
             'Personal Care': 2700,
-            'Other Expenses': 6300
+            'Utilities': 2520,
+            'Internet & Phone': 1890,
+            'Subscriptions': 945,
+            'Other Expenses': 945
         },
         "High-end": {
             'Food & Groceries': 18000,
@@ -1126,7 +1213,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 13500,
             'Entertainment & Activities': 9000,
             'Personal Care': 4500,
-            'Other Expenses': 9000
+            'Utilities': 3600,
+            'Internet & Phone': 2700,
+            'Subscriptions': 1350,
+            'Other Expenses': 1350
         }
     },
     "Toulouse": {
@@ -1136,7 +1226,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 6500,
             'Entertainment & Activities': 3120,
             'Personal Care': 1560,
-            'Other Expenses': 3900
+            'Utilities': 1560,
+            'Internet & Phone': 1170,
+            'Subscriptions': 390,
+            'Other Expenses': 780
         },
         "Average": {
             'Food & Groceries': 11700,
@@ -1144,7 +1237,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 8450,
             'Entertainment & Activities': 4680,
             'Personal Care': 2340,
-            'Other Expenses': 5460
+            'Utilities': 2184,
+            'Internet & Phone': 1638,
+            'Subscriptions': 819,
+            'Other Expenses': 819
         },
         "High-end": {
             'Food & Groceries': 15600,
@@ -1152,7 +1248,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 11700,
             'Entertainment & Activities': 7800,
             'Personal Care': 3900,
-            'Other Expenses': 7800
+            'Utilities': 3120,
+            'Internet & Phone': 2340,
+            'Subscriptions': 1170,
+            'Other Expenses': 1170
         }
     },
     "Berlin": {
@@ -1162,7 +1261,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 7000,
             'Entertainment & Activities': 3360,
             'Personal Care': 1680,
-            'Other Expenses': 4200
+            'Utilities': 1680,
+            'Internet & Phone': 1260,
+            'Subscriptions': 420,
+            'Other Expenses': 840
         },
         "Average": {
             'Food & Groceries': 12600,
@@ -1170,7 +1272,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 9100,
             'Entertainment & Activities': 5040,
             'Personal Care': 2520,
-            'Other Expenses': 5880
+            'Utilities': 2352,
+            'Internet & Phone': 1764,
+            'Subscriptions': 882,
+            'Other Expenses': 882
         },
         "High-end": {
             'Food & Groceries': 16800,
@@ -1178,7 +1283,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 12600,
             'Entertainment & Activities': 8400,
             'Personal Care': 4200,
-            'Other Expenses': 8400
+            'Utilities': 3360,
+            'Internet & Phone': 2520,
+            'Subscriptions': 1260,
+            'Other Expenses': 1260
         }
     },
     "Munich": {
@@ -1188,7 +1296,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 9000,
             'Entertainment & Activities': 4320,
             'Personal Care': 2160,
-            'Other Expenses': 5400
+            'Utilities': 2160,
+            'Internet & Phone': 1620,
+            'Subscriptions': 540,
+            'Other Expenses': 1080
         },
         "Average": {
             'Food & Groceries': 16200,
@@ -1196,7 +1307,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 11700,
             'Entertainment & Activities': 6480,
             'Personal Care': 3240,
-            'Other Expenses': 7560
+            'Utilities': 3024,
+            'Internet & Phone': 2268,
+            'Subscriptions': 1134,
+            'Other Expenses': 1134
         },
         "High-end": {
             'Food & Groceries': 21600,
@@ -1204,7 +1318,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 16200,
             'Entertainment & Activities': 10800,
             'Personal Care': 5400,
-            'Other Expenses': 10800
+            'Utilities': 4320,
+            'Internet & Phone': 3240,
+            'Subscriptions': 1620,
+            'Other Expenses': 1620
         }
     },
     "Sydney": {
@@ -1214,7 +1331,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 11000,
             'Entertainment & Activities': 5280,
             'Personal Care': 2640,
-            'Other Expenses': 6600
+            'Utilities': 2640,
+            'Internet & Phone': 1980,
+            'Subscriptions': 660,
+            'Other Expenses': 1320
         },
         "Average": {
             'Food & Groceries': 19800,
@@ -1222,7 +1342,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 14300,
             'Entertainment & Activities': 7920,
             'Personal Care': 3960,
-            'Other Expenses': 9240
+            'Utilities': 3696,
+            'Internet & Phone': 2772,
+            'Subscriptions': 1386,
+            'Other Expenses': 1386
         },
         "High-end": {
             'Food & Groceries': 26400,
@@ -1230,7 +1353,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 19800,
             'Entertainment & Activities': 13200,
             'Personal Care': 6600,
-            'Other Expenses': 13200
+            'Utilities': 5280,
+            'Internet & Phone': 3960,
+            'Subscriptions': 1980,
+            'Other Expenses': 1980
         }
     },
     "Melbourne": {
@@ -1240,7 +1366,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 9500,
             'Entertainment & Activities': 4560,
             'Personal Care': 2280,
-            'Other Expenses': 5700
+            'Utilities': 2280,
+            'Internet & Phone': 1710,
+            'Subscriptions': 570,
+            'Other Expenses': 1140
         },
         "Average": {
             'Food & Groceries': 17100,
@@ -1248,7 +1377,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 12350,
             'Entertainment & Activities': 6840,
             'Personal Care': 3420,
-            'Other Expenses': 7980
+            'Utilities': 3192,
+            'Internet & Phone': 2394,
+            'Subscriptions': 1197,
+            'Other Expenses': 1197
         },
         "High-end": {
             'Food & Groceries': 22800,
@@ -1256,7 +1388,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 17100,
             'Entertainment & Activities': 11400,
             'Personal Care': 5700,
-            'Other Expenses': 11400
+            'Utilities': 4560,
+            'Internet & Phone': 3420,
+            'Subscriptions': 1710,
+            'Other Expenses': 1710
         }
     },
     "Brisbane": {
@@ -1266,7 +1401,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 8500,
             'Entertainment & Activities': 4080,
             'Personal Care': 2040,
-            'Other Expenses': 5100
+            'Utilities': 2040,
+            'Internet & Phone': 1530,
+            'Subscriptions': 510,
+            'Other Expenses': 1020
         },
         "Average": {
             'Food & Groceries': 15300,
@@ -1274,7 +1412,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 11050,
             'Entertainment & Activities': 6120,
             'Personal Care': 3060,
-            'Other Expenses': 7140
+            'Utilities': 2856,
+            'Internet & Phone': 2142,
+            'Subscriptions': 1071,
+            'Other Expenses': 1071
         },
         "High-end": {
             'Food & Groceries': 20400,
@@ -1282,7 +1423,10 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Transportation': 15300,
             'Entertainment & Activities': 10200,
             'Personal Care': 5100,
-            'Other Expenses': 10200
+            'Utilities': 4080,
+            'Internet & Phone': 3060,
+            'Subscriptions': 1530,
+            'Other Expenses': 1530
         }
     }
 }
@@ -1622,7 +1766,10 @@ def initialize_session_state():
             'Entertainment & Activities': 6000.0,
             'Personal Care': 3600.0,
             'Vacations & Travel': 8000.0,  # Assumes 1-2 vacations per year
-            'Other Expenses': 7200.0
+            'Utilities': 3000.0,  # Electricity, Water, Gas
+            'Internet & Phone': 2400.0,  # Internet + Cellphones
+            'Subscriptions': 1200.0,  # Streaming services, music, etc.
+            'Other Expenses': 1800.0
         }
 
         # Children expenses table
@@ -2797,7 +2944,7 @@ def main():
         ("🏥 Healthcare & Insurance", healthcare_insurance_tab, st.session_state.get('show_healthcare', False)),
         ("💳 Debt Management", debt_management_tab, st.session_state.get('show_debt', False)),
         ("📊 Analysis & Cashflow", combined_analysis_cashflow_tab, True),
-        ("🦢 Black Swan Events", black_swan_tab, True),
+        ("🧪 Stress Test", stress_test_tab, True),
         ("📄 Export Reports", report_export_tab, st.session_state.get('show_export', True)),
         ("💾 Save/Load", save_load_tab, True)
     ]
@@ -4790,7 +4937,37 @@ def calculate_lifetime_cashflow():
                 elif ltc.covered_person == "Parent 2" and parent2_age >= ltc.start_age:
                     healthcare_expenses += ltc.monthly_premium * 12
 
-        total_expenses = base_expenses + children_expenses + recurring_expenses_total + major_purchase_expenses + healthcare_expenses
+        # House expenses (property tax, insurance, maintenance, upkeep)
+        house_expenses = 0
+        if 'houses' in st.session_state:
+            for house in st.session_state.houses:
+                # Check if the house is owned during this year based on timeline
+                is_owned = False
+                for timeline_entry in house.timeline:
+                    if timeline_entry.year <= year:
+                        if timeline_entry.status in ["Own_Live", "Own_Rent"]:
+                            is_owned = True
+                        elif timeline_entry.status == "Sold":
+                            is_owned = False
+
+                if is_owned:
+                    # Calculate house value with appreciation (assume 3% annual appreciation)
+                    years_since_purchase = year - house.purchase_year
+                    current_house_value = house.current_value * (1.03 ** years_from_now)
+
+                    # Property tax (based on current house value)
+                    house_expenses += current_house_value * house.property_tax_rate
+
+                    # Home insurance (with inflation)
+                    house_expenses += house.home_insurance * (1.03 ** years_from_now)
+
+                    # Maintenance (based on current house value)
+                    house_expenses += current_house_value * house.maintenance_rate
+
+                    # Upkeep costs (with inflation)
+                    house_expenses += house.upkeep_costs * (1.03 ** years_from_now)
+
+        total_expenses = base_expenses + children_expenses + recurring_expenses_total + major_purchase_expenses + healthcare_expenses + house_expenses
 
         # Calculate cashflow
         cashflow = total_income - total_expenses
@@ -4831,6 +5008,7 @@ def calculate_lifetime_cashflow():
             'base_expenses': base_expenses,
             'children_expenses': children_expenses,
             'healthcare_expenses': healthcare_expenses,
+            'house_expenses': house_expenses,
             'total_expenses': total_expenses,
             'cashflow': cashflow,
             'net_worth': cumulative_net_worth,
@@ -5423,7 +5601,7 @@ def combined_analysis_cashflow_tab():
         else:
             st.success("✅ Your plan shows strong resilience to market uncertainty!")
 
-        st.info("💡 **Next Step:** Use the Black Swan Events tab to stress-test against catastrophic scenarios.")
+        st.info("💡 **Next Step:** Use the Stress Test tab to test against catastrophic scenarios.")
     else:
         st.info("⏸️ Click 'Run Monte Carlo Simulation' above to see probabilistic outcomes and success rates.")
 
@@ -5673,9 +5851,9 @@ def test_hyperinflation_scenario(percentiles_data, config):
     return event_results
 
 
-def black_swan_tab():
-    """Black Swan Events stress testing tab"""
-    st.header("🦢 Black Swan Events Analysis")
+def stress_test_tab():
+    """Stress testing tab for catastrophic scenarios"""
+    st.header("🧪 Stress Test Analysis")
     st.markdown("""
     Stress-test your financial plan against rare catastrophic events.
     This analysis shows whether your plan can withstand worst-case scenarios across different Monte Carlo percentiles.
@@ -5695,32 +5873,16 @@ def black_swan_tab():
 
     st.info(f"📊 Analyzing {len(years)} years across 5 percentiles (10th, 25th, 50th, 75th, 90th)")
 
-    # Tier Selection
-    st.markdown("---")
-    st.subheader("🎯 Select Stress Test Tier")
-
-    tier_options = {
-        "Tier 1: Basic Scenarios": 1,
-        "Tier 2: Moderate Scenarios": 2,
-        "Tier 3: Comprehensive Analysis": 3,
-        "All Tiers": 0
-    }
-
-    selected_tier_name = st.radio(
-        "Choose test tier:",
-        options=list(tier_options.keys()),
-        help="Tier 1: Quick basic tests | Tier 2: Family & employment | Tier 3: All scenarios combined"
-    )
-
-    selected_tier = tier_options[selected_tier_name]
+    # Run all tiers automatically
+    selected_tier = 0  # 0 = All Tiers
 
     # Define percentile names for iteration
     percentile_names = ['10th', '25th', '50th', '75th', '90th']
 
     # Store results for stoplight table
-    black_swan_results = []
+    stress_test_results = []
 
-    with st.spinner("🔍 Analyzing black swan scenarios... This may take a moment."):
+    with st.spinner("🔍 Analyzing stress test scenarios... This may take a moment."):
 
         # TIER 1: Basic Scenarios
         if selected_tier == 1 or selected_tier == 0:
@@ -5748,7 +5910,7 @@ def black_swan_tab():
 
             config = {'loss_percent': loss_percent}
             event_results = test_net_worth_loss_scenario(percentiles_data, config)
-            black_swan_results.append(event_results)
+            stress_test_results.append(event_results)
 
             # Hyperinflation Scenario
             st.markdown("---")
@@ -5781,7 +5943,7 @@ def black_swan_tab():
                 'inflation_rate': hyperinflation_rate / 100
             }
             event_results = test_hyperinflation_scenario(percentiles_data, config)
-            black_swan_results.append(event_results)
+            stress_test_results.append(event_results)
 
         # TIER 2: Moderate Scenarios
         if selected_tier == 2 or selected_tier == 0:
@@ -5806,7 +5968,7 @@ def black_swan_tab():
                     }
 
                     event_results = test_disabled_child_scenario(percentiles_data, config)
-                    black_swan_results.append(event_results)
+                    stress_test_results.append(event_results)
 
             # Unemployment Scenarios
             st.markdown("### 💼 Forced Unemployment")
@@ -5821,7 +5983,7 @@ def black_swan_tab():
                 }
 
                 event_results = test_unemployment_scenario(percentiles_data, config)
-                black_swan_results.append(event_results)
+                stress_test_results.append(event_results)
 
         # TIER 3: Comprehensive Analysis
         if selected_tier == 3 or selected_tier == 0:
@@ -5879,16 +6041,16 @@ def black_swan_tab():
                         'final_nw': worst_final_nw
                     }
 
-                black_swan_results.append(event_results)
+                stress_test_results.append(event_results)
 
     # Display Stoplight Table
     st.markdown("---")
-    st.markdown("## 🚦 Black Swan Event Stoplight Analysis")
+    st.markdown("## 🚦 Stress Test Stoplight Analysis")
     st.markdown("**Green ✅**: Plan survives | **Red ❌**: Plan fails")
 
     # Create DataFrame for display
     table_data = []
-    for result in black_swan_results:
+    for result in stress_test_results:
         row = {'Event': result['event']}
         for pct_name in percentile_names:
             if pct_name in result:
@@ -5912,7 +6074,7 @@ def black_swan_tab():
     st.markdown("---")
     st.markdown("## 📋 Detailed Results")
 
-    for result in black_swan_results:
+    for result in stress_test_results:
         with st.expander(f"🔍 {result['event']}", expanded=False):
             detail_data = []
             for pct_name in percentile_names:
@@ -5935,10 +6097,10 @@ def black_swan_tab():
     st.markdown("---")
     st.markdown("## 📊 Summary Statistics")
 
-    total_scenarios = len(black_swan_results) * len(percentile_names)
+    total_scenarios = len(stress_test_results) * len(percentile_names)
     passed_scenarios = 0
 
-    for result in black_swan_results:
+    for result in stress_test_results:
         for pct_name in percentile_names:
             if pct_name in result and isinstance(result[pct_name], dict):
                 if result[pct_name]['status'] == "✅":
@@ -5955,13 +6117,13 @@ def black_swan_tab():
         st.metric("Overall Success Rate", f"{success_rate:.1f}%")
 
     if success_rate >= 80:
-        st.success("✅ **Excellent!** Your financial plan is highly resilient to black swan events.")
+        st.success("✅ **Excellent!** Your financial plan is highly resilient to stress test scenarios.")
     elif success_rate >= 60:
         st.info("⚠️ **Good** - Your plan handles most scenarios but consider building more buffer.")
     elif success_rate >= 40:
         st.warning("⚠️ **Moderate Risk** - Your plan struggles with many catastrophic scenarios. Consider increasing savings or reducing expenses.")
     else:
-        st.error("❌ **High Risk** - Your plan is vulnerable to black swan events. Significant adjustments recommended.")
+        st.error("❌ **High Risk** - Your plan is vulnerable to stress test scenarios. Significant adjustments recommended.")
 
 
 def save_load_tab():
