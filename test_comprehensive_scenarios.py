@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Comprehensive Scenario Runner for Financial Planning App v0.72
+Comprehensive Scenario Runner for Financial Planning App v0.74
 Runs all demo scenarios through various economic conditions to ensure stability
 """
 

@@ -1,4 +1,4 @@
-# Financial Planning App v0.72 - Test Results
+# Financial Planning App v0.74 - Test Results
 
 **Test Date:** 2025-11-22
 **Branch:** claude/expand-example-scenarios-01BYiAbfaT5zAFGhUXq6uuGn
@@ -205,7 +205,7 @@ Tested extreme economic conditions to ensure no crashes:
 
 ## Conclusion
 
-The Financial Planning App v0.72 has been thoroughly tested across:
+The Financial Planning App v0.74 has been thoroughly tested across:
 - ✅ 5 diverse demo scenarios
 - ✅ 6 different economic conditions
 - ✅ Extreme stress test scenarios

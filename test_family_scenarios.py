@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Comprehensive test scenarios for Financial Planning Suite v0.7
+Comprehensive test scenarios for Financial Planning Suite v0.74
 Tests various family configurations and recent changes
 """
 
@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Optional, List
 
 print("=" * 80)
-print("FINANCIAL PLANNING SUITE v0.7 - FAMILY SCENARIO TESTS")
+print("FINANCIAL PLANNING SUITE v0.74 - FAMILY SCENARIO TESTS")
 print("=" * 80)
 
 # Import necessary components
@@ -20,7 +20,7 @@ try:
         get_location_display_name, LOCATION_DISPLAY_NAMES,
         FAMILY_EXPENSE_TEMPLATES, AVAILABLE_LOCATIONS_FAMILY
     )
-    print("✅ Successfully imported v0.7 components\n")
+    print("✅ Successfully imported v0.74 components\n")
 except ImportError as e:
     print(f"❌ Failed to import components: {e}")
     # Continue with limited testing

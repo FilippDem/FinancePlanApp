@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Static analysis and pattern testing for Financial Planning Suite v0.7
+Static analysis and pattern testing for Financial Planning Suite v0.74
 Tests for potential runtime errors and broken functionality without running Streamlit
 """
 
@@ -9,7 +9,7 @@ import ast
 import sys
 
 print("=" * 80)
-print("FINANCIAL PLANNING SUITE v0.7 - STATIC ANALYSIS & PATTERN TESTING")
+print("FINANCIAL PLANNING SUITE v0.74 - STATIC ANALYSIS & PATTERN TESTING")
 print("=" * 80)
 
 with open('FinancialPlanner_v0_7.py', 'r') as f:
