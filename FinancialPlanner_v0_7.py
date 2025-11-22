@@ -21,6 +21,14 @@ try:
 except ImportError:
     REPORTLAB_AVAILABLE = False
 
+# File dialog imports
+try:
+    import tkinter as tk
+    from tkinter import filedialog
+    TKINTER_AVAILABLE = True
+except ImportError:
+    TKINTER_AVAILABLE = False
+
 # Set page configuration
 st.set_page_config(
     page_title="Financial Planning Application v0.74",
@@ -1731,6 +1739,37 @@ def format_currency(value, force_full=False, context="general"):
     else:
         return f"${value:,.0f}"
 
+
+def get_save_file_path(default_filename, file_types):
+    """
+    Show a file save dialog and return the selected file path.
+
+    Args:
+        default_filename: Default filename to suggest
+        file_types: List of tuples like [("PDF files", "*.pdf"), ("All files", "*.*")]
+
+    Returns:
+        Selected file path as string, or None if cancelled
+    """
+    if not TKINTER_AVAILABLE:
+        return None
+
+    # Create a temporary root window (hidden)
+    root = tk.Tk()
+    root.withdraw()
+    root.wm_attributes('-topmost', 1)
+
+    # Show save dialog
+    file_path = filedialog.asksaveasfilename(
+        defaultextension=file_types[0][1].replace("*", ""),
+        filetypes=file_types,
+        initialfile=default_filename
+    )
+
+    # Clean up
+    root.destroy()
+
+    return file_path if file_path else None
 
 
 # Initialize session state
@@ -7169,12 +7208,27 @@ def save_load_tab():
 
             json_str = json.dumps(export_data, indent=2)
 
-            st.download_button(
-                label="📥 Download JSON",
-                data=json_str,
-                file_name=f"financial_plan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                mime="application/json"
-            )
+            # Show file save dialog
+            if TKINTER_AVAILABLE:
+                file_path = get_save_file_path(
+                    f"financial_plan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    [("JSON files", "*.json"), ("All files", "*.*")]
+                )
+
+                if file_path:
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(json_str)
+                    st.success(f"✅ Scenario exported successfully to: {file_path}")
+                else:
+                    st.info("ℹ️ Export cancelled")
+            else:
+                # Fallback to download button if tkinter not available
+                st.download_button(
+                    label="📥 Download JSON",
+                    data=json_str,
+                    file_name=f"financial_plan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json"
+                )
 
     with col2:
         st.markdown("**Import from JSON File**")
@@ -7644,13 +7698,28 @@ def report_export_tab():
                     doc.build(elements)
                     output.seek(0)
 
-                    st.download_button(
-                        label="📥 Download PDF Report",
-                        data=output,
-                        file_name=f"{report_name}.pdf",
-                        mime="application/pdf"
-                    )
-                    st.success("✅ PDF report generated successfully!")
+                    # Show file save dialog
+                    if TKINTER_AVAILABLE:
+                        file_path = get_save_file_path(
+                            f"{report_name}.pdf",
+                            [("PDF files", "*.pdf"), ("All files", "*.*")]
+                        )
+
+                        if file_path:
+                            with open(file_path, 'wb') as f:
+                                f.write(output.getvalue())
+                            st.success(f"✅ PDF report saved successfully to: {file_path}")
+                        else:
+                            st.info("ℹ️ Save cancelled")
+                    else:
+                        # Fallback to download button if tkinter not available
+                        st.download_button(
+                            label="📥 Download PDF Report",
+                            data=output,
+                            file_name=f"{report_name}.pdf",
+                            mime="application/pdf"
+                        )
+                        st.success("✅ PDF report generated successfully!")
 
                 elif report_format == "Excel (.xlsx)":
                     # Create Excel workbook
@@ -7684,40 +7753,84 @@ def report_export_tab():
 
                     output.seek(0)
 
-                    st.download_button(
-                        label="📥 Download Excel Report",
-                        data=output,
-                        file_name=f"{report_name}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-                    st.success("✅ Excel report generated successfully!")
+                    # Show file save dialog
+                    if TKINTER_AVAILABLE:
+                        file_path = get_save_file_path(
+                            f"{report_name}.xlsx",
+                            [("Excel files", "*.xlsx"), ("All files", "*.*")]
+                        )
+
+                        if file_path:
+                            with open(file_path, 'wb') as f:
+                                f.write(output.getvalue())
+                            st.success(f"✅ Excel report saved successfully to: {file_path}")
+                        else:
+                            st.info("ℹ️ Save cancelled")
+                    else:
+                        # Fallback to download button if tkinter not available
+                        st.download_button(
+                            label="📥 Download Excel Report",
+                            data=output,
+                            file_name=f"{report_name}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+                        st.success("✅ Excel report generated successfully!")
 
                 elif report_format == "JSON (Data Export)":
                     json_str = json.dumps(report_data, indent=2, default=str)
 
-                    st.download_button(
-                        label="📥 Download JSON Data",
-                        data=json_str,
-                        file_name=f"{report_name}.json",
-                        mime="application/json"
-                    )
-                    st.success("✅ JSON export generated successfully!")
+                    # Show file save dialog
+                    if TKINTER_AVAILABLE:
+                        file_path = get_save_file_path(
+                            f"{report_name}.json",
+                            [("JSON files", "*.json"), ("All files", "*.*")]
+                        )
+
+                        if file_path:
+                            with open(file_path, 'w', encoding='utf-8') as f:
+                                f.write(json_str)
+                            st.success(f"✅ JSON export saved successfully to: {file_path}")
+                        else:
+                            st.info("ℹ️ Save cancelled")
+                    else:
+                        # Fallback to download button if tkinter not available
+                        st.download_button(
+                            label="📥 Download JSON Data",
+                            data=json_str,
+                            file_name=f"{report_name}.json",
+                            mime="application/json"
+                        )
+                        st.success("✅ JSON export generated successfully!")
 
                 elif report_format == "CSV (Multiple Files)":
-                    st.info("📊 CSV export will generate multiple files. Download them separately:")
-
                     # Summary CSV
                     if "Summary" in include_sections:
                         summary_df = pd.DataFrame([report_data["summary"]]).T
                         summary_csv = summary_df.to_csv()
-                        st.download_button(
-                            "Download Summary.csv",
-                            summary_csv,
-                            f"{report_name}_summary.csv",
-                            "text/csv"
-                        )
 
-                    st.success("✅ CSV files ready for download!")
+                        # Show file save dialog
+                        if TKINTER_AVAILABLE:
+                            file_path = get_save_file_path(
+                                f"{report_name}_summary.csv",
+                                [("CSV files", "*.csv"), ("All files", "*.*")]
+                            )
+
+                            if file_path:
+                                with open(file_path, 'w', encoding='utf-8') as f:
+                                    f.write(summary_csv)
+                                st.success(f"✅ CSV file saved successfully to: {file_path}")
+                            else:
+                                st.info("ℹ️ Save cancelled")
+                        else:
+                            # Fallback to download button if tkinter not available
+                            st.info("📊 CSV export will generate multiple files. Download them separately:")
+                            st.download_button(
+                                "Download Summary.csv",
+                                summary_csv,
+                                f"{report_name}_summary.csv",
+                                "text/csv"
+                            )
+                            st.success("✅ CSV files ready for download!")
 
             except Exception as e:
                 st.error(f"❌ Error generating report: {str(e)}")
