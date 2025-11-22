@@ -15,7 +15,7 @@ try:
     from reportlab.lib.pagesizes import letter, A4
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Image
     from reportlab.lib import colors
     REPORTLAB_AVAILABLE = True
 except ImportError:
@@ -31,7 +31,7 @@ except ImportError:
 
 # Set page configuration
 st.set_page_config(
-    page_title="Financial Planning Application v0.74",
+    page_title="Financial Planning Application v0.75",
     page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -3545,11 +3545,39 @@ def calculate_monthly_house_payment(house):
     return monthly_payment + monthly_property_tax + monthly_insurance
 
 
+def plotly_fig_to_image(fig, width=6*inch, height=4*inch):
+    """
+    Convert a Plotly figure to a ReportLab Image object for PDF inclusion.
+
+    Args:
+        fig: Plotly figure object
+        width: Width of image in PDF (default 6 inches)
+        height: Height of image in PDF (default 4 inches)
+
+    Returns:
+        ReportLab Image object or None if conversion fails
+    """
+    try:
+        # Export figure to bytes (PNG format)
+        img_bytes = fig.to_image(format="png", width=800, height=600, scale=2)
+
+        # Create BytesIO object from bytes
+        img_buffer = io.BytesIO(img_bytes)
+
+        # Create ReportLab Image object
+        img = Image(img_buffer, width=width, height=height)
+        return img
+    except Exception as e:
+        # If kaleido is not installed or conversion fails, return None
+        print(f"Warning: Could not convert chart to image: {e}")
+        return None
+
+
 def main():
     """Main application function"""
     initialize_session_state()
 
-    st.title("💰 Financial Planning Suite v0.74")
+    st.title("💰 Financial Planning Suite v0.75")
 
     # Build tab list dynamically based on visibility settings
     tab_configs = [
@@ -7853,6 +7881,41 @@ def report_export_tab():
                                 ('GRID', (0, 0), (-1, -1), 1, colors.black)
                             ]))
                             elements.append(expense_table)
+                            elements.append(Spacer(1, 12))
+
+                            # Generate and add expense breakdown pie chart
+                            try:
+                                # Prepare data for pie chart (exclude total row)
+                                expense_categories = []
+                                expense_amounts = []
+                                for category, amount in expenses.items():
+                                    if amount > 0:
+                                        formatted_category = category.replace('_', ' ').title()
+                                        expense_categories.append(formatted_category)
+                                        expense_amounts.append(amount)
+
+                                if expense_categories:
+                                    # Create pie chart
+                                    expense_pie_fig = go.Figure(data=[go.Pie(
+                                        labels=expense_categories,
+                                        values=expense_amounts,
+                                        hole=0.3
+                                    )])
+                                    expense_pie_fig.update_layout(
+                                        title="Annual Expense Distribution",
+                                        height=400,
+                                        showlegend=True
+                                    )
+
+                                    # Convert to image and add to PDF
+                                    expense_chart_img = plotly_fig_to_image(expense_pie_fig, width=5*inch, height=3.5*inch)
+                                    if expense_chart_img:
+                                        elements.append(expense_chart_img)
+                                        elements.append(Spacer(1, 12))
+                            except Exception as e:
+                                # If chart generation fails, just skip it
+                                pass
+
                             elements.append(Spacer(1, 20))
 
                     # Healthcare Section
@@ -8031,6 +8094,59 @@ def report_export_tab():
                         # Add note about detailed data
                         note_text = "<i>Note: Full year-by-year cashflow projections with detailed expense breakdowns are available in the Excel export. The Excel file includes comprehensive data on income, expenses, net worth trajectory, and all expense categories for each year of your financial plan.</i>"
                         elements.append(Paragraph(note_text, styles['Normal']))
+                        elements.append(Spacer(1, 12))
+
+                        # Generate and add cashflow chart
+                        try:
+                            years = [d['year'] for d in cashflow_proj]
+                            income = [d['total_income'] for d in cashflow_proj]
+                            expenses = [d['total_expenses'] for d in cashflow_proj]
+                            net_worth = [d['net_worth'] for d in cashflow_proj]
+
+                            # Create cashflow chart with dual y-axis
+                            from plotly.subplots import make_subplots
+                            cashflow_fig = make_subplots(
+                                specs=[[{"secondary_y": True}]]
+                            )
+
+                            # Add income and expenses on primary y-axis
+                            cashflow_fig.add_trace(
+                                go.Scatter(x=years, y=income, mode='lines', name='Income',
+                                          line=dict(color='green', width=2)),
+                                secondary_y=False
+                            )
+                            cashflow_fig.add_trace(
+                                go.Scatter(x=years, y=expenses, mode='lines', name='Expenses',
+                                          line=dict(color='red', width=2)),
+                                secondary_y=False
+                            )
+
+                            # Add net worth on secondary y-axis
+                            cashflow_fig.add_trace(
+                                go.Scatter(x=years, y=net_worth, mode='lines', name='Net Worth',
+                                          line=dict(color='blue', width=2, dash='dot')),
+                                secondary_y=True
+                            )
+
+                            cashflow_fig.update_xaxes(title_text="Year")
+                            cashflow_fig.update_yaxes(title_text="Income/Expenses ($)", secondary_y=False)
+                            cashflow_fig.update_yaxes(title_text="Net Worth ($)", secondary_y=True)
+                            cashflow_fig.update_layout(
+                                title="Lifetime Income, Expenses, and Net Worth",
+                                height=500,
+                                showlegend=True,
+                                hovermode='x unified'
+                            )
+
+                            # Convert to image and add to PDF
+                            chart_img = plotly_fig_to_image(cashflow_fig, width=6.5*inch, height=4*inch)
+                            if chart_img:
+                                elements.append(chart_img)
+                                elements.append(Spacer(1, 12))
+                        except Exception as e:
+                            # If chart generation fails, just skip it
+                            pass
+
                         elements.append(Spacer(1, 20))
 
                     # Monte Carlo Results Summary
@@ -8055,6 +8171,67 @@ def report_export_tab():
 
                         note_text = "<i>Note: Complete Monte Carlo results with year-by-year percentile data are available in the Excel export.</i>"
                         elements.append(Paragraph(note_text, styles['Normal']))
+                        elements.append(Spacer(1, 12))
+
+                        # Generate and add Monte Carlo chart
+                        try:
+                            mc_years = mc_results['years']
+                            percentiles = mc_results['percentiles']
+
+                            # Create Monte Carlo percentile fan chart
+                            mc_fig = go.Figure()
+
+                            # Add percentile bands
+                            mc_fig.add_trace(go.Scatter(
+                                x=mc_years, y=percentiles['90th'],
+                                mode='lines', name='90th Percentile',
+                                line=dict(color='rgba(0,100,255,0.2)', width=1)
+                            ))
+                            mc_fig.add_trace(go.Scatter(
+                                x=mc_years, y=percentiles['75th'],
+                                mode='lines', name='75th Percentile',
+                                line=dict(color='rgba(0,150,255,0.3)', width=1),
+                                fill='tonexty', fillcolor='rgba(0,100,255,0.1)'
+                            ))
+                            mc_fig.add_trace(go.Scatter(
+                                x=mc_years, y=percentiles['50th'],
+                                mode='lines', name='Median (50th)',
+                                line=dict(color='blue', width=3)
+                            ))
+                            mc_fig.add_trace(go.Scatter(
+                                x=mc_years, y=percentiles['25th'],
+                                mode='lines', name='25th Percentile',
+                                line=dict(color='rgba(255,150,0,0.3)', width=1),
+                                fill='tonexty', fillcolor='rgba(100,150,255,0.1)'
+                            ))
+                            mc_fig.add_trace(go.Scatter(
+                                x=mc_years, y=percentiles['10th'],
+                                mode='lines', name='10th Percentile',
+                                line=dict(color='rgba(255,0,0,0.3)', width=1),
+                                fill='tonexty', fillcolor='rgba(255,100,0,0.1)'
+                            ))
+
+                            # Add zero line
+                            mc_fig.add_hline(y=0, line_dash="dash", line_color="red")
+
+                            mc_fig.update_layout(
+                                title="Net Worth Trajectories: Monte Carlo Simulation",
+                                xaxis_title="Year",
+                                yaxis_title="Net Worth ($)",
+                                height=500,
+                                showlegend=True,
+                                hovermode='x unified'
+                            )
+
+                            # Convert to image and add to PDF
+                            mc_chart_img = plotly_fig_to_image(mc_fig, width=6.5*inch, height=4*inch)
+                            if mc_chart_img:
+                                elements.append(mc_chart_img)
+                                elements.append(Spacer(1, 12))
+                        except Exception as e:
+                            # If chart generation fails, just skip it
+                            pass
+
                         elements.append(Spacer(1, 20))
 
                     # Build PDF
