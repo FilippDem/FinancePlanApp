@@ -7694,7 +7694,10 @@ def report_export_tab():
                         "health_insurances": [asdict(h) for h in st.session_state.health_insurances],
                         "ltc_insurances": [asdict(l) for l in st.session_state.ltc_insurances],
                         "hsa_balance": st.session_state.hsa_balance
-                    }
+                    },
+                    "houses": [asdict(h) for h in st.session_state.houses] if hasattr(st.session_state, 'houses') else [],
+                    "major_purchases": [asdict(mp) for mp in st.session_state.major_purchases] if hasattr(st.session_state, 'major_purchases') else [],
+                    "recurring_expenses": [asdict(re) for re in st.session_state.recurring_expenses] if hasattr(st.session_state, 'recurring_expenses') else []
                 }
 
                 if report_format == "PDF (.pdf)":
@@ -7807,6 +7810,164 @@ def report_export_tab():
                         ]))
                         elements.append(children_table)
                         elements.append(Spacer(1, 20))
+
+                    # Expenses Section
+                    if "Income & Expenses" in include_sections and report_data.get('expenses'):
+                        elements.append(Paragraph("Annual Expense Breakdown", heading_style))
+
+                        # Create detailed expense table
+                        expenses = report_data['expenses']
+                        expense_data = [['Category', 'Annual Amount']]
+
+                        # Add all expense categories
+                        for category, amount in expenses.items():
+                            if amount > 0:
+                                # Format category name (replace underscores with spaces, title case)
+                                formatted_category = category.replace('_', ' ').title()
+                                expense_data.append([formatted_category, f"${amount:,.2f}"])
+
+                        # Add total row
+                        total_expenses = sum(expenses.values())
+                        expense_data.append(['Total Annual Expenses', f"${total_expenses:,.2f}"])
+
+                        if len(expense_data) > 1:  # More than just header
+                            expense_table = Table(expense_data, colWidths=[3.5*inch, 2.5*inch])
+                            expense_table.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                                ('BACKGROUND', (0, 1), (-1, -2), colors.beige),
+                                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+                                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                                ('LINEABOVE', (0, -1), (-1, -1), 2, colors.black),
+                                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                            ]))
+                            elements.append(expense_table)
+                            elements.append(Spacer(1, 20))
+
+                    # Healthcare Section
+                    if "Healthcare" in include_sections and report_data.get('healthcare'):
+                        healthcare = report_data['healthcare']
+
+                        # Health Insurance
+                        if healthcare.get('health_insurances'):
+                            elements.append(Paragraph("Health Insurance Coverage", heading_style))
+                            for idx, insurance in enumerate(healthcare['health_insurances'], 1):
+                                insurance_data = [
+                                    ['Field', 'Value'],
+                                    ['Policy Type', insurance.get('policy_type', 'N/A')],
+                                    ['Annual Premium', f"${insurance.get('annual_premium', 0):,.2f}"],
+                                    ['Annual Deductible', f"${insurance.get('annual_deductible', 0):,.2f}"],
+                                    ['Annual OOP Max', f"${insurance.get('annual_oop_max', 0):,.2f}"]
+                                ]
+
+                                insurance_table = Table(insurance_data, colWidths=[2.5*inch, 3.5*inch])
+                                insurance_table.setStyle(TableStyle([
+                                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                                ]))
+                                elements.append(insurance_table)
+                                elements.append(Spacer(1, 12))
+
+                        # HSA Balance
+                        if healthcare.get('hsa_balance', 0) > 0:
+                            hsa_text = f"<b>HSA Balance:</b> ${healthcare['hsa_balance']:,.2f}"
+                            elements.append(Paragraph(hsa_text, styles['Normal']))
+                            elements.append(Spacer(1, 20))
+
+                    # Houses/Properties Section
+                    if report_data.get('houses'):
+                        elements.append(Paragraph("Real Estate Properties", heading_style))
+                        for idx, house in enumerate(report_data['houses'], 1):
+                            house_name = house.get('name', f'Property {idx}')
+                            elements.append(Paragraph(f"<b>{house_name}</b>", styles['Heading3']))
+
+                            house_data = [
+                                ['Field', 'Value'],
+                                ['Purchase Year', str(house.get('purchase_year', 'N/A'))],
+                                ['Purchase Price', f"${house.get('purchase_price', 0):,.2f}"],
+                                ['Down Payment', f"${house.get('down_payment', 0):,.2f}"],
+                                ['Interest Rate', f"{house.get('interest_rate', 0):.2f}%"],
+                                ['Loan Term', f"{house.get('loan_term_years', 0)} years"],
+                                ['Property Tax Rate', f"{house.get('property_tax_rate', 0):.3f}%"],
+                                ['Home Insurance', f"${house.get('home_insurance_annual', 0):,.2f}"],
+                                ['Maintenance Rate', f"{house.get('maintenance_rate', 0):.2f}%"],
+                                ['Upkeep Rate', f"{house.get('upkeep_rate', 0):.2f}%"],
+                                ['Owner', house.get('owner', 'N/A')]
+                            ]
+
+                            house_table = Table(house_data, colWidths=[2.5*inch, 3.5*inch])
+                            house_table.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                            ]))
+                            elements.append(house_table)
+                            elements.append(Spacer(1, 12))
+
+                    # Major Purchases Section
+                    if report_data.get('major_purchases'):
+                        elements.append(Paragraph("Major Purchases", heading_style))
+                        major_purchases_data = [['Item', 'Year', 'Cost', 'Owner']]
+                        for mp in report_data['major_purchases']:
+                            major_purchases_data.append([
+                                mp.get('item_name', 'N/A'),
+                                str(mp.get('purchase_year', 'N/A')),
+                                f"${mp.get('cost', 0):,.2f}",
+                                mp.get('owner', 'N/A')
+                            ])
+
+                        if len(major_purchases_data) > 1:
+                            mp_table = Table(major_purchases_data, colWidths=[2*inch, 1.5*inch, 1.5*inch, 1.5*inch])
+                            mp_table.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('ALIGN', (2, 0), (2, -1), 'RIGHT'),
+                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                            ]))
+                            elements.append(mp_table)
+                            elements.append(Spacer(1, 20))
+
+                    # Recurring Expenses Section
+                    if report_data.get('recurring_expenses'):
+                        elements.append(Paragraph("Recurring Expenses", heading_style))
+                        recurring_data = [['Description', 'Amount', 'Start Year', 'End Year', 'Owner']]
+                        for re in report_data['recurring_expenses']:
+                            recurring_data.append([
+                                re.get('description', 'N/A'),
+                                f"${re.get('annual_amount', 0):,.2f}",
+                                str(re.get('start_year', 'N/A')),
+                                str(re.get('end_year', 'N/A')),
+                                re.get('owner', 'N/A')
+                            ])
+
+                        if len(recurring_data) > 1:
+                            recurring_table = Table(recurring_data, colWidths=[2*inch, 1.2*inch, 1.2*inch, 1.2*inch, 1*inch])
+                            recurring_table.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                            ]))
+                            elements.append(recurring_table)
+                            elements.append(Spacer(1, 20))
 
                     # Build PDF
                     doc.build(elements)
