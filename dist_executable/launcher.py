@@ -38,7 +38,14 @@ def main():
     if not os.path.exists(app_file):
         print(f"ERROR: Application file not found: {app_file}")
         print(f"Looking in: {application_path}")
-        print(f"Files available: {os.listdir(application_path)[:10]}")
+        try:
+            if os.path.isdir(application_path):
+                files = os.listdir(application_path)
+                print(f"Files available ({len(files)} total): {files[:10]}")
+            else:
+                print(f"ERROR: {application_path} is not a directory")
+        except Exception as e:
+            print(f"Could not list directory: {e}")
         print()
         print("Press Enter to exit...")
         input()
@@ -48,7 +55,7 @@ def main():
     os.environ['STREAMLIT_BROWSER_GATHER_USAGE_STATS'] = 'false'
     os.environ['STREAMLIT_SERVER_HEADLESS'] = 'true'
 
-    # Streamlit configuration
+    # Streamlit configuration - try different ports if needed
     port = 8501
     url = f"http://localhost:{port}"
 
@@ -59,13 +66,16 @@ def main():
     print("-" * 50)
     print()
 
-    # Schedule browser opening in background thread
-    browser_thread = threading.Thread(target=open_browser, args=(url,), daemon=True)
+    # Schedule browser opening in background thread (with longer delay for safety)
+    browser_thread = threading.Thread(target=open_browser, args=(url, 5), daemon=True)
     browser_thread.start()
 
     try:
         # Import streamlit's CLI and run it directly
+        print("Loading Streamlit...")
         from streamlit.web import cli as stcli
+        print("Streamlit loaded successfully!")
+        print()
 
         # Prepare arguments for streamlit run
         sys.argv = [
@@ -79,11 +89,28 @@ def main():
             "--browser.serverAddress", "localhost",
         ]
 
-        print("Launching Streamlit...")
+        print("Launching Streamlit server...")
         print()
 
         # Run streamlit
         sys.exit(stcli.main())
+
+    except ImportError as e:
+        print()
+        print("=" * 50)
+        print("ERROR: Could not import Streamlit")
+        print("=" * 50)
+        print(f"ImportError: {e}")
+        print()
+        print("This likely means Streamlit was not properly bundled.")
+        print("Please rebuild the executable.")
+        print()
+        import traceback
+        traceback.print_exc()
+        print()
+        print("Press Enter to exit...")
+        input()
+        sys.exit(1)
 
     except Exception as e:
         print()

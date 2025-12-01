@@ -18,17 +18,27 @@ a = Analysis(
         'streamlit.runtime.scriptrunner.magic_funcs',
         'streamlit.runtime.scriptrunner.script_runner',
         'streamlit.runtime.state',
+        'streamlit.runtime.state.session_state',
         'streamlit.runtime.media_file_manager',
+        'streamlit.runtime.caching',
+        'streamlit.runtime.uploaded_file_manager',
+        'streamlit.elements',
+        'streamlit.components.v1',
         # Data processing
         'pandas',
+        'pandas.io.formats.style',
         'numpy',
+        'numpy.random',
         # Plotting
         'plotly',
         'plotly.graph_objects',
         'plotly.express',
         'plotly.subplots',
+        'plotly.io',
         # File handling
         'openpyxl',
+        'openpyxl.workbook',
+        'openpyxl.styles',
         # PDF generation
         'reportlab',
         'reportlab.lib',
@@ -37,6 +47,8 @@ a = Analysis(
         'reportlab.lib.units',
         'reportlab.platypus',
         'reportlab.lib.colors',
+        'reportlab.pdfgen',
+        'reportlab.pdfgen.canvas',
         # Chart rendering
         'kaleido',
         # GUI
@@ -49,7 +61,15 @@ a = Analysis(
         'tornado',
         'tornado.web',
         'tornado.websocket',
+        'tornado.ioloop',
         'watchdog',
+        'watchdog.observers',
+        # Standard library modules that might need explicit inclusion
+        'queue',
+        'asyncio',
+        'concurrent.futures',
+        'PIL',
+        'PIL.Image',
     ],
     hookspath=[],
     hooksconfig={},
