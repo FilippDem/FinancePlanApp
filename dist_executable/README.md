@@ -93,17 +93,31 @@ To stop the app, just close the terminal/command window that opened.
 
 ### Troubleshooting
 
+**Window opens and closes immediately?**
+- Make sure you're using the launcher script (`run_FinancialPlanner.bat` or `run_FinancialPlanner.sh`) NOT the executable directly
+- The executable needs to be run through the launcher for proper startup
+- If the window still closes, try running the executable directly from command line to see error messages:
+  - Windows: Open Command Prompt, navigate to the folder, run `FinancialPlanner.exe`
+  - Mac/Linux: Open Terminal, navigate to the folder, run `./FinancialPlanner`
+
 **Browser doesn't open automatically?**
 - Manually open your browser and go to: http://localhost:8501
+- Wait 5-10 seconds after starting the app before opening the browser
 
 **Port 8501 already in use?**
-- Close any other Streamlit applications
-- Or edit the launcher script to use a different port
+- Close any other Streamlit applications or web servers using that port
+- Restart your computer to clear any stuck processes
 
 **Application won't start?**
-- Check your antivirus isn't blocking it
-- Make sure you extracted ALL files from the zip
-- Try running from a folder path without spaces
+- Check your antivirus isn't blocking it (common with PyInstaller executables)
+- Make sure you extracted ALL files from the zip - the executable needs the library files
+- Try running from a folder path without spaces or special characters
+- On Windows, make sure you're not running from OneDrive or network drive
+
+**Still having issues?**
+- Rebuild the executable with `build.bat` or `build.sh`
+- Make sure all dependencies in `requirements_build.txt` installed correctly
+- Check that you have the latest version of PyInstaller
 
 ## 📋 System Requirements
 
@@ -158,6 +172,8 @@ Same license as the main Financial Planning Application.
   - Standalone packaging with PyInstaller
   - One-click launch experience
   - No Python installation required for end users
+  - Custom launcher wrapper for proper Streamlit initialization
+  - Automatic browser opening with status messages
 
 ---
 

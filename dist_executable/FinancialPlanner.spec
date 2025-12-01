@@ -3,23 +3,33 @@
 block_cipher = None
 
 a = Analysis(
-    ['FinancialPlanner_v0_85.py'],
+    ['launcher.py'],  # Use launcher as entry point
     pathex=[],
     binaries=[],
     datas=[
         ('assets', 'assets'),  # Include assets folder
+        ('FinancialPlanner_v0_85.py', '.'),  # Include main app as data file
     ],
     hiddenimports=[
+        # Streamlit core
         'streamlit',
         'streamlit.web.cli',
+        'streamlit.web.bootstrap',
         'streamlit.runtime.scriptrunner.magic_funcs',
+        'streamlit.runtime.scriptrunner.script_runner',
+        'streamlit.runtime.state',
+        'streamlit.runtime.media_file_manager',
+        # Data processing
         'pandas',
         'numpy',
+        # Plotting
         'plotly',
         'plotly.graph_objects',
         'plotly.express',
         'plotly.subplots',
+        # File handling
         'openpyxl',
+        # PDF generation
         'reportlab',
         'reportlab.lib',
         'reportlab.lib.pagesizes',
@@ -27,9 +37,19 @@ a = Analysis(
         'reportlab.lib.units',
         'reportlab.platypus',
         'reportlab.lib.colors',
+        # Chart rendering
         'kaleido',
+        # GUI
         'tkinter',
         'tkinter.filedialog',
+        # Additional dependencies
+        'altair',
+        'click',
+        'validators',
+        'tornado',
+        'tornado.web',
+        'tornado.websocket',
+        'watchdog',
     ],
     hookspath=[],
     hooksconfig={},
