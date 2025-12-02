@@ -5683,6 +5683,175 @@ def timeline_tab():
             st.success(f"**{year}:** → {state} - {strategy}")
 
 
+# ============================================================================
+# TAX DATABASE: Location-based tax information
+# ============================================================================
+
+# US State Tax Information
+US_STATE_TAX_INFO = {
+    # States with no income tax
+    'Alaska': {'type': 'none', 'rate': 0.0},
+    'Florida': {'type': 'none', 'rate': 0.0},
+    'Nevada': {'type': 'none', 'rate': 0.0},
+    'New Hampshire': {'type': 'none', 'rate': 0.0},  # Only taxes dividends/interest
+    'South Dakota': {'type': 'none', 'rate': 0.0},
+    'Tennessee': {'type': 'none', 'rate': 0.0},
+    'Texas': {'type': 'none', 'rate': 0.0},
+    'Washington': {'type': 'none', 'rate': 0.0},
+    'Wyoming': {'type': 'none', 'rate': 0.0},
+
+    # States with flat tax rates
+    'Arizona': {'type': 'flat', 'rate': 0.025},
+    'Colorado': {'type': 'flat', 'rate': 0.044},
+    'Idaho': {'type': 'flat', 'rate': 0.058},
+    'Illinois': {'type': 'flat', 'rate': 0.0495},
+    'Indiana': {'type': 'flat', 'rate': 0.0315},
+    'Kentucky': {'type': 'flat', 'rate': 0.045},
+    'Massachusetts': {'type': 'flat', 'rate': 0.05},
+    'Michigan': {'type': 'flat', 'rate': 0.0425},
+    'Mississippi': {'type': 'flat', 'rate': 0.05},
+    'North Carolina': {'type': 'flat', 'rate': 0.045},
+    'Pennsylvania': {'type': 'flat', 'rate': 0.0307},
+    'Utah': {'type': 'flat', 'rate': 0.0465},
+
+    # States with progressive tax brackets (showing top marginal rate as approximation)
+    'Alabama': {'type': 'progressive', 'rate': 0.05},
+    'Arkansas': {'type': 'progressive', 'rate': 0.047},
+    'California': {'type': 'progressive', 'rate': 0.133, 'note': 'Highest in US'},
+    'Connecticut': {'type': 'progressive', 'rate': 0.0699},
+    'Delaware': {'type': 'progressive', 'rate': 0.066},
+    'Georgia': {'type': 'progressive', 'rate': 0.0575},
+    'Hawaii': {'type': 'progressive', 'rate': 0.11},
+    'Iowa': {'type': 'progressive', 'rate': 0.06},
+    'Kansas': {'type': 'progressive', 'rate': 0.057},
+    'Louisiana': {'type': 'progressive', 'rate': 0.0425},
+    'Maine': {'type': 'progressive', 'rate': 0.0715},
+    'Maryland': {'type': 'progressive', 'rate': 0.0575},
+    'Minnesota': {'type': 'progressive', 'rate': 0.0985},
+    'Missouri': {'type': 'progressive', 'rate': 0.054},
+    'Montana': {'type': 'progressive', 'rate': 0.0675},
+    'Nebraska': {'type': 'progressive', 'rate': 0.0684},
+    'New Jersey': {'type': 'progressive', 'rate': 0.1075},
+    'New Mexico': {'type': 'progressive', 'rate': 0.059},
+    'New York': {'type': 'progressive', 'rate': 0.109},
+    'North Dakota': {'type': 'progressive', 'rate': 0.029},
+    'Ohio': {'type': 'progressive', 'rate': 0.0385},
+    'Oklahoma': {'type': 'progressive', 'rate': 0.0475},
+    'Oregon': {'type': 'progressive', 'rate': 0.099},
+    'Rhode Island': {'type': 'progressive', 'rate': 0.0599},
+    'South Carolina': {'type': 'progressive', 'rate': 0.07},
+    'Vermont': {'type': 'progressive', 'rate': 0.0875},
+    'Virginia': {'type': 'progressive', 'rate': 0.0575},
+    'West Virginia': {'type': 'progressive', 'rate': 0.065},
+    'Wisconsin': {'type': 'progressive', 'rate': 0.0765},
+    'District of Columbia': {'type': 'progressive', 'rate': 0.1075},
+}
+
+# Country Tax Information (simplified - using approximate effective rates)
+COUNTRY_TAX_INFO = {
+    'United States': {'type': 'federal_state', 'federal_rate': 'progressive', 'has_fica': True},
+
+    # Major developed countries
+    'Canada': {'type': 'federal_provincial', 'effective_rate': 0.33, 'has_fica': False, 'note': 'CPP/EI separate'},
+    'United Kingdom': {'type': 'national', 'effective_rate': 0.40, 'has_fica': False, 'note': 'NI separate'},
+    'Germany': {'type': 'national', 'effective_rate': 0.45, 'has_fica': False, 'note': 'Social insurance separate'},
+    'France': {'type': 'national', 'effective_rate': 0.45, 'has_fica': False},
+    'Australia': {'type': 'national', 'effective_rate': 0.37, 'has_fica': False},
+    'Japan': {'type': 'national', 'effective_rate': 0.33, 'has_fica': False},
+    'South Korea': {'type': 'national', 'effective_rate': 0.38, 'has_fica': False},
+    'Singapore': {'type': 'national', 'effective_rate': 0.22, 'has_fica': False, 'note': 'Low tax'},
+    'Hong Kong': {'type': 'territorial', 'effective_rate': 0.15, 'has_fica': False, 'note': 'Very low tax'},
+    'Switzerland': {'type': 'cantonal', 'effective_rate': 0.30, 'has_fica': False},
+    'Netherlands': {'type': 'national', 'effective_rate': 0.49, 'has_fica': False},
+    'Sweden': {'type': 'national', 'effective_rate': 0.52, 'has_fica': False, 'note': 'High tax, high services'},
+    'Norway': {'type': 'national', 'effective_rate': 0.38, 'has_fica': False},
+    'Denmark': {'type': 'national', 'effective_rate': 0.55, 'has_fica': False, 'note': 'Highest in developed world'},
+    'Finland': {'type': 'national', 'effective_rate': 0.51, 'has_fica': False},
+    'Belgium': {'type': 'national', 'effective_rate': 0.50, 'has_fica': False},
+    'Austria': {'type': 'national', 'effective_rate': 0.48, 'has_fica': False},
+    'Italy': {'type': 'national', 'effective_rate': 0.43, 'has_fica': False},
+    'Spain': {'type': 'national', 'effective_rate': 0.43, 'has_fica': False},
+    'Portugal': {'type': 'national', 'effective_rate': 0.48, 'has_fica': False},
+    'Ireland': {'type': 'national', 'effective_rate': 0.48, 'has_fica': False},
+    'New Zealand': {'type': 'national', 'effective_rate': 0.33, 'has_fica': False},
+
+    # Other locations
+    'United Arab Emirates': {'type': 'none', 'effective_rate': 0.0, 'has_fica': False, 'note': 'No income tax'},
+    'Saudi Arabia': {'type': 'none', 'effective_rate': 0.0, 'has_fica': False, 'note': 'No income tax for individuals'},
+    'Bahamas': {'type': 'none', 'effective_rate': 0.0, 'has_fica': False, 'note': 'No income tax'},
+    'Cayman Islands': {'type': 'none', 'effective_rate': 0.0, 'has_fica': False, 'note': 'No income tax'},
+    'Monaco': {'type': 'none', 'effective_rate': 0.0, 'has_fica': False, 'note': 'No income tax'},
+
+    # Latin America
+    'Mexico': {'type': 'national', 'effective_rate': 0.35, 'has_fica': False},
+    'Brazil': {'type': 'national', 'effective_rate': 0.275, 'has_fica': False},
+    'Argentina': {'type': 'national', 'effective_rate': 0.35, 'has_fica': False},
+    'Chile': {'type': 'national', 'effective_rate': 0.40, 'has_fica': False},
+    'Costa Rica': {'type': 'national', 'effective_rate': 0.25, 'has_fica': False},
+
+    # Asia
+    'China': {'type': 'national', 'effective_rate': 0.45, 'has_fica': False},
+    'India': {'type': 'national', 'effective_rate': 0.30, 'has_fica': False},
+    'Thailand': {'type': 'national', 'effective_rate': 0.35, 'has_fica': False},
+    'Vietnam': {'type': 'national', 'effective_rate': 0.35, 'has_fica': False},
+    'Philippines': {'type': 'national', 'effective_rate': 0.35, 'has_fica': False},
+    'Malaysia': {'type': 'national', 'effective_rate': 0.28, 'has_fica': False},
+    'Indonesia': {'type': 'national', 'effective_rate': 0.30, 'has_fica': False},
+    'Taiwan': {'type': 'national', 'effective_rate': 0.40, 'has_fica': False},
+
+    # Middle East
+    'Israel': {'type': 'national', 'effective_rate': 0.47, 'has_fica': False},
+    'Turkey': {'type': 'national', 'effective_rate': 0.35, 'has_fica': False},
+}
+
+def get_location_type(location):
+    """
+    Determine if a location is a US state, a country, or unknown.
+
+    Returns:
+        tuple: (location_type, tax_info) where location_type is 'us_state', 'country', or 'unknown'
+    """
+    # Check if it's a US state
+    if location in US_STATE_TAX_INFO:
+        return 'us_state', US_STATE_TAX_INFO[location]
+
+    # Check if it's a country
+    if location in COUNTRY_TAX_INFO:
+        return 'country', COUNTRY_TAX_INFO[location]
+
+    # Check if it's a common custom city (map to state)
+    CITY_TO_STATE = {
+        'Seattle': 'Washington',
+        'San Francisco': 'California',
+        'Los Angeles': 'California',
+        'San Diego': 'California',
+        'Sacramento': 'California',
+        'Portland': 'Oregon',
+        'Austin': 'Texas',
+        'Houston': 'Texas',
+        'Dallas': 'Texas',
+        'New York City': 'New York',
+        'NYC': 'New York',
+        'Boston': 'Massachusetts',
+        'Chicago': 'Illinois',
+        'Miami': 'Florida',
+        'Denver': 'Colorado',
+        'Phoenix': 'Arizona',
+        'Las Vegas': 'Nevada',
+        'Atlanta': 'Georgia',
+        'Philadelphia': 'Pennsylvania',
+        'Washington DC': 'District of Columbia',
+        'DC': 'District of Columbia',
+    }
+
+    if location in CITY_TO_STATE:
+        state = CITY_TO_STATE[location]
+        return 'us_state', US_STATE_TAX_INFO[state]
+
+    # Unknown location - return None so user can configure
+    return 'unknown', None
+
+
 def calculate_federal_income_tax(taxable_income, filing_status='married'):
     """
     Calculate federal income tax using 2024 tax brackets.
@@ -5787,43 +5956,114 @@ def calculate_ss_taxable_amount(ss_income, other_income):
         excess_2 = provisional_income - threshold_2
         return min(excess_1 + (excess_2 * 0.85), ss_income * 0.85)
 
-def calculate_total_taxes(parent1_income, parent2_income, ss_income, state_tax_rate=0.05, filing_status='married'):
+def calculate_total_taxes(parent1_income, parent2_income, ss_income, location=None, state_tax_rate=None, filing_status='married'):
     """
-    Calculate total taxes for the year.
+    Calculate total taxes for the year based on location.
 
     Args:
         parent1_income: Parent 1 wage income
         parent2_income: Parent 2 wage income
         ss_income: Social Security benefits
-        state_tax_rate: State income tax rate (default 5%)
+        location: Location name (US state or country). If None, uses state_tax_rate fallback
+        state_tax_rate: Manual override for state/local tax rate (for unknown locations)
         filing_status: 'single' or 'married'
 
     Returns:
-        dict: Breakdown of all taxes
+        dict: Breakdown of all taxes including location info
     """
-    # Calculate FICA on wage income (both parents)
-    fica_tax = calculate_fica_tax(parent1_income + parent2_income)
-
-    # Calculate taxable Social Security
     wage_income = parent1_income + parent2_income
-    taxable_ss = calculate_ss_taxable_amount(ss_income, wage_income)
 
-    # Total taxable income (wages + taxable portion of SS)
-    # Standard deduction for 2024: $29,200 (married), $14,600 (single)
-    standard_deduction = 29200 if filing_status == 'married' else 14600
-    taxable_income = max(0, wage_income + taxable_ss - standard_deduction)
+    # Determine location type and tax rules
+    location_type = 'unknown'
+    tax_info = None
 
-    # Calculate federal income tax
-    federal_tax = calculate_federal_income_tax(taxable_income, filing_status)
+    if location:
+        location_type, tax_info = get_location_type(location)
 
-    # Calculate state tax (on same taxable income)
-    state_tax = taxable_income * state_tax_rate
+    # Initialize tax components
+    federal_tax = 0
+    state_tax = 0
+    fica_tax = 0
+    foreign_tax = 0
+
+    # Calculate taxes based on location type
+    if location_type == 'us_state':
+        # US State: Apply federal + FICA + state taxes
+
+        # 1. Calculate FICA on wage income
+        fica_tax = calculate_fica_tax(wage_income)
+
+        # 2. Calculate taxable Social Security
+        taxable_ss = calculate_ss_taxable_amount(ss_income, wage_income)
+
+        # 3. Total taxable income with standard deduction
+        standard_deduction = 29200 if filing_status == 'married' else 14600
+        taxable_income = max(0, wage_income + taxable_ss - standard_deduction)
+
+        # 4. Calculate federal income tax
+        federal_tax = calculate_federal_income_tax(taxable_income, filing_status)
+
+        # 5. Calculate state tax using location's rate
+        state_rate = tax_info.get('rate', 0.0)
+        state_tax = taxable_income * state_rate
+
+    elif location_type == 'country' and tax_info:
+        # Foreign Country: Apply country's tax system
+        # Note: US citizens still owe US taxes on worldwide income, but we'll simplify
+        # by assuming they're using Foreign Earned Income Exclusion or Foreign Tax Credit
+
+        if tax_info.get('type') == 'federal_state':
+            # It's the United States as a country
+            # Apply US federal taxes + FICA
+            fica_tax = calculate_fica_tax(wage_income)
+            taxable_ss = calculate_ss_taxable_amount(ss_income, wage_income)
+            standard_deduction = 29200 if filing_status == 'married' else 14600
+            taxable_income = max(0, wage_income + taxable_ss - standard_deduction)
+            federal_tax = calculate_federal_income_tax(taxable_income, filing_status)
+            # No state tax since it's just "United States" without a specific state
+            state_tax = 0
+        else:
+            # Foreign country - apply their tax system
+            # Use effective rate on total income (simplified)
+            effective_rate = tax_info.get('effective_rate', 0.35)
+
+            # Most countries don't have standard deductions like the US
+            # Some have personal allowances, but we'll simplify
+            total_income = wage_income + ss_income
+            foreign_tax = total_income * effective_rate
+
+            # FICA only applies if working for US employer
+            # We'll assume foreign employment = no FICA
+            if tax_info.get('has_fica', False):
+                fica_tax = calculate_fica_tax(wage_income)
+
+    else:
+        # Unknown location - use manual state_tax_rate if provided
+        # Default to US tax system
+        fica_tax = calculate_fica_tax(wage_income)
+        taxable_ss = calculate_ss_taxable_amount(ss_income, wage_income)
+        standard_deduction = 29200 if filing_status == 'married' else 14600
+        taxable_income = max(0, wage_income + taxable_ss - standard_deduction)
+        federal_tax = calculate_federal_income_tax(taxable_income, filing_status)
+
+        # Use manual override or default to 5%
+        if state_tax_rate is not None:
+            state_tax = taxable_income * state_tax_rate
+        else:
+            state_tax = taxable_income * 0.05
+
+    # Calculate total
+    total_taxes = federal_tax + state_tax + fica_tax + foreign_tax
 
     return {
         'federal_income_tax': federal_tax,
         'state_tax': state_tax,
         'fica_tax': fica_tax,
-        'total_taxes': federal_tax + state_tax + fica_tax
+        'foreign_tax': foreign_tax,
+        'total_taxes': total_taxes,
+        'location': location if location else 'Unknown',
+        'location_type': location_type,
+        'tax_note': tax_info.get('note', '') if tax_info else ''
     }
 
 def calculate_lifetime_cashflow():
@@ -5885,15 +6125,19 @@ def calculate_lifetime_cashflow():
 
         total_income = parent1_income + parent2_income + ss_income
 
-        # Calculate taxes
-        # Get state tax rate from session state, default to 5% if not set
-        state_tax_rate = st.session_state.get('state_tax_rate', 0.05)
+        # Calculate taxes based on location for this year
+        # Get the location (state or country) for this year
+        location, _ = get_state_for_year(year)
+
+        # Get manual tax rate override from session state if set
+        state_tax_rate = st.session_state.get('state_tax_rate', None)
         filing_status = st.session_state.get('tax_filing_status', 'married')
 
         tax_breakdown = calculate_total_taxes(
             parent1_income,
             parent2_income,
             ss_income,
+            location=location,
             state_tax_rate=state_tax_rate,
             filing_status=filing_status
         )
@@ -6554,17 +6798,35 @@ def deterministic_cashflow_tab():
                                 if year_data.get('taxes', 0) > 0 and year_data.get('tax_breakdown'):
                                     with st.expander("💸 Tax Details", expanded=True):
                                         tax_breakdown = year_data['tax_breakdown']
-                                        tax_df = pd.DataFrame([
-                                            {'Tax Type': 'Federal Income Tax', 'Amount': f"${tax_breakdown['federal_income_tax']:,.0f}"},
-                                            {'Tax Type': 'State Income Tax', 'Amount': f"${tax_breakdown['state_tax']:,.0f}"},
-                                            {'Tax Type': 'FICA (Social Security + Medicare)', 'Amount': f"${tax_breakdown['fica_tax']:,.0f}"}
-                                        ])
-                                        st.dataframe(tax_df, hide_index=True, use_container_width=True)
+
+                                        # Show location info if available
+                                        if tax_breakdown.get('location'):
+                                            location_type = tax_breakdown.get('location_type', 'unknown')
+                                            location_emoji = '🇺🇸' if location_type == 'us_state' else ('🌍' if location_type == 'country' else '📍')
+                                            st.info(f"{location_emoji} **Tax Location:** {tax_breakdown['location']}")
+                                            if tax_breakdown.get('tax_note'):
+                                                st.caption(f"Note: {tax_breakdown['tax_note']}")
+
+                                        # Build tax table based on what taxes apply
+                                        tax_rows = []
+                                        if tax_breakdown.get('federal_income_tax', 0) > 0:
+                                            tax_rows.append({'Tax Type': 'Federal Income Tax', 'Amount': f"${tax_breakdown['federal_income_tax']:,.0f}"})
+                                        if tax_breakdown.get('state_tax', 0) > 0:
+                                            tax_rows.append({'Tax Type': 'State/Local Income Tax', 'Amount': f"${tax_breakdown['state_tax']:,.0f}"})
+                                        if tax_breakdown.get('fica_tax', 0) > 0:
+                                            tax_rows.append({'Tax Type': 'FICA (Social Security + Medicare)', 'Amount': f"${tax_breakdown['fica_tax']:,.0f}"})
+                                        if tax_breakdown.get('foreign_tax', 0) > 0:
+                                            tax_rows.append({'Tax Type': 'Foreign Income Tax', 'Amount': f"${tax_breakdown['foreign_tax']:,.0f}"})
+
+                                        if tax_rows:
+                                            tax_df = pd.DataFrame(tax_rows)
+                                            st.dataframe(tax_df, hide_index=True, use_container_width=True)
+
                                         st.markdown(f"**Total Taxes: ${tax_breakdown['total_taxes']:,.0f}**")
 
                                         # Show effective tax rate
                                         effective_rate = (tax_breakdown['total_taxes'] / year_data['total_income'] * 100) if year_data['total_income'] > 0 else 0
-                                        st.caption(f"Effective tax rate on earned income: {effective_rate:.1f}%")
+                                        st.caption(f"Effective tax rate on total income: {effective_rate:.1f}%")
 
                                 # Family Living Expenses breakdown
                                 if year_data['base_expenses'] > 0 and year_data.get('base_expenses_breakdown'):
