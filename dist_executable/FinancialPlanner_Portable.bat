@@ -88,14 +88,30 @@ if %errorlevel% neq 0 (
     echo.
     echo Installing dependencies (this may take a few minutes)...
     echo.
-    python -m pip install --upgrade pip
+
+    REM Update pip first
+    echo Updating pip...
+    python -m pip install --upgrade pip >nul 2>&1
+
+    REM Install with retry logic
+    echo Installing dependencies (attempt 1/3)...
     python -m pip install streamlit pandas numpy plotly openpyxl reportlab kaleido
     if %errorlevel% neq 0 (
-        echo.
-        echo ERROR: Failed to install dependencies
-        echo Check your internet connection and try again
-        pause
-        exit /b 1
+        echo First attempt failed, retrying (attempt 2/3)...
+        timeout /t 3 /nobreak >nul
+        python -m pip install streamlit pandas numpy plotly openpyxl reportlab kaleido
+        if %errorlevel% neq 0 (
+            echo Second attempt failed, final retry (attempt 3/3)...
+            timeout /t 5 /nobreak >nul
+            python -m pip install streamlit pandas numpy plotly openpyxl reportlab kaleido
+            if %errorlevel% neq 0 (
+                echo.
+                echo ERROR: Failed to install dependencies after 3 attempts
+                echo Check your internet connection and try again
+                pause
+                exit /b 1
+            )
+        )
     )
     echo.
     echo [OK] Dependencies installed successfully
@@ -107,13 +123,31 @@ echo ========================================================
 echo Starting Financial Planning Application
 echo ========================================================
 echo.
-echo The application will open in your browser in a few seconds...
+echo Starting Streamlit server...
 echo To stop the application, close this window or press Ctrl+C
 echo.
 echo --------------------------------------------------------
 echo.
 
-streamlit run FinancialPlanner_v0_85.py --server.headless=true --browser.gatherUsageStats=false
+REM Start Streamlit in background
+start /B streamlit run FinancialPlanner_v0_85.py --server.headless=true --browser.gatherUsageStats=false
+
+REM Wait for server to start
+echo Waiting for server to start...
+timeout /t 5 /nobreak >nul
+
+REM Open browser
+echo Opening browser...
+python -c "import webbrowser; webbrowser.open('http://localhost:8501')"
+
+echo.
+echo [OK] Application is running at: http://localhost:8501
+echo.
+echo If browser didn't open, manually navigate to: http://localhost:8501
+echo.
+
+REM Keep window open
+pause >nul
 
 REM If we get here, the app was stopped
 echo.

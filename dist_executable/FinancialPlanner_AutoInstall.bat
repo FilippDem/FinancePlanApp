@@ -286,14 +286,37 @@ if %errorlevel% neq 0 (
     echo Installing required packages...
     echo This will take 2-5 minutes on first run.
     echo.
-    python -m pip install --upgrade pip --quiet
-    python -m pip install streamlit pandas numpy plotly openpyxl reportlab kaleido --quiet
+
+    REM Update pip first
+    echo Updating pip...
+    python -m pip install --upgrade pip >nul 2>&1
+
+    REM Install dependencies with retry logic
+    echo Installing dependencies (attempt 1/3)...
+    python -m pip install streamlit pandas numpy plotly openpyxl reportlab kaleido
     if %errorlevel% neq 0 (
         echo.
-        echo ERROR: Failed to install dependencies
-        echo Check your internet connection and try again
-        pause
-        exit /b 1
+        echo First attempt failed, retrying (attempt 2/3)...
+        timeout /t 3 /nobreak >nul
+        python -m pip install streamlit pandas numpy plotly openpyxl reportlab kaleido
+        if %errorlevel% neq 0 (
+            echo.
+            echo Second attempt failed, final retry (attempt 3/3)...
+            timeout /t 5 /nobreak >nul
+            python -m pip install streamlit pandas numpy plotly openpyxl reportlab kaleido
+            if %errorlevel% neq 0 (
+                echo.
+                echo ERROR: Failed to install dependencies after 3 attempts
+                echo.
+                echo Please check:
+                echo   - Your internet connection
+                echo   - Firewall settings
+                echo   - Try running as Administrator
+                echo.
+                pause
+                exit /b 1
+            )
+        )
     )
     echo.
     echo [OK] All dependencies installed successfully!
@@ -312,7 +335,7 @@ echo ========================================================
 echo Financial Planning Application v0.85
 echo ========================================================
 echo.
-echo The application will open in your browser in a few seconds...
+echo Starting Streamlit server...
 echo.
 echo To stop the application:
 echo   - Close this window, or
@@ -321,7 +344,29 @@ echo.
 echo --------------------------------------------------------
 echo.
 
-streamlit run FinancialPlanner_v0_85.py --server.headless=true --browser.gatherUsageStats=false
+REM Start Streamlit in background and capture the process
+start /B streamlit run FinancialPlanner_v0_85.py --server.headless=true --browser.gatherUsageStats=false
+
+REM Wait for Streamlit to start (give it 5 seconds)
+echo Waiting for server to start...
+timeout /t 5 /nobreak >nul
+
+REM Open browser
+echo Opening browser...
+python -c "import webbrowser; webbrowser.open('http://localhost:8501')"
+
+echo.
+echo [OK] Application is running!
+echo Browser should open at: http://localhost:8501
+echo.
+echo If browser didn't open, manually navigate to:
+echo http://localhost:8501
+echo.
+echo --------------------------------------------------------
+echo.
+
+REM Wait for streamlit to finish (keeps window open)
+wait
 
 REM If we get here, the app was stopped
 echo.
