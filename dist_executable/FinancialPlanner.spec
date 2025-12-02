@@ -19,7 +19,7 @@ a = Analysis(
     binaries=[],
     datas=[
         ('assets', 'assets'),  # Include assets folder
-        ('FinancialPlanner_v0_85.py', '.'),  # Include main app as data file
+        ('FinancialPlanner_v0_7.py', '.'),  # Include main app as data file
     ] + datas,  # Add collected metadata
     hiddenimports=[
         # Streamlit core

@@ -18,7 +18,7 @@ def open_browser(url, delay=3):
 def main():
     """Main launcher function"""
     print("=" * 50)
-    print("Financial Planning Application v0.85")
+    print("Financial Planning Application v0.75")
     print("=" * 50)
     print()
     print("Starting the application...")
@@ -33,7 +33,7 @@ def main():
         application_path = os.path.dirname(os.path.abspath(__file__))
 
     # Path to the main application file
-    app_file = os.path.join(application_path, 'FinancialPlanner_v0_85.py')
+    app_file = os.path.join(application_path, 'FinancialPlanner_v0_7.py')
 
     if not os.path.exists(app_file):
         print(f"ERROR: Application file not found: {app_file}")
