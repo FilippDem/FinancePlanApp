@@ -5683,9 +5683,153 @@ def timeline_tab():
             st.success(f"**{year}:** → {state} - {strategy}")
 
 
+def calculate_federal_income_tax(taxable_income, filing_status='married'):
+    """
+    Calculate federal income tax using 2024 tax brackets.
+
+    Args:
+        taxable_income: Total taxable income for the year
+        filing_status: 'single' or 'married' (default: 'married')
+
+    Returns:
+        float: Federal income tax amount
+    """
+    if filing_status == 'married':
+        # 2024 Married Filing Jointly brackets
+        brackets = [
+            (22000, 0.10),      # 10% on first $22,000
+            (89075, 0.12),      # 12% on $22,001 to $89,075
+            (190750, 0.22),     # 22% on $89,076 to $190,750
+            (364200, 0.24),     # 24% on $190,751 to $364,200
+            (462500, 0.32),     # 32% on $364,201 to $462,500
+            (693750, 0.35),     # 35% on $462,501 to $693,750
+            (float('inf'), 0.37)  # 37% on $693,751+
+        ]
+    else:
+        # 2024 Single filer brackets
+        brackets = [
+            (11000, 0.10),
+            (44725, 0.12),
+            (95375, 0.22),
+            (182100, 0.24),
+            (231250, 0.32),
+            (578125, 0.35),
+            (float('inf'), 0.37)
+        ]
+
+    tax = 0
+    previous_limit = 0
+
+    for limit, rate in brackets:
+        if taxable_income > previous_limit:
+            taxable_in_bracket = min(taxable_income, limit) - previous_limit
+            tax += taxable_in_bracket * rate
+            previous_limit = limit
+        else:
+            break
+
+    return tax
+
+def calculate_fica_tax(wage_income):
+    """
+    Calculate FICA taxes (Social Security + Medicare).
+
+    Args:
+        wage_income: W-2 wages subject to FICA
+
+    Returns:
+        float: Total FICA tax (employee portion)
+    """
+    # Social Security: 6.2% up to wage base ($160,200 in 2024)
+    ss_wage_base = 160200
+    social_security_tax = min(wage_income, ss_wage_base) * 0.062
+
+    # Medicare: 1.45% on all wages, plus 0.9% Additional Medicare Tax on high earners
+    medicare_wage_threshold = 250000  # For married filing jointly
+
+    if wage_income <= medicare_wage_threshold:
+        medicare_tax = wage_income * 0.0145
+    else:
+        medicare_tax = (medicare_wage_threshold * 0.0145) + \
+                      ((wage_income - medicare_wage_threshold) * 0.0235)  # 1.45% + 0.9%
+
+    return social_security_tax + medicare_tax
+
+def calculate_ss_taxable_amount(ss_income, other_income):
+    """
+    Calculate taxable portion of Social Security benefits.
+    Uses provisional income method.
+
+    Args:
+        ss_income: Social Security benefits received
+        other_income: Other taxable income (wages, pensions, etc.)
+
+    Returns:
+        float: Taxable portion of Social Security benefits
+    """
+    # Provisional income = AGI + 50% of SS benefits + tax-exempt interest
+    provisional_income = other_income + (ss_income * 0.5)
+
+    # Married filing jointly thresholds
+    threshold_1 = 32000
+    threshold_2 = 44000
+
+    if provisional_income <= threshold_1:
+        # No SS benefits taxed
+        return 0
+    elif provisional_income <= threshold_2:
+        # Up to 50% of benefits may be taxed
+        excess = provisional_income - threshold_1
+        return min(excess, ss_income * 0.5)
+    else:
+        # Up to 85% of benefits may be taxed
+        excess_1 = threshold_2 - threshold_1
+        excess_2 = provisional_income - threshold_2
+        return min(excess_1 + (excess_2 * 0.85), ss_income * 0.85)
+
+def calculate_total_taxes(parent1_income, parent2_income, ss_income, state_tax_rate=0.05, filing_status='married'):
+    """
+    Calculate total taxes for the year.
+
+    Args:
+        parent1_income: Parent 1 wage income
+        parent2_income: Parent 2 wage income
+        ss_income: Social Security benefits
+        state_tax_rate: State income tax rate (default 5%)
+        filing_status: 'single' or 'married'
+
+    Returns:
+        dict: Breakdown of all taxes
+    """
+    # Calculate FICA on wage income (both parents)
+    fica_tax = calculate_fica_tax(parent1_income + parent2_income)
+
+    # Calculate taxable Social Security
+    wage_income = parent1_income + parent2_income
+    taxable_ss = calculate_ss_taxable_amount(ss_income, wage_income)
+
+    # Total taxable income (wages + taxable portion of SS)
+    # Standard deduction for 2024: $29,200 (married), $14,600 (single)
+    standard_deduction = 29200 if filing_status == 'married' else 14600
+    taxable_income = max(0, wage_income + taxable_ss - standard_deduction)
+
+    # Calculate federal income tax
+    federal_tax = calculate_federal_income_tax(taxable_income, filing_status)
+
+    # Calculate state tax (on same taxable income)
+    state_tax = taxable_income * state_tax_rate
+
+    return {
+        'federal_income_tax': federal_tax,
+        'state_tax': state_tax,
+        'fica_tax': fica_tax,
+        'total_taxes': federal_tax + state_tax + fica_tax
+    }
+
 def calculate_lifetime_cashflow():
     """
     Calculate detailed year-by-year cashflow for entire lifetime (current year to age 100).
+    Now includes tax calculations.
 
     Returns:
         list: List of dictionaries with year-by-year financial data
@@ -5740,6 +5884,21 @@ def calculate_lifetime_cashflow():
             ss_income += parent2_ss
 
         total_income = parent1_income + parent2_income + ss_income
+
+        # Calculate taxes
+        # Get state tax rate from session state, default to 5% if not set
+        state_tax_rate = st.session_state.get('state_tax_rate', 0.05)
+        filing_status = st.session_state.get('tax_filing_status', 'married')
+
+        tax_breakdown = calculate_total_taxes(
+            parent1_income,
+            parent2_income,
+            ss_income,
+            state_tax_rate=state_tax_rate,
+            filing_status=filing_status
+        )
+
+        total_taxes = tax_breakdown['total_taxes']
 
         # Calculate expenses
         # Base family expenses (state-based with inflation)
@@ -5906,8 +6065,8 @@ def calculate_lifetime_cashflow():
 
         total_expenses = base_expenses + children_expenses + recurring_expenses_total + major_purchase_expenses + healthcare_expenses + house_expenses
 
-        # Calculate cashflow
-        cashflow = total_income - total_expenses
+        # Calculate cashflow (Income - Taxes - Expenses)
+        cashflow = total_income - total_taxes - total_expenses
 
         # Update net worth (simple model: cashflow + 7% investment return)
         investment_return = cumulative_net_worth * 0.07
@@ -5941,7 +6100,10 @@ def calculate_lifetime_cashflow():
             'parent1_income': parent1_income,
             'parent2_income': parent2_income,
             'ss_income': ss_income,
+            'investment_income': investment_return,  # Add investment returns
             'total_income': total_income,
+            'taxes': total_taxes,  # Total taxes
+            'tax_breakdown': tax_breakdown,  # Detailed tax breakdown
             'base_expenses': base_expenses,
             'base_expenses_breakdown': base_expenses_dict_inflated,
             'children_expenses': children_expenses,
@@ -6126,21 +6288,31 @@ def deterministic_cashflow_tab():
                                 income_breakdown.append({'Source': f"{st.session_state.parent2_name} Salary", 'Amount': year_data['parent2_income']})
                             if year_data['ss_income'] > 0:
                                 income_breakdown.append({'Source': 'Social Security', 'Amount': year_data['ss_income']})
+                            if year_data.get('investment_income', 0) > 0:
+                                income_breakdown.append({'Source': '📈 Investment Returns', 'Amount': year_data['investment_income']})
 
                             if income_breakdown:
                                 income_df = pd.DataFrame(income_breakdown)
-                                income_fig = go.Figure(data=[go.Pie(labels=income_df['Source'], values=income_df['Amount'], hole=0.3, marker_colors=['#2ecc71', '#27ae60', '#16a085'])])
+                                income_fig = go.Figure(data=[go.Pie(labels=income_df['Source'], values=income_df['Amount'], hole=0.3, marker_colors=['#2ecc71', '#27ae60', '#16a085', '#1abc9c'])])
                                 income_fig.update_layout(height=300, showlegend=True)
                                 st.plotly_chart(income_fig, use_container_width=True)
                                 income_df['Amount'] = income_df['Amount'].apply(lambda x: f"${x:,.0f}")
                                 st.dataframe(income_df, hide_index=True, use_container_width=True)
-                                st.metric("Total Income", f"${year_data['total_income']:,.0f}")
+
+                                # Calculate total including investment returns
+                                total_with_investments = year_data['total_income'] + year_data.get('investment_income', 0)
+                                st.metric("Total Earned Income", f"${year_data['total_income']:,.0f}")
+                                if year_data.get('investment_income', 0) > 0:
+                                    st.metric("Total with Investments", f"${total_with_investments:,.0f}")
                             else:
                                 st.info("No income for this year")
 
                         with col2:
                             st.markdown("#### 💳 Expense Breakdown")
                             expense_breakdown = []
+                            # Add taxes first (critical expense)
+                            if year_data.get('taxes', 0) > 0:
+                                expense_breakdown.append({'Category': '💸 Taxes', 'Amount': year_data['taxes']})
                             if year_data['base_expenses'] > 0:
                                 expense_breakdown.append({'Category': 'Family Living Expenses', 'Amount': year_data['base_expenses']})
                             if year_data['children_expenses'] > 0:
@@ -6166,7 +6338,7 @@ def deterministic_cashflow_tab():
                                 # Sankey Diagram for Money Flow
                                 st.markdown("---")
                                 st.markdown("#### 💰 Money Flow Visualization (Sankey Diagram)")
-                                st.caption("See how money flows from income sources through various expense categories to savings")
+                                st.caption("See how money flows from income sources (including investment returns) through various expense categories to savings")
 
                                 # Build Sankey diagram data
                                 sankey_labels = []
@@ -6199,6 +6371,12 @@ def deterministic_cashflow_tab():
                                         'value': year_data['ss_income'],
                                         'color': '#16a085'
                                     })
+                                if year_data.get('investment_income', 0) > 0:
+                                    income_sources.append({
+                                        'name': '📈 Investment Returns',
+                                        'value': year_data['investment_income'],
+                                        'color': '#1abc9c'
+                                    })
 
                                 # Add income source nodes
                                 for source in income_sources:
@@ -6221,6 +6399,15 @@ def deterministic_cashflow_tab():
 
                                 # Expense categories (right side)
                                 expense_categories = []
+
+                                # Taxes come first (critical expense)
+                                if year_data.get('taxes', 0) > 0:
+                                    expense_categories.append({
+                                        'name': '💸 Taxes',
+                                        'value': year_data['taxes'],
+                                        'color': 'rgba(52, 73, 94, 0.7)'  # Dark gray-blue
+                                    })
+
                                 if year_data['base_expenses'] > 0:
                                     expense_categories.append({
                                         'name': 'Family Living',
@@ -6300,6 +6487,8 @@ def deterministic_cashflow_tab():
                                         node_colors.append('#2ecc71')
                                     elif 'Social Security' in label:
                                         node_colors.append('#16a085')
+                                    elif 'Investment Returns' in label:
+                                        node_colors.append('#1abc9c')
                                     elif 'Total Income' in label:
                                         node_colors.append('#3498db')
                                     elif 'Savings' in label:
@@ -6341,14 +6530,41 @@ def deterministic_cashflow_tab():
                                 st.plotly_chart(sankey_fig, use_container_width=True)
 
                                 # Add summary below Sankey
+                                total_available = year_data['total_income'] + year_data.get('investment_income', 0)
                                 if cashflow_value >= 0:
-                                    st.success(f"💰 **Net Savings: ${cashflow_value:,.0f}** ({(cashflow_value/year_data['total_income']*100):.1f}% of income)")
+                                    # Include investment returns in the savings calculation
+                                    total_added_to_savings = cashflow_value + year_data.get('investment_income', 0)
+                                    st.success(f"💰 **Net Addition to Savings: ${total_added_to_savings:,.0f}** ({(total_added_to_savings/total_available*100):.1f}% of total available funds)")
+                                    if year_data.get('investment_income', 0) > 0:
+                                        st.info(f"📊 Breakdown: ${cashflow_value:,.0f} from earned income surplus + ${year_data['investment_income']:,.0f} from investments")
                                 else:
-                                    st.error(f"⚠️ **Deficit: ${abs(cashflow_value):,.0f}** (spending {(abs(cashflow_value)/year_data['total_income']*100):.1f}% more than income)")
+                                    st.error(f"⚠️ **Deficit: ${abs(cashflow_value):,.0f}** (spending {(abs(cashflow_value)/year_data['total_income']*100):.1f}% more than earned income)")
+                                    if year_data.get('investment_income', 0) > 0:
+                                        net_change = cashflow_value + year_data['investment_income']
+                                        if net_change >= 0:
+                                            st.warning(f"⚖️ Investment returns of ${year_data['investment_income']:,.0f} cover the deficit with ${net_change:,.0f} remaining")
+                                        else:
+                                            st.error(f"⚖️ Even with ${year_data['investment_income']:,.0f} investment returns, net change is ${net_change:,.0f}")
 
                                 # Detailed subcategory breakdowns
                                 st.markdown("---")
                                 st.markdown("#### 📋 Detailed Expense Breakdown - All Line Items")
+
+                                # Tax breakdown (show first - critical expense)
+                                if year_data.get('taxes', 0) > 0 and year_data.get('tax_breakdown'):
+                                    with st.expander("💸 Tax Details", expanded=True):
+                                        tax_breakdown = year_data['tax_breakdown']
+                                        tax_df = pd.DataFrame([
+                                            {'Tax Type': 'Federal Income Tax', 'Amount': f"${tax_breakdown['federal_income_tax']:,.0f}"},
+                                            {'Tax Type': 'State Income Tax', 'Amount': f"${tax_breakdown['state_tax']:,.0f}"},
+                                            {'Tax Type': 'FICA (Social Security + Medicare)', 'Amount': f"${tax_breakdown['fica_tax']:,.0f}"}
+                                        ])
+                                        st.dataframe(tax_df, hide_index=True, use_container_width=True)
+                                        st.markdown(f"**Total Taxes: ${tax_breakdown['total_taxes']:,.0f}**")
+
+                                        # Show effective tax rate
+                                        effective_rate = (tax_breakdown['total_taxes'] / year_data['total_income'] * 100) if year_data['total_income'] > 0 else 0
+                                        st.caption(f"Effective tax rate on earned income: {effective_rate:.1f}%")
 
                                 # Family Living Expenses breakdown
                                 if year_data['base_expenses'] > 0 and year_data.get('base_expenses_breakdown'):
