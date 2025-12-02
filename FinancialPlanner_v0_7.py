@@ -146,9 +146,132 @@ LOCATION_COORDINATES = {
 # [Keep all the CHILDREN_EXPENSE_TEMPLATES and FAMILY_EXPENSE_TEMPLATES from V14]
 # [I'll include the full templates but truncate here for readability]
 
+# Spending strategy constants
+STATISTICAL_STRATEGIES = ["Conservative (statistical)", "Average (statistical)", "High-end (statistical)"]
+STATISTICAL_STRATEGIES_LEGACY = ["Conservative", "Average", "High-end"]  # For backward compatibility
+
+# Helper functions for strategy management
+def get_available_strategies_for_location(location, template_type='family'):
+    """
+    Get all available strategies for a location (statistical + custom)
+
+    Args:
+        location: Location name
+        template_type: 'family' or 'children'
+
+    Returns:
+        List of strategy names (statistical + custom)
+    """
+    strategies = []
+
+    # Get base templates
+    if template_type == 'family':
+        base_templates = FAMILY_EXPENSE_TEMPLATES
+        custom_templates = st.session_state.get('custom_family_templates', {})
+    else:  # children
+        base_templates = CHILDREN_EXPENSE_TEMPLATES
+        custom_templates = st.session_state.get('custom_children_templates', {})
+
+    # Add statistical strategies if they exist for this location
+    if location in base_templates:
+        strategies.extend(STATISTICAL_STRATEGIES)
+
+    # Add custom strategies if they exist for this location
+    if location in custom_templates:
+        for strategy_name in custom_templates[location].keys():
+            if not strategy_name.endswith(' (custom)'):
+                # Add (custom) suffix if not already present
+                strategies.append(f"{strategy_name} (custom)")
+            else:
+                strategies.append(strategy_name)
+
+    return strategies
+
+def is_statistical_strategy(strategy_name):
+    """Check if a strategy is a statistical (built-in) strategy"""
+    return strategy_name in STATISTICAL_STRATEGIES or strategy_name in STATISTICAL_STRATEGIES_LEGACY
+
+def is_custom_strategy(strategy_name):
+    """Check if a strategy is a custom (user-defined) strategy"""
+    return strategy_name.endswith(' (custom)')
+
+def get_strategy_base_name(strategy_name):
+    """Get the base name of a strategy without (statistical) or (custom) suffix"""
+    if strategy_name.endswith(' (statistical)'):
+        return strategy_name[:-14]  # Remove ' (statistical)'
+    elif strategy_name.endswith(' (custom)'):
+        return strategy_name[:-9]  # Remove ' (custom)'
+    return strategy_name
+
+def normalize_strategy_name(strategy_name):
+    """
+    Normalize strategy name to the new format with suffix.
+    Handles backward compatibility with old names.
+    """
+    # If already has a suffix, return as is
+    if strategy_name.endswith(' (statistical)') or strategy_name.endswith(' (custom)'):
+        return strategy_name
+
+    # Convert legacy names to new format
+    if strategy_name in STATISTICAL_STRATEGIES_LEGACY:
+        idx = STATISTICAL_STRATEGIES_LEGACY.index(strategy_name)
+        return STATISTICAL_STRATEGIES[idx]
+
+    # Assume it's a custom strategy if not statistical
+    return f"{strategy_name} (custom)"
+
+def get_template_strategy_data(location, strategy_name, template_type='family'):
+    """
+    Get the template data for a specific location and strategy.
+    Handles both statistical and custom strategies with proper name normalization.
+
+    Args:
+        location: Location name
+        strategy_name: Strategy name (with or without suffix)
+        template_type: 'family' or 'children'
+
+    Returns:
+        Dictionary of template data, or None if not found
+    """
+    if template_type == 'family':
+        base_templates = FAMILY_EXPENSE_TEMPLATES
+        custom_templates = st.session_state.get('custom_family_templates', {})
+    else:  # children
+        base_templates = CHILDREN_EXPENSE_TEMPLATES
+        custom_templates = st.session_state.get('custom_children_templates', {})
+
+    # Try to get from base templates first (statistical)
+    if location in base_templates:
+        # Try with current name
+        if strategy_name in base_templates[location]:
+            return base_templates[location][strategy_name].copy()
+
+        # Try legacy name
+        base_name = get_strategy_base_name(strategy_name)
+        if base_name in base_templates[location]:
+            return base_templates[location][base_name].copy()
+
+        # Try with (statistical) suffix
+        statistical_name = f"{base_name} (statistical)"
+        if statistical_name in base_templates[location]:
+            return base_templates[location][statistical_name].copy()
+
+    # Try custom templates
+    if location in custom_templates:
+        # Try with current name
+        if strategy_name in custom_templates[location]:
+            return custom_templates[location][strategy_name].copy()
+
+        # Try without suffix
+        base_name = get_strategy_base_name(strategy_name)
+        if base_name in custom_templates[location]:
+            return custom_templates[location][base_name].copy()
+
+    return None
+
 CHILDREN_EXPENSE_TEMPLATES = {
     "Sacramento": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food': [1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200,
                      4400, 4600, 2000, 1800, 1600, 1400, 1200, 1000, 800, 600, 400, 200, 100, 50, 0],
             'Clothing': [400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1200, 1400, 1600, 1800, 2000,
@@ -174,7 +297,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28000, 28000, 28000, 28000, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "Average": {
+        "Average (statistical)": {
             'Food': [1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400, 4600,
                      4800, 5000, 2400, 2200, 2000, 1800, 1600, 1400, 1200, 1000, 800, 600, 400, 200, 0],
             'Clothing': [600, 650, 700, 750, 800, 850, 900, 950, 1000, 1050, 1100, 1150, 1200, 1400, 1600, 1800, 2000,
@@ -200,7 +323,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35000, 35000, 35000, 35000, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food': [2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400, 4600, 4800, 5000, 5200,
                      5400, 5600, 3200, 3000, 2800, 2600, 2400, 2200, 2000, 1800, 1600, 1400, 1200, 1000, 500],
             'Clothing': [1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2500, 2800, 3100,
@@ -229,7 +352,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
         }
     },
     "Seattle": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food': [1100, 1300, 1500, 1700, 1900, 2100, 2300, 2500, 2700, 2900, 3100, 3300, 3500, 3700, 3900, 4100,
                      4300, 4500, 1900, 1700, 1500, 1300, 1100, 900, 700, 500, 300, 100, 50, 25, 0],
             'Clothing': [350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1100, 1300, 1500, 1700, 1900,
@@ -255,7 +378,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22000, 22000, 22000, 22000, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "Average": {
+        "Average (statistical)": {
             'Food': [1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400,
                      4600, 4800, 2200, 2000, 1800, 1600, 1400, 1200, 1000, 800, 600, 400, 200, 100, 0],
             'Clothing': [500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1050, 1100, 1300, 1500, 1700, 1900,
@@ -281,7 +404,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28000, 28000, 28000, 28000, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food': [2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400, 4600, 4800, 5000,
                      5200, 5400, 2800, 2600, 2400, 2200, 2000, 1800, 1600, 1400, 1200, 1000, 800, 600, 300],
             'Clothing': [800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2200, 2400, 2600,
@@ -309,7 +432,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
         }
     },
     "Houston": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food': [1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000,
                      4200, 4400, 1800, 1600, 1400, 1200, 1000, 800, 600, 400, 200, 100, 50, 25, 0],
             'Clothing': [300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 1000, 1200, 1400, 1600, 1800,
@@ -335,7 +458,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18000, 18000, 18000, 18000, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "Average": {
+        "Average (statistical)": {
             'Food': [1300, 1500, 1700, 1900, 2100, 2300, 2500, 2700, 2900, 3100, 3300, 3500, 3700, 3900, 4100, 4300,
                      4500, 4700, 2100, 1900, 1700, 1500, 1300, 1100, 900, 700, 500, 300, 200, 100, 0],
             'Clothing': [450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1050, 1200, 1400, 1600, 1800,
@@ -361,7 +484,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25000, 25000, 25000, 25000, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food': [1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400, 4600, 4800,
                      5000, 5200, 2600, 2400, 2200, 2000, 1800, 1600, 1400, 1200, 1000, 800, 600, 400, 200],
             'Clothing': [750, 825, 900, 975, 1050, 1125, 1200, 1275, 1350, 1425, 1500, 1575, 1650, 1875, 2100, 2325,
@@ -390,7 +513,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
     },
     # US Cities
     "New York": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food': [1560, 1820, 2080, 2340, 2600, 2860, 3120, 3380, 3640, 3900, 4160, 4420, 4680, 4940, 5200, 5460,
                      5720, 5980, 2600, 2340, 2080, 1820, 1560, 1300, 1040, 780, 520, 260, 130, 65, 0],
             'Clothing': [520, 585, 650, 715, 780, 845, 910, 975, 1040, 1105, 1170, 1235, 1300, 1560, 1820, 2080, 2340, 2600,
@@ -416,7 +539,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36400, 36400, 36400, 36400, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "Average": {
+        "Average (statistical)": {
             'Food': [2080, 2340, 2600, 2860, 3120, 3380, 3640, 3900, 4160, 4420, 4680, 4940, 5200, 5460, 5720, 5980,
                      6240, 6500, 3120, 2860, 2600, 2340, 2080, 1820, 1560, 1300, 1040, 780, 520, 260, 0],
             'Clothing': [780, 845, 910, 975, 1040, 1105, 1170, 1235, 1300, 1365, 1430, 1495, 1560, 1820, 2080, 2340, 2600,
@@ -442,7 +565,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 45500, 45500, 45500, 45500, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food': [2860, 3120, 3380, 3640, 3900, 4160, 4420, 4680, 4940, 5200, 5460, 5720, 5980, 6240, 6500, 6760,
                      7020, 7280, 4160, 3900, 3640, 3380, 3120, 2860, 2600, 2340, 2080, 1820, 1560, 1300, 650],
             'Clothing': [1300, 1430, 1560, 1690, 1820, 1950, 2080, 2210, 2340, 2470, 2600, 2730, 2860, 3250, 3640, 4030,
@@ -470,7 +593,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
         }
     },
     "San Francisco": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food': [1380, 1610, 1840, 2070, 2300, 2530, 2760, 2990, 3220, 3450, 3680, 3910, 4140, 4370, 4600, 4830,
                      5060, 5290, 2300, 2070, 1840, 1610, 1380, 1150, 920, 690, 460, 230, 115, 57, 0],
             'Clothing': [460, 517, 575, 632, 690, 747, 805, 862, 920, 977, 1035, 1092, 1150, 1380, 1610, 1840, 2070, 2300,
@@ -496,7 +619,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32200, 32200, 32200, 32200, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "Average": {
+        "Average (statistical)": {
             'Food': [1840, 2070, 2300, 2530, 2760, 2990, 3220, 3450, 3680, 3910, 4140, 4370, 4600, 4830, 5060, 5290,
                      5520, 5750, 2760, 2530, 2300, 2070, 1840, 1610, 1380, 1150, 920, 690, 460, 230, 0],
             'Clothing': [690, 747, 805, 862, 920, 977, 1035, 1092, 1150, 1207, 1265, 1322, 1380, 1610, 1840, 2070, 2300,
@@ -522,7 +645,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40250, 40250, 40250, 40250, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food': [2530, 2760, 2990, 3220, 3450, 3680, 3910, 4140, 4370, 4600, 4830, 5060, 5290, 5520, 5750, 5980,
                      6210, 6440, 3680, 3450, 3220, 2990, 2760, 2530, 2300, 2070, 1840, 1610, 1380, 1150, 575],
             'Clothing': [1150, 1265, 1380, 1495, 1610, 1725, 1840, 1955, 2070, 2185, 2300, 2415, 2530, 2875, 3220, 3565,
@@ -550,7 +673,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
         }
     },
     "Los Angeles": {  # Similar to California but slightly less expensive
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food': [1140, 1330, 1520, 1710, 1900, 2090, 2280, 2470, 2660, 2850, 3040, 3230, 3420, 3610, 3800, 3990,
                      4180, 4370, 1900, 1710, 1520, 1330, 1140, 950, 760, 570, 380, 190, 95, 47, 0],
             'Clothing': [380, 427, 475, 522, 570, 617, 665, 712, 760, 807, 855, 902, 950, 1140, 1330, 1520, 1710, 1900,
@@ -576,7 +699,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 26600, 26600, 26600, 26600, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "Average": {
+        "Average (statistical)": {
             'Food': [1520, 1710, 1900, 2090, 2280, 2470, 2660, 2850, 3040, 3230, 3420, 3610, 3800, 3990, 4180, 4370,
                      4560, 4750, 2280, 2090, 1900, 1710, 1520, 1330, 1140, 950, 760, 570, 380, 190, 0],
             'Clothing': [570, 617, 665, 712, 760, 807, 855, 902, 950, 997, 1045, 1092, 1140, 1330, 1520, 1710, 1900,
@@ -602,7 +725,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33250, 33250, 33250, 33250, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food': [2090, 2280, 2470, 2660, 2850, 3040, 3230, 3420, 3610, 3800, 3990, 4180, 4370, 4560, 4750, 4940,
                      5130, 5320, 3040, 2850, 2660, 2470, 2280, 2090, 1900, 1710, 1520, 1330, 1140, 950, 475],
             'Clothing': [950, 1045, 1140, 1235, 1330, 1425, 1520, 1615, 1710, 1805, 1900, 1995, 2090, 2375, 2660, 2945,
@@ -630,7 +753,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
         }
     },
     "Portland": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food': [1020, 1190, 1360, 1530, 1700, 1870, 2040, 2210, 2380, 2550, 2720, 2890, 3060, 3230, 3400, 3570,
                      3740, 3910, 1700, 1530, 1360, 1190, 1020, 850, 680, 510, 340, 170, 85, 42, 0],
             'Clothing': [340, 382, 425, 467, 510, 552, 595, 637, 680, 722, 765, 807, 850, 1020, 1190, 1360, 1530, 1700,
@@ -656,7 +779,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23800, 23800, 23800, 23800, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "Average": {
+        "Average (statistical)": {
             'Food': [1360, 1530, 1700, 1870, 2040, 2210, 2380, 2550, 2720, 2890, 3060, 3230, 3400, 3570, 3740, 3910,
                      4080, 4250, 2040, 1870, 1700, 1530, 1360, 1190, 1020, 850, 680, 510, 340, 170, 0],
             'Clothing': [510, 552, 595, 637, 680, 722, 765, 807, 850, 892, 935, 977, 1020, 1190, 1360, 1530, 1700,
@@ -682,7 +805,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29750, 29750, 29750, 29750, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food': [1870, 2040, 2210, 2380, 2550, 2720, 2890, 3060, 3230, 3400, 3570, 3740, 3910, 4080, 4250, 4420,
                      4590, 4760, 2720, 2550, 2380, 2210, 2040, 1870, 1700, 1530, 1360, 1190, 1020, 850, 425],
             'Clothing': [850, 935, 1020, 1105, 1190, 1275, 1360, 1445, 1530, 1615, 1700, 1785, 1870, 2125, 2380, 2635,
@@ -710,7 +833,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
         }
     },
     "Auckland": {  # New Zealand's largest city, high cost of living
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food': [1150, 1340, 1530, 1720, 1910, 2100, 2290, 2480, 2670, 2860, 3050, 3240, 3430, 3620, 3810, 4000,
                      4190, 4380, 1910, 1720, 1530, 1340, 1150, 960, 770, 580, 390, 200, 100, 50, 0],
             'Clothing': [380, 430, 480, 530, 580, 630, 680, 730, 780, 830, 880, 930, 980, 1150, 1340, 1530, 1720, 1910,
@@ -736,7 +859,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24000, 24000, 24000, 24000, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "Average": {
+        "Average (statistical)": {
             'Food': [1530, 1720, 1910, 2100, 2290, 2480, 2670, 2860, 3050, 3240, 3430, 3620, 3810, 4000, 4190, 4380,
                      4570, 4760, 2290, 2100, 1910, 1720, 1530, 1340, 1150, 960, 770, 580, 390, 200, 0],
             'Clothing': [540, 590, 640, 690, 740, 790, 840, 890, 940, 990, 1040, 1090, 1140, 1340, 1530, 1720, 1910,
@@ -762,7 +885,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30000, 30000, 30000, 30000, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food': [2100, 2290, 2480, 2670, 2860, 3050, 3240, 3430, 3620, 3810, 4000, 4190, 4380, 4570, 4760, 4950,
                      5140, 5330, 2860, 2670, 2480, 2290, 2100, 1910, 1720, 1530, 1340, 1150, 960, 770, 385],
             'Clothing': [900, 990, 1080, 1170, 1260, 1350, 1440, 1530, 1620, 1710, 1800, 1890, 1980, 2290, 2600, 2910,
@@ -790,7 +913,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
         }
     },
     "Wellington": {  # New Zealand's capital, medium-high cost of living
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food': [1050, 1230, 1410, 1590, 1770, 1950, 2130, 2310, 2490, 2670, 2850, 3030, 3210, 3390, 3570, 3750,
                      3930, 4110, 1770, 1590, 1410, 1230, 1050, 870, 690, 510, 330, 150, 75, 40, 0],
             'Clothing': [350, 395, 440, 485, 530, 575, 620, 665, 710, 755, 800, 845, 890, 1050, 1230, 1410, 1590, 1770,
@@ -816,7 +939,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22000, 22000, 22000, 22000, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "Average": {
+        "Average (statistical)": {
             'Food': [1410, 1590, 1770, 1950, 2130, 2310, 2490, 2670, 2850, 3030, 3210, 3390, 3570, 3750, 3930, 4110,
                      4290, 4470, 2130, 1950, 1770, 1590, 1410, 1230, 1050, 870, 690, 510, 330, 150, 0],
             'Clothing': [495, 540, 585, 630, 675, 720, 765, 810, 855, 900, 945, 990, 1035, 1230, 1410, 1590, 1770,
@@ -842,7 +965,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
             'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27500, 27500, 27500, 27500, 0, 0, 0, 0,
                           0, 0, 0, 0, 0]
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food': [1950, 2130, 2310, 2490, 2670, 2850, 3030, 3210, 3390, 3570, 3750, 3930, 4110, 4290, 4470, 4650,
                      4830, 5010, 2670, 2490, 2310, 2130, 1950, 1770, 1590, 1410, 1230, 1050, 870, 690, 345],
             'Clothing': [825, 907, 990, 1072, 1155, 1237, 1320, 1402, 1485, 1567, 1650, 1732, 1815, 2070, 2325, 2580,
@@ -873,7 +996,7 @@ CHILDREN_EXPENSE_TEMPLATES = {
 
 FAMILY_EXPENSE_TEMPLATES = {
     "California": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food & Groceries': 14400,
             'Clothing': 3600,
             'Transportation': 10000,
@@ -884,7 +1007,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 600,  # Streaming services, music, etc. (~$50/mo)
             'Other Expenses': 1200
         },
-        "Average": {
+        "Average (statistical)": {
             'Food & Groceries': 18000,
             'Clothing': 4800,
             'Transportation': 13000,
@@ -895,7 +1018,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 1200,  # Streaming services, music, etc. (~$100/mo)
             'Other Expenses': 1800
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food & Groceries': 24000,
             'Clothing': 7200,
             'Transportation': 18000,
@@ -908,7 +1031,7 @@ FAMILY_EXPENSE_TEMPLATES = {
         }
     },
     "Seattle": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food & Groceries': 13200,
             'Clothing': 3000,
             'Transportation': 9000,
@@ -919,7 +1042,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 540,
             'Other Expenses': 1080
         },
-        "Average": {
+        "Average (statistical)": {
             'Food & Groceries': 16800,
             'Clothing': 4200,
             'Transportation': 12000,
@@ -930,7 +1053,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 1170,
             'Other Expenses': 1170
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food & Groceries': 22800,
             'Clothing': 6600,
             'Transportation': 16800,
@@ -943,7 +1066,7 @@ FAMILY_EXPENSE_TEMPLATES = {
         }
     },
     "Houston": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food & Groceries': 12600,
             'Clothing': 2800,
             'Transportation': 8400,
@@ -954,7 +1077,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 510,
             'Other Expenses': 1020
         },
-        "Average": {
+        "Average (statistical)": {
             'Food & Groceries': 15600,
             'Clothing': 3900,
             'Transportation': 11400,
@@ -965,7 +1088,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 1080,
             'Other Expenses': 1080
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food & Groceries': 21000,
             'Clothing': 6000,
             'Transportation': 15600,
@@ -979,7 +1102,7 @@ FAMILY_EXPENSE_TEMPLATES = {
     },
     # Major US Cities
     "New York": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food & Groceries': 18720,  # 30% higher than CA
             'Clothing': 4680,
             'Transportation': 13000,
@@ -990,7 +1113,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 780,
             'Other Expenses': 1560
         },
-        "Average": {
+        "Average (statistical)": {
             'Food & Groceries': 23400,
             'Clothing': 6240,
             'Transportation': 16900,
@@ -1001,7 +1124,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 1638,
             'Other Expenses': 1638
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food & Groceries': 31200,
             'Clothing': 9360,
             'Transportation': 23400,
@@ -1014,7 +1137,7 @@ FAMILY_EXPENSE_TEMPLATES = {
         }
     },
     "San Francisco": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food & Groceries': 16560,  # 15% higher than CA
             'Clothing': 4140,
             'Transportation': 11500,
@@ -1025,7 +1148,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 690,
             'Other Expenses': 1380
         },
-        "Average": {
+        "Average (statistical)": {
             'Food & Groceries': 20700,
             'Clothing': 5520,
             'Transportation': 14950,
@@ -1036,7 +1159,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 1449,
             'Other Expenses': 1449
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food & Groceries': 27600,
             'Clothing': 8280,
             'Transportation': 20700,
@@ -1049,7 +1172,7 @@ FAMILY_EXPENSE_TEMPLATES = {
         }
     },
     "Los Angeles": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food & Groceries': 13680,  # 5% lower than CA
             'Clothing': 3420,
             'Transportation': 9500,
@@ -1060,7 +1183,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 570,
             'Other Expenses': 1140
         },
-        "Average": {
+        "Average (statistical)": {
             'Food & Groceries': 17100,
             'Clothing': 4560,
             'Transportation': 12350,
@@ -1071,7 +1194,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 1197,
             'Other Expenses': 1197
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food & Groceries': 22800,
             'Clothing': 6840,
             'Transportation': 17100,
@@ -1084,7 +1207,7 @@ FAMILY_EXPENSE_TEMPLATES = {
         }
     },
     "Portland": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food & Groceries': 12240,  # 15% lower than CA
             'Clothing': 3060,
             'Transportation': 8500,
@@ -1095,7 +1218,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 510,
             'Other Expenses': 1020
         },
-        "Average": {
+        "Average (statistical)": {
             'Food & Groceries': 15300,
             'Clothing': 4080,
             'Transportation': 11050,
@@ -1106,7 +1229,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 1071,
             'Other Expenses': 1071
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food & Groceries': 20400,
             'Clothing': 6120,
             'Transportation': 15300,
@@ -1123,7 +1246,7 @@ FAMILY_EXPENSE_TEMPLATES = {
     # For European cities (EUR), multiply by ~0.92 for EUR
     # For Australian cities (AUD), multiply by ~1.52 for AUD
     "Toronto": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food & Groceries': 12960,  # 10% lower than CA
             'Clothing': 3240,
             'Transportation': 9000,
@@ -1134,7 +1257,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 540,
             'Other Expenses': 1080
         },
-        "Average": {
+        "Average (statistical)": {
             'Food & Groceries': 16200,
             'Clothing': 4320,
             'Transportation': 11700,
@@ -1145,7 +1268,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 1134,
             'Other Expenses': 1134
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food & Groceries': 21600,
             'Clothing': 6480,
             'Transportation': 16200,
@@ -1158,7 +1281,7 @@ FAMILY_EXPENSE_TEMPLATES = {
         }
     },
     "Vancouver": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food & Groceries': 13680,  # 5% lower than CA
             'Clothing': 3420,
             'Transportation': 9500,
@@ -1169,7 +1292,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 570,
             'Other Expenses': 1140
         },
-        "Average": {
+        "Average (statistical)": {
             'Food & Groceries': 17100,
             'Clothing': 4560,
             'Transportation': 12350,
@@ -1180,7 +1303,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 1197,
             'Other Expenses': 1197
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food & Groceries': 22800,
             'Clothing': 6840,
             'Transportation': 17100,
@@ -1193,7 +1316,7 @@ FAMILY_EXPENSE_TEMPLATES = {
         }
     },
     "Paris": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food & Groceries': 10800,  # 25% lower than CA
             'Clothing': 2700,
             'Transportation': 7500,
@@ -1204,7 +1327,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 450,
             'Other Expenses': 900
         },
-        "Average": {
+        "Average (statistical)": {
             'Food & Groceries': 13500,
             'Clothing': 3600,
             'Transportation': 9750,
@@ -1215,7 +1338,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 945,
             'Other Expenses': 945
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food & Groceries': 18000,
             'Clothing': 5400,
             'Transportation': 13500,
@@ -1228,7 +1351,7 @@ FAMILY_EXPENSE_TEMPLATES = {
         }
     },
     "Toulouse": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food & Groceries': 9360,  # 35% lower than CA
             'Clothing': 2340,
             'Transportation': 6500,
@@ -1239,7 +1362,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 390,
             'Other Expenses': 780
         },
-        "Average": {
+        "Average (statistical)": {
             'Food & Groceries': 11700,
             'Clothing': 3120,
             'Transportation': 8450,
@@ -1250,7 +1373,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 819,
             'Other Expenses': 819
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food & Groceries': 15600,
             'Clothing': 4680,
             'Transportation': 11700,
@@ -1263,7 +1386,7 @@ FAMILY_EXPENSE_TEMPLATES = {
         }
     },
     "Berlin": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food & Groceries': 10080,  # 30% lower than CA
             'Clothing': 2520,
             'Transportation': 7000,
@@ -1274,7 +1397,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 420,
             'Other Expenses': 840
         },
-        "Average": {
+        "Average (statistical)": {
             'Food & Groceries': 12600,
             'Clothing': 3360,
             'Transportation': 9100,
@@ -1285,7 +1408,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 882,
             'Other Expenses': 882
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food & Groceries': 16800,
             'Clothing': 5040,
             'Transportation': 12600,
@@ -1298,7 +1421,7 @@ FAMILY_EXPENSE_TEMPLATES = {
         }
     },
     "Munich": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food & Groceries': 12960,  # 10% lower than CA
             'Clothing': 3240,
             'Transportation': 9000,
@@ -1309,7 +1432,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 540,
             'Other Expenses': 1080
         },
-        "Average": {
+        "Average (statistical)": {
             'Food & Groceries': 16200,
             'Clothing': 4320,
             'Transportation': 11700,
@@ -1320,7 +1443,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 1134,
             'Other Expenses': 1134
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food & Groceries': 21600,
             'Clothing': 6480,
             'Transportation': 16200,
@@ -1333,7 +1456,7 @@ FAMILY_EXPENSE_TEMPLATES = {
         }
     },
     "Sydney": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food & Groceries': 15840,  # 10% higher than CA
             'Clothing': 3960,
             'Transportation': 11000,
@@ -1344,7 +1467,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 660,
             'Other Expenses': 1320
         },
-        "Average": {
+        "Average (statistical)": {
             'Food & Groceries': 19800,
             'Clothing': 5280,
             'Transportation': 14300,
@@ -1355,7 +1478,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 1386,
             'Other Expenses': 1386
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food & Groceries': 26400,
             'Clothing': 7920,
             'Transportation': 19800,
@@ -1368,7 +1491,7 @@ FAMILY_EXPENSE_TEMPLATES = {
         }
     },
     "Melbourne": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food & Groceries': 13680,  # 5% lower than CA
             'Clothing': 3420,
             'Transportation': 9500,
@@ -1379,7 +1502,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 570,
             'Other Expenses': 1140
         },
-        "Average": {
+        "Average (statistical)": {
             'Food & Groceries': 17100,
             'Clothing': 4560,
             'Transportation': 12350,
@@ -1390,7 +1513,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 1197,
             'Other Expenses': 1197
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food & Groceries': 22800,
             'Clothing': 6840,
             'Transportation': 17100,
@@ -1403,7 +1526,7 @@ FAMILY_EXPENSE_TEMPLATES = {
         }
     },
     "Brisbane": {
-        "Conservative": {
+        "Conservative (statistical)": {
             'Food & Groceries': 12240,  # 15% lower than CA
             'Clothing': 3060,
             'Transportation': 8500,
@@ -1414,7 +1537,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 510,
             'Other Expenses': 1020
         },
-        "Average": {
+        "Average (statistical)": {
             'Food & Groceries': 15300,
             'Clothing': 4080,
             'Transportation': 11050,
@@ -1425,7 +1548,7 @@ FAMILY_EXPENSE_TEMPLATES = {
             'Subscriptions': 1071,
             'Other Expenses': 1071
         },
-        "High-end": {
+        "High-end (statistical)": {
             'Food & Groceries': 20400,
             'Clothing': 6120,
             'Transportation': 15300,
@@ -3176,8 +3299,22 @@ def initialize_session_state():
         # NEW: Custom children templates
         st.session_state.custom_children_templates = {}
 
-        # NEW: Custom family expense templates
-        st.session_state.custom_family_templates = {}
+        # NEW: Custom family expense templates with pre-populated Filipp&Erin strategy
+        st.session_state.custom_family_templates = {
+            "Sacramento": {
+                "Filipp&Erin Spending (custom)": {
+                    'Food & Groceries': 21000,  # Between Average (18k) and High-end (24k)
+                    'Clothing': 6000,  # Between Average (4.8k) and High-end (7.2k)
+                    'Transportation': 15500,  # Between Average (13k) and High-end (18k)
+                    'Entertainment & Activities': 7500,  # Between Average (6k) and High-end (9k)
+                    'Personal Care': 3600,  # Between Average (3k) and High-end (4.2k)
+                    'Utilities': 3000,  # Between Average (2.4k) and High-end (3.6k)
+                    'Internet & Phone': 2200,  # Between Average (1.8k) and High-end (2.6k)
+                    'Subscriptions': 900,  # Between Average (0.6k) and High-end (1.2k)
+                    'Other Expenses': 1800  # Between Average (1.2k) and High-end (2.4k)
+                }
+            }
+        }
 
         # NEW: Custom location display names (for user-created cities)
         st.session_state.custom_location_display_names = {}
@@ -3207,17 +3344,18 @@ def initialize_session_state():
 def get_state_for_year(year: int) -> tuple:
     """Get the state and spending strategy for a given year"""
     if not st.session_state.state_timeline:
-        return "Seattle", "Average"
+        return "Seattle", "Average (statistical)"
 
     sorted_timeline = sorted(st.session_state.state_timeline, key=lambda x: x.year)
 
     current_state = "Seattle"
-    current_strategy = "Average"
+    current_strategy = "Average (statistical)"
 
     for entry in sorted_timeline:
         if entry.year <= year:
             current_state = entry.state
-            current_strategy = entry.spending_strategy
+            # Normalize the strategy name for backward compatibility
+            current_strategy = normalize_strategy_name(entry.spending_strategy)
         else:
             break
 
@@ -3238,8 +3376,11 @@ def get_state_based_family_expenses(year: int) -> dict:
     """Get family expenses based on the state for a given year"""
     state, strategy = get_state_for_year(year)
 
-    if state in FAMILY_EXPENSE_TEMPLATES and strategy in FAMILY_EXPENSE_TEMPLATES[state]:
-        return FAMILY_EXPENSE_TEMPLATES[state][strategy].copy()
+    # Use the helper function to get template data (handles both statistical and custom)
+    template_data = get_template_strategy_data(state, strategy, 'family')
+
+    if template_data:
+        return template_data
     else:
         return st.session_state.expenses.copy()
 
@@ -3248,11 +3389,10 @@ def get_state_based_children_expenses(year: int, child_age: int) -> dict:
     """Get children expenses for a specific age based on the state for a given year"""
     state, strategy = get_state_for_year(year)
 
-    if (state in CHILDREN_EXPENSE_TEMPLATES and
-            strategy in CHILDREN_EXPENSE_TEMPLATES[state] and
-            0 <= child_age < len(CHILDREN_EXPENSE_TEMPLATES[state][strategy]['Food'])):
+    # Use the helper function to get template data (handles both statistical and custom)
+    template = get_template_strategy_data(state, strategy, 'children')
 
-        template = CHILDREN_EXPENSE_TEMPLATES[state][strategy]
+    if template and 0 <= child_age < len(template.get('Food', [])):
         child_expenses = {}
 
         for category, values in template.items():
@@ -3302,15 +3442,13 @@ def get_child_expenses(child: dict, year: int, current_year: int) -> dict:
         location = child.get('template_state', 'Seattle')
         lives_at_college = False
 
-    strategy = child.get('template_strategy', 'Average')
+    strategy = normalize_strategy_name(child.get('template_strategy', 'Average'))
     school_type = child.get('school_type', 'Public')
 
-    # Get base expenses from template
-    if (location in CHILDREN_EXPENSE_TEMPLATES and
-            strategy in CHILDREN_EXPENSE_TEMPLATES[location] and
-            0 <= child_age < len(CHILDREN_EXPENSE_TEMPLATES[location][strategy]['Food'])):
+    # Get base expenses from template using helper function
+    template = get_template_strategy_data(location, strategy, 'children')
 
-        template = CHILDREN_EXPENSE_TEMPLATES[location][strategy]
+    if template and 0 <= child_age < len(template.get('Food', [])):
         child_expenses = {}
 
         for category, values in template.items():
@@ -3592,7 +3730,8 @@ def main():
         ("📈 Economy", economy_tab, True),
         ("🖼️ Retirement", retirement_tab, True),
         ("🏥 Healthcare & Insurance", healthcare_insurance_tab, st.session_state.get('show_healthcare', False)),
-        ("📊 Analysis & Cashflow", combined_analysis_cashflow_tab, True),
+        ("💰 Deterministic Cashflow", deterministic_cashflow_tab, True),
+        ("🎲 Monte Carlo Simulation", monte_carlo_simulation_tab, True),
         ("🧪 Stress Test", stress_test_tab, True),
         ("📄 Export Reports", report_export_tab, st.session_state.get('show_export', True)),
         ("💾 Save/Load", save_load_tab, True)
@@ -4210,35 +4349,57 @@ def family_expenses_tab():
                 key="new_city_location",
                 help="Enter a new city/location name to save this template under"
             )
-            new_strategy_name = st.text_input(
+            # Get base name without suffix for input
+            base_strategy = get_strategy_base_name(edit_strategy)
+            new_strategy_base = st.text_input(
                 "Strategy Name:",
-                value=edit_strategy,
-                key="new_strategy_name_city"
+                value=base_strategy,
+                key="new_strategy_name_city",
+                help="Custom strategy name (without suffix). Will be saved with '(custom)' suffix."
             )
+            new_strategy_name = f"{new_strategy_base} (custom)"
             save_location = new_city_location
         elif save_as_new:
-            new_strategy_name = st.text_input(
+            # Get base name without suffix for input
+            base_strategy = get_strategy_base_name(edit_strategy)
+            new_strategy_base = st.text_input(
                 "New Strategy Name:",
-                value=f"{edit_strategy} (Modified)",
-                key="new_strategy_name"
+                value=base_strategy,
+                key="new_strategy_name",
+                help="Custom strategy name (without suffix). Will be saved with '(custom)' suffix."
             )
+            new_strategy_name = f"{new_strategy_base} (custom)"
             save_location = edit_location
         else:
-            new_strategy_name = edit_strategy
-            save_location = edit_location
+            # Check if trying to overwrite a statistical strategy
+            if is_statistical_strategy(edit_strategy):
+                st.error("❌ Cannot overwrite statistical (built-in) strategies. Please check 'Save as new strategy' to create a custom version.")
+                new_strategy_name = None
+                save_location = None
+            elif is_custom_strategy(edit_strategy):
+                # Can overwrite custom strategies
+                new_strategy_name = edit_strategy
+                save_location = edit_location
+            else:
+                # Legacy strategy name - save as custom
+                new_strategy_name = f"{edit_strategy} (custom)"
+                save_location = edit_location
 
-        col_save1, col_save2 = st.columns([3, 1])
+        col_save1, col_save2, col_save3 = st.columns([2, 1, 1])
 
         with col_save1:
             if save_as_new_city:
                 st.info(f"Will save as new city: **{new_city_location} - {new_strategy_name}**")
             elif save_as_new:
                 st.info(f"Will save as: **{get_location_display_name(edit_location)} - {new_strategy_name}**")
-            else:
-                st.warning(f"⚠️ Will overwrite: **{get_location_display_name(edit_location)} - {edit_strategy}** (saved as custom template)")
+            elif new_strategy_name:
+                if is_custom_strategy(edit_strategy):
+                    st.warning(f"⚠️ Will overwrite: **{get_location_display_name(edit_location)} - {edit_strategy}**")
+                else:
+                    st.warning(f"⚠️ Will save as custom template: **{get_location_display_name(edit_location)} - {new_strategy_name}**")
 
         with col_save2:
-            if st.button("💾 Save Template", type="primary", key="save_edited_template"):
+            if new_strategy_name and st.button("💾 Save Template", type="primary", key="save_edited_template"):
                 # Initialize location if needed
                 if save_location not in st.session_state.custom_family_templates:
                     st.session_state.custom_family_templates[save_location] = {}
@@ -4248,6 +4409,46 @@ def family_expenses_tab():
 
                 st.success(f"✅ Saved template: {save_location} - {new_strategy_name}")
                 st.rerun()
+
+        with col_save3:
+            # Delete button for custom strategies only
+            if is_custom_strategy(edit_strategy):
+                if st.button("🗑️ Delete", type="secondary", key="delete_strategy_btn"):
+                    st.session_state['confirm_delete_strategy'] = {
+                        'location': edit_location,
+                        'strategy': edit_strategy
+                    }
+                    st.rerun()
+
+        # Confirmation dialog for deletion
+        if 'confirm_delete_strategy' in st.session_state:
+            st.markdown("---")
+            st.warning(f"⚠️ **Confirm Deletion**")
+            st.write(f"Are you sure you want to delete the strategy **'{st.session_state.confirm_delete_strategy['strategy']}'** for **{st.session_state.confirm_delete_strategy['location']}**?")
+            st.write("This action cannot be undone.")
+
+            col_confirm1, col_confirm2, col_confirm3 = st.columns([1, 1, 2])
+            with col_confirm1:
+                if st.button("✅ Yes, Delete", type="primary", key="confirm_delete_yes"):
+                    loc = st.session_state.confirm_delete_strategy['location']
+                    strat = st.session_state.confirm_delete_strategy['strategy']
+
+                    if loc in st.session_state.custom_family_templates:
+                        if strat in st.session_state.custom_family_templates[loc]:
+                            del st.session_state.custom_family_templates[loc][strat]
+                            st.success(f"✅ Deleted strategy: {strat}")
+
+                            # Clean up empty locations
+                            if not st.session_state.custom_family_templates[loc]:
+                                del st.session_state.custom_family_templates[loc]
+
+                    del st.session_state['confirm_delete_strategy']
+                    st.rerun()
+
+            with col_confirm2:
+                if st.button("❌ Cancel", key="confirm_delete_no"):
+                    del st.session_state['confirm_delete_strategy']
+                    st.rerun()
 
     # TAB 3: Create Custom City
     with expense_tab3:
@@ -4662,10 +4863,15 @@ def children_tab():
                             index=AVAILABLE_LOCATIONS_CHILDREN.index(child.get('template_state', 'Seattle')) if child.get('template_state', 'Seattle') in AVAILABLE_LOCATIONS_CHILDREN else 1,
                             key=f"child_state_{idx}"
                         )
+                        # Get available strategies for this location
+                        available_child_strategies = get_available_strategies_for_location(child.get('template_state', 'Seattle'), 'children')
+                        # Normalize the stored strategy name to handle backward compatibility
+                        current_strategy = normalize_strategy_name(child.get('template_strategy', 'Average'))
+                        default_idx = available_child_strategies.index(current_strategy) if current_strategy in available_child_strategies else 1
                         child['template_strategy'] = st.selectbox(
                             "Spending Level",
-                            ["Conservative", "Average", "High-end"],
-                            index=["Conservative", "Average", "High-end"].index(child.get('template_strategy', 'Average')),
+                            available_child_strategies,
+                            index=default_idx,
                             key=f"child_strategy_{idx}"
                         )
 
@@ -4716,7 +4922,8 @@ def children_tab():
     with col1:
         preview_state = st.selectbox("Preview Location", AVAILABLE_LOCATIONS_CHILDREN, key="preview_state")
     with col2:
-        preview_strategy = st.selectbox("Preview Strategy", ["Conservative", "Average", "High-end"], key="preview_strategy")
+        preview_available_strategies = get_available_strategies_for_location(preview_state, 'children')
+        preview_strategy = st.selectbox("Preview Strategy", preview_available_strategies, key="preview_strategy")
 
     col3, col4 = st.columns(2)
     with col3:
@@ -4734,8 +4941,10 @@ def children_tab():
             help="Private colleges typically cost 2-3x more than public colleges"
         )
 
-    if preview_state in CHILDREN_EXPENSE_TEMPLATES and preview_strategy in CHILDREN_EXPENSE_TEMPLATES[preview_state]:
-        template = CHILDREN_EXPENSE_TEMPLATES[preview_state][preview_strategy].copy()
+    # Use helper function to get template data
+    template = get_template_strategy_data(preview_state, preview_strategy, 'children')
+
+    if template:
 
         # Adjust for private K-12 school (ages 5-17)
         if preview_school_type == "Private":
@@ -5236,7 +5445,7 @@ def timeline_tab():
             ),
             "Spending Strategy": st.column_config.SelectboxColumn(
                 "Spending Strategy",
-                options=["Conservative", "Average", "High-end"],
+                options=STATISTICAL_STRATEGIES,
                 required=True
             )
         },
@@ -5755,20 +5964,9 @@ def calculate_lifetime_cashflow():
     return results
 
 
-def combined_analysis_cashflow_tab():
-    """Unified Financial Analysis tab - combines deterministic cashflow and Monte Carlo simulation"""
-    st.header("📊 Financial Analysis")
-
-    st.markdown("""
-    Comprehensive financial analysis combining deterministic lifetime cashflow projections with Monte Carlo uncertainty simulations.
-    Analyze your plan's resilience and identify key opportunities and risks.
-    """)
-
-    # =============================================================================
-    # SECTION 1: DETERMINISTIC LIFETIME CASHFLOW
-    # =============================================================================
-    st.markdown("---")
-    st.markdown("## 💰 Section 1: Deterministic Lifetime Cashflow")
+def deterministic_cashflow_tab():
+    """Deterministic Lifetime Cashflow Analysis"""
+    st.header("💰 Deterministic Lifetime Cashflow")
 
     st.markdown("""
     See exactly how money flows through your entire life from now until age 100.
@@ -6203,11 +6401,11 @@ def combined_analysis_cashflow_tab():
     else:
         st.warning("⚠️ No cashflow data calculated yet. Click the button above to generate your lifetime cashflow analysis.")
 
-    # =============================================================================
-    # SECTION 2: MONTE CARLO SIMULATION
-    # =============================================================================
-    st.markdown("---")
-    st.markdown("## 🎲 Section 2: Monte Carlo Simulation")
+
+
+def monte_carlo_simulation_tab():
+    """Monte Carlo Simulation Analysis"""
+    st.header("🎲 Monte Carlo Simulation")
 
     st.markdown("""
     Add uncertainty to your plan and see the range of possible outcomes.
