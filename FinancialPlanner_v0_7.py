@@ -6068,8 +6068,8 @@ def calculate_lifetime_cashflow():
         # Calculate cashflow (Income - Taxes - Expenses)
         cashflow = total_income - total_taxes - total_expenses
 
-        # Update net worth (simple model: cashflow + 7% investment return)
-        investment_return = cumulative_net_worth * 0.07
+        # Update net worth (cashflow + investment return based on user's expected return rate)
+        investment_return = cumulative_net_worth * st.session_state.economic_params.investment_return
         cumulative_net_worth += cashflow + investment_return
 
         # Track events
