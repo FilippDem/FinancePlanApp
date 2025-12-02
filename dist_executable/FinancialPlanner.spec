@@ -1,6 +1,17 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import copy_metadata, collect_data_files
+
 block_cipher = None
+
+# Collect metadata for packages that need it
+datas = []
+datas += copy_metadata('streamlit')
+datas += copy_metadata('altair')
+datas += copy_metadata('pandas')
+datas += copy_metadata('plotly')
+datas += copy_metadata('numpy')
+datas += collect_data_files('streamlit')
 
 a = Analysis(
     ['launcher.py'],  # Use launcher as entry point
@@ -9,7 +20,7 @@ a = Analysis(
     datas=[
         ('assets', 'assets'),  # Include assets folder
         ('FinancialPlanner_v0_85.py', '.'),  # Include main app as data file
-    ],
+    ] + datas,  # Add collected metadata
     hiddenimports=[
         # Streamlit core
         'streamlit',
