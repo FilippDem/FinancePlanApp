@@ -1,180 +1,147 @@
-# Financial Planning Application - Executable Distribution
+# Financial Planning Application v0.85 - Distribution Files
 
-Version 0.85
+This folder contains everything you need to create a distributable version of the Financial Planning Application.
 
-This folder contains everything needed to build and distribute a standalone executable version of the Financial Planning Application.
+## 🎯 Quick Start
 
-## 📦 What's This?
+**For the easiest distribution (recommended):**
 
-This is a distributable version of the Financial Planner that can be packaged into a standalone executable. Users who receive the built executable **DO NOT need Python installed** - they can just double-click and run!
+1. **Test it yourself first:**
+   ```
+   Double-click: FinancialPlanner_AutoInstall.bat
+   ```
 
-## 🔨 Building the Executable (For Developers)
+2. **To share with friends, zip these files:**
+   - `FinancialPlanner_AutoInstall.bat` (or rename to `START_HERE.bat`)
+   - `FinancialPlanner_v0_85.py`
+   - `assets/` folder
+   - (Optional) `README_AUTOINSTALL.md` for detailed instructions
 
-### Prerequisites
+3. **Send to friends - they just:**
+   - Extract the zip
+   - Double-click the .bat file
+   - Choose Python installation option if needed
+   - Done!
 
-You need Python installed to BUILD the executable (but end users won't need it):
-- Python 3.8 or higher
-- pip (Python package installer)
+## 📁 Files in This Folder
 
-### Build Instructions
+### Main Distribution Files
 
-#### **Windows:**
-1. Open Command Prompt or PowerShell
-2. Navigate to this `dist_executable` folder
-3. Run: `build.bat`
-4. Wait for the build to complete (may take 2-5 minutes)
-5. The executable will be in: `dist/FinancialPlanner/`
+- **`FinancialPlanner_AutoInstall.bat`** ⭐ **RECOMMENDED**
+  - Automatically installs Python if user doesn't have it
+  - Handles everything automatically
+  - Best for non-technical users
+  - See `README_AUTOINSTALL.md` for details
 
-#### **Linux/Mac:**
-1. Open Terminal
-2. Navigate to this `dist_executable` folder
-3. Run: `./build.sh`
-4. Wait for the build to complete (may take 2-5 minutes)
-5. The executable will be in: `dist/FinancialPlanner/`
+- **`FinancialPlanner_Portable.bat`** (Windows)
+- **`FinancialPlanner_Portable.sh`** (Mac/Linux)
+  - For users who already have Python installed
+  - Simpler, faster setup
+  - See `README_PORTABLE.md` for details
 
-### What Gets Built?
+- **`FinancialPlanner_v0_85.py`**
+  - The main application (required)
 
-After building, you'll have a `dist/FinancialPlanner/` folder containing:
-- The main executable (FinancialPlanner.exe on Windows, FinancialPlanner on Linux/Mac)
-- All necessary libraries and dependencies
-- The launcher scripts (`run_FinancialPlanner.bat` or `run_FinancialPlanner.sh`)
-- Assets folder with icons and resources
+- **`assets/`**
+  - Application icons and resources (required)
 
-## 📤 Distributing to Friends
+### Documentation
 
-### What to Share
+- **`README_AUTOINSTALL.md`**
+  - Complete guide for auto-install version
+  - Installation options explained
+  - Troubleshooting guide
 
-**Share the entire `dist/FinancialPlanner/` folder** with your friends. They need all the files, not just the executable!
+- **`README_PORTABLE.md`**
+  - Guide for portable version
+  - Manual Python installation instructions
 
-You can:
-1. **Compress it**: Zip the entire `dist/FinancialPlanner/` folder
-2. **Share via**: Email, cloud storage (Dropbox, Google Drive), USB drive, etc.
+## 🎁 Recommended Distribution Package
 
-### Installation Instructions (For End Users)
-
-**FOR YOUR FRIENDS WHO RECEIVE THE APP:**
-
-1. **Download/Copy** the FinancialPlanner folder to your computer
-2. **Extract** if it's in a zip file
-3. **Open** the FinancialPlanner folder
-4. **Double-click** the launcher script:
-   - Windows: `run_FinancialPlanner.bat`
-   - Mac/Linux: `run_FinancialPlanner.sh`
-5. **Wait** a few seconds - your web browser will automatically open with the app
-6. **Start planning!** 💰
-
-### First Time Setup
-
-**Windows Users:**
-- If you see a "Windows protected your PC" warning, click "More info" and then "Run anyway"
-- This is normal for applications that aren't signed with an expensive code signing certificate
-
-**Mac Users:**
-- If you see a security warning, go to System Preferences > Security & Privacy and click "Open Anyway"
-- Or right-click the file and select "Open" the first time
-
-**Linux Users:**
-- Make sure the script is executable: `chmod +x run_FinancialPlanner.sh`
-
-## 🚀 Running the Application
-
-### For End Users (No Python Required!)
-
-Simply double-click the launcher script:
-- **Windows**: `run_FinancialPlanner.bat`
-- **Mac/Linux**: `run_FinancialPlanner.sh`
-
-The app will:
-1. Start in the background
-2. Automatically open in your default web browser
-3. Display at: http://localhost:8501
-
-To stop the app, just close the terminal/command window that opened.
-
-### Troubleshooting
-
-**Window opens and closes immediately?**
-- Make sure you're using the launcher script (`run_FinancialPlanner.bat` or `run_FinancialPlanner.sh`) NOT the executable directly
-- The executable needs to be run through the launcher for proper startup
-- If the window still closes, try running the executable directly from command line to see error messages:
-  - Windows: Open Command Prompt, navigate to the folder, run `FinancialPlanner.exe`
-  - Mac/Linux: Open Terminal, navigate to the folder, run `./FinancialPlanner`
-
-**Browser doesn't open automatically?**
-- Manually open your browser and go to: http://localhost:8501
-- Wait 5-10 seconds after starting the app before opening the browser
-
-**Port 8501 already in use?**
-- Close any other Streamlit applications or web servers using that port
-- Restart your computer to clear any stuck processes
-
-**Application won't start?**
-- Check your antivirus isn't blocking it (common with PyInstaller executables)
-- Make sure you extracted ALL files from the zip - the executable needs the library files
-- Try running from a folder path without spaces or special characters
-- On Windows, make sure you're not running from OneDrive or network drive
-
-**Still having issues?**
-- Rebuild the executable with `build.bat` or `build.sh`
-- Make sure all dependencies in `requirements_build.txt` installed correctly
-- Check that you have the latest version of PyInstaller
-
-## 📋 System Requirements
-
-- **Windows**: Windows 10 or later (64-bit)
-- **Mac**: macOS 10.13 or later
-- **Linux**: Most modern distributions (Ubuntu 18.04+, etc.)
-- **RAM**: 2GB minimum, 4GB recommended
-- **Disk Space**: 500MB for the application files
-
-## 🔧 Technical Details
-
-### How It Works
-
-This uses PyInstaller to bundle:
-- Python interpreter
-- Streamlit web framework
-- All Python libraries (pandas, plotly, numpy, etc.)
-- Your application code
-- Assets and resources
-
-Into a single folder that can run independently.
-
-### File Structure
+Create a folder called `FinancialPlanner` with:
 
 ```
-dist/FinancialPlanner/
-├── FinancialPlanner.exe (or FinancialPlanner on Mac/Linux)
-├── run_FinancialPlanner.bat (Windows launcher)
-├── run_FinancialPlanner.sh (Mac/Linux launcher)
-├── FinancialPlanner_v0_85.py (bundled)
+FinancialPlanner/
+├── START_HERE.bat                 (renamed from AutoInstall)
+├── FinancialPlanner_v0_85.py
 ├── assets/
 │   └── piggy-bank-coin.svg
-└── [many library files...]
+└── README.txt                      (simple user instructions)
 ```
+
+**README.txt example:**
+```
+Financial Planning Application v0.85
+
+HOW TO START:
+1. Double-click "START_HERE.bat"
+2. Follow the on-screen prompts
+3. The app will open in your browser!
+
+First run takes 5-10 minutes for setup.
+After that, it starts in seconds.
+
+Need help? See README_AUTOINSTALL.md
+```
+
+## 🎯 Which Version to Use?
+
+| Use Case | Recommended File |
+|----------|------------------|
+| **General distribution** | FinancialPlanner_AutoInstall.bat |
+| **Users without Python** | FinancialPlanner_AutoInstall.bat |
+| **Users with Python** | Either (AutoInstall detects and skips install) |
+| **Mac/Linux users** | FinancialPlanner_Portable.sh |
+| **Corporate environments** | FinancialPlanner_AutoInstall.bat (portable option) |
+| **Maximum simplicity** | FinancialPlanner_AutoInstall.bat |
+
+**Bottom line:** Use `FinancialPlanner_AutoInstall.bat` for Windows users - it handles all scenarios.
+
+## ✅ Advantages Over PyInstaller
+
+This approach is **much better** than creating a single executable:
+
+| Aspect | This Approach | PyInstaller |
+|--------|---------------|-------------|
+| **Reliability** | ⭐⭐⭐⭐⭐ | ⭐⭐ |
+| **File Size** | 5 MB | 500 MB |
+| **Build Required** | No | Yes (complex) |
+| **Easy to Update** | Yes (replace .py) | No (rebuild) |
+| **Startup Speed** | 2-3 seconds | 5-10 seconds |
+| **Debugging** | Easy | Difficult |
+| **Antivirus Issues** | Rare | Common |
+
+## 🔧 System Requirements
+
+**For end users:**
+- Windows 10 or later (Mac/Linux supported with .sh version)
+- 500 MB free disk space
+- Internet connection (first-time setup only)
+- Python 3.8+ (auto-installed if using AutoInstall version)
+
+**For distribution (you):**
+- Just copy the files - no build process needed!
 
 ## 🆘 Support
 
-If you or your friends encounter issues:
+If users have issues, check:
+1. `README_AUTOINSTALL.md` - Troubleshooting section
+2. `README_PORTABLE.md` - Alternative approach
+3. Run from command line to see error messages
 
-1. **Check System Requirements**: Make sure the system meets minimum requirements
-2. **Antivirus**: Some antivirus programs are overzealous with executables
-3. **Permissions**: Ensure the folder has read/write permissions
-4. **Rebuild**: Try building again if something seems corrupted
+Common solutions:
+- **"Python not found"** → Use AutoInstall version
+- **"Dependencies failed"** → Check internet connection
+- **"Port in use"** → Close other applications on port 8501
 
 ## 📝 License
 
 Same license as the main Financial Planning Application.
 
-## 🎯 Version History
-
-- **v0.85**: Initial executable distribution version
-  - Standalone packaging with PyInstaller
-  - One-click launch experience
-  - No Python installation required for end users
-  - Custom launcher wrapper for proper Streamlit initialization
-  - Automatic browser opening with status messages
-
 ---
 
-**Built with ❤️ using Python, Streamlit, and PyInstaller**
+**Version:** 0.85
+**Distribution Method:** Portable with Auto-Install
+**Last Updated:** December 2025
+
+This is the **recommended** distribution method for sharing the Financial Planning Application with friends and colleagues.
