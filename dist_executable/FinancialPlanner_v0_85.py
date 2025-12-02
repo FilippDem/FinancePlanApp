@@ -2846,9 +2846,14 @@ def initialize_session_state():
                     'property_tax_rate': 0.0085,
                     'home_insurance': 1300.0,
                     'maintenance_rate': 0.01,
-                    'asset_type': 'Expense',
-                    'appreciation_rate': 0.0
-                },
+                    'upkeep_costs': 4200.0,
+                    'owner': 'ParentX',
+                    'timeline': [
+                        {'year': current_year + 12, 'status': 'Own_Live', 'rental_income': 0.0}
+                    ]
+                }
+            ],
+            'one_time_purchases': [
                 {
                     'name': 'Sabbatical Year (Educational Travel)',
                     'year': current_year + 10,
