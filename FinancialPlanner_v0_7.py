@@ -1946,7 +1946,7 @@ def initialize_session_state():
             'Car Insurance',
             'Car Maintenance & Upkeep',
             'Parking & Tolls',
-            'Public Transit & Rideshare',
+            'Taxis',
             'Registration & Fees',
             'Entertainment & Activities',
             'Personal Care',
@@ -1962,7 +1962,7 @@ def initialize_session_state():
             'Car Insurance': 2400.0,
             'Car Maintenance & Upkeep': 2000.0,
             'Parking & Tolls': 1200.0,
-            'Public Transit & Rideshare': 1200.0,
+            'Taxis': 1200.0,
             'Registration & Fees': 1200.0,
             'Entertainment & Activities': 6000.0,
             'Personal Care': 3600.0,
@@ -3315,12 +3315,12 @@ def initialize_session_state():
                 "Filipp&Erin Spending (custom)": {
                     'Food & Groceries': 48000,  # Based on actual CC spending data
                     'Clothing': 14000,  # Based on actual CC spending data
-                    'Gas & Fuel': 12000,  # 2 cars, Seattle area driving
-                    'Car Insurance': 7000,  # 2 cars, comprehensive coverage
-                    'Car Maintenance & Upkeep': 6000,  # Oil changes, tires, repairs, inspections
-                    'Parking & Tolls': 4000,  # Downtown parking, toll bridges
-                    'Public Transit & Rideshare': 4000,  # Light rail, buses, Uber/Lyft
-                    'Registration & Fees': 3000,  # Vehicle tabs, emissions, fees
+                    'Gas & Fuel': 7200,  # 2 cars, ~$600/month ($300 per car)
+                    'Car Insurance': 5400,  # 2 cars, ~$450/month
+                    'Car Maintenance & Upkeep': 3600,  # Oil changes, tires, repairs, ~$300/month
+                    'Parking & Tolls': 1800,  # Occasional downtown parking, ~$150/month
+                    'Taxis': 1200,  # Occasional taxi use, $100/month
+                    'Registration & Fees': 1200,  # Vehicle tabs, emissions, ~$100/month averaged
                     'Entertainment & Activities': 17000,  # Based on actual CC spending data
                     'Personal Care': 8300,  # Based on actual CC spending data
                     'Utilities': 7000,  # Based on actual CC spending data
@@ -4562,7 +4562,7 @@ def family_expenses_tab():
                 'Car Insurance': 0.0,
                 'Car Maintenance & Upkeep': 0.0,
                 'Parking & Tolls': 0.0,
-                'Public Transit & Rideshare': 0.0,
+                'Taxis': 0.0,
                 'Registration & Fees': 0.0,
                 'Entertainment & Activities': 0.0,
                 'Personal Care': 0.0,
