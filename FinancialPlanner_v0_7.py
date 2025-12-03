@@ -3301,17 +3301,17 @@ def initialize_session_state():
 
         # NEW: Custom family expense templates with pre-populated Filipp&Erin strategy
         st.session_state.custom_family_templates = {
-            "Sacramento": {
+            "Seattle": {
                 "Filipp&Erin Spending (custom)": {
-                    'Food & Groceries': 21000,  # Between Average (18k) and High-end (24k)
-                    'Clothing': 6000,  # Between Average (4.8k) and High-end (7.2k)
-                    'Transportation': 15500,  # Between Average (13k) and High-end (18k)
-                    'Entertainment & Activities': 7500,  # Between Average (6k) and High-end (9k)
-                    'Personal Care': 3600,  # Between Average (3k) and High-end (4.2k)
-                    'Utilities': 3000,  # Between Average (2.4k) and High-end (3.6k)
-                    'Internet & Phone': 2200,  # Between Average (1.8k) and High-end (2.6k)
-                    'Subscriptions': 900,  # Between Average (0.6k) and High-end (1.2k)
-                    'Other Expenses': 1800  # Between Average (1.2k) and High-end (2.4k)
+                    'Food & Groceries': 48000,  # Based on actual CC spending data
+                    'Clothing': 14000,  # Based on actual CC spending data
+                    'Transportation': 36000,  # Based on actual CC spending data (includes gas, transit, car expenses)
+                    'Entertainment & Activities': 17000,  # Based on actual CC spending data
+                    'Personal Care': 8300,  # Based on actual CC spending data
+                    'Utilities': 7000,  # Based on actual CC spending data
+                    'Internet & Phone': 5100,  # Based on actual CC spending data
+                    'Subscriptions': 2100,  # Based on actual CC spending data (streaming, apps, etc.)
+                    'Other Expenses': 4100  # Based on actual CC spending data
                 }
             }
         }
