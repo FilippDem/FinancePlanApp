@@ -6624,218 +6624,220 @@ def deterministic_cashflow_tab():
                                 st.dataframe(expense_df, hide_index=True, use_container_width=True)
                                 st.metric("Total Expenses", f"${year_data['total_expenses']:,.0f}")
 
-                                # Sankey Diagram for Money Flow
-                                st.markdown("---")
-                                st.markdown("#### 💰 Money Flow Visualization (Sankey Diagram)")
-                                st.caption("See how money flows from income sources (including investment returns) through various expense categories to savings")
+                        # Sankey Diagram for Money Flow (full width outside columns)
+                        st.markdown("---")
+                        st.markdown("#### 💰 Money Flow Visualization (Sankey Diagram)")
+                        st.caption("See how money flows from income sources (including investment returns) through various expense categories to savings")
 
-                                # Build Sankey diagram data
-                                sankey_labels = []
-                                sankey_source = []
-                                sankey_target = []
-                                sankey_values = []
-                                sankey_colors = []
+                        # Build Sankey diagram data
+                        sankey_labels = []
+                        sankey_source = []
+                        sankey_target = []
+                        sankey_values = []
+                        sankey_colors = []
 
-                                # Define node indices
-                                node_index = 0
-                                node_map = {}
+                        # Define node indices
+                        node_index = 0
+                        node_map = {}
 
-                                # Income sources (left side)
-                                income_sources = []
-                                if year_data['parent1_income'] > 0:
-                                    income_sources.append({
-                                        'name': f"{st.session_state.parent1_name} Salary",
-                                        'value': year_data['parent1_income'],
-                                        'color': '#2ecc71'
-                                    })
-                                if year_data['parent2_income'] > 0:
-                                    income_sources.append({
-                                        'name': f"{st.session_state.parent2_name} Salary",
-                                        'value': year_data['parent2_income'],
-                                        'color': '#27ae60'
-                                    })
-                                if year_data['ss_income'] > 0:
-                                    income_sources.append({
-                                        'name': 'Social Security',
-                                        'value': year_data['ss_income'],
-                                        'color': '#16a085'
-                                    })
-                                if year_data.get('investment_income', 0) > 0:
-                                    income_sources.append({
-                                        'name': '📈 Investment Returns',
-                                        'value': year_data['investment_income'],
-                                        'color': '#1abc9c'
-                                    })
+                        # Income sources (left side)
+                        income_sources = []
+                        if year_data['parent1_income'] > 0:
+                            income_sources.append({
+                                'name': f"{st.session_state.parent1_name} Salary",
+                                'value': year_data['parent1_income'],
+                                'color': '#2ecc71'
+                            })
+                        if year_data['parent2_income'] > 0:
+                            income_sources.append({
+                                'name': f"{st.session_state.parent2_name} Salary",
+                                'value': year_data['parent2_income'],
+                                'color': '#27ae60'
+                            })
+                        if year_data['ss_income'] > 0:
+                            income_sources.append({
+                                'name': 'Social Security',
+                                'value': year_data['ss_income'],
+                                'color': '#16a085'
+                            })
+                        if year_data.get('investment_income', 0) > 0:
+                            income_sources.append({
+                                'name': '📈 Investment Returns',
+                                'value': year_data['investment_income'],
+                                'color': '#1abc9c'
+                            })
 
-                                # Add income source nodes
-                                for source in income_sources:
-                                    sankey_labels.append(source['name'])
-                                    node_map[source['name']] = node_index
-                                    node_index += 1
+                        # Add income source nodes
+                        for source in income_sources:
+                            sankey_labels.append(source['name'])
+                            node_map[source['name']] = node_index
+                            node_index += 1
 
-                                # Add "Total Income" middle node
-                                sankey_labels.append("Total Income")
-                                node_map["Total Income"] = node_index
-                                total_income_idx = node_index
-                                node_index += 1
+                        # Add "Total Income" middle node
+                        sankey_labels.append("Total Income")
+                        node_map["Total Income"] = node_index
+                        total_income_idx = node_index
+                        node_index += 1
 
-                                # Connect income sources to Total Income
-                                for source in income_sources:
-                                    sankey_source.append(node_map[source['name']])
-                                    sankey_target.append(total_income_idx)
-                                    sankey_values.append(source['value'])
-                                    sankey_colors.append(source['color'])
+                        # Connect income sources to Total Income
+                        for source in income_sources:
+                            sankey_source.append(node_map[source['name']])
+                            sankey_target.append(total_income_idx)
+                            sankey_values.append(source['value'])
+                            sankey_colors.append(source['color'])
 
-                                # Expense categories (right side)
-                                expense_categories = []
+                        # Expense categories (right side)
+                        expense_categories = []
 
-                                # Taxes come first (critical expense)
-                                if year_data.get('taxes', 0) > 0:
-                                    expense_categories.append({
-                                        'name': '💸 Taxes',
-                                        'value': year_data['taxes'],
-                                        'color': 'rgba(52, 73, 94, 0.7)'  # Dark gray-blue
-                                    })
+                        # Taxes come first (critical expense)
+                        if year_data.get('taxes', 0) > 0:
+                            expense_categories.append({
+                                'name': '💸 Taxes',
+                                'value': year_data['taxes'],
+                                'color': 'rgba(52, 73, 94, 0.7)'  # Dark gray-blue
+                            })
 
-                                if year_data['base_expenses'] > 0:
-                                    expense_categories.append({
-                                        'name': 'Family Living',
-                                        'value': year_data['base_expenses'],
-                                        'color': 'rgba(231, 76, 60, 0.6)'
-                                    })
-                                if year_data['children_expenses'] > 0:
-                                    expense_categories.append({
-                                        'name': 'Children',
-                                        'value': year_data['children_expenses'],
-                                        'color': 'rgba(192, 57, 43, 0.6)'
-                                    })
-                                if year_data.get('healthcare_expenses', 0) > 0:
-                                    expense_categories.append({
-                                        'name': 'Healthcare',
-                                        'value': year_data['healthcare_expenses'],
-                                        'color': 'rgba(155, 89, 182, 0.6)'
-                                    })
-                                if year_data.get('house_expenses', 0) > 0:
-                                    expense_categories.append({
-                                        'name': 'House',
-                                        'value': year_data['house_expenses'],
-                                        'color': 'rgba(142, 68, 173, 0.6)'
-                                    })
-                                if year_data.get('recurring_expenses', 0) > 0:
-                                    expense_categories.append({
-                                        'name': 'Recurring',
-                                        'value': year_data['recurring_expenses'],
-                                        'color': 'rgba(211, 84, 0, 0.6)'
-                                    })
-                                if year_data.get('major_purchases', 0) > 0:
-                                    expense_categories.append({
-                                        'name': 'Major Purchases',
-                                        'value': year_data['major_purchases'],
-                                        'color': 'rgba(230, 126, 34, 0.6)'
-                                    })
+                        if year_data['base_expenses'] > 0:
+                            expense_categories.append({
+                                'name': 'Family Living',
+                                'value': year_data['base_expenses'],
+                                'color': 'rgba(231, 76, 60, 0.6)'
+                            })
+                        if year_data['children_expenses'] > 0:
+                            expense_categories.append({
+                                'name': 'Children',
+                                'value': year_data['children_expenses'],
+                                'color': 'rgba(192, 57, 43, 0.6)'
+                            })
+                        if year_data.get('healthcare_expenses', 0) > 0:
+                            expense_categories.append({
+                                'name': 'Healthcare',
+                                'value': year_data['healthcare_expenses'],
+                                'color': 'rgba(155, 89, 182, 0.6)'
+                            })
+                        if year_data.get('house_expenses', 0) > 0:
+                            expense_categories.append({
+                                'name': 'House',
+                                'value': year_data['house_expenses'],
+                                'color': 'rgba(142, 68, 173, 0.6)'
+                            })
+                        if year_data.get('recurring_expenses', 0) > 0:
+                            expense_categories.append({
+                                'name': 'Recurring',
+                                'value': year_data['recurring_expenses'],
+                                'color': 'rgba(211, 84, 0, 0.6)'
+                            })
+                        if year_data.get('major_purchases', 0) > 0:
+                            expense_categories.append({
+                                'name': 'Major Purchases',
+                                'value': year_data['major_purchases'],
+                                'color': 'rgba(230, 126, 34, 0.6)'
+                            })
 
-                                # Add expense category nodes
-                                for category in expense_categories:
-                                    sankey_labels.append(category['name'])
-                                    node_map[category['name']] = node_index
-                                    node_index += 1
+                        # Add expense category nodes
+                        for category in expense_categories:
+                            sankey_labels.append(category['name'])
+                            node_map[category['name']] = node_index
+                            node_index += 1
 
-                                # Add Savings/Deficit node
-                                cashflow_value = year_data['cashflow']
-                                if cashflow_value > 0:
-                                    sankey_labels.append("💰 Savings")
-                                    node_map["Savings"] = node_index
-                                    savings_idx = node_index
-                                    node_index += 1
-                                    savings_color = 'rgba(46, 204, 113, 0.6)'
-                                elif cashflow_value < 0:
-                                    sankey_labels.append("⚠️ Deficit")
-                                    node_map["Deficit"] = node_index
-                                    deficit_idx = node_index
-                                    node_index += 1
-                                    deficit_color = 'rgba(231, 76, 60, 0.8)'
+                        # Add Savings/Deficit node
+                        cashflow_value = year_data['cashflow']
+                        if cashflow_value > 0:
+                            sankey_labels.append("💰 Savings")
+                            node_map["Savings"] = node_index
+                            savings_idx = node_index
+                            node_index += 1
+                            savings_color = 'rgba(46, 204, 113, 0.6)'
+                        elif cashflow_value < 0:
+                            sankey_labels.append("⚠️ Deficit")
+                            node_map["Deficit"] = node_index
+                            deficit_idx = node_index
+                            node_index += 1
+                            deficit_color = 'rgba(231, 76, 60, 0.8)'
 
-                                # Connect Total Income to expense categories
-                                for category in expense_categories:
-                                    sankey_source.append(total_income_idx)
-                                    sankey_target.append(node_map[category['name']])
-                                    sankey_values.append(category['value'])
-                                    sankey_colors.append(category['color'])
+                        # Connect Total Income to expense categories
+                        for category in expense_categories:
+                            sankey_source.append(total_income_idx)
+                            sankey_target.append(node_map[category['name']])
+                            sankey_values.append(category['value'])
+                            sankey_colors.append(category['color'])
 
-                                # Connect Total Income to Savings or show Deficit
-                                if cashflow_value > 0:
-                                    sankey_source.append(total_income_idx)
-                                    sankey_target.append(savings_idx)
-                                    sankey_values.append(cashflow_value)
-                                    sankey_colors.append(savings_color)
+                        # Connect Total Income to Savings or show Deficit
+                        if cashflow_value > 0:
+                            sankey_source.append(total_income_idx)
+                            sankey_target.append(savings_idx)
+                            sankey_values.append(cashflow_value)
+                            sankey_colors.append(savings_color)
 
-                                # Create node colors list
-                                node_colors = []
-                                for label in sankey_labels:
-                                    if 'Salary' in label:
-                                        node_colors.append('#2ecc71')
-                                    elif 'Social Security' in label:
-                                        node_colors.append('#16a085')
-                                    elif 'Investment Returns' in label:
-                                        node_colors.append('#1abc9c')
-                                    elif 'Total Income' in label:
-                                        node_colors.append('#3498db')
-                                    elif 'Savings' in label:
-                                        node_colors.append('#2ecc71')
-                                    elif 'Deficit' in label:
-                                        node_colors.append('#e74c3c')
-                                    else:
-                                        node_colors.append('#95a5a6')
+                        # Create node colors list
+                        node_colors = []
+                        for label in sankey_labels:
+                            if 'Salary' in label:
+                                node_colors.append('#2ecc71')
+                            elif 'Social Security' in label:
+                                node_colors.append('#16a085')
+                            elif 'Investment Returns' in label:
+                                node_colors.append('#1abc9c')
+                            elif 'Total Income' in label:
+                                node_colors.append('#3498db')
+                            elif 'Savings' in label:
+                                node_colors.append('#2ecc71')
+                            elif 'Deficit' in label:
+                                node_colors.append('#e74c3c')
+                            else:
+                                node_colors.append('#95a5a6')
 
-                                # Create Sankey diagram
-                                sankey_fig = go.Figure(data=[go.Sankey(
-                                    node=dict(
-                                        pad=15,
-                                        thickness=20,
-                                        line=dict(color="black", width=0.5),
-                                        label=sankey_labels,
-                                        color=node_colors,
-                                        customdata=[f"${year_data['parent1_income']:,.0f}" if i == 0 and year_data['parent1_income'] > 0 else
-                                                   f"${year_data['parent2_income']:,.0f}" if 'parent2' in sankey_labels[i].lower() else
-                                                   f"${val:,.0f}" for i, val in enumerate([0]*len(sankey_labels))],
-                                        hovertemplate='%{label}<br>$%{value:,.0f}<extra></extra>'
-                                    ),
-                                    link=dict(
-                                        source=sankey_source,
-                                        target=sankey_target,
-                                        value=sankey_values,
-                                        color=sankey_colors,
-                                        hovertemplate='%{source.label} → %{target.label}<br>$%{value:,.0f}<extra></extra>'
-                                    )
-                                )])
+                        # Create Sankey diagram
+                        sankey_fig = go.Figure(data=[go.Sankey(
+                            node=dict(
+                                pad=15,
+                                thickness=20,
+                                line=dict(color="black", width=0.5),
+                                label=sankey_labels,
+                                color=node_colors,
+                                customdata=[f"${year_data['parent1_income']:,.0f}" if i == 0 and year_data['parent1_income'] > 0 else
+                                           f"${year_data['parent2_income']:,.0f}" if 'parent2' in sankey_labels[i].lower() else
+                                           f"${val:,.0f}" for i, val in enumerate([0]*len(sankey_labels))],
+                                hovertemplate='%{label}<br>$%{value:,.0f}<extra></extra>'
+                            ),
+                            link=dict(
+                                source=sankey_source,
+                                target=sankey_target,
+                                value=sankey_values,
+                                color=sankey_colors,
+                                hovertemplate='%{source.label} → %{target.label}<br>$%{value:,.0f}<extra></extra>'
+                            )
+                        )])
 
-                                sankey_fig.update_layout(
-                                    title=f"Money Flow for {st.session_state.selected_cashflow_year}",
-                                    font=dict(size=12),
-                                    height=600,
-                                    margin=dict(l=20, r=20, t=40, b=20)
-                                )
+                        sankey_fig.update_layout(
+                            title=f"Money Flow for {st.session_state.selected_cashflow_year}",
+                            font=dict(size=12),
+                            height=600,
+                            margin=dict(l=20, r=20, t=40, b=20)
+                        )
 
-                                st.plotly_chart(sankey_fig, use_container_width=True)
+                        st.plotly_chart(sankey_fig, use_container_width=True)
 
-                                # Add summary below Sankey
-                                total_available = year_data['total_income'] + year_data.get('investment_income', 0)
-                                if cashflow_value >= 0:
-                                    # Include investment returns in the savings calculation
-                                    total_added_to_savings = cashflow_value + year_data.get('investment_income', 0)
-                                    st.success(f"💰 **Net Addition to Savings: ${total_added_to_savings:,.0f}** ({(total_added_to_savings/total_available*100):.1f}% of total available funds)")
-                                    if year_data.get('investment_income', 0) > 0:
-                                        st.info(f"📊 Breakdown: ${cashflow_value:,.0f} from earned income surplus + ${year_data['investment_income']:,.0f} from investments")
+                        # Add summary below Sankey
+                        total_available = year_data['total_income'] + year_data.get('investment_income', 0)
+                        if cashflow_value >= 0:
+                            # Include investment returns in the savings calculation
+                            total_added_to_savings = cashflow_value + year_data.get('investment_income', 0)
+                            st.success(f"💰 **Net Addition to Savings: ${total_added_to_savings:,.0f}** ({(total_added_to_savings/total_available*100):.1f}% of total available funds)")
+                            if year_data.get('investment_income', 0) > 0:
+                                st.info(f"📊 Breakdown: ${cashflow_value:,.0f} from earned income surplus + ${year_data['investment_income']:,.0f} from investments")
+                        else:
+                            st.error(f"⚠️ **Deficit: ${abs(cashflow_value):,.0f}** (spending {(abs(cashflow_value)/year_data['total_income']*100):.1f}% more than earned income)")
+                            if year_data.get('investment_income', 0) > 0:
+                                net_change = cashflow_value + year_data['investment_income']
+                                investment_income_formatted = f"${year_data['investment_income']:,.0f}"
+                                net_change_formatted = f"${net_change:,.0f}"
+                                if net_change >= 0:
+                                    st.warning(f"⚖️ Investment returns of {investment_income_formatted} cover the deficit with {net_change_formatted} remaining")
                                 else:
-                                    st.error(f"⚠️ **Deficit: ${abs(cashflow_value):,.0f}** (spending {(abs(cashflow_value)/year_data['total_income']*100):.1f}% more than earned income)")
-                                    if year_data.get('investment_income', 0) > 0:
-                                        net_change = cashflow_value + year_data['investment_income']
-                                        if net_change >= 0:
-                                            st.warning(f"⚖️ Investment returns of ${year_data['investment_income']:,.0f} cover the deficit with ${net_change:,.0f} remaining")
-                                        else:
-                                            st.error(f"⚖️ Even with ${year_data['investment_income']:,.0f} investment returns, net change is ${net_change:,.0f}")
+                                    st.error(f"⚖️ Even with {investment_income_formatted} investment returns, net change is {net_change_formatted}")
 
-                                # Detailed subcategory breakdowns
+                        # Detailed subcategory breakdowns
                                 st.markdown("---")
                                 st.markdown("#### 📋 Detailed Expense Breakdown - All Line Items")
 
