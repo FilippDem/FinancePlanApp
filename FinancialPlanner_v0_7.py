@@ -7024,6 +7024,27 @@ def deterministic_cashflow_tab():
             with cashflow_tab2:
                 # Critical Years Table
                 st.subheader("Critical Years Analysis")
+
+                # Helper function to format event descriptions
+                def format_event_description(event):
+                    """Format event tuple into descriptive string"""
+                    event_type = event[0]
+                    if event_type == 'job_change':
+                        parent_name = event[1]
+                        new_income = event[2]
+                        return f"{parent_name} job change to ${new_income:,.0f}"
+                    elif event_type == 'retirement':
+                        parent_name = event[1]
+                        return f"{parent_name} retires"
+                    elif event_type == 'college':
+                        children = event[1]
+                        if isinstance(children, list):
+                            return f"{', '.join(children)} in college"
+                        return f"{children} in college"
+                    else:
+                        # Fallback for unknown event types
+                        return str(event[1]) if len(event) > 1 else str(event[0])
+
                 critical_years_data = []
                 for d in cashflow_data:
                     if d['cashflow'] < 0 or d['net_worth'] < 0 or d['children_in_college'] or any(e[0] in ['retirement', 'job_change'] for e in d['events']):
@@ -7032,7 +7053,7 @@ def deterministic_cashflow_tab():
                             'Ages': f"{d['parent1_age']} / {d['parent2_age']}",
                             'Cashflow': f"${d['cashflow']:,.0f}",
                             'Net Worth': f"${d['net_worth']:,.0f}",
-                            'Events': ', '.join([f"{e[1]}" if len(e) > 1 else e[0] for e in d['events']]) if d['events'] else '-',
+                            'Events': ', '.join([format_event_description(e) for e in d['events']]) if d['events'] else '-',
                             'In College': ', '.join(d['children_in_college']) if d['children_in_college'] else '-'
                         })
 
