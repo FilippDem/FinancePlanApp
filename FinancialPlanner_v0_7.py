@@ -7611,8 +7611,13 @@ def test_unemployment_scenario(percentiles_data, config):
     parent_name = config.get('parent_name', 'Parent')
     parent_income = config.get('parent_income', 0)
     duration_years = config.get('duration_years', 3)
+    parent_age = config.get('parent_age', 30)  # Current age
+    parent_retirement_age = config.get('parent_retirement_age', 65)
 
     event_results = {'event': f'{parent_name} Unemployed {duration_years} Years (Worst Year)'}
+
+    # Calculate current year from years array (first year)
+    current_year = years[0] if len(years) > 0 else 2024
 
     for pct_name in percentile_names:
         pct_values = percentiles[pct_name]
@@ -7621,6 +7626,15 @@ def test_unemployment_scenario(percentiles_data, config):
 
         # Try each year as the unemployment start
         for unemp_start_idx in range(len(years) - duration_years):
+            # Calculate parent's age in this year
+            year = years[unemp_start_idx]
+            years_from_current = year - current_year
+            parent_age_in_year = parent_age + years_from_current
+
+            # Skip years where parent is already retired
+            if parent_age_in_year >= parent_retirement_age:
+                continue
+
             net_worth = pct_values[unemp_start_idx]
 
             # Simulate unemployment period plus recovery
@@ -7648,12 +7662,20 @@ def test_unemployment_scenario(percentiles_data, config):
                 worst_final_nw = net_worth
                 worst_year = years[unemp_start_idx]
 
-        status = "✅" if worst_final_nw > 0 else "❌"
-        event_results[pct_name] = {
-            'status': status,
-            'worst_year': worst_year,
-            'final_nw': worst_final_nw
-        }
+        # Handle case where parent is already retired in all testable years
+        if worst_year is None:
+            event_results[pct_name] = {
+                'status': 'N/A',
+                'worst_year': 'N/A',
+                'final_nw': 0
+            }
+        else:
+            status = "✅" if worst_final_nw > 0 else "❌"
+            event_results[pct_name] = {
+                'status': status,
+                'worst_year': worst_year,
+                'final_nw': worst_final_nw
+            }
 
     return event_results
 
@@ -7842,12 +7864,16 @@ def stress_test_tab():
         st.markdown("### 💼 Forced Unemployment")
         st.markdown("*Testing 3-year unemployment periods at the worst possible time*")
 
-        for parent_name, parent_income in [(st.session_state.parent1_name, st.session_state.parentX_income),
-                                            (st.session_state.parent2_name, st.session_state.parentY_income)]:
+        for parent_name, parent_income, parent_age, parent_retirement_age in [
+            (st.session_state.parent1_name, st.session_state.parentX_income, st.session_state.parentX_age, st.session_state.parentX_retirement_age),
+            (st.session_state.parent2_name, st.session_state.parentY_income, st.session_state.parentY_age, st.session_state.parentY_retirement_age)
+        ]:
             config = {
                 'parent_name': parent_name,
                 'parent_income': parent_income,
-                'duration_years': 3
+                'duration_years': 3,
+                'parent_age': parent_age,
+                'parent_retirement_age': parent_retirement_age
             }
 
             event_results = test_unemployment_scenario(percentiles_data, config)
