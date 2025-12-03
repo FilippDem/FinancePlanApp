@@ -2005,6 +2005,7 @@ def initialize_session_state():
             {
                 'name': 'Child 1',
                 'birth_year': 2028,
+                'mother_takes_year_off': False,
                 'use_template': True,
                 'template_state': 'Seattle',
                 'template_strategy': 'Average',
@@ -2014,6 +2015,7 @@ def initialize_session_state():
             {
                 'name': 'Child 2',
                 'birth_year': 2030,
+                'mother_takes_year_off': False,
                 'use_template': True,
                 'template_state': 'Seattle',
                 'template_strategy': 'Average',
@@ -2173,6 +2175,7 @@ def initialize_session_state():
                 {
                     'name': 'Emma',
                     'birth_year': current_year - 2,
+                    'mother_takes_year_off': False,
                     'use_template': True,
                     'template_state': 'San Francisco',
                     'template_strategy': 'High-end',
@@ -2183,6 +2186,7 @@ def initialize_session_state():
                 {
                     'name': 'Lucas',
                     'birth_year': current_year,
+                    'mother_takes_year_off': False,
                     'use_template': True,
                     'template_state': 'San Francisco',
                     'template_strategy': 'High-end',
@@ -2392,6 +2396,7 @@ def initialize_session_state():
                 {
                     'name': 'Olivia',
                     'birth_year': current_year - 10,
+                    'mother_takes_year_off': False,
                     'use_template': True,
                     'template_state': 'Seattle',
                     'template_strategy': 'Average',
@@ -2402,6 +2407,7 @@ def initialize_session_state():
                 {
                     'name': 'Noah',
                     'birth_year': current_year - 7,
+                    'mother_takes_year_off': False,
                     'use_template': True,
                     'template_state': 'Seattle',
                     'template_strategy': 'Average',
@@ -2412,6 +2418,7 @@ def initialize_session_state():
                 {
                     'name': 'Sophia',
                     'birth_year': current_year - 4,
+                    'mother_takes_year_off': False,
                     'use_template': True,
                     'template_state': 'Seattle',
                     'template_strategy': 'Average',
@@ -2652,6 +2659,7 @@ def initialize_session_state():
                 {
                     'name': 'Isabella',
                     'birth_year': current_year - 13,
+                    'mother_takes_year_off': False,
                     'use_template': True,
                     'template_state': 'New York',
                     'template_strategy': 'High-end',
@@ -2662,6 +2670,7 @@ def initialize_session_state():
                 {
                     'name': 'William',
                     'birth_year': current_year - 11,
+                    'mother_takes_year_off': False,
                     'use_template': True,
                     'template_state': 'New York',
                     'template_strategy': 'High-end',
@@ -4842,6 +4851,7 @@ def children_tab():
                 st.session_state.children_list.append({
                     'name': child_name,
                     'birth_year': child_birth_year,
+                    'mother_takes_year_off': False,  # Default to not taking year off
                     'use_template': True,
                     'template_state': 'Seattle',
                     'template_strategy': 'Average',
@@ -4870,6 +4880,12 @@ def children_tab():
                         max_value=st.session_state.current_year + 20,
                         value=child['birth_year'],
                         key=f"child_birth_{idx}"
+                    )
+                    child['mother_takes_year_off'] = st.checkbox(
+                        f"Mother takes {child['birth_year']} off",
+                        value=child.get('mother_takes_year_off', False),
+                        key=f"child_mother_off_{idx}",
+                        help=f"If checked, {st.session_state.parent2_name}'s income will be $0 in {child['birth_year']} (year of birth)"
                     )
 
                 with col2:
@@ -6140,6 +6156,12 @@ def calculate_lifetime_cashflow():
                 st.session_state.current_year,
                 year
             )
+
+            # Check if mother takes year off for any child birth this year
+            for child in st.session_state.children_list:
+                if child.get('mother_takes_year_off', False) and child['birth_year'] == year:
+                    parent2_income = 0
+                    break  # Only need to find one match
         else:
             parent2_ss = st.session_state.parentY_ss_benefit * 12
             if st.session_state.ss_insolvency_enabled and year >= 2034:
