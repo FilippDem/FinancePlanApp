@@ -1,0 +1,10045 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots
+import json
+from datetime import datetime
+import io
+from dataclasses import dataclass, asdict
+from typing import List, Dict, Optional, Any
+
+# PDF generation imports
+try:
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Image
+    from reportlab.lib import colors
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+
+# File dialog imports
+try:
+    import tkinter as tk
+    from tkinter import filedialog
+    TKINTER_AVAILABLE = True
+except ImportError:
+    TKINTER_AVAILABLE = False
+
+# Set page configuration
+st.set_page_config(
+    page_title="Financial Planning Application v0.8",
+    page_icon="💰",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Base year for expense templates (all templates inflation-adjusted to this year)
+EXPENSE_TEMPLATE_BASE_YEAR = 2024
+
+# Historical S&P 500 Annual Returns (approximately 1924-2023, 100 years)
+HISTORICAL_STOCK_RETURNS = [
+    # 1924-1929 (Pre-Depression)
+    0.26, 0.10, 0.11, 0.37, 0.48, 0.12,
+    # 1930-1939 (Great Depression & Recovery)
+    -0.25, -0.43, -0.08, 0.54, -0.01, 0.47, 0.34, -0.35, 0.31, -0.01,
+    # 1940-1949 (WWII & Post-war)
+    -0.10, -0.12, 0.20, 0.26, 0.19, 0.36, -0.08, 0.05, 0.05, 0.18,
+    # 1950-1959 (Post-war Boom)
+    0.31, 0.24, 0.18, -0.01, 0.52, 0.31, 0.06, -0.11, 0.43, 0.12,
+    # 1960-1969 (Go-Go Years)
+    0.00, 0.27, -0.09, 0.23, 0.16, 0.12, -0.10, 0.24, 0.11, -0.08,
+    # 1970-1979 (Stagflation)
+    0.04, 0.14, 0.19, -0.15, -0.26, 0.37, 0.24, -0.07, 0.07, 0.18,
+    # 1980-1989 (Reagan Bull Market)
+    0.32, -0.05, 0.21, 0.22, 0.06, 0.31, 0.18, 0.05, 0.16, 0.32,
+    # 1990-1999 (Tech Boom)
+    -0.03, 0.30, 0.08, 0.10, 0.01, 0.38, 0.23, 0.33, 0.29, 0.21,
+    # 2000-2009 (Dot-com Crash & Financial Crisis)
+    -0.09, -0.12, -0.22, 0.29, 0.11, 0.05, 0.16, 0.05, -0.37, 0.26,
+    # 2010-2019 (Recovery & Bull Market)
+    0.15, 0.02, 0.16, 0.32, 0.14, 0.01, 0.12, 0.22, -0.04, 0.32,
+    # 2020-2023 (Recent years with COVID impact)
+    0.18, 0.29, -0.18, 0.26
+]
+
+# Available locations for expense templates
+# Note: CHILDREN_EXPENSE_TEMPLATES currently only includes US locations and original 3 states
+# FAMILY_EXPENSE_TEMPLATES includes all locations below
+AVAILABLE_LOCATIONS_CHILDREN = [
+    # Major US Cities (with detailed children templates)
+    "Seattle", "Sacramento", "Houston",
+    "New York", "San Francisco", "Los Angeles", "Portland",
+    # New Zealand Cities
+    "Auckland", "Wellington"
+]
+
+AVAILABLE_LOCATIONS_FAMILY = [
+    # Major US Cities
+    "Seattle", "Sacramento", "Houston",
+    "New York", "San Francisco", "Los Angeles", "Portland",
+    # Canada
+    "Toronto", "Vancouver",
+    # France
+    "Paris", "Toulouse",
+    # Germany
+    "Berlin", "Munich",
+    # Australia
+    "Sydney", "Melbourne", "Brisbane"
+]
+
+# Display names for locations (includes country and state for USA cities)
+LOCATION_DISPLAY_NAMES = {
+    # USA
+    "Seattle": "Seattle, WA, USA",
+    "Sacramento": "Sacramento, CA, USA",
+    "California": "California, USA",
+    "Houston": "Houston, TX, USA",
+    "New York": "New York, NY, USA",
+    "San Francisco": "San Francisco, CA, USA",
+    "Los Angeles": "Los Angeles, CA, USA",
+    "Portland": "Portland, OR, USA",
+    # Canada
+    "Toronto": "Toronto, ON, Canada",
+    "Vancouver": "Vancouver, BC, Canada",
+    # France
+    "Paris": "Paris, France",
+    "Toulouse": "Toulouse, France",
+    # Germany
+    "Berlin": "Berlin, Germany",
+    "Munich": "Munich, Germany",
+    # Australia
+    "Sydney": "Sydney, NSW, Australia",
+    "Melbourne": "Melbourne, VIC, Australia",
+    "Brisbane": "Brisbane, QLD, Australia"
+}
+
+# Geographic coordinates for world map visualization
+LOCATION_COORDINATES = {
+    # USA
+    "Seattle": {"lat": 47.6062, "lon": -122.3321},
+    "Sacramento": {"lat": 38.5816, "lon": -121.4944},
+    "California": {"lat": 36.7783, "lon": -119.4179},  # Center of CA
+    "Houston": {"lat": 29.7604, "lon": -95.3698},
+    "New York": {"lat": 40.7128, "lon": -74.0060},
+    "San Francisco": {"lat": 37.7749, "lon": -122.4194},
+    "Los Angeles": {"lat": 34.0522, "lon": -118.2437},
+    "Portland": {"lat": 45.5152, "lon": -122.6784},
+    # Canada
+    "Toronto": {"lat": 43.6532, "lon": -79.3832},
+    "Vancouver": {"lat": 49.2827, "lon": -123.1207},
+    # France
+    "Paris": {"lat": 48.8566, "lon": 2.3522},
+    "Toulouse": {"lat": 43.6047, "lon": 1.4442},
+    # Germany
+    "Berlin": {"lat": 52.5200, "lon": 13.4050},
+    "Munich": {"lat": 48.1351, "lon": 11.5820},
+    # Australia
+    "Sydney": {"lat": -33.8688, "lon": 151.2093},
+    "Melbourne": {"lat": -37.8136, "lon": 144.9631},
+    "Brisbane": {"lat": -27.4698, "lon": 153.0251}
+}
+
+# [Keep all the CHILDREN_EXPENSE_TEMPLATES and FAMILY_EXPENSE_TEMPLATES from V14]
+# [I'll include the full templates but truncate here for readability]
+
+# Spending strategy constants
+STATISTICAL_STRATEGIES = ["Conservative (statistical)", "Average (statistical)", "High-end (statistical)"]
+
+# ============================================================================
+# COMPREHENSIVE EXPENSE CATEGORY STRUCTURE (Monarch-inspired)
+# ============================================================================
+
+# Adult expense categories (for Parent X and Parent Y)
+# These categories apply to individual adults and are tracked per parent
+ADULT_EXPENSE_CATEGORIES = {
+    'Food & Dining': [
+        'Groceries',
+        'Dining Out',
+        'Coffee Shops'
+    ],
+    'Transportation': [
+        'Auto Payment',
+        'Gas & Fuel',
+        'Auto Maintenance',
+        'Auto Insurance',
+        'Parking & Tolls',
+        'Public Transit',
+        'Ride Shares'
+    ],
+    'Personal': [
+        'Clothing',
+        'Personal Care',
+        'Grooming'
+    ],
+    'Health & Wellness': [
+        'Medical',
+        'Dental',
+        'Vision',
+        'Fitness',
+        'Mental Health'
+    ],
+    'Entertainment & Lifestyle': [
+        'Entertainment',
+        'Hobbies',
+        'Subscriptions',
+        'Phone'
+    ],
+    'Other': [
+        'Other Personal'
+    ]
+}
+
+# Flatten adult categories for easier iteration
+ADULT_EXPENSE_CATEGORIES_FLAT = [
+    'Groceries', 'Dining Out', 'Coffee Shops',
+    'Auto Payment', 'Gas & Fuel', 'Auto Maintenance', 'Auto Insurance',
+    'Parking & Tolls', 'Public Transit', 'Ride Shares',
+    'Clothing', 'Personal Care', 'Grooming',
+    'Medical', 'Dental', 'Vision', 'Fitness', 'Mental Health',
+    'Entertainment', 'Hobbies', 'Subscriptions', 'Phone',
+    'Other Personal'
+]
+
+# Children expense categories (includes adult categories + child-specific)
+# These are age-based (0-30 years) and apply per child
+CHILDREN_EXPENSE_CATEGORIES_FLAT = [
+    # Food & Dining (same as adults)
+    'Groceries', 'Dining Out', 'Coffee Shops',
+    # Transportation (same as adults)
+    'Auto Payment', 'Gas & Fuel', 'Auto Maintenance', 'Auto Insurance',
+    'Parking & Tolls', 'Public Transit', 'Ride Shares',
+    # Personal (same as adults)
+    'Clothing', 'Personal Care', 'Grooming',
+    # Health & Wellness (same as adults)
+    'Medical', 'Dental', 'Vision', 'Fitness', 'Mental Health',
+    # Entertainment & Lifestyle (same as adults)
+    'Entertainment', 'Hobbies', 'Subscriptions', 'Phone',
+    # Child-specific categories
+    'Baby Equipment',
+    'Daycare',
+    'School Supplies',
+    'Activities & Sports',
+    'Gifts & Celebrations',
+    'Education',
+    'Other Child Expenses'
+]
+
+# Legacy mapping for backwards compatibility with old children templates
+LEGACY_CHILDREN_CATEGORIES = [
+    'Food', 'Clothing', 'Healthcare', 'Activities/Sports', 'Entertainment',
+    'Transportation', 'School Supplies', 'Gifts/Celebrations', 'Miscellaneous',
+    'Daycare', 'Baby Equipment', 'Education'
+]
+
+# Family shared expense categories (housing, utilities, etc.)
+# These are expenses shared by the entire family
+FAMILY_SHARED_CATEGORIES = {
+    'Housing': [
+        'Mortgage/Rent',
+        'Home Improvement',
+        'Property Tax',
+        'Home Insurance'
+    ],
+    'Utilities & Bills': [
+        'Gas & Electric',
+        'Water',
+        'Garbage',
+        'Internet & Cable'
+    ],
+    'Shared Lifestyle': [
+        'Shared Subscriptions',
+        'Family Vacations',
+        'Pet Care'
+    ],
+    'Other': [
+        'Other Family Expenses'
+    ]
+}
+
+# Flatten family categories
+FAMILY_SHARED_CATEGORIES_FLAT = [
+    'Mortgage/Rent', 'Home Improvement', 'Property Tax', 'Home Insurance',
+    'Gas & Electric', 'Water', 'Garbage', 'Internet & Cable',
+    'Shared Subscriptions', 'Family Vacations', 'Pet Care',
+    'Other Family Expenses'
+]
+
+# ============================================================================
+# ADULT EXPENSE TEMPLATES (by location and spending strategy)
+# ============================================================================
+# Annual amounts for individual adults (Parent X or Parent Y)
+# Organized by location, then strategy, then category
+# All values are in 2024 dollars
+
+ADULT_EXPENSE_TEMPLATES = {
+    "Seattle": {
+        "Conservative (statistical)": {
+            'Groceries': 4800,
+            'Dining Out': 2400,
+            'Coffee Shops': 600,
+            'Auto Payment': 3600,
+            'Gas & Fuel': 1800,
+            'Auto Maintenance': 800,
+            'Auto Insurance': 1400,
+            'Parking & Tolls': 400,
+            'Public Transit': 800,
+            'Ride Shares': 400,
+            'Clothing': 1000,
+            'Personal Care': 400,
+            'Grooming': 400,
+            'Medical': 800,
+            'Dental': 400,
+            'Vision': 200,
+            'Fitness': 480,
+            'Mental Health': 0,
+            'Entertainment': 1200,
+            'Hobbies': 600,
+            'Subscriptions': 400,
+            'Phone': 800,
+            'Other Personal': 800
+        },
+        "Average (statistical)": {
+            'Groceries': 6000,
+            'Dining Out': 3600,
+            'Coffee Shops': 1200,
+            'Auto Payment': 6000,
+            'Gas & Fuel': 2400,
+            'Auto Maintenance': 1200,
+            'Auto Insurance': 1800,
+            'Parking & Tolls': 600,
+            'Public Transit': 1200,
+            'Ride Shares': 600,
+            'Clothing': 1500,
+            'Personal Care': 600,
+            'Grooming': 600,
+            'Medical': 1200,
+            'Dental': 600,
+            'Vision': 300,
+            'Fitness': 720,
+            'Mental Health': 600,
+            'Entertainment': 1800,
+            'Hobbies': 1200,
+            'Subscriptions': 600,
+            'Phone': 1000,
+            'Other Personal': 1200
+        },
+        "High-end (statistical)": {
+            'Groceries': 8400,
+            'Dining Out': 6000,
+            'Coffee Shops': 2400,
+            'Auto Payment': 12000,
+            'Gas & Fuel': 3600,
+            'Auto Maintenance': 2000,
+            'Auto Insurance': 2400,
+            'Parking & Tolls': 1200,
+            'Public Transit': 1800,
+            'Ride Shares': 1200,
+            'Clothing': 3000,
+            'Personal Care': 1200,
+            'Grooming': 1200,
+            'Medical': 2000,
+            'Dental': 1000,
+            'Vision': 500,
+            'Fitness': 1440,
+            'Mental Health': 1200,
+            'Entertainment': 3600,
+            'Hobbies': 2400,
+            'Subscriptions': 1200,
+            'Phone': 1200,
+            'Other Personal': 2400
+        }
+    },
+    "Sacramento": {
+        "Conservative (statistical)": {
+            'Groceries': 4200,
+            'Dining Out': 2000,
+            'Coffee Shops': 500,
+            'Auto Payment': 3200,
+            'Gas & Fuel': 2000,
+            'Auto Maintenance': 900,
+            'Auto Insurance': 1600,
+            'Parking & Tolls': 300,
+            'Public Transit': 400,
+            'Ride Shares': 300,
+            'Clothing': 900,
+            'Personal Care': 350,
+            'Grooming': 350,
+            'Medical': 700,
+            'Dental': 350,
+            'Vision': 180,
+            'Fitness': 420,
+            'Mental Health': 0,
+            'Entertainment': 1000,
+            'Hobbies': 500,
+            'Subscriptions': 350,
+            'Phone': 750,
+            'Other Personal': 700
+        },
+        "Average (statistical)": {
+            'Groceries': 5400,
+            'Dining Out': 3000,
+            'Coffee Shops': 1000,
+            'Auto Payment': 5500,
+            'Gas & Fuel': 2600,
+            'Auto Maintenance': 1300,
+            'Auto Insurance': 2000,
+            'Parking & Tolls': 500,
+            'Public Transit': 600,
+            'Ride Shares': 500,
+            'Clothing': 1400,
+            'Personal Care': 550,
+            'Grooming': 550,
+            'Medical': 1100,
+            'Dental': 550,
+            'Vision': 280,
+            'Fitness': 660,
+            'Mental Health': 550,
+            'Entertainment': 1600,
+            'Hobbies': 1100,
+            'Subscriptions': 550,
+            'Phone': 950,
+            'Other Personal': 1100
+        },
+        "High-end (statistical)": {
+            'Groceries': 7800,
+            'Dining Out': 5400,
+            'Coffee Shops': 2000,
+            'Auto Payment': 11000,
+            'Gas & Fuel': 3800,
+            'Auto Maintenance': 2200,
+            'Auto Insurance': 2800,
+            'Parking & Tolls': 1000,
+            'Public Transit': 1000,
+            'Ride Shares': 1000,
+            'Clothing': 2800,
+            'Personal Care': 1100,
+            'Grooming': 1100,
+            'Medical': 1900,
+            'Dental': 950,
+            'Vision': 480,
+            'Fitness': 1320,
+            'Mental Health': 1100,
+            'Entertainment': 3200,
+            'Hobbies': 2200,
+            'Subscriptions': 1100,
+            'Phone': 1150,
+            'Other Personal': 2200
+        }
+    },
+    "Houston": {
+        "Conservative (statistical)": {
+            'Groceries': 3800,
+            'Dining Out': 1800,
+            'Coffee Shops': 400,
+            'Auto Payment': 3000,
+            'Gas & Fuel': 2200,
+            'Auto Maintenance': 1000,
+            'Auto Insurance': 1800,
+            'Parking & Tolls': 250,
+            'Public Transit': 300,
+            'Ride Shares': 250,
+            'Clothing': 800,
+            'Personal Care': 300,
+            'Grooming': 300,
+            'Medical': 600,
+            'Dental': 300,
+            'Vision': 150,
+            'Fitness': 360,
+            'Mental Health': 0,
+            'Entertainment': 900,
+            'Hobbies': 450,
+            'Subscriptions': 300,
+            'Phone': 700,
+            'Other Personal': 600
+        },
+        "Average (statistical)": {
+            'Groceries': 5000,
+            'Dining Out': 2700,
+            'Coffee Shops': 900,
+            'Auto Payment': 5200,
+            'Gas & Fuel': 2800,
+            'Auto Maintenance': 1400,
+            'Auto Insurance': 2200,
+            'Parking & Tolls': 450,
+            'Public Transit': 500,
+            'Ride Shares': 450,
+            'Clothing': 1300,
+            'Personal Care': 500,
+            'Grooming': 500,
+            'Medical': 1000,
+            'Dental': 500,
+            'Vision': 250,
+            'Fitness': 600,
+            'Mental Health': 500,
+            'Entertainment': 1500,
+            'Hobbies': 1000,
+            'Subscriptions': 500,
+            'Phone': 900,
+            'Other Personal': 1000
+        },
+        "High-end (statistical)": {
+            'Groceries': 7200,
+            'Dining Out': 4800,
+            'Coffee Shops': 1800,
+            'Auto Payment': 10500,
+            'Gas & Fuel': 4000,
+            'Auto Maintenance': 2400,
+            'Auto Insurance': 3000,
+            'Parking & Tolls': 900,
+            'Public Transit': 800,
+            'Ride Shares': 900,
+            'Clothing': 2600,
+            'Personal Care': 1000,
+            'Grooming': 1000,
+            'Medical': 1800,
+            'Dental': 900,
+            'Vision': 450,
+            'Fitness': 1200,
+            'Mental Health': 1000,
+            'Entertainment': 3000,
+            'Hobbies': 2000,
+            'Subscriptions': 1000,
+            'Phone': 1100,
+            'Other Personal': 2000
+        }
+    }
+}
+
+STATISTICAL_STRATEGIES_LEGACY = ["Conservative", "Average", "High-end"]  # For backward compatibility
+
+# Helper functions for strategy management
+def get_available_strategies_for_location(location, template_type='family'):
+    """
+    Get all available strategies for a location (statistical + custom)
+
+    Args:
+        location: Location name
+        template_type: 'family' or 'children'
+
+    Returns:
+        List of strategy names (statistical + custom)
+    """
+    strategies = []
+
+    # Get base templates
+    if template_type == 'family':
+        base_templates = FAMILY_EXPENSE_TEMPLATES
+        custom_templates = st.session_state.get('custom_family_templates', {})
+    else:  # children
+        base_templates = CHILDREN_EXPENSE_TEMPLATES
+        custom_templates = st.session_state.get('custom_children_templates', {})
+
+    # Add statistical strategies if they exist for this location
+    if location in base_templates:
+        strategies.extend(STATISTICAL_STRATEGIES)
+
+    # Add custom strategies if they exist for this location
+    if location in custom_templates:
+        for strategy_name in custom_templates[location].keys():
+            if not strategy_name.endswith(' (custom)'):
+                # Add (custom) suffix if not already present
+                strategies.append(f"{strategy_name} (custom)")
+            else:
+                strategies.append(strategy_name)
+
+    return strategies
+
+def is_statistical_strategy(strategy_name):
+    """Check if a strategy is a statistical (built-in) strategy"""
+    return strategy_name in STATISTICAL_STRATEGIES or strategy_name in STATISTICAL_STRATEGIES_LEGACY
+
+def is_custom_strategy(strategy_name):
+    """Check if a strategy is a custom (user-defined) strategy"""
+    return strategy_name.endswith(' (custom)')
+
+def get_strategy_base_name(strategy_name):
+    """Get the base name of a strategy without (statistical) or (custom) suffix"""
+    if strategy_name.endswith(' (statistical)'):
+        return strategy_name[:-14]  # Remove ' (statistical)'
+    elif strategy_name.endswith(' (custom)'):
+        return strategy_name[:-9]  # Remove ' (custom)'
+    return strategy_name
+
+def normalize_strategy_name(strategy_name):
+    """
+    Normalize strategy name to the new format with suffix.
+    Handles backward compatibility with old names.
+    """
+    # If already has a suffix, return as is
+    if strategy_name.endswith(' (statistical)') or strategy_name.endswith(' (custom)'):
+        return strategy_name
+
+    # Convert legacy names to new format
+    if strategy_name in STATISTICAL_STRATEGIES_LEGACY:
+        idx = STATISTICAL_STRATEGIES_LEGACY.index(strategy_name)
+        return STATISTICAL_STRATEGIES[idx]
+
+    # Assume it's a custom strategy if not statistical
+    return f"{strategy_name} (custom)"
+
+def get_adult_expense_template(location, strategy_name):
+    """
+    Get adult expense template for a specific location and strategy.
+
+    Args:
+        location: Location name
+        strategy_name: Strategy name (with or without suffix)
+
+    Returns:
+        Dictionary of annual expense amounts per category, or default template if not found
+    """
+    # Try to get from base templates
+    if location in ADULT_EXPENSE_TEMPLATES:
+        if strategy_name in ADULT_EXPENSE_TEMPLATES[location]:
+            return ADULT_EXPENSE_TEMPLATES[location][strategy_name].copy()
+
+        # Try legacy name
+        base_name = get_strategy_base_name(strategy_name)
+        if base_name in ADULT_EXPENSE_TEMPLATES[location]:
+            return ADULT_EXPENSE_TEMPLATES[location][base_name].copy()
+
+    # Return default (Seattle Average) if not found
+    if "Average (statistical)" in ADULT_EXPENSE_TEMPLATES.get("Seattle", {}):
+        return ADULT_EXPENSE_TEMPLATES["Seattle"]["Average (statistical)"].copy()
+
+    # Last resort: return zeros for all categories
+    return {cat: 0 for cat in ADULT_EXPENSE_CATEGORIES_FLAT}
+
+def migrate_legacy_children_expenses_to_new_structure(legacy_data, child_age):
+    """
+    Migrate legacy children expense data (single age) to new category structure.
+    Maps old categories to new ones and fills in defaults for new categories.
+
+    Args:
+        legacy_data: Dict with legacy category names as keys
+        child_age: Age of child (0-30)
+
+    Returns:
+        Dict with new category names as keys
+    """
+    # Mapping from legacy to new categories
+    category_mapping = {
+        'Food': 'Groceries',  # Split food into groceries primarily
+        'Clothing': 'Clothing',
+        'Healthcare': 'Medical',  # Map healthcare to medical
+        'Activities/Sports': 'Activities & Sports',
+        'Entertainment': 'Entertainment',
+        'Transportation': 'Gas & Fuel',  # Map transportation to gas primarily
+        'School Supplies': 'School Supplies',
+        'Gifts/Celebrations': 'Gifts & Celebrations',
+        'Miscellaneous': 'Other Child Expenses',
+        'Daycare': 'Daycare',
+        'Baby Equipment': 'Baby Equipment',
+        'Education': 'Education'
+    }
+
+    new_data = {}
+
+    # Map legacy categories to new ones
+    for legacy_cat, new_cat in category_mapping.items():
+        if legacy_cat in legacy_data:
+            new_data[new_cat] = legacy_data[legacy_cat]
+
+    # Fill in new categories with reasonable defaults based on age
+    if 'Dining Out' not in new_data:
+        # Dining out increases with age
+        new_data['Dining Out'] = 200 if child_age < 5 else 400 if child_age < 13 else 800 if child_age < 18 else 600 if child_age < 23 else 0
+
+    if 'Coffee Shops' not in new_data:
+        # Coffee shops mainly for teenagers/young adults
+        new_data['Coffee Shops'] = 100 if 16 <= child_age < 23 else 0
+
+    if 'Auto Payment' not in new_data:
+        # Car payment for teenagers/young adults
+        new_data['Auto Payment'] = 3000 if 16 <= child_age < 23 else 0
+
+    if 'Auto Maintenance' not in new_data:
+        new_data['Auto Maintenance'] = 500 if 16 <= child_age < 23 else 0
+
+    if 'Auto Insurance' not in new_data:
+        new_data['Auto Insurance'] = 2000 if 16 <= child_age < 19 else 1500 if 19 <= child_age < 23 else 0
+
+    if 'Parking & Tolls' not in new_data:
+        new_data['Parking & Tolls'] = 200 if 16 <= child_age < 23 else 0
+
+    if 'Public Transit' not in new_data:
+        new_data['Public Transit'] = 100 if 13 <= child_age < 16 else 0
+
+    if 'Ride Shares' not in new_data:
+        new_data['Ride Shares'] = 200 if 16 <= child_age < 23 else 0
+
+    if 'Personal Care' not in new_data:
+        new_data['Personal Care'] = 100 if child_age < 5 else 200 if child_age < 13 else 400 if child_age < 23 else 0
+
+    if 'Grooming' not in new_data:
+        new_data['Grooming'] = 50 if child_age < 5 else 100 if child_age < 13 else 300 if child_age < 23 else 0
+
+    if 'Dental' not in new_data:
+        new_data['Dental'] = 300 if child_age < 18 else 200 if child_age < 23 else 0
+
+    if 'Vision' not in new_data:
+        new_data['Vision'] = 150 if child_age < 18 else 100 if child_age < 23 else 0
+
+    if 'Fitness' not in new_data:
+        # Fitness memberships for teens/young adults
+        new_data['Fitness'] = 300 if 13 <= child_age < 23 else 0
+
+    if 'Mental Health' not in new_data:
+        new_data['Mental Health'] = 0  # Optional, parents can add if needed
+
+    if 'Hobbies' not in new_data:
+        new_data['Hobbies'] = 200 if child_age < 13 else 400 if child_age < 18 else 300 if child_age < 23 else 0
+
+    if 'Subscriptions' not in new_data:
+        new_data['Subscriptions'] = 100 if child_age >= 13 and child_age < 23 else 0
+
+    if 'Phone' not in new_data:
+        new_data['Phone'] = 500 if 13 <= child_age < 23 else 0
+
+    # Ensure all required categories exist
+    for cat in CHILDREN_EXPENSE_CATEGORIES_FLAT:
+        if cat not in new_data:
+            new_data[cat] = 0
+
+    return new_data
+
+def get_template_strategy_data(location, strategy_name, template_type='family'):
+    """
+    Get the template data for a specific location and strategy.
+    Handles both statistical and custom strategies with proper name normalization.
+
+    Args:
+        location: Location name
+        strategy_name: Strategy name (with or without suffix)
+        template_type: 'family', 'children', or 'adult'
+
+    Returns:
+        Dictionary of template data, or None if not found
+    """
+    if template_type == 'adult':
+        return get_adult_expense_template(location, strategy_name)
+    elif template_type == 'family':
+        base_templates = FAMILY_EXPENSE_TEMPLATES
+        custom_templates = st.session_state.get('custom_family_templates', {})
+    else:  # children
+        base_templates = CHILDREN_EXPENSE_TEMPLATES
+        custom_templates = st.session_state.get('custom_children_templates', {})
+
+    # Try to get from base templates first (statistical)
+    if location in base_templates:
+        # Try with current name
+        if strategy_name in base_templates[location]:
+            return base_templates[location][strategy_name].copy()
+
+        # Try legacy name
+        base_name = get_strategy_base_name(strategy_name)
+        if base_name in base_templates[location]:
+            return base_templates[location][base_name].copy()
+
+        # Try with (statistical) suffix
+        statistical_name = f"{base_name} (statistical)"
+        if statistical_name in base_templates[location]:
+            return base_templates[location][statistical_name].copy()
+
+    # Try custom templates
+    if location in custom_templates:
+        # Try with current name
+        if strategy_name in custom_templates[location]:
+            return custom_templates[location][strategy_name].copy()
+
+        # Try without suffix
+        base_name = get_strategy_base_name(strategy_name)
+        if base_name in custom_templates[location]:
+            return custom_templates[location][base_name].copy()
+
+    return None
+
+CHILDREN_EXPENSE_TEMPLATES = {
+    "Sacramento": {
+        "Conservative (statistical)": {
+            'Food': [1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200,
+                     4400, 4600, 2000, 1800, 1600, 1400, 1200, 1000, 800, 600, 400, 200, 100, 50, 0],
+            'Clothing': [400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1200, 1400, 1600, 1800, 2000,
+                         800, 600, 400, 300, 250, 200, 150, 100, 50, 25, 0, 0, 0],
+            'Healthcare': [800, 600, 500, 450, 400, 400, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950,
+                           500, 400, 300, 250, 200, 150, 100, 75, 50, 25, 0, 0, 0],
+            'Activities/Sports': [50, 100, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600,
+                                  2800, 3000, 3200, 600, 400, 300, 200, 150, 100, 50, 25, 0, 0, 0, 0, 0],
+            'Entertainment': [100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950,
+                              400, 300, 200, 150, 100, 75, 50, 25, 0, 0, 0, 0, 0],
+            'Transportation': [100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340, 500, 800, 1200, 1600,
+                               2000, 600, 400, 300, 200, 150, 100, 50, 25, 0, 0, 0, 0, 0],
+            'School Supplies': [25, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850,
+                                200, 150, 100, 75, 50, 25, 0, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
+                                   1050, 600, 500, 400, 350, 300, 250, 200, 150, 100, 75, 50, 25, 0],
+            'Miscellaneous': [150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575,
+                              400, 350, 300, 250, 200, 150, 100, 75, 50, 25, 0, 0, 0],
+            'Daycare': [22000, 22000, 22000, 22000, 22000, 8000, 6000, 4000, 2000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [3000, 500, 300, 200, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28000, 28000, 28000, 28000, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "Average (statistical)": {
+            'Food': [1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400, 4600,
+                     4800, 5000, 2400, 2200, 2000, 1800, 1600, 1400, 1200, 1000, 800, 600, 400, 200, 0],
+            'Clothing': [600, 650, 700, 750, 800, 850, 900, 950, 1000, 1050, 1100, 1150, 1200, 1400, 1600, 1800, 2000,
+                         2200, 1200, 900, 700, 500, 400, 350, 300, 250, 200, 150, 100, 50, 0],
+            'Healthcare': [1000, 800, 650, 600, 550, 550, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1050, 1100,
+                           700, 600, 500, 400, 350, 300, 250, 200, 150, 100, 50, 25, 0],
+            'Activities/Sports': [100, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800,
+                                  3000, 3200, 3400, 1000, 700, 500, 400, 300, 250, 200, 150, 100, 50, 25, 0, 0],
+            'Entertainment': [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
+                              1050, 600, 500, 400, 300, 250, 200, 150, 100, 75, 50, 25, 0, 0],
+            'Transportation': [150, 180, 210, 240, 270, 300, 330, 360, 390, 420, 450, 480, 510, 750, 1200, 1800, 2400,
+                               3000, 900, 600, 450, 350, 300, 250, 200, 150, 100, 50, 25, 0, 0],
+            'School Supplies': [50, 75, 150, 225, 300, 375, 450, 525, 600, 675, 750, 825, 900, 975, 1050, 1125, 1200,
+                                1275, 300, 225, 150, 100, 75, 50, 25, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1050,
+                                   1100, 1150, 800, 700, 600, 500, 450, 400, 350, 300, 250, 200, 150, 100, 50],
+            'Miscellaneous': [250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675,
+                              600, 500, 450, 400, 350, 300, 250, 200, 150, 100, 75, 50, 25],
+            'Daycare': [26000, 26000, 26000, 26000, 26000, 12000, 9000, 6000, 3000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [5000, 700, 500, 300, 200, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35000, 35000, 35000, 35000, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "High-end (statistical)": {
+            'Food': [2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400, 4600, 4800, 5000, 5200,
+                     5400, 5600, 3200, 3000, 2800, 2600, 2400, 2200, 2000, 1800, 1600, 1400, 1200, 1000, 500],
+            'Clothing': [1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2500, 2800, 3100,
+                         3400, 3700, 2000, 1500, 1200, 1000, 800, 700, 600, 500, 400, 300, 200, 100, 50],
+            'Healthcare': [1500, 1200, 1000, 900, 800, 800, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700,
+                           1800, 1900, 1200, 1000, 800, 700, 600, 500, 400, 350, 300, 250, 200, 150, 100],
+            'Activities/Sports': [200, 400, 800, 1200, 1600, 2000, 2400, 2800, 3200, 3600, 4000, 4400, 4800, 5200, 5600,
+                                  6000, 6400, 6800, 2000, 1500, 1200, 1000, 800, 600, 500, 400, 300, 200, 100, 50, 0],
+            'Entertainment': [400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900,
+                              2000, 2100, 1200, 1000, 800, 600, 500, 400, 350, 300, 250, 200, 150, 100, 50],
+            'Transportation': [250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 1200, 2000, 3000, 4000,
+                               5000, 1500, 1000, 750, 600, 500, 400, 350, 300, 250, 200, 150, 100, 50],
+            'School Supplies': [100, 150, 300, 450, 600, 750, 900, 1050, 1200, 1350, 1500, 1650, 1800, 1950, 2100, 2250,
+                                2400, 2550, 500, 375, 300, 250, 200, 150, 100, 75, 50, 25, 0, 0, 0],
+            'Gifts/Celebrations': [500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900,
+                                   2000, 2100, 2200, 1500, 1200, 1000, 800, 700, 600, 500, 450, 400, 350, 300, 250,
+                                   200],
+            'Miscellaneous': [400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1050, 1100, 1150, 1200,
+                              1250, 1000, 850, 750, 650, 600, 550, 500, 450, 400, 350, 300, 250, 200],
+            'Daycare': [35000, 35000, 35000, 35000, 35000, 18000, 15000, 12000, 6000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [10000, 1200, 800, 500, 300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 55000, 55000, 55000, 55000, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        }
+    },
+    "Seattle": {
+        "Conservative (statistical)": {
+            'Food': [1100, 1300, 1500, 1700, 1900, 2100, 2300, 2500, 2700, 2900, 3100, 3300, 3500, 3700, 3900, 4100,
+                     4300, 4500, 1900, 1700, 1500, 1300, 1100, 900, 700, 500, 300, 100, 50, 25, 0],
+            'Clothing': [350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1100, 1300, 1500, 1700, 1900,
+                         750, 550, 350, 250, 200, 150, 100, 75, 50, 25, 0, 0, 0],
+            'Healthcare': [700, 500, 400, 350, 300, 300, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850,
+                           400, 300, 200, 150, 100, 75, 50, 25, 0, 0, 0, 0, 0],
+            'Activities/Sports': [40, 80, 160, 320, 480, 640, 800, 960, 1120, 1280, 1440, 1600, 1760, 1920, 2080, 2240,
+                                  2400, 2560, 480, 320, 240, 160, 120, 80, 40, 20, 0, 0, 0, 0, 0],
+            'Entertainment': [80, 120, 160, 200, 240, 280, 320, 360, 400, 440, 480, 520, 560, 600, 640, 680, 720, 760,
+                              320, 240, 160, 120, 80, 60, 40, 20, 0, 0, 0, 0, 0],
+            'Transportation': [80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 450, 700, 1000, 1300,
+                               1600, 500, 300, 200, 150, 100, 75, 50, 25, 0, 0, 0, 0, 0],
+            'School Supplies': [20, 40, 80, 120, 160, 200, 240, 280, 320, 360, 400, 440, 480, 520, 560, 600, 640, 680,
+                                160, 120, 80, 60, 40, 20, 0, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [160, 200, 240, 280, 320, 360, 400, 440, 480, 520, 560, 600, 640, 680, 720, 760, 800,
+                                   840, 480, 400, 320, 280, 240, 200, 160, 120, 80, 60, 40, 20, 0],
+            'Miscellaneous': [120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340, 360, 380, 400, 420, 440, 460,
+                              320, 280, 240, 200, 160, 120, 80, 60, 40, 20, 0, 0, 0],
+            'Daycare': [18000, 18000, 18000, 18000, 18000, 6000, 4000, 2000, 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [3000, 500, 300, 200, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22000, 22000, 22000, 22000, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "Average (statistical)": {
+            'Food': [1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400,
+                     4600, 4800, 2200, 2000, 1800, 1600, 1400, 1200, 1000, 800, 600, 400, 200, 100, 0],
+            'Clothing': [500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1050, 1100, 1300, 1500, 1700, 1900,
+                         2100, 1000, 750, 600, 450, 350, 300, 250, 200, 150, 100, 50, 25, 0],
+            'Healthcare': [900, 700, 550, 500, 450, 450, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
+                           600, 500, 400, 300, 250, 200, 150, 100, 75, 50, 25, 0, 0],
+            'Activities/Sports': [80, 160, 320, 480, 640, 800, 960, 1120, 1280, 1440, 1600, 1760, 1920, 2080, 2240,
+                                  2400, 2560, 2720, 800, 560, 400, 320, 240, 200, 160, 120, 80, 40, 20, 0, 0],
+            'Entertainment': [160, 200, 240, 280, 320, 360, 400, 440, 480, 520, 560, 600, 640, 680, 720, 760, 800, 840,
+                              480, 400, 320, 240, 200, 160, 120, 80, 60, 40, 20, 0, 0],
+            'Transportation': [120, 150, 180, 210, 240, 270, 300, 330, 360, 390, 420, 450, 480, 650, 1000, 1500, 2000,
+                               2500, 750, 500, 375, 300, 250, 200, 150, 100, 75, 50, 25, 0, 0],
+            'School Supplies': [40, 60, 120, 180, 240, 300, 360, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020,
+                                240, 180, 120, 80, 60, 40, 20, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [240, 280, 320, 360, 400, 440, 480, 520, 560, 600, 640, 680, 720, 760, 800, 840, 880,
+                                   920, 640, 560, 480, 400, 360, 320, 280, 240, 200, 160, 120, 80, 40],
+            'Miscellaneous': [200, 220, 240, 260, 280, 300, 320, 340, 360, 380, 400, 420, 440, 460, 480, 500, 520, 540,
+                              480, 400, 360, 320, 280, 240, 200, 160, 120, 80, 60, 40, 20],
+            'Daycare': [22000, 22000, 22000, 22000, 22000, 9000, 6000, 3000, 1500, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [5000, 700, 500, 300, 200, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28000, 28000, 28000, 28000, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "High-end (statistical)": {
+            'Food': [2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400, 4600, 4800, 5000,
+                     5200, 5400, 2800, 2600, 2400, 2200, 2000, 1800, 1600, 1400, 1200, 1000, 800, 600, 300],
+            'Clothing': [800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2200, 2400, 2600,
+                         2800, 3000, 1800, 1300, 1000, 800, 600, 500, 400, 300, 200, 150, 100, 50, 25],
+            'Healthcare': [1300, 1000, 800, 700, 600, 600, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600,
+                           1700, 1000, 800, 600, 500, 400, 300, 250, 200, 150, 100, 75, 50, 25],
+            'Activities/Sports': [160, 320, 640, 960, 1280, 1600, 1920, 2240, 2560, 2880, 3200, 3520, 3840, 4160, 4480,
+                                  4800, 5120, 5440, 1600, 1120, 800, 640, 480, 400, 320, 240, 160, 80, 40, 20, 0],
+            'Entertainment': [320, 400, 480, 560, 640, 720, 800, 880, 960, 1040, 1120, 1200, 1280, 1360, 1440, 1520,
+                              1600, 1680, 960, 800, 640, 480, 400, 320, 280, 240, 200, 160, 120, 80, 40],
+            'Transportation': [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 1000, 1600, 2400, 3200,
+                               4000, 1200, 800, 600, 500, 400, 300, 250, 200, 150, 100, 75, 50, 25],
+            'School Supplies': [80, 120, 240, 360, 480, 600, 720, 840, 960, 1080, 1200, 1320, 1440, 1560, 1680, 1800,
+                                1920, 2040, 400, 300, 240, 200, 160, 120, 80, 60, 40, 20, 0, 0, 0],
+            'Gifts/Celebrations': [400, 480, 560, 640, 720, 800, 880, 960, 1040, 1120, 1200, 1280, 1360, 1440, 1520,
+                                   1600, 1680, 1760, 1200, 960, 800, 640, 560, 480, 400, 360, 320, 280, 240, 200, 160],
+            'Miscellaneous': [320, 360, 400, 440, 480, 520, 560, 600, 640, 680, 720, 760, 800, 840, 880, 920, 960, 1000,
+                              800, 680, 600, 520, 480, 440, 400, 360, 320, 280, 240, 200, 160],
+            'Daycare': [30000, 30000, 30000, 30000, 30000, 15000, 12000, 9000, 4500, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [10000, 1200, 800, 500, 300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 45000, 45000, 45000, 45000, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        }
+    },
+    "Houston": {
+        "Conservative (statistical)": {
+            'Food': [1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000,
+                     4200, 4400, 1800, 1600, 1400, 1200, 1000, 800, 600, 400, 200, 100, 50, 25, 0],
+            'Clothing': [300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 1000, 1200, 1400, 1600, 1800,
+                         700, 500, 300, 200, 150, 100, 75, 50, 25, 0, 0, 0, 0],
+            'Healthcare': [600, 400, 300, 250, 200, 200, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750,
+                           300, 200, 150, 100, 75, 50, 25, 0, 0, 0, 0, 0, 0],
+            'Activities/Sports': [30, 60, 120, 240, 360, 480, 600, 720, 840, 960, 1080, 1200, 1320, 1440, 1560, 1680,
+                                  1800, 1920, 360, 240, 180, 120, 90, 60, 30, 15, 0, 0, 0, 0, 0],
+            'Entertainment': [60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360, 390, 420, 450, 480, 510, 540, 570,
+                              240, 180, 120, 90, 60, 45, 30, 15, 0, 0, 0, 0, 0],
+            'Transportation': [60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240, 350, 550, 800, 1050,
+                               1300, 400, 250, 150, 100, 75, 50, 25, 0, 0, 0, 0, 0, 0],
+            'School Supplies': [15, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360, 390, 420, 450, 480, 510,
+                                120, 90, 60, 45, 30, 15, 0, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [120, 150, 180, 210, 240, 270, 300, 330, 360, 390, 420, 450, 480, 510, 540, 570, 600,
+                                   630, 360, 300, 240, 210, 180, 150, 120, 90, 60, 45, 30, 15, 0],
+            'Miscellaneous': [90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240, 255, 270, 285, 300, 315, 330, 345,
+                              240, 210, 180, 150, 120, 90, 60, 45, 30, 15, 0, 0, 0],
+            'Daycare': [15000, 15000, 15000, 15000, 15000, 5000, 3000, 1500, 750, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [2500, 400, 250, 150, 75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18000, 18000, 18000, 18000, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "Average (statistical)": {
+            'Food': [1300, 1500, 1700, 1900, 2100, 2300, 2500, 2700, 2900, 3100, 3300, 3500, 3700, 3900, 4100, 4300,
+                     4500, 4700, 2100, 1900, 1700, 1500, 1300, 1100, 900, 700, 500, 300, 200, 100, 0],
+            'Clothing': [450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1050, 1200, 1400, 1600, 1800,
+                         2000, 900, 650, 500, 350, 250, 200, 150, 100, 75, 50, 25, 0, 0],
+            'Healthcare': [750, 550, 450, 400, 350, 350, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900,
+                           450, 350, 250, 200, 150, 100, 75, 50, 25, 0, 0, 0, 0],
+            'Activities/Sports': [60, 120, 240, 360, 480, 600, 720, 840, 960, 1080, 1200, 1320, 1440, 1560, 1680, 1800,
+                                  1920, 2040, 600, 420, 300, 240, 180, 150, 120, 90, 60, 30, 15, 0, 0],
+            'Entertainment': [120, 150, 180, 210, 240, 270, 300, 330, 360, 390, 420, 450, 480, 510, 540, 570, 600, 630,
+                              360, 300, 240, 180, 150, 120, 90, 60, 45, 30, 15, 0, 0],
+            'Transportation': [90, 112, 135, 157, 180, 202, 225, 247, 270, 292, 315, 337, 360, 500, 800, 1200, 1600,
+                               2000, 600, 400, 300, 240, 200, 150, 100, 75, 50, 25, 0, 0, 0],
+            'School Supplies': [30, 45, 90, 135, 180, 225, 270, 315, 360, 405, 450, 495, 540, 585, 630, 675, 720, 765,
+                                180, 135, 90, 67, 45, 30, 15, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [180, 210, 240, 270, 300, 330, 360, 390, 420, 450, 480, 510, 540, 570, 600, 630, 660,
+                                   690, 480, 420, 360, 315, 270, 225, 180, 135, 90, 67, 45, 30, 15],
+            'Miscellaneous': [150, 165, 180, 195, 210, 225, 240, 255, 270, 285, 300, 315, 330, 345, 360, 375, 390, 405,
+                              360, 300, 270, 240, 210, 180, 150, 120, 90, 67, 45, 30, 15],
+            'Daycare': [18000, 18000, 18000, 18000, 18000, 7500, 5000, 2500, 1250, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [4500, 600, 400, 250, 150, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25000, 25000, 25000, 25000, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "High-end (statistical)": {
+            'Food': [1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400, 4600, 4800,
+                     5000, 5200, 2600, 2400, 2200, 2000, 1800, 1600, 1400, 1200, 1000, 800, 600, 400, 200],
+            'Clothing': [750, 825, 900, 975, 1050, 1125, 1200, 1275, 1350, 1425, 1500, 1575, 1650, 1875, 2100, 2325,
+                         2550, 2775, 1500, 1125, 900, 675, 525, 450, 375, 300, 225, 150, 75, 37, 0],
+            'Healthcare': [1125, 900, 750, 675, 600, 600, 600, 675, 750, 825, 900, 975, 1050, 1125, 1200, 1275, 1350,
+                           1425, 900, 675, 525, 450, 375, 300, 225, 150, 112, 75, 37, 0, 0],
+            'Activities/Sports': [120, 240, 480, 720, 960, 1200, 1440, 1680, 1920, 2160, 2400, 2640, 2880, 3120, 3360,
+                                  3600, 3840, 4080, 1200, 840, 600, 480, 360, 300, 240, 180, 120, 60, 30, 15, 0],
+            'Entertainment': [240, 300, 360, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080, 1140, 1200,
+                              1260, 720, 600, 480, 360, 300, 240, 210, 180, 150, 120, 90, 60, 30],
+            'Transportation': [150, 187, 225, 262, 300, 337, 375, 412, 450, 487, 525, 562, 600, 800, 1280, 1920, 2560,
+                               3200, 960, 640, 480, 400, 320, 240, 200, 160, 120, 80, 60, 40, 20],
+            'School Supplies': [60, 90, 180, 270, 360, 450, 540, 630, 720, 810, 900, 990, 1080, 1170, 1260, 1350, 1440,
+                                1530, 360, 270, 180, 135, 90, 60, 30, 15, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [300, 360, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080, 1140, 1200,
+                                   1260, 1320, 900, 720, 600, 480, 420, 360, 300, 270, 240, 210, 180, 150, 120],
+            'Miscellaneous': [240, 270, 300, 330, 360, 390, 420, 450, 480, 510, 540, 570, 600, 630, 660, 690, 720, 750,
+                              600, 510, 450, 390, 360, 330, 300, 270, 240, 210, 180, 150, 120],
+            'Daycare': [25000, 25000, 25000, 25000, 25000, 12500, 10000, 7500, 3750, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [8000, 1000, 600, 400, 250, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40000, 40000, 40000, 40000, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        }
+    },
+    # US Cities
+    "New York": {
+        "Conservative (statistical)": {
+            'Food': [1560, 1820, 2080, 2340, 2600, 2860, 3120, 3380, 3640, 3900, 4160, 4420, 4680, 4940, 5200, 5460,
+                     5720, 5980, 2600, 2340, 2080, 1820, 1560, 1300, 1040, 780, 520, 260, 130, 65, 0],
+            'Clothing': [520, 585, 650, 715, 780, 845, 910, 975, 1040, 1105, 1170, 1235, 1300, 1560, 1820, 2080, 2340, 2600,
+                         1040, 780, 520, 390, 325, 260, 195, 130, 65, 32, 0, 0, 0],
+            'Healthcare': [1040, 780, 650, 585, 520, 520, 520, 585, 650, 715, 780, 845, 910, 975, 1040, 1105, 1170, 1235,
+                           650, 520, 390, 325, 260, 195, 130, 97, 65, 32, 0, 0, 0],
+            'Activities/Sports': [65, 130, 260, 520, 780, 1040, 1300, 1560, 1820, 2080, 2340, 2600, 2860, 3120, 3380, 3640,
+                                  3900, 4160, 780, 520, 390, 260, 195, 130, 65, 32, 0, 0, 0, 0, 0],
+            'Entertainment': [130, 195, 260, 325, 390, 455, 520, 585, 650, 715, 780, 845, 910, 975, 1040, 1105, 1170, 1235,
+                              520, 390, 260, 195, 130, 97, 65, 32, 0, 0, 0, 0, 0],
+            'Transportation': [130, 156, 182, 208, 234, 260, 286, 312, 338, 364, 390, 416, 442, 650, 1040, 1560, 2080,
+                               2600, 780, 520, 390, 260, 195, 130, 65, 32, 0, 0, 0, 0, 0],
+            'School Supplies': [32, 65, 130, 195, 260, 325, 390, 455, 520, 585, 650, 715, 780, 845, 910, 975, 1040, 1105,
+                                260, 195, 130, 97, 65, 32, 0, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [260, 325, 390, 455, 520, 585, 650, 715, 780, 845, 910, 975, 1040, 1105, 1170, 1235, 1300,
+                                   1365, 780, 650, 520, 455, 390, 325, 260, 195, 130, 97, 65, 32, 0],
+            'Miscellaneous': [195, 227, 260, 292, 325, 357, 390, 422, 455, 487, 520, 552, 585, 617, 650, 682, 715, 747,
+                              520, 455, 390, 325, 260, 195, 130, 97, 65, 32, 0, 0, 0],
+            'Daycare': [28600, 28600, 28600, 28600, 28600, 10400, 7800, 5200, 2600, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [3000, 500, 300, 200, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36400, 36400, 36400, 36400, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "Average (statistical)": {
+            'Food': [2080, 2340, 2600, 2860, 3120, 3380, 3640, 3900, 4160, 4420, 4680, 4940, 5200, 5460, 5720, 5980,
+                     6240, 6500, 3120, 2860, 2600, 2340, 2080, 1820, 1560, 1300, 1040, 780, 520, 260, 0],
+            'Clothing': [780, 845, 910, 975, 1040, 1105, 1170, 1235, 1300, 1365, 1430, 1495, 1560, 1820, 2080, 2340, 2600,
+                         2860, 1560, 1170, 910, 650, 520, 455, 390, 325, 260, 195, 130, 65, 0],
+            'Healthcare': [1300, 1040, 845, 780, 715, 715, 715, 780, 845, 910, 975, 1040, 1105, 1170, 1235, 1300, 1365, 1430,
+                           910, 780, 650, 520, 455, 390, 325, 260, 195, 130, 65, 32, 0],
+            'Activities/Sports': [130, 260, 520, 780, 1040, 1300, 1560, 1820, 2080, 2340, 2600, 2860, 3120, 3380, 3640, 3900,
+                                  4160, 4420, 1300, 910, 650, 520, 390, 325, 260, 195, 130, 65, 32, 0, 0],
+            'Entertainment': [260, 325, 390, 455, 520, 585, 650, 715, 780, 845, 910, 975, 1040, 1105, 1170, 1235, 1300,
+                              1365, 780, 650, 520, 390, 325, 260, 195, 130, 97, 65, 32, 0, 0],
+            'Transportation': [195, 234, 273, 312, 351, 390, 429, 468, 507, 546, 585, 624, 663, 975, 1560, 2340, 3120,
+                               3900, 1170, 780, 585, 455, 390, 325, 260, 195, 130, 65, 32, 0, 0],
+            'School Supplies': [65, 97, 195, 292, 390, 487, 585, 682, 780, 877, 975, 1072, 1170, 1267, 1365, 1462, 1560,
+                                1657, 390, 292, 195, 130, 97, 65, 32, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [390, 455, 520, 585, 650, 715, 780, 845, 910, 975, 1040, 1105, 1170, 1235, 1300, 1365,
+                                   1430, 1495, 1040, 910, 780, 650, 585, 520, 455, 390, 325, 260, 195, 130, 65],
+            'Miscellaneous': [325, 357, 390, 422, 455, 487, 520, 552, 585, 617, 650, 682, 715, 747, 780, 812, 845, 877,
+                              780, 650, 585, 520, 455, 390, 325, 260, 195, 130, 97, 65, 32],
+            'Daycare': [33800, 33800, 33800, 33800, 33800, 15600, 11700, 7800, 3900, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [5000, 700, 500, 300, 200, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 45500, 45500, 45500, 45500, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "High-end (statistical)": {
+            'Food': [2860, 3120, 3380, 3640, 3900, 4160, 4420, 4680, 4940, 5200, 5460, 5720, 5980, 6240, 6500, 6760,
+                     7020, 7280, 4160, 3900, 3640, 3380, 3120, 2860, 2600, 2340, 2080, 1820, 1560, 1300, 650],
+            'Clothing': [1300, 1430, 1560, 1690, 1820, 1950, 2080, 2210, 2340, 2470, 2600, 2730, 2860, 3250, 3640, 4030,
+                         4420, 4810, 2600, 1950, 1560, 1300, 1040, 910, 780, 650, 520, 390, 260, 130, 65],
+            'Healthcare': [1950, 1560, 1300, 1170, 1040, 1040, 1040, 1170, 1300, 1430, 1560, 1690, 1820, 1950, 2080, 2210,
+                           2340, 2470, 1560, 1300, 1040, 910, 780, 650, 520, 455, 390, 325, 260, 195, 130],
+            'Activities/Sports': [260, 520, 1040, 1560, 2080, 2600, 3120, 3640, 4160, 4680, 5200, 5720, 6240, 6760, 7280, 7800,
+                                  8320, 8840, 2600, 1950, 1560, 1300, 1040, 780, 650, 520, 390, 260, 130, 65, 0],
+            'Entertainment': [520, 650, 780, 910, 1040, 1170, 1300, 1430, 1560, 1690, 1820, 1950, 2080, 2210, 2340, 2470,
+                              2600, 2730, 1560, 1300, 1040, 780, 650, 520, 455, 390, 325, 260, 195, 130, 65],
+            'Transportation': [325, 390, 455, 520, 585, 650, 715, 780, 845, 910, 975, 1040, 1105, 1560, 2600, 3900, 5200,
+                               6500, 1950, 1300, 975, 780, 650, 520, 455, 390, 325, 260, 195, 130, 65],
+            'School Supplies': [130, 195, 390, 585, 780, 975, 1170, 1365, 1560, 1755, 1950, 2145, 2340, 2535, 2730, 2925,
+                                3120, 3315, 650, 487, 390, 325, 260, 195, 130, 97, 65, 32, 0, 0, 0],
+            'Gifts/Celebrations': [650, 780, 910, 1040, 1170, 1300, 1430, 1560, 1690, 1820, 1950, 2080, 2210, 2340, 2470,
+                                   2600, 2730, 2860, 1950, 1560, 1300, 1040, 910, 780, 650, 585, 520, 455, 390, 325, 260],
+            'Miscellaneous': [520, 585, 650, 715, 780, 845, 910, 975, 1040, 1105, 1170, 1235, 1300, 1365, 1430, 1495, 1560,
+                              1625, 1300, 1105, 975, 845, 780, 715, 650, 585, 520, 455, 390, 325, 260],
+            'Daycare': [45500, 45500, 45500, 45500, 45500, 23400, 19500, 15600, 7800, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [10000, 1200, 800, 500, 300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 71500, 71500, 71500, 71500, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        }
+    },
+    "San Francisco": {
+        "Conservative (statistical)": {
+            'Food': [1380, 1610, 1840, 2070, 2300, 2530, 2760, 2990, 3220, 3450, 3680, 3910, 4140, 4370, 4600, 4830,
+                     5060, 5290, 2300, 2070, 1840, 1610, 1380, 1150, 920, 690, 460, 230, 115, 57, 0],
+            'Clothing': [460, 517, 575, 632, 690, 747, 805, 862, 920, 977, 1035, 1092, 1150, 1380, 1610, 1840, 2070, 2300,
+                         920, 690, 460, 345, 287, 230, 172, 115, 57, 28, 0, 0, 0],
+            'Healthcare': [920, 690, 575, 517, 460, 460, 460, 517, 575, 632, 690, 747, 805, 862, 920, 977, 1035, 1092,
+                           575, 460, 345, 287, 230, 172, 115, 86, 57, 28, 0, 0, 0],
+            'Activities/Sports': [57, 115, 230, 460, 690, 920, 1150, 1380, 1610, 1840, 2070, 2300, 2530, 2760, 2990, 3220,
+                                  3450, 3680, 690, 460, 345, 230, 172, 115, 57, 28, 0, 0, 0, 0, 0],
+            'Entertainment': [115, 172, 230, 287, 345, 402, 460, 517, 575, 632, 690, 747, 805, 862, 920, 977, 1035, 1092,
+                              460, 345, 230, 172, 115, 86, 57, 28, 0, 0, 0, 0, 0],
+            'Transportation': [115, 138, 161, 184, 207, 230, 253, 276, 299, 322, 345, 368, 391, 575, 920, 1380, 1840,
+                               2300, 690, 460, 345, 230, 172, 115, 57, 28, 0, 0, 0, 0, 0],
+            'School Supplies': [28, 57, 115, 172, 230, 287, 345, 402, 460, 517, 575, 632, 690, 747, 805, 862, 920, 977,
+                                230, 172, 115, 86, 57, 28, 0, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [230, 287, 345, 402, 460, 517, 575, 632, 690, 747, 805, 862, 920, 977, 1035, 1092, 1150,
+                                   1207, 690, 575, 460, 402, 345, 287, 230, 172, 115, 86, 57, 28, 0],
+            'Miscellaneous': [172, 201, 230, 258, 287, 316, 345, 373, 402, 431, 460, 488, 517, 546, 575, 603, 632, 661,
+                              460, 402, 345, 287, 230, 172, 115, 86, 57, 28, 0, 0, 0],
+            'Daycare': [25300, 25300, 25300, 25300, 25300, 9200, 6900, 4600, 2300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [3000, 500, 300, 200, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32200, 32200, 32200, 32200, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "Average (statistical)": {
+            'Food': [1840, 2070, 2300, 2530, 2760, 2990, 3220, 3450, 3680, 3910, 4140, 4370, 4600, 4830, 5060, 5290,
+                     5520, 5750, 2760, 2530, 2300, 2070, 1840, 1610, 1380, 1150, 920, 690, 460, 230, 0],
+            'Clothing': [690, 747, 805, 862, 920, 977, 1035, 1092, 1150, 1207, 1265, 1322, 1380, 1610, 1840, 2070, 2300,
+                         2530, 1380, 1035, 805, 575, 460, 402, 345, 287, 230, 172, 115, 57, 0],
+            'Healthcare': [1150, 920, 747, 690, 632, 632, 632, 690, 747, 805, 862, 920, 977, 1035, 1092, 1150, 1207, 1265,
+                           805, 690, 575, 460, 402, 345, 287, 230, 172, 115, 57, 28, 0],
+            'Activities/Sports': [115, 230, 460, 690, 920, 1150, 1380, 1610, 1840, 2070, 2300, 2530, 2760, 2990, 3220, 3450,
+                                  3680, 3910, 1150, 805, 575, 460, 345, 287, 230, 172, 115, 57, 28, 0, 0],
+            'Entertainment': [230, 287, 345, 402, 460, 517, 575, 632, 690, 747, 805, 862, 920, 977, 1035, 1092, 1150,
+                              1207, 690, 575, 460, 345, 287, 230, 172, 115, 86, 57, 28, 0, 0],
+            'Transportation': [172, 207, 241, 276, 310, 345, 379, 414, 448, 483, 517, 552, 586, 862, 1380, 2070, 2760,
+                               3450, 1035, 690, 517, 402, 345, 287, 230, 172, 115, 57, 28, 0, 0],
+            'School Supplies': [57, 86, 172, 258, 345, 431, 517, 603, 690, 776, 862, 948, 1035, 1121, 1207, 1293, 1380,
+                                1466, 345, 258, 172, 115, 86, 57, 28, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [345, 402, 460, 517, 575, 632, 690, 747, 805, 862, 920, 977, 1035, 1092, 1150, 1207,
+                                   1265, 1322, 920, 805, 690, 575, 517, 460, 402, 345, 287, 230, 172, 115, 57],
+            'Miscellaneous': [287, 316, 345, 373, 402, 431, 460, 488, 517, 546, 575, 603, 632, 661, 690, 718, 747, 776,
+                              690, 575, 517, 460, 402, 345, 287, 230, 172, 115, 86, 57, 28],
+            'Daycare': [29900, 29900, 29900, 29900, 29900, 13800, 10350, 6900, 3450, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [5000, 700, 500, 300, 200, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40250, 40250, 40250, 40250, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "High-end (statistical)": {
+            'Food': [2530, 2760, 2990, 3220, 3450, 3680, 3910, 4140, 4370, 4600, 4830, 5060, 5290, 5520, 5750, 5980,
+                     6210, 6440, 3680, 3450, 3220, 2990, 2760, 2530, 2300, 2070, 1840, 1610, 1380, 1150, 575],
+            'Clothing': [1150, 1265, 1380, 1495, 1610, 1725, 1840, 1955, 2070, 2185, 2300, 2415, 2530, 2875, 3220, 3565,
+                         3910, 4255, 2300, 1725, 1380, 1150, 920, 805, 690, 575, 460, 345, 230, 115, 57],
+            'Healthcare': [1725, 1380, 1150, 1035, 920, 920, 920, 1035, 1150, 1265, 1380, 1495, 1610, 1725, 1840, 1955,
+                           2070, 2185, 1380, 1150, 920, 805, 690, 575, 460, 402, 345, 287, 230, 172, 115],
+            'Activities/Sports': [230, 460, 920, 1380, 1840, 2300, 2760, 3220, 3680, 4140, 4600, 5060, 5520, 5980, 6440, 6900,
+                                  7360, 7820, 2300, 1725, 1380, 1150, 920, 690, 575, 460, 345, 230, 115, 57, 0],
+            'Entertainment': [460, 575, 690, 805, 920, 1035, 1150, 1265, 1380, 1495, 1610, 1725, 1840, 1955, 2070, 2185,
+                              2300, 2415, 1380, 1150, 920, 690, 575, 460, 402, 345, 287, 230, 172, 115, 57],
+            'Transportation': [287, 345, 402, 460, 517, 575, 632, 690, 747, 805, 862, 920, 977, 1380, 2300, 3450, 4600,
+                               5750, 1725, 1150, 862, 690, 575, 460, 402, 345, 287, 230, 172, 115, 57],
+            'School Supplies': [115, 172, 345, 517, 690, 862, 1035, 1207, 1380, 1552, 1725, 1897, 2070, 2242, 2415, 2587,
+                                2760, 2932, 575, 431, 345, 287, 230, 172, 115, 86, 57, 28, 0, 0, 0],
+            'Gifts/Celebrations': [575, 690, 805, 920, 1035, 1150, 1265, 1380, 1495, 1610, 1725, 1840, 1955, 2070, 2185,
+                                   2300, 2415, 2530, 1725, 1380, 1150, 920, 805, 690, 575, 517, 460, 402, 345, 287, 230],
+            'Miscellaneous': [460, 517, 575, 632, 690, 747, 805, 862, 920, 977, 1035, 1092, 1150, 1207, 1265, 1322, 1380,
+                              1437, 1150, 977, 862, 747, 690, 632, 575, 517, 460, 402, 345, 287, 230],
+            'Daycare': [40250, 40250, 40250, 40250, 40250, 20700, 17250, 13800, 6900, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [10000, 1200, 800, 500, 300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 63250, 63250, 63250, 63250, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        }
+    },
+    "Los Angeles": {  # Similar to California but slightly less expensive
+        "Conservative (statistical)": {
+            'Food': [1140, 1330, 1520, 1710, 1900, 2090, 2280, 2470, 2660, 2850, 3040, 3230, 3420, 3610, 3800, 3990,
+                     4180, 4370, 1900, 1710, 1520, 1330, 1140, 950, 760, 570, 380, 190, 95, 47, 0],
+            'Clothing': [380, 427, 475, 522, 570, 617, 665, 712, 760, 807, 855, 902, 950, 1140, 1330, 1520, 1710, 1900,
+                         760, 570, 380, 285, 237, 190, 142, 95, 47, 23, 0, 0, 0],
+            'Healthcare': [760, 570, 475, 427, 380, 380, 380, 427, 475, 522, 570, 617, 665, 712, 760, 807, 855, 902,
+                           475, 380, 285, 237, 190, 142, 95, 71, 47, 23, 0, 0, 0],
+            'Activities/Sports': [47, 95, 190, 380, 570, 760, 950, 1140, 1330, 1520, 1710, 1900, 2090, 2280, 2470, 2660,
+                                  2850, 3040, 570, 380, 285, 190, 142, 95, 47, 23, 0, 0, 0, 0, 0],
+            'Entertainment': [95, 142, 190, 237, 285, 332, 380, 427, 475, 522, 570, 617, 665, 712, 760, 807, 855, 902,
+                              380, 285, 190, 142, 95, 71, 47, 23, 0, 0, 0, 0, 0],
+            'Transportation': [95, 114, 133, 152, 171, 190, 209, 228, 247, 266, 285, 304, 323, 475, 760, 1140, 1520,
+                               1900, 570, 380, 285, 190, 142, 95, 47, 23, 0, 0, 0, 0, 0],
+            'School Supplies': [23, 47, 95, 142, 190, 237, 285, 332, 380, 427, 475, 522, 570, 617, 665, 712, 760, 807,
+                                190, 142, 95, 71, 47, 23, 0, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [190, 237, 285, 332, 380, 427, 475, 522, 570, 617, 665, 712, 760, 807, 855, 902, 950,
+                                   997, 570, 475, 380, 332, 285, 237, 190, 142, 95, 71, 47, 23, 0],
+            'Miscellaneous': [142, 166, 190, 213, 237, 261, 285, 308, 332, 356, 380, 403, 427, 451, 475, 498, 522, 546,
+                              380, 332, 285, 237, 190, 142, 95, 71, 47, 23, 0, 0, 0],
+            'Daycare': [20900, 20900, 20900, 20900, 20900, 7600, 5700, 3800, 1900, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [3000, 500, 300, 200, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 26600, 26600, 26600, 26600, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "Average (statistical)": {
+            'Food': [1520, 1710, 1900, 2090, 2280, 2470, 2660, 2850, 3040, 3230, 3420, 3610, 3800, 3990, 4180, 4370,
+                     4560, 4750, 2280, 2090, 1900, 1710, 1520, 1330, 1140, 950, 760, 570, 380, 190, 0],
+            'Clothing': [570, 617, 665, 712, 760, 807, 855, 902, 950, 997, 1045, 1092, 1140, 1330, 1520, 1710, 1900,
+                         2090, 1140, 855, 665, 475, 380, 332, 285, 237, 190, 142, 95, 47, 0],
+            'Healthcare': [950, 760, 617, 570, 522, 522, 522, 570, 617, 665, 712, 760, 807, 855, 902, 950, 997, 1045,
+                           665, 570, 475, 380, 332, 285, 237, 190, 142, 95, 47, 23, 0],
+            'Activities/Sports': [95, 190, 380, 570, 760, 950, 1140, 1330, 1520, 1710, 1900, 2090, 2280, 2470, 2660, 2850,
+                                  3040, 3230, 950, 665, 475, 380, 285, 237, 190, 142, 95, 47, 23, 0, 0],
+            'Entertainment': [190, 237, 285, 332, 380, 427, 475, 522, 570, 617, 665, 712, 760, 807, 855, 902, 950,
+                              997, 570, 475, 380, 285, 237, 190, 142, 95, 71, 47, 23, 0, 0],
+            'Transportation': [142, 171, 199, 228, 256, 285, 313, 342, 370, 399, 427, 456, 484, 712, 1140, 1710, 2280,
+                               2850, 855, 570, 427, 332, 285, 237, 190, 142, 95, 47, 23, 0, 0],
+            'School Supplies': [47, 71, 142, 213, 285, 356, 427, 498, 570, 641, 712, 783, 855, 926, 997, 1068, 1140,
+                                1211, 285, 213, 142, 95, 71, 47, 23, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [285, 332, 380, 427, 475, 522, 570, 617, 665, 712, 760, 807, 855, 902, 950, 997,
+                                   1045, 1092, 760, 665, 570, 475, 427, 380, 332, 285, 237, 190, 142, 95, 47],
+            'Miscellaneous': [237, 261, 285, 308, 332, 356, 380, 403, 427, 451, 475, 498, 522, 546, 570, 593, 617, 641,
+                              570, 475, 427, 380, 332, 285, 237, 190, 142, 95, 71, 47, 23],
+            'Daycare': [24700, 24700, 24700, 24700, 24700, 11400, 8550, 5700, 2850, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [5000, 700, 500, 300, 200, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33250, 33250, 33250, 33250, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "High-end (statistical)": {
+            'Food': [2090, 2280, 2470, 2660, 2850, 3040, 3230, 3420, 3610, 3800, 3990, 4180, 4370, 4560, 4750, 4940,
+                     5130, 5320, 3040, 2850, 2660, 2470, 2280, 2090, 1900, 1710, 1520, 1330, 1140, 950, 475],
+            'Clothing': [950, 1045, 1140, 1235, 1330, 1425, 1520, 1615, 1710, 1805, 1900, 1995, 2090, 2375, 2660, 2945,
+                         3230, 3515, 1900, 1425, 1140, 950, 760, 665, 570, 475, 380, 285, 190, 95, 47],
+            'Healthcare': [1425, 1140, 950, 855, 760, 760, 760, 855, 950, 1045, 1140, 1235, 1330, 1425, 1520, 1615,
+                           1710, 1805, 1140, 950, 760, 665, 570, 475, 380, 332, 285, 237, 190, 142, 95],
+            'Activities/Sports': [190, 380, 760, 1140, 1520, 1900, 2280, 2660, 3040, 3420, 3800, 4180, 4560, 4940, 5320, 5700,
+                                  6080, 6460, 1900, 1425, 1140, 950, 760, 570, 475, 380, 285, 190, 95, 47, 0],
+            'Entertainment': [380, 475, 570, 665, 760, 855, 950, 1045, 1140, 1235, 1330, 1425, 1520, 1615, 1710, 1805,
+                              1900, 1995, 1140, 950, 760, 570, 475, 380, 332, 285, 237, 190, 142, 95, 47],
+            'Transportation': [237, 285, 332, 380, 427, 475, 522, 570, 617, 665, 712, 760, 807, 1140, 1900, 2850, 3800,
+                               4750, 1425, 950, 712, 570, 475, 380, 332, 285, 237, 190, 142, 95, 47],
+            'School Supplies': [95, 142, 285, 427, 570, 712, 855, 997, 1140, 1282, 1425, 1567, 1710, 1852, 1995, 2137,
+                                2280, 2422, 475, 356, 285, 237, 190, 142, 95, 71, 47, 23, 0, 0, 0],
+            'Gifts/Celebrations': [475, 570, 665, 760, 855, 950, 1045, 1140, 1235, 1330, 1425, 1520, 1615, 1710, 1805,
+                                   1900, 1995, 2090, 1425, 1140, 950, 760, 665, 570, 475, 427, 380, 332, 285, 237, 190],
+            'Miscellaneous': [380, 427, 475, 522, 570, 617, 665, 712, 760, 807, 855, 902, 950, 997, 1045, 1092, 1140,
+                              1187, 950, 807, 712, 617, 570, 522, 475, 427, 380, 332, 285, 237, 190],
+            'Daycare': [33250, 33250, 33250, 33250, 33250, 17100, 14250, 11400, 5700, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [10000, 1200, 800, 500, 300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 52250, 52250, 52250, 52250, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        }
+    },
+    "Portland": {
+        "Conservative (statistical)": {
+            'Food': [1020, 1190, 1360, 1530, 1700, 1870, 2040, 2210, 2380, 2550, 2720, 2890, 3060, 3230, 3400, 3570,
+                     3740, 3910, 1700, 1530, 1360, 1190, 1020, 850, 680, 510, 340, 170, 85, 42, 0],
+            'Clothing': [340, 382, 425, 467, 510, 552, 595, 637, 680, 722, 765, 807, 850, 1020, 1190, 1360, 1530, 1700,
+                         680, 510, 340, 255, 212, 170, 127, 85, 42, 21, 0, 0, 0],
+            'Healthcare': [680, 510, 425, 382, 340, 340, 340, 382, 425, 467, 510, 552, 595, 637, 680, 722, 765, 807,
+                           425, 340, 255, 212, 170, 127, 85, 63, 42, 21, 0, 0, 0],
+            'Activities/Sports': [42, 85, 170, 340, 510, 680, 850, 1020, 1190, 1360, 1530, 1700, 1870, 2040, 2210, 2380,
+                                  2550, 2720, 510, 340, 255, 170, 127, 85, 42, 21, 0, 0, 0, 0, 0],
+            'Entertainment': [85, 127, 170, 212, 255, 297, 340, 382, 425, 467, 510, 552, 595, 637, 680, 722, 765, 807,
+                              340, 255, 170, 127, 85, 63, 42, 21, 0, 0, 0, 0, 0],
+            'Transportation': [85, 102, 119, 136, 153, 170, 187, 204, 221, 238, 255, 272, 289, 425, 680, 1020, 1360,
+                               1700, 510, 340, 255, 170, 127, 85, 42, 21, 0, 0, 0, 0, 0],
+            'School Supplies': [21, 42, 85, 127, 170, 212, 255, 297, 340, 382, 425, 467, 510, 552, 595, 637, 680, 722,
+                                170, 127, 85, 63, 42, 21, 0, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [170, 212, 255, 297, 340, 382, 425, 467, 510, 552, 595, 637, 680, 722, 765, 807, 850,
+                                   892, 510, 425, 340, 297, 255, 212, 170, 127, 85, 63, 42, 21, 0],
+            'Miscellaneous': [127, 148, 170, 191, 212, 233, 255, 276, 297, 318, 340, 361, 382, 403, 425, 446, 467, 488,
+                              340, 297, 255, 212, 170, 127, 85, 63, 42, 21, 0, 0, 0],
+            'Daycare': [18700, 18700, 18700, 18700, 18700, 6800, 5100, 3400, 1700, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [2750, 450, 275, 175, 90, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23800, 23800, 23800, 23800, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "Average (statistical)": {
+            'Food': [1360, 1530, 1700, 1870, 2040, 2210, 2380, 2550, 2720, 2890, 3060, 3230, 3400, 3570, 3740, 3910,
+                     4080, 4250, 2040, 1870, 1700, 1530, 1360, 1190, 1020, 850, 680, 510, 340, 170, 0],
+            'Clothing': [510, 552, 595, 637, 680, 722, 765, 807, 850, 892, 935, 977, 1020, 1190, 1360, 1530, 1700,
+                         1870, 1020, 765, 595, 425, 340, 297, 255, 212, 170, 127, 85, 42, 0],
+            'Healthcare': [850, 680, 552, 510, 467, 467, 467, 510, 552, 595, 637, 680, 722, 765, 807, 850, 892, 935,
+                           595, 510, 425, 340, 297, 255, 212, 170, 127, 85, 42, 21, 0],
+            'Activities/Sports': [85, 170, 340, 510, 680, 850, 1020, 1190, 1360, 1530, 1700, 1870, 2040, 2210, 2380, 2550,
+                                  2720, 2890, 850, 595, 425, 340, 255, 212, 170, 127, 85, 42, 21, 0, 0],
+            'Entertainment': [170, 212, 255, 297, 340, 382, 425, 467, 510, 552, 595, 637, 680, 722, 765, 807, 850,
+                              892, 510, 425, 340, 255, 212, 170, 127, 85, 63, 42, 21, 0, 0],
+            'Transportation': [127, 153, 178, 204, 229, 255, 280, 306, 331, 357, 382, 408, 433, 637, 1020, 1530, 2040,
+                               2550, 765, 510, 382, 297, 255, 212, 170, 127, 85, 42, 21, 0, 0],
+            'School Supplies': [42, 63, 127, 191, 255, 318, 382, 446, 510, 573, 637, 701, 765, 828, 892, 956, 1020,
+                                1083, 255, 191, 127, 85, 63, 42, 21, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [255, 297, 340, 382, 425, 467, 510, 552, 595, 637, 680, 722, 765, 807, 850, 892,
+                                   935, 977, 680, 595, 510, 425, 382, 340, 297, 255, 212, 170, 127, 85, 42],
+            'Miscellaneous': [212, 233, 255, 276, 297, 318, 340, 361, 382, 403, 425, 446, 467, 488, 510, 531, 552, 573,
+                              510, 425, 382, 340, 297, 255, 212, 170, 127, 85, 63, 42, 21],
+            'Daycare': [22100, 22100, 22100, 22100, 22100, 10200, 7650, 5100, 2550, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [4750, 650, 450, 275, 175, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29750, 29750, 29750, 29750, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "High-end (statistical)": {
+            'Food': [1870, 2040, 2210, 2380, 2550, 2720, 2890, 3060, 3230, 3400, 3570, 3740, 3910, 4080, 4250, 4420,
+                     4590, 4760, 2720, 2550, 2380, 2210, 2040, 1870, 1700, 1530, 1360, 1190, 1020, 850, 425],
+            'Clothing': [850, 935, 1020, 1105, 1190, 1275, 1360, 1445, 1530, 1615, 1700, 1785, 1870, 2125, 2380, 2635,
+                         2890, 3145, 1700, 1275, 1020, 850, 680, 595, 510, 425, 340, 255, 170, 85, 42],
+            'Healthcare': [1275, 1020, 850, 765, 680, 680, 680, 765, 850, 935, 1020, 1105, 1190, 1275, 1360, 1445,
+                           1530, 1615, 1020, 850, 680, 595, 510, 425, 340, 297, 255, 212, 170, 127, 85],
+            'Activities/Sports': [170, 340, 680, 1020, 1360, 1700, 2040, 2380, 2720, 3060, 3400, 3740, 4080, 4420, 4760, 5100,
+                                  5440, 5780, 1700, 1275, 1020, 850, 680, 510, 425, 340, 255, 170, 85, 42, 0],
+            'Entertainment': [340, 425, 510, 595, 680, 765, 850, 935, 1020, 1105, 1190, 1275, 1360, 1445, 1530, 1615,
+                              1700, 1785, 1020, 850, 680, 510, 425, 340, 297, 255, 212, 170, 127, 85, 42],
+            'Transportation': [212, 255, 297, 340, 382, 425, 467, 510, 552, 595, 637, 680, 722, 1020, 1700, 2550, 3400,
+                               4250, 1275, 850, 637, 510, 425, 340, 297, 255, 212, 170, 127, 85, 42],
+            'School Supplies': [85, 127, 255, 382, 510, 637, 765, 892, 1020, 1147, 1275, 1402, 1530, 1657, 1785, 1912,
+                                2040, 2167, 425, 318, 255, 212, 170, 127, 85, 63, 42, 21, 0, 0, 0],
+            'Gifts/Celebrations': [425, 510, 595, 680, 765, 850, 935, 1020, 1105, 1190, 1275, 1360, 1445, 1530, 1615,
+                                   1700, 1785, 1870, 1275, 1020, 850, 680, 595, 510, 425, 382, 340, 297, 255, 212, 170],
+            'Miscellaneous': [340, 382, 425, 467, 510, 552, 595, 637, 680, 722, 765, 807, 850, 892, 935, 977, 1020,
+                              1062, 850, 722, 637, 552, 510, 467, 425, 382, 340, 297, 255, 212, 170],
+            'Daycare': [29750, 29750, 29750, 29750, 29750, 15300, 12750, 10200, 5100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [9000, 1100, 700, 450, 275, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 46750, 46750, 46750, 46750, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        }
+    },
+    "Auckland": {  # New Zealand's largest city, high cost of living
+        "Conservative (statistical)": {
+            'Food': [1150, 1340, 1530, 1720, 1910, 2100, 2290, 2480, 2670, 2860, 3050, 3240, 3430, 3620, 3810, 4000,
+                     4190, 4380, 1910, 1720, 1530, 1340, 1150, 960, 770, 580, 390, 200, 100, 50, 0],
+            'Clothing': [380, 430, 480, 530, 580, 630, 680, 730, 780, 830, 880, 930, 980, 1150, 1340, 1530, 1720, 1910,
+                         780, 580, 380, 280, 230, 180, 130, 80, 50, 30, 0, 0, 0],
+            'Healthcare': [750, 550, 450, 400, 350, 350, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900,
+                           450, 350, 250, 200, 150, 100, 75, 50, 25, 0, 0, 0, 0],
+            'Activities/Sports': [45, 90, 180, 360, 540, 720, 900, 1080, 1260, 1440, 1620, 1800, 1980, 2160, 2340, 2520,
+                                  2700, 2880, 540, 360, 270, 180, 135, 90, 45, 25, 0, 0, 0, 0, 0],
+            'Entertainment': [90, 135, 180, 225, 270, 315, 360, 405, 450, 495, 540, 585, 630, 675, 720, 765, 810, 855,
+                              360, 270, 180, 135, 90, 70, 45, 25, 0, 0, 0, 0, 0],
+            'Transportation': [90, 110, 130, 150, 170, 190, 210, 230, 250, 270, 290, 310, 330, 480, 750, 1100, 1450,
+                               1800, 540, 340, 230, 170, 120, 90, 60, 30, 0, 0, 0, 0, 0],
+            'School Supplies': [25, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850,
+                                200, 150, 100, 75, 50, 25, 0, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [180, 225, 270, 315, 360, 405, 450, 495, 540, 585, 630, 675, 720, 765, 810, 855, 900,
+                                   945, 540, 450, 360, 315, 270, 225, 180, 135, 90, 70, 45, 25, 0],
+            'Miscellaneous': [135, 157, 180, 202, 225, 247, 270, 292, 315, 337, 360, 382, 405, 427, 450, 472, 495, 517,
+                              360, 315, 270, 225, 180, 135, 90, 70, 45, 25, 0, 0, 0],
+            'Daycare': [19500, 19500, 19500, 19500, 19500, 6500, 4500, 2500, 1250, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [3200, 550, 350, 220, 110, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24000, 24000, 24000, 24000, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "Average (statistical)": {
+            'Food': [1530, 1720, 1910, 2100, 2290, 2480, 2670, 2860, 3050, 3240, 3430, 3620, 3810, 4000, 4190, 4380,
+                     4570, 4760, 2290, 2100, 1910, 1720, 1530, 1340, 1150, 960, 770, 580, 390, 200, 0],
+            'Clothing': [540, 590, 640, 690, 740, 790, 840, 890, 940, 990, 1040, 1090, 1140, 1340, 1530, 1720, 1910,
+                         2100, 1140, 840, 690, 540, 440, 390, 340, 290, 240, 190, 140, 90, 0],
+            'Healthcare': [950, 750, 620, 570, 520, 520, 520, 570, 620, 670, 720, 770, 820, 870, 920, 970, 1020, 1070,
+                           670, 570, 470, 370, 320, 270, 220, 170, 120, 70, 40, 20, 0],
+            'Activities/Sports': [90, 180, 360, 540, 720, 900, 1080, 1260, 1440, 1620, 1800, 1980, 2160, 2340, 2520,
+                                  2700, 2880, 3060, 900, 630, 450, 360, 270, 225, 180, 135, 90, 45, 25, 0, 0],
+            'Entertainment': [180, 225, 270, 315, 360, 405, 450, 495, 540, 585, 630, 675, 720, 765, 810, 855, 900, 945,
+                              540, 450, 360, 270, 225, 180, 135, 90, 70, 45, 25, 0, 0],
+            'Transportation': [135, 167, 198, 230, 261, 293, 324, 356, 387, 419, 450, 482, 513, 730, 1140, 1710, 2280,
+                               2850, 855, 570, 427, 340, 285, 230, 175, 120, 85, 55, 30, 0, 0],
+            'School Supplies': [50, 75, 150, 225, 300, 375, 450, 525, 600, 675, 750, 825, 900, 975, 1050, 1125, 1200,
+                                1275, 300, 225, 150, 100, 75, 50, 25, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [270, 315, 360, 405, 450, 495, 540, 585, 630, 675, 720, 765, 810, 855, 900, 945,
+                                   990, 1035, 720, 630, 540, 450, 405, 360, 315, 270, 225, 180, 135, 90, 45],
+            'Miscellaneous': [225, 247, 270, 292, 315, 337, 360, 382, 405, 427, 450, 472, 495, 517, 540, 562, 585, 607,
+                              540, 450, 405, 360, 315, 270, 225, 180, 135, 90, 70, 45, 25],
+            'Daycare': [24000, 24000, 24000, 24000, 24000, 10000, 7000, 4000, 2000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [5500, 750, 550, 350, 220, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30000, 30000, 30000, 30000, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "High-end (statistical)": {
+            'Food': [2100, 2290, 2480, 2670, 2860, 3050, 3240, 3430, 3620, 3810, 4000, 4190, 4380, 4570, 4760, 4950,
+                     5140, 5330, 2860, 2670, 2480, 2290, 2100, 1910, 1720, 1530, 1340, 1150, 960, 770, 385],
+            'Clothing': [900, 990, 1080, 1170, 1260, 1350, 1440, 1530, 1620, 1710, 1800, 1890, 1980, 2290, 2600, 2910,
+                         3220, 3530, 1980, 1440, 1170, 990, 810, 720, 630, 540, 450, 360, 270, 180, 90],
+            'Healthcare': [1400, 1120, 940, 850, 760, 760, 760, 850, 940, 1030, 1120, 1210, 1300, 1390, 1480, 1570,
+                           1660, 1750, 1120, 940, 760, 670, 580, 490, 400, 350, 300, 250, 200, 150, 100],
+            'Activities/Sports': [180, 360, 720, 1080, 1440, 1800, 2160, 2520, 2880, 3240, 3600, 3960, 4320, 4680, 5040,
+                                  5400, 5760, 6120, 1800, 1260, 900, 720, 540, 450, 360, 270, 180, 90, 45, 25, 0],
+            'Entertainment': [360, 450, 540, 630, 720, 810, 900, 990, 1080, 1170, 1260, 1350, 1440, 1530, 1620, 1710,
+                              1800, 1890, 1080, 900, 720, 540, 450, 360, 315, 270, 225, 180, 135, 90, 45],
+            'Transportation': [225, 270, 315, 360, 405, 450, 495, 540, 585, 630, 675, 720, 765, 1140, 1800, 2700, 3600,
+                               4500, 1350, 900, 675, 540, 450, 360, 315, 270, 225, 180, 135, 90, 45],
+            'School Supplies': [100, 150, 300, 450, 600, 750, 900, 1050, 1200, 1350, 1500, 1650, 1800, 1950, 2100, 2250,
+                                2400, 2550, 500, 375, 300, 250, 200, 150, 100, 75, 50, 25, 0, 0, 0],
+            'Gifts/Celebrations': [450, 540, 630, 720, 810, 900, 990, 1080, 1170, 1260, 1350, 1440, 1530, 1620, 1710,
+                                   1800, 1890, 1980, 1350, 1080, 900, 720, 630, 540, 450, 405, 360, 315, 270, 225, 180],
+            'Miscellaneous': [360, 405, 450, 495, 540, 585, 630, 675, 720, 765, 810, 855, 900, 945, 990, 1035, 1080,
+                              1125, 900, 765, 675, 585, 540, 495, 450, 405, 360, 315, 270, 225, 180],
+            'Daycare': [32000, 32000, 32000, 32000, 32000, 16000, 13000, 10000, 5000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [11000, 1400, 900, 600, 350, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 48000, 48000, 48000, 48000, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        }
+    },
+    "Wellington": {  # New Zealand's capital, medium-high cost of living
+        "Conservative (statistical)": {
+            'Food': [1050, 1230, 1410, 1590, 1770, 1950, 2130, 2310, 2490, 2670, 2850, 3030, 3210, 3390, 3570, 3750,
+                     3930, 4110, 1770, 1590, 1410, 1230, 1050, 870, 690, 510, 330, 150, 75, 40, 0],
+            'Clothing': [350, 395, 440, 485, 530, 575, 620, 665, 710, 755, 800, 845, 890, 1050, 1230, 1410, 1590, 1770,
+                         710, 530, 350, 260, 215, 170, 125, 80, 45, 25, 0, 0, 0],
+            'Healthcare': [700, 500, 410, 365, 320, 320, 320, 365, 410, 455, 500, 545, 590, 635, 680, 725, 770, 815,
+                           410, 320, 230, 185, 140, 95, 70, 45, 20, 0, 0, 0, 0],
+            'Activities/Sports': [40, 80, 160, 320, 480, 640, 800, 960, 1120, 1280, 1440, 1600, 1760, 1920, 2080, 2240,
+                                  2400, 2560, 480, 320, 240, 160, 120, 80, 40, 20, 0, 0, 0, 0, 0],
+            'Entertainment': [80, 120, 160, 200, 240, 280, 320, 360, 400, 440, 480, 520, 560, 600, 640, 680, 720, 760,
+                              320, 240, 160, 120, 80, 60, 40, 20, 0, 0, 0, 0, 0],
+            'Transportation': [80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 440, 680, 1000, 1320,
+                               1640, 480, 310, 210, 160, 110, 80, 50, 25, 0, 0, 0, 0, 0],
+            'School Supplies': [20, 40, 80, 120, 160, 200, 240, 280, 320, 360, 400, 440, 480, 520, 560, 600, 640, 680,
+                                160, 120, 80, 60, 40, 20, 0, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [160, 200, 240, 280, 320, 360, 400, 440, 480, 520, 560, 600, 640, 680, 720, 760, 800,
+                                   840, 480, 400, 320, 280, 240, 200, 160, 120, 80, 60, 40, 20, 0],
+            'Miscellaneous': [120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340, 360, 380, 400, 420, 440, 460,
+                              320, 280, 240, 200, 160, 120, 80, 60, 40, 20, 0, 0, 0],
+            'Daycare': [17500, 17500, 17500, 17500, 17500, 6000, 4000, 2200, 1100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [2800, 470, 290, 185, 95, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22000, 22000, 22000, 22000, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "Average (statistical)": {
+            'Food': [1410, 1590, 1770, 1950, 2130, 2310, 2490, 2670, 2850, 3030, 3210, 3390, 3570, 3750, 3930, 4110,
+                     4290, 4470, 2130, 1950, 1770, 1590, 1410, 1230, 1050, 870, 690, 510, 330, 150, 0],
+            'Clothing': [495, 540, 585, 630, 675, 720, 765, 810, 855, 900, 945, 990, 1035, 1230, 1410, 1590, 1770,
+                         1950, 1035, 765, 630, 495, 405, 360, 315, 270, 225, 180, 135, 90, 0],
+            'Healthcare': [870, 690, 565, 515, 465, 465, 465, 515, 565, 615, 665, 715, 765, 815, 865, 915, 965, 1015,
+                           615, 515, 415, 315, 270, 225, 180, 135, 90, 60, 30, 15, 0],
+            'Activities/Sports': [80, 160, 320, 480, 640, 800, 960, 1120, 1280, 1440, 1600, 1760, 1920, 2080, 2240,
+                                  2400, 2560, 2720, 800, 560, 400, 320, 240, 200, 160, 120, 80, 40, 20, 0, 0],
+            'Entertainment': [160, 200, 240, 280, 320, 360, 400, 440, 480, 520, 560, 600, 640, 680, 720, 760, 800, 840,
+                              480, 400, 320, 240, 200, 160, 120, 80, 60, 40, 20, 0, 0],
+            'Transportation': [120, 150, 180, 210, 240, 270, 300, 330, 360, 390, 420, 450, 480, 660, 1040, 1560, 2080,
+                               2600, 780, 520, 390, 310, 260, 210, 160, 110, 80, 50, 25, 0, 0],
+            'School Supplies': [40, 60, 120, 180, 240, 300, 360, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020,
+                                240, 180, 120, 80, 60, 40, 20, 0, 0, 0, 0, 0, 0],
+            'Gifts/Celebrations': [240, 280, 320, 360, 400, 440, 480, 520, 560, 600, 640, 680, 720, 760, 800, 840,
+                                   880, 920, 640, 560, 480, 400, 360, 320, 280, 240, 200, 160, 120, 80, 40],
+            'Miscellaneous': [200, 220, 240, 260, 280, 300, 320, 340, 360, 380, 400, 420, 440, 460, 480, 500, 520, 540,
+                              480, 400, 360, 320, 280, 240, 200, 160, 120, 80, 60, 40, 20],
+            'Daycare': [21500, 21500, 21500, 21500, 21500, 9200, 7000, 3800, 1900, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [4900, 670, 470, 295, 190, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27500, 27500, 27500, 27500, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        },
+        "High-end (statistical)": {
+            'Food': [1950, 2130, 2310, 2490, 2670, 2850, 3030, 3210, 3390, 3570, 3750, 3930, 4110, 4290, 4470, 4650,
+                     4830, 5010, 2670, 2490, 2310, 2130, 1950, 1770, 1590, 1410, 1230, 1050, 870, 690, 345],
+            'Clothing': [825, 907, 990, 1072, 1155, 1237, 1320, 1402, 1485, 1567, 1650, 1732, 1815, 2070, 2325, 2580,
+                         2835, 3090, 1815, 1320, 1072, 907, 742, 660, 577, 495, 412, 330, 247, 165, 82],
+            'Healthcare': [1300, 1040, 870, 785, 700, 700, 700, 785, 870, 955, 1040, 1125, 1210, 1295, 1380, 1465,
+                           1550, 1635, 1040, 870, 700, 615, 530, 445, 360, 315, 270, 225, 180, 135, 90],
+            'Activities/Sports': [160, 320, 640, 960, 1280, 1600, 1920, 2240, 2560, 2880, 3200, 3520, 3840, 4160, 4480,
+                                  4800, 5120, 5440, 1600, 1120, 800, 640, 480, 400, 320, 240, 160, 80, 40, 20, 0],
+            'Entertainment': [320, 400, 480, 560, 640, 720, 800, 880, 960, 1040, 1120, 1200, 1280, 1360, 1440, 1520,
+                              1600, 1680, 960, 800, 640, 480, 400, 320, 280, 240, 200, 160, 120, 80, 40],
+            'Transportation': [210, 252, 294, 336, 378, 420, 462, 504, 546, 588, 630, 672, 714, 1040, 1650, 2475, 3300,
+                               4125, 1237, 825, 618, 495, 412, 330, 288, 246, 204, 162, 120, 82, 41],
+            'School Supplies': [82, 123, 247, 370, 495, 618, 742, 865, 990, 1113, 1237, 1360, 1485, 1608, 1732, 1855,
+                                1980, 2103, 412, 309, 247, 206, 165, 123, 82, 61, 41, 20, 0, 0, 0],
+            'Gifts/Celebrations': [420, 504, 588, 672, 756, 840, 924, 1008, 1092, 1176, 1260, 1344, 1428, 1512, 1596,
+                                   1680, 1764, 1848, 1260, 1008, 840, 672, 588, 504, 420, 378, 336, 294, 252, 210, 168],
+            'Miscellaneous': [330, 371, 412, 454, 495, 536, 577, 619, 660, 701, 742, 784, 825, 866, 907, 949, 990,
+                              1031, 825, 701, 618, 536, 495, 454, 412, 371, 330, 288, 247, 206, 165],
+            'Daycare': [28500, 28500, 28500, 28500, 28500, 14500, 11800, 9500, 4750, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Baby Equipment': [9500, 1150, 730, 470, 290, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'Education': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 44000, 44000, 44000, 44000, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0]
+        }
+    }
+}
+
+FAMILY_EXPENSE_TEMPLATES = {
+    "California": {
+        "Conservative (statistical)": {
+            'Food & Groceries': 14400,
+            'Clothing': 3600,
+            'Transportation': 10000,
+            'Entertainment & Activities': 4800,
+            'Personal Care': 2400,
+            'Utilities': 2400,  # Electricity, Water, Gas (~$200/mo)
+            'Internet & Phone': 1800,  # Internet + Cellphones (~$150/mo)
+            'Subscriptions': 600,  # Streaming services, music, etc. (~$50/mo)
+            'Other Expenses': 1200
+        },
+        "Average (statistical)": {
+            'Food & Groceries': 18000,
+            'Clothing': 4800,
+            'Transportation': 13000,
+            'Entertainment & Activities': 7200,
+            'Personal Care': 3600,
+            'Utilities': 3000,  # Electricity, Water, Gas (~$250/mo)
+            'Internet & Phone': 2400,  # Internet + Cellphones (~$200/mo)
+            'Subscriptions': 1200,  # Streaming services, music, etc. (~$100/mo)
+            'Other Expenses': 1800
+        },
+        "High-end (statistical)": {
+            'Food & Groceries': 24000,
+            'Clothing': 7200,
+            'Transportation': 18000,
+            'Entertainment & Activities': 12000,
+            'Personal Care': 6000,
+            'Utilities': 4200,  # Electricity, Water, Gas (~$350/mo)
+            'Internet & Phone': 3600,  # Internet + Cellphones (~$300/mo)
+            'Subscriptions': 2400,  # Streaming services, music, etc. (~$200/mo)
+            'Other Expenses': 1800
+        }
+    },
+    "Seattle": {
+        "Conservative (statistical)": {
+            'Food & Groceries': 13200,
+            'Clothing': 3000,
+            'Transportation': 9000,
+            'Entertainment & Activities': 4200,
+            'Personal Care': 2100,
+            'Utilities': 2160,
+            'Internet & Phone': 1620,
+            'Subscriptions': 540,
+            'Other Expenses': 1080
+        },
+        "Average (statistical)": {
+            'Food & Groceries': 16800,
+            'Clothing': 4200,
+            'Transportation': 12000,
+            'Entertainment & Activities': 6600,
+            'Personal Care': 3000,
+            'Utilities': 3120,
+            'Internet & Phone': 2340,
+            'Subscriptions': 1170,
+            'Other Expenses': 1170
+        },
+        "High-end (statistical)": {
+            'Food & Groceries': 22800,
+            'Clothing': 6600,
+            'Transportation': 16800,
+            'Entertainment & Activities': 10800,
+            'Personal Care': 5400,
+            'Utilities': 4320,
+            'Internet & Phone': 3240,
+            'Subscriptions': 1620,
+            'Other Expenses': 1620
+        }
+    },
+    "Houston": {
+        "Conservative (statistical)": {
+            'Food & Groceries': 12600,
+            'Clothing': 2800,
+            'Transportation': 8400,
+            'Entertainment & Activities': 3900,
+            'Personal Care': 1800,
+            'Utilities': 2040,
+            'Internet & Phone': 1530,
+            'Subscriptions': 510,
+            'Other Expenses': 1020
+        },
+        "Average (statistical)": {
+            'Food & Groceries': 15600,
+            'Clothing': 3900,
+            'Transportation': 11400,
+            'Entertainment & Activities': 6000,
+            'Personal Care': 2700,
+            'Utilities': 2880,
+            'Internet & Phone': 2160,
+            'Subscriptions': 1080,
+            'Other Expenses': 1080
+        },
+        "High-end (statistical)": {
+            'Food & Groceries': 21000,
+            'Clothing': 6000,
+            'Transportation': 15600,
+            'Entertainment & Activities': 9600,
+            'Personal Care': 4800,
+            'Utilities': 4080,
+            'Internet & Phone': 3060,
+            'Subscriptions': 1530,
+            'Other Expenses': 1530
+        }
+    },
+    # Major US Cities
+    "New York": {
+        "Conservative (statistical)": {
+            'Food & Groceries': 18720,  # 30% higher than CA
+            'Clothing': 4680,
+            'Transportation': 13000,
+            'Entertainment & Activities': 6240,
+            'Personal Care': 3120,
+            'Utilities': 3120,
+            'Internet & Phone': 2340,
+            'Subscriptions': 780,
+            'Other Expenses': 1560
+        },
+        "Average (statistical)": {
+            'Food & Groceries': 23400,
+            'Clothing': 6240,
+            'Transportation': 16900,
+            'Entertainment & Activities': 9360,
+            'Personal Care': 4680,
+            'Utilities': 4368,
+            'Internet & Phone': 3276,
+            'Subscriptions': 1638,
+            'Other Expenses': 1638
+        },
+        "High-end (statistical)": {
+            'Food & Groceries': 31200,
+            'Clothing': 9360,
+            'Transportation': 23400,
+            'Entertainment & Activities': 15600,
+            'Personal Care': 7800,
+            'Utilities': 6240,
+            'Internet & Phone': 4680,
+            'Subscriptions': 2340,
+            'Other Expenses': 2340
+        }
+    },
+    "San Francisco": {
+        "Conservative (statistical)": {
+            'Food & Groceries': 16560,  # 15% higher than CA
+            'Clothing': 4140,
+            'Transportation': 11500,
+            'Entertainment & Activities': 5520,
+            'Personal Care': 2760,
+            'Utilities': 2760,
+            'Internet & Phone': 2070,
+            'Subscriptions': 690,
+            'Other Expenses': 1380
+        },
+        "Average (statistical)": {
+            'Food & Groceries': 20700,
+            'Clothing': 5520,
+            'Transportation': 14950,
+            'Entertainment & Activities': 8280,
+            'Personal Care': 4140,
+            'Utilities': 3864,
+            'Internet & Phone': 2898,
+            'Subscriptions': 1449,
+            'Other Expenses': 1449
+        },
+        "High-end (statistical)": {
+            'Food & Groceries': 27600,
+            'Clothing': 8280,
+            'Transportation': 20700,
+            'Entertainment & Activities': 13800,
+            'Personal Care': 6900,
+            'Utilities': 5520,
+            'Internet & Phone': 4140,
+            'Subscriptions': 2070,
+            'Other Expenses': 2070
+        }
+    },
+    "Los Angeles": {
+        "Conservative (statistical)": {
+            'Food & Groceries': 13680,  # 5% lower than CA
+            'Clothing': 3420,
+            'Transportation': 9500,
+            'Entertainment & Activities': 4560,
+            'Personal Care': 2280,
+            'Utilities': 2280,
+            'Internet & Phone': 1710,
+            'Subscriptions': 570,
+            'Other Expenses': 1140
+        },
+        "Average (statistical)": {
+            'Food & Groceries': 17100,
+            'Clothing': 4560,
+            'Transportation': 12350,
+            'Entertainment & Activities': 6840,
+            'Personal Care': 3420,
+            'Utilities': 3192,
+            'Internet & Phone': 2394,
+            'Subscriptions': 1197,
+            'Other Expenses': 1197
+        },
+        "High-end (statistical)": {
+            'Food & Groceries': 22800,
+            'Clothing': 6840,
+            'Transportation': 17100,
+            'Entertainment & Activities': 11400,
+            'Personal Care': 5700,
+            'Utilities': 4560,
+            'Internet & Phone': 3420,
+            'Subscriptions': 1710,
+            'Other Expenses': 1710
+        }
+    },
+    "Portland": {
+        "Conservative (statistical)": {
+            'Food & Groceries': 12240,  # 15% lower than CA
+            'Clothing': 3060,
+            'Transportation': 8500,
+            'Entertainment & Activities': 4080,
+            'Personal Care': 2040,
+            'Utilities': 2040,
+            'Internet & Phone': 1530,
+            'Subscriptions': 510,
+            'Other Expenses': 1020
+        },
+        "Average (statistical)": {
+            'Food & Groceries': 15300,
+            'Clothing': 4080,
+            'Transportation': 11050,
+            'Entertainment & Activities': 6120,
+            'Personal Care': 3060,
+            'Utilities': 2856,
+            'Internet & Phone': 2142,
+            'Subscriptions': 1071,
+            'Other Expenses': 1071
+        },
+        "High-end (statistical)": {
+            'Food & Groceries': 20400,
+            'Clothing': 6120,
+            'Transportation': 15300,
+            'Entertainment & Activities': 10200,
+            'Personal Care': 5100,
+            'Utilities': 4080,
+            'Internet & Phone': 3060,
+            'Subscriptions': 1530,
+            'Other Expenses': 1530
+        }
+    },
+    # International Cities (in USD equivalent for simplicity)
+    # Note: For Canadian cities, multiply by ~0.75 for CAD
+    # For European cities (EUR), multiply by ~0.92 for EUR
+    # For Australian cities (AUD), multiply by ~1.52 for AUD
+    "Toronto": {
+        "Conservative (statistical)": {
+            'Food & Groceries': 12960,  # 10% lower than CA
+            'Clothing': 3240,
+            'Transportation': 9000,
+            'Entertainment & Activities': 4320,
+            'Personal Care': 2160,
+            'Utilities': 2160,
+            'Internet & Phone': 1620,
+            'Subscriptions': 540,
+            'Other Expenses': 1080
+        },
+        "Average (statistical)": {
+            'Food & Groceries': 16200,
+            'Clothing': 4320,
+            'Transportation': 11700,
+            'Entertainment & Activities': 6480,
+            'Personal Care': 3240,
+            'Utilities': 3024,
+            'Internet & Phone': 2268,
+            'Subscriptions': 1134,
+            'Other Expenses': 1134
+        },
+        "High-end (statistical)": {
+            'Food & Groceries': 21600,
+            'Clothing': 6480,
+            'Transportation': 16200,
+            'Entertainment & Activities': 10800,
+            'Personal Care': 5400,
+            'Utilities': 4320,
+            'Internet & Phone': 3240,
+            'Subscriptions': 1620,
+            'Other Expenses': 1620
+        }
+    },
+    "Vancouver": {
+        "Conservative (statistical)": {
+            'Food & Groceries': 13680,  # 5% lower than CA
+            'Clothing': 3420,
+            'Transportation': 9500,
+            'Entertainment & Activities': 4560,
+            'Personal Care': 2280,
+            'Utilities': 2280,
+            'Internet & Phone': 1710,
+            'Subscriptions': 570,
+            'Other Expenses': 1140
+        },
+        "Average (statistical)": {
+            'Food & Groceries': 17100,
+            'Clothing': 4560,
+            'Transportation': 12350,
+            'Entertainment & Activities': 6840,
+            'Personal Care': 3420,
+            'Utilities': 3192,
+            'Internet & Phone': 2394,
+            'Subscriptions': 1197,
+            'Other Expenses': 1197
+        },
+        "High-end (statistical)": {
+            'Food & Groceries': 22800,
+            'Clothing': 6840,
+            'Transportation': 17100,
+            'Entertainment & Activities': 11400,
+            'Personal Care': 5700,
+            'Utilities': 4560,
+            'Internet & Phone': 3420,
+            'Subscriptions': 1710,
+            'Other Expenses': 1710
+        }
+    },
+    "Paris": {
+        "Conservative (statistical)": {
+            'Food & Groceries': 10800,  # 25% lower than CA
+            'Clothing': 2700,
+            'Transportation': 7500,
+            'Entertainment & Activities': 3600,
+            'Personal Care': 1800,
+            'Utilities': 1800,
+            'Internet & Phone': 1350,
+            'Subscriptions': 450,
+            'Other Expenses': 900
+        },
+        "Average (statistical)": {
+            'Food & Groceries': 13500,
+            'Clothing': 3600,
+            'Transportation': 9750,
+            'Entertainment & Activities': 5400,
+            'Personal Care': 2700,
+            'Utilities': 2520,
+            'Internet & Phone': 1890,
+            'Subscriptions': 945,
+            'Other Expenses': 945
+        },
+        "High-end (statistical)": {
+            'Food & Groceries': 18000,
+            'Clothing': 5400,
+            'Transportation': 13500,
+            'Entertainment & Activities': 9000,
+            'Personal Care': 4500,
+            'Utilities': 3600,
+            'Internet & Phone': 2700,
+            'Subscriptions': 1350,
+            'Other Expenses': 1350
+        }
+    },
+    "Toulouse": {
+        "Conservative (statistical)": {
+            'Food & Groceries': 9360,  # 35% lower than CA
+            'Clothing': 2340,
+            'Transportation': 6500,
+            'Entertainment & Activities': 3120,
+            'Personal Care': 1560,
+            'Utilities': 1560,
+            'Internet & Phone': 1170,
+            'Subscriptions': 390,
+            'Other Expenses': 780
+        },
+        "Average (statistical)": {
+            'Food & Groceries': 11700,
+            'Clothing': 3120,
+            'Transportation': 8450,
+            'Entertainment & Activities': 4680,
+            'Personal Care': 2340,
+            'Utilities': 2184,
+            'Internet & Phone': 1638,
+            'Subscriptions': 819,
+            'Other Expenses': 819
+        },
+        "High-end (statistical)": {
+            'Food & Groceries': 15600,
+            'Clothing': 4680,
+            'Transportation': 11700,
+            'Entertainment & Activities': 7800,
+            'Personal Care': 3900,
+            'Utilities': 3120,
+            'Internet & Phone': 2340,
+            'Subscriptions': 1170,
+            'Other Expenses': 1170
+        }
+    },
+    "Berlin": {
+        "Conservative (statistical)": {
+            'Food & Groceries': 10080,  # 30% lower than CA
+            'Clothing': 2520,
+            'Transportation': 7000,
+            'Entertainment & Activities': 3360,
+            'Personal Care': 1680,
+            'Utilities': 1680,
+            'Internet & Phone': 1260,
+            'Subscriptions': 420,
+            'Other Expenses': 840
+        },
+        "Average (statistical)": {
+            'Food & Groceries': 12600,
+            'Clothing': 3360,
+            'Transportation': 9100,
+            'Entertainment & Activities': 5040,
+            'Personal Care': 2520,
+            'Utilities': 2352,
+            'Internet & Phone': 1764,
+            'Subscriptions': 882,
+            'Other Expenses': 882
+        },
+        "High-end (statistical)": {
+            'Food & Groceries': 16800,
+            'Clothing': 5040,
+            'Transportation': 12600,
+            'Entertainment & Activities': 8400,
+            'Personal Care': 4200,
+            'Utilities': 3360,
+            'Internet & Phone': 2520,
+            'Subscriptions': 1260,
+            'Other Expenses': 1260
+        }
+    },
+    "Munich": {
+        "Conservative (statistical)": {
+            'Food & Groceries': 12960,  # 10% lower than CA
+            'Clothing': 3240,
+            'Transportation': 9000,
+            'Entertainment & Activities': 4320,
+            'Personal Care': 2160,
+            'Utilities': 2160,
+            'Internet & Phone': 1620,
+            'Subscriptions': 540,
+            'Other Expenses': 1080
+        },
+        "Average (statistical)": {
+            'Food & Groceries': 16200,
+            'Clothing': 4320,
+            'Transportation': 11700,
+            'Entertainment & Activities': 6480,
+            'Personal Care': 3240,
+            'Utilities': 3024,
+            'Internet & Phone': 2268,
+            'Subscriptions': 1134,
+            'Other Expenses': 1134
+        },
+        "High-end (statistical)": {
+            'Food & Groceries': 21600,
+            'Clothing': 6480,
+            'Transportation': 16200,
+            'Entertainment & Activities': 10800,
+            'Personal Care': 5400,
+            'Utilities': 4320,
+            'Internet & Phone': 3240,
+            'Subscriptions': 1620,
+            'Other Expenses': 1620
+        }
+    },
+    "Sydney": {
+        "Conservative (statistical)": {
+            'Food & Groceries': 15840,  # 10% higher than CA
+            'Clothing': 3960,
+            'Transportation': 11000,
+            'Entertainment & Activities': 5280,
+            'Personal Care': 2640,
+            'Utilities': 2640,
+            'Internet & Phone': 1980,
+            'Subscriptions': 660,
+            'Other Expenses': 1320
+        },
+        "Average (statistical)": {
+            'Food & Groceries': 19800,
+            'Clothing': 5280,
+            'Transportation': 14300,
+            'Entertainment & Activities': 7920,
+            'Personal Care': 3960,
+            'Utilities': 3696,
+            'Internet & Phone': 2772,
+            'Subscriptions': 1386,
+            'Other Expenses': 1386
+        },
+        "High-end (statistical)": {
+            'Food & Groceries': 26400,
+            'Clothing': 7920,
+            'Transportation': 19800,
+            'Entertainment & Activities': 13200,
+            'Personal Care': 6600,
+            'Utilities': 5280,
+            'Internet & Phone': 3960,
+            'Subscriptions': 1980,
+            'Other Expenses': 1980
+        }
+    },
+    "Melbourne": {
+        "Conservative (statistical)": {
+            'Food & Groceries': 13680,  # 5% lower than CA
+            'Clothing': 3420,
+            'Transportation': 9500,
+            'Entertainment & Activities': 4560,
+            'Personal Care': 2280,
+            'Utilities': 2280,
+            'Internet & Phone': 1710,
+            'Subscriptions': 570,
+            'Other Expenses': 1140
+        },
+        "Average (statistical)": {
+            'Food & Groceries': 17100,
+            'Clothing': 4560,
+            'Transportation': 12350,
+            'Entertainment & Activities': 6840,
+            'Personal Care': 3420,
+            'Utilities': 3192,
+            'Internet & Phone': 2394,
+            'Subscriptions': 1197,
+            'Other Expenses': 1197
+        },
+        "High-end (statistical)": {
+            'Food & Groceries': 22800,
+            'Clothing': 6840,
+            'Transportation': 17100,
+            'Entertainment & Activities': 11400,
+            'Personal Care': 5700,
+            'Utilities': 4560,
+            'Internet & Phone': 3420,
+            'Subscriptions': 1710,
+            'Other Expenses': 1710
+        }
+    },
+    "Brisbane": {
+        "Conservative (statistical)": {
+            'Food & Groceries': 12240,  # 15% lower than CA
+            'Clothing': 3060,
+            'Transportation': 8500,
+            'Entertainment & Activities': 4080,
+            'Personal Care': 2040,
+            'Utilities': 2040,
+            'Internet & Phone': 1530,
+            'Subscriptions': 510,
+            'Other Expenses': 1020
+        },
+        "Average (statistical)": {
+            'Food & Groceries': 15300,
+            'Clothing': 4080,
+            'Transportation': 11050,
+            'Entertainment & Activities': 6120,
+            'Personal Care': 3060,
+            'Utilities': 2856,
+            'Internet & Phone': 2142,
+            'Subscriptions': 1071,
+            'Other Expenses': 1071
+        },
+        "High-end (statistical)": {
+            'Food & Groceries': 20400,
+            'Clothing': 6120,
+            'Transportation': 15300,
+            'Entertainment & Activities': 10200,
+            'Personal Care': 5100,
+            'Utilities': 4080,
+            'Internet & Phone': 3060,
+            'Subscriptions': 1530,
+            'Other Expenses': 1530
+        }
+    }
+}
+
+
+# Data Source References for Expense Templates
+# These references indicate where the living expense data was gathered from
+EXPENSE_DATA_SOURCES = {
+    "California": {
+        "source": "MIT Living Wage Calculator & Bureau of Labor Statistics Consumer Expenditure Survey",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "Expenses adjusted for California cost of living index. Data includes Sacramento and broader California metropolitan areas."
+    },
+    "Sacramento": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and Sacramento Area Council of Governments",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/, https://www.sacog.org/",
+        "year": "2024",
+        "notes": "Daycare costs based on Child Care Aware of America 2024 report. Education costs from California State University and UC system averages."
+    },
+    "Seattle": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and Washington State Department of Commerce",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "Adjusted for Seattle-Tacoma-Bellevue metro area cost of living. Daycare costs from Child Care Aware of America."
+    },
+    "Houston": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and Greater Houston Partnership",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "Reflects Houston-The Woodlands-Sugar Land metro area costs. Lower cost of living compared to coastal cities."
+    },
+    "New York": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and NYC Department of Consumer and Worker Protection",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/, https://www.nyc.gov/dca",
+        "year": "2024",
+        "notes": "NYC metro area costs including Manhattan, Brooklyn, Queens. Among highest cost of living in US."
+    },
+    "San Francisco": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and San Francisco Controller's Office",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "San Francisco-Oakland-Berkeley metro area. Highest cost of living city in the dataset."
+    },
+    "Los Angeles": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and LA County Economic Development Corporation",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "Los Angeles-Long Beach-Anaheim metro area costs."
+    },
+    "Portland": {
+        "source": "MIT Living Wage Calculator, BLS Consumer Expenditure Survey, and Portland Metro Regional Government",
+        "url": "https://livingwage.mit.edu/, https://www.bls.gov/cex/",
+        "year": "2024",
+        "notes": "Portland-Vancouver-Hillsboro metro area costs."
+    },
+    "Toronto": {
+        "source": "Statistics Canada Survey of Household Spending and Numbeo Cost of Living Database",
+        "url": "https://www.statcan.gc.ca/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from CAD to USD. Toronto metro area including GTA."
+    },
+    "Vancouver": {
+        "source": "Statistics Canada Survey of Household Spending and Numbeo Cost of Living Database",
+        "url": "https://www.statcan.gc.ca/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from CAD to USD. Metro Vancouver area costs."
+    },
+    "Paris": {
+        "source": "INSEE (French National Institute of Statistics) and Numbeo Cost of Living Database",
+        "url": "https://www.insee.fr/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from EUR to USD. Île-de-France region costs."
+    },
+    "Toulouse": {
+        "source": "INSEE (French National Institute of Statistics) and Numbeo Cost of Living Database",
+        "url": "https://www.insee.fr/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from EUR to USD. Lower cost of living compared to Paris."
+    },
+    "Berlin": {
+        "source": "Destatis (German Federal Statistical Office) and Numbeo Cost of Living Database",
+        "url": "https://www.destatis.de/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from EUR to USD. Berlin metropolitan area."
+    },
+    "Munich": {
+        "source": "Destatis (German Federal Statistical Office) and Numbeo Cost of Living Database",
+        "url": "https://www.destatis.de/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from EUR to USD. Highest cost German city in dataset."
+    },
+    "Sydney": {
+        "source": "Australian Bureau of Statistics Household Expenditure Survey and Numbeo Cost of Living Database",
+        "url": "https://www.abs.gov.au/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from AUD to USD. Greater Sydney area costs."
+    },
+    "Melbourne": {
+        "source": "Australian Bureau of Statistics Household Expenditure Survey and Numbeo Cost of Living Database",
+        "url": "https://www.abs.gov.au/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from AUD to USD. Greater Melbourne area costs."
+    },
+    "Brisbane": {
+        "source": "Australian Bureau of Statistics Household Expenditure Survey and Numbeo Cost of Living Database",
+        "url": "https://www.abs.gov.au/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from AUD to USD. Brisbane metro area costs."
+    },
+    "Auckland": {
+        "source": "Statistics New Zealand Household Economic Survey and Numbeo Cost of Living Database",
+        "url": "https://www.stats.govt.nz/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from NZD to USD. Auckland metro area costs."
+    },
+    "Wellington": {
+        "source": "Statistics New Zealand Household Economic Survey and Numbeo Cost of Living Database",
+        "url": "https://www.stats.govt.nz/, https://www.numbeo.com/",
+        "year": "2024",
+        "notes": "Converted from NZD to USD. Wellington metro area costs."
+    }
+}
+
+
+def get_expense_data_source(location: str) -> dict:
+    """Get data source information for a specific location's expense template"""
+    return EXPENSE_DATA_SOURCES.get(location, {
+        "source": "Custom user-created template",
+        "url": "N/A",
+        "year": str(datetime.now().year),
+        "notes": "This is a custom expense template created by the user."
+    })
+
+
+# Data Classes
+@dataclass
+class MajorPurchase:
+    name: str
+    year: int
+    amount: float
+    financing_years: int = 0
+    interest_rate: float = 0.0
+    asset_type: str = "Expense"  # NEW: "Expense", "Real Estate", "Vehicle", "Investment"
+    appreciation_rate: float = 0.0  # NEW: Annual appreciation rate
+
+
+@dataclass
+class RecurringExpense:
+    name: str
+    category: str
+    amount: float
+    frequency_years: int
+    start_year: int
+    end_year: Optional[int] = None
+    inflation_adjust: bool = True
+    parent: str = "Both"
+    financing_years: int = 0
+    interest_rate: float = 0.0
+
+
+@dataclass
+class EconomicParameters:
+    investment_return: float  # Annual return rate (e.g., 0.06 = 6%)
+    inflation_rate: float  # Annual inflation (e.g., 0.03 = 3%)
+    expense_growth_rate: float  # Expense growth separate from inflation
+    healthcare_inflation_rate: float  # Healthcare-specific inflation
+    use_historical_returns: bool = False  # Use historical average instead of custom
+    use_historical_inflation: bool = False  # Use historical average instead of custom
+    use_historical_expense_growth: bool = False  # Use historical average for expense growth
+    use_historical_healthcare_inflation: bool = False  # Use historical average for healthcare inflation
+
+
+@dataclass
+class HouseTimelineEntry:
+    year: int
+    status: str
+    rental_income: float = 0.0
+
+
+@dataclass
+class House:
+    name: str
+    purchase_year: int
+    purchase_price: float
+    current_value: float
+    mortgage_balance: float
+    mortgage_rate: float
+    mortgage_years_left: int
+    property_tax_rate: float
+    home_insurance: float
+    maintenance_rate: float
+    upkeep_costs: float
+    owner: str = "Shared"
+    timeline: List[HouseTimelineEntry] = None
+
+    def __post_init__(self):
+        if self.timeline is None:
+            self.timeline = [HouseTimelineEntry(self.purchase_year, "Own_Live", 0.0)]
+
+    def get_status_for_year(self, year: int) -> tuple:
+        """Get status and rental income for a specific year"""
+        if not self.timeline:
+            return "Own_Live", 0.0
+
+        sorted_timeline = sorted(self.timeline, key=lambda x: x.year)
+
+        current_status = "Own_Live"
+        current_rental = 0.0
+
+        for entry in sorted_timeline:
+            if entry.year <= year:
+                current_status = entry.status
+                current_rental = entry.rental_income
+            else:
+                break
+
+        return current_status, current_rental
+
+
+@dataclass
+class StateTimelineEntry:
+    year: int
+    state: str
+    spending_strategy: str = "Average"
+
+
+# NEW: Healthcare & Insurance dataclasses
+@dataclass
+class HealthInsurance:
+    name: str
+    type: str  # "Employer", "Marketplace", "Medicare", "Medicaid"
+    monthly_premium: float
+    annual_deductible: float
+    annual_out_of_pocket_max: float
+    copay_primary: float
+    copay_specialist: float
+    covered_by: str  # "Parent 1", "Parent 2", "Both", "Family"
+    start_age: int = 0
+    end_age: int = 999
+
+@dataclass
+class LongTermCareInsurance:
+    name: str
+    monthly_premium: float
+    daily_benefit: float
+    benefit_period_days: int
+    elimination_period_days: int
+    covered_person: str  # "Parent 1", "Parent 2"
+    start_age: int = 55
+    inflation_protection: float = 0.03
+
+@dataclass
+class HealthExpense:
+    category: str  # "Routine Care", "Prescription", "Emergency", "Dental", "Vision", "Mental Health"
+    annual_amount: float
+    covered_by_insurance: bool
+    start_age: int
+    end_age: int
+    affected_person: str  # "Parent 1", "Parent 2", "Both"
+
+
+# Currency formatting function with automatic scaling
+def format_currency(value, force_full=False, context="general"):
+    """
+    Currency formatting with automatic scaling
+
+    Args:
+        value: The monetary value to format
+        force_full: If True, always show full amount regardless of size
+        context: Context for formatting ("general", "input", "detailed")
+
+    Returns:
+        Formatted currency string
+    """
+    if pd.isna(value) or value is None:
+        return "$0"
+
+    if context == "input" or force_full:
+        return f"${value:,.0f}"
+
+    abs_value = abs(value)
+
+    if abs_value < 1000:
+        return f"${value:,.0f}"
+
+    if context == "detailed" and abs_value < 100000:
+        return f"${value:,.0f}"
+
+    if abs_value >= 1000000:
+        scaled = value / 1000000
+        if scaled == int(scaled):
+            return f"${scaled:.0f}M"
+        else:
+            return f"${scaled:.1f}M"
+    elif abs_value >= 1000:
+        scaled = value / 1000
+        if scaled == int(scaled):
+            return f"${scaled:.0f}k"
+        else:
+            return f"${scaled:.0f}k"
+    else:
+        return f"${value:,.0f}"
+
+
+def get_save_file_path(default_filename, file_types):
+    """
+    Show a file save dialog and return the selected file path.
+
+    Args:
+        default_filename: Default filename to suggest
+        file_types: List of tuples like [("PDF files", "*.pdf"), ("All files", "*.*")]
+
+    Returns:
+        Selected file path as string, or None if cancelled
+    """
+    if not TKINTER_AVAILABLE:
+        return None
+
+    # Create a temporary root window (hidden)
+    root = tk.Tk()
+    root.withdraw()
+    root.wm_attributes('-topmost', 1)
+
+    # Show save dialog
+    file_path = filedialog.asksaveasfilename(
+        defaultextension=file_types[0][1].replace("*", ""),
+        filetypes=file_types,
+        initialfile=default_filename
+    )
+
+    # Clean up
+    root.destroy()
+
+    return file_path if file_path else None
+
+
+# Initialize session state
+def initialize_session_state():
+    """Initialize all session state variables"""
+    if 'initialized' not in st.session_state:
+        st.session_state.current_year = datetime.now().year
+
+        st.session_state.parent1_name = "Filipp"
+        st.session_state.parent1_emoji = "👨"
+        st.session_state.parent2_name = "Erin"
+        st.session_state.parent2_emoji = "👩"
+
+        st.session_state.marriage_year = "N/A"
+
+        st.session_state.state_timeline = [
+            StateTimelineEntry(datetime.now().year, "Seattle", "Average")
+        ]
+
+        # Parent X data
+        st.session_state.parentX_age = 35
+        st.session_state.parentX_net_worth = 85000.0
+        st.session_state.parentX_income = 95000.0
+        st.session_state.parentX_raise = 3.5
+        st.session_state.parentX_retirement_age = 65
+        st.session_state.parentX_death_age = 100
+        st.session_state.parentX_ss_benefit = 2500.0
+        st.session_state.parentX_job_changes = pd.DataFrame({
+            'Year': [datetime.now().year + 2, datetime.now().year + 7],
+            'New Income': [105000, 120000]
+        })
+
+        # Parent Y data
+        st.session_state.parentY_age = 33
+        st.session_state.parentY_net_worth = 75000.0
+        st.session_state.parentY_income = 85000.0
+        st.session_state.parentY_raise = 3.2
+        st.session_state.parentY_retirement_age = 65
+        st.session_state.parentY_death_age = 100
+        st.session_state.parentY_ss_benefit = 2200.0
+        st.session_state.parentY_job_changes = pd.DataFrame({
+            'Year': [datetime.now().year + 3, datetime.now().year + 8],
+            'New Income': [92000, 105000]
+        })
+
+        # Parent X expense settings
+        st.session_state.parentX_expense_location = "Seattle"
+        st.session_state.parentX_expense_strategy = "Average (statistical)"
+        st.session_state.parentX_use_template = True
+
+        # Parent X detailed expenses (using new category structure)
+        default_parentX_template = get_adult_expense_template("Seattle", "Average (statistical)")
+        st.session_state.parentX_expenses = default_parentX_template.copy()
+
+        # Parent Y expense settings
+        st.session_state.parentY_expense_location = "Seattle"
+        st.session_state.parentY_expense_strategy = "Average (statistical)"
+        st.session_state.parentY_use_template = True
+
+        # Parent Y detailed expenses (using new category structure)
+        default_parentY_template = get_adult_expense_template("Seattle", "Average (statistical)")
+        st.session_state.parentY_expenses = default_parentY_template.copy()
+
+        # Family shared expenses (reduced to only truly shared items)
+        st.session_state.family_shared_expenses = {
+            # Housing
+            'Mortgage/Rent': 30000.0,  # $2,500/month
+            'Home Improvement': 3000.0,
+            'Property Tax': 6000.0,
+            'Home Insurance': 1500.0,
+            # Utilities & Bills
+            'Gas & Electric': 2400.0,  # $200/month
+            'Water': 900.0,  # $75/month
+            'Garbage': 600.0,  # $50/month
+            'Internet & Cable': 1800.0,  # $150/month
+            # Shared Lifestyle
+            'Shared Subscriptions': 600.0,  # Netflix, etc.
+            'Family Vacations': 8000.0,
+            'Pet Care': 0.0,
+            'Other Family Expenses': 1200.0
+        }
+
+        # Legacy expense categories (for backwards compatibility - DEPRECATED)
+        # These will be migrated to parent/family expenses in v0.8
+        st.session_state.expense_categories = [
+            'Food & Groceries',
+            'Clothing',
+            'Transportation',
+            'Entertainment & Activities',
+            'Personal Care',
+            'Vacations & Travel',
+            'Other Expenses'
+        ]
+
+        # Legacy expenses (DEPRECATED - kept for backwards compatibility only)
+        st.session_state.expenses = {
+            'Food & Groceries': 0.0,  # Now tracked per parent
+            'Clothing': 0.0,  # Now tracked per parent
+            'Transportation': 0.0,  # Now tracked per parent
+            'Entertainment & Activities': 0.0,  # Now tracked per parent
+            'Personal Care': 0.0,  # Now tracked per parent
+            'Vacations & Travel': 0.0,  # Now in family_shared_expenses
+            'Utilities': 0.0,  # Now in family_shared_expenses
+            'Internet & Phone': 0.0,  # Now split between parent phone and family internet
+            'Subscriptions': 0.0,  # Now tracked per parent or family
+            'Other Expenses': 0.0
+        }
+
+        # Children expenses table
+        st.session_state.children_expenses = pd.DataFrame({
+            'Age': list(range(31)),
+            'Food': [
+                1500 if i < 2 else 1800 if i < 5 else 2400 if i < 12 else 3000 if i < 19 else 1500 if i < 23 else 600 if i < 26 else 0
+                for i in range(31)],
+            'Clothing': [
+                600 if i < 2 else 500 if i < 5 else 600 if i < 12 else 900 if i < 19 else 500 if i < 23 else 200 if i < 26 else 0
+                for i in range(31)],
+            'Healthcare': [
+                800 if i < 1 else 500 if i < 5 else 400 if i < 19 else 300 if i < 23 else 200 if i < 26 else 0 for i in
+                range(31)],
+            'Activities/Sports': [
+                100 if i < 3 else 300 if i < 6 else 800 if i < 12 else 1500 if i < 19 else 400 if i < 23 else 0 for i in
+                range(31)],
+            'Entertainment': [200 if i < 3 else 300 if i < 12 else 500 if i < 19 else 300 if i < 23 else 0 for i in
+                              range(31)],
+            'Transportation': [200 if i < 13 else 300 if i < 16 else 1000 if i < 19 else 400 if i < 23 else 0 for i in
+                               range(31)],
+            'School Supplies': [50 if i < 5 else 200 if i < 13 else 300 if i < 19 else 0 for i in range(31)],
+            'Gifts/Celebrations': [300 if i < 19 else 400 if i < 30 else 0 for i in range(31)],
+            'Miscellaneous': [200 if i < 19 else 300 if i < 23 else 200 if i < 26 else 100 if i < 30 else 0 for i in
+                              range(31)],
+            'Daycare': [20376 if i < 5 else 0 for i in range(31)],
+            'Education': [25000 if 18 <= i <= 21 else 0 for i in range(31)]
+        })
+
+        # Children instances
+        st.session_state.children_list = [
+            {
+                'name': 'Child 1',
+                'birth_year': 2028,
+                'use_template': True,
+                'template_state': 'Seattle',
+                'template_strategy': 'Average',
+                'school_type': 'Public',
+                'college_location': 'Seattle'
+            },
+            {
+                'name': 'Child 2',
+                'birth_year': 2030,
+                'use_template': True,
+                'template_state': 'Seattle',
+                'template_strategy': 'Average',
+                'school_type': 'Public',
+                'college_location': 'Seattle'
+            }
+        ]
+        st.session_state.children_today_dollars = True
+
+        # Major purchases and recurring expenses
+        st.session_state.major_purchases = []
+        st.session_state.recurring_expenses = [
+            RecurringExpense(
+                name="Parent Retirement Help",
+                category="Family Support",
+                amount=20000.0,
+                frequency_years=1,
+                start_year=datetime.now().year,
+                end_year=None,
+                inflation_adjust=False,
+                parent="Both",
+                financing_years=0,
+                interest_rate=0.0
+            ),
+            RecurringExpense(
+                name="Parent X Vehicle",
+                category="Vehicle",
+                amount=35000.0,
+                frequency_years=10,
+                start_year=datetime.now().year,
+                end_year=None,
+                inflation_adjust=True,
+                parent="ParentX",
+                financing_years=5,
+                interest_rate=0.045
+            ),
+            RecurringExpense(
+                name="Parent Y Vehicle",
+                category="Vehicle",
+                amount=32000.0,
+                frequency_years=10,
+                start_year=datetime.now().year + 2,
+                end_year=None,
+                inflation_adjust=True,
+                parent="ParentY",
+                financing_years=5,
+                interest_rate=0.045
+            )
+        ]
+
+        # Economic parameters
+        # Default to moderate assumptions with custom values
+        st.session_state.economic_params = EconomicParameters(
+            investment_return=0.06,  # 6% default
+            inflation_rate=0.03,  # 3% default
+            expense_growth_rate=0.02,  # 2% default
+            healthcare_inflation_rate=0.045,  # 4.5% default
+            use_historical_returns=False,
+            use_historical_inflation=False,
+            use_historical_expense_growth=False,
+            use_historical_healthcare_inflation=False
+        )
+
+        # Houses
+        st.session_state.houses = [
+            House(
+                name="Primary Home",
+                purchase_year=2020,
+                purchase_price=600000.0,
+                current_value=650000.0,
+                mortgage_balance=500000.0,
+                mortgage_rate=0.067,
+                mortgage_years_left=28,
+                property_tax_rate=0.0092,
+                home_insurance=1800.0,
+                maintenance_rate=0.015,
+                upkeep_costs=3000.0,
+                owner="Shared",
+                timeline=[HouseTimelineEntry(2020, "Own_Live", 0.0)]
+            )
+        ]
+
+        # Tax settings
+        st.session_state.state_tax_rate = 0.0
+        st.session_state.pretax_401k = 0.0
+
+        # Social Security insolvency settings
+        st.session_state.ss_insolvency_enabled = True
+        st.session_state.ss_shortfall_percentage = 30.0
+
+        # Monte Carlo settings
+        st.session_state.mc_start_year = datetime.now().year
+        # Default to running until both parents reach their death age
+        parent1_years_left = st.session_state.parentX_death_age - st.session_state.parentX_age
+        parent2_years_left = st.session_state.parentY_death_age - st.session_state.parentY_age
+        st.session_state.mc_years = max(parent1_years_left, parent2_years_left)
+        st.session_state.mc_simulations = 100
+        st.session_state.mc_income_variability = 10.0
+        st.session_state.mc_expense_variability = 5.0
+        st.session_state.mc_return_variability = 15.0
+
+        # NEW: Asymmetric variability settings
+        st.session_state.mc_income_variability_positive = 10.0
+        st.session_state.mc_income_variability_negative = 10.0
+        st.session_state.mc_expense_variability_positive = 5.0
+        st.session_state.mc_expense_variability_negative = 5.0
+        st.session_state.mc_return_variability_positive = 15.0
+        st.session_state.mc_return_variability_negative = 15.0
+
+        # Historical simulation settings
+        st.session_state.mc_use_historical = False
+        st.session_state.mc_historical_start_year = 1924
+        st.session_state.mc_show_historical_stats = False
+
+        # NEW: Inflation normalization toggle
+        st.session_state.mc_normalize_to_today_dollars = False
+
+        # Display preferences
+        st.session_state.inflation_adjusted_display = True
+        st.session_state.default_inflation_rate = 0.025
+
+        # NEW: Internal save/load system
+        st.session_state.saved_scenarios = {}
+
+        # Preload 5 demo scenarios showcasing different features
+        current_year = datetime.now().year
+
+        # Scenario 1: Young Tech Couple with Multiple Relocations & Early Retirement
+        st.session_state.saved_scenarios["[DEMO] Tech Couple: SF→Austin→Seattle, Early Retirement @50"] = {
+            'current_year': current_year,
+            'parent1_name': "Alex",
+            'parent1_emoji': "👨",
+            'parent2_name': "Jordan",
+            'parent2_emoji': "👩",
+            'marriage_year': current_year - 3,
+            'parentX_age': 28,
+            'parentX_net_worth': 150000.0,
+            'parentX_income': 180000.0,  # High initial, increases, sabbatical, then recovery
+            'parentX_raise': 8.0,
+            'parentX_retirement_age': 50,  # Early retirement!
+            'parentX_ss_benefit': 3500.0,
+            'parentY_age': 27,
+            'parentY_net_worth': 120000.0,
+            'parentY_income': 165000.0,
+            'parentY_raise': 7.5,
+            'parentY_retirement_age': 51,  # Early retirement!
+            'parentY_ss_benefit': 3200.0,
+            'expenses': {
+                'Food & Groceries': 18000.0,
+                'Clothing': 6000.0,
+                'Transportation': 8000.0,
+                'Entertainment & Activities': 12000.0,
+                'Personal Care': 4800.0,
+                'Other Expenses': 9600.0
+            },
+            'children_list': [
+                {
+                    'name': 'Emma',
+                    'birth_year': current_year - 2,
+                    'use_template': True,
+                    'template_state': 'San Francisco',
+                    'template_strategy': 'High-end',
+                    'school_type': 'Private',
+                    'college_type': 'Private',
+                    'college_location': 'San Francisco'
+                },
+                {
+                    'name': 'Lucas',
+                    'birth_year': current_year,
+                    'use_template': True,
+                    'template_state': 'San Francisco',
+                    'template_strategy': 'High-end',
+                    'school_type': 'Private',
+                    'college_type': 'Private',
+                    'college_location': 'New York'
+                }
+            ],
+            'houses': [
+                {
+                    'name': 'SF Condo',
+                    'purchase_year': current_year - 2,
+                    'purchase_price': 1200000.0,
+                    'current_value': 1300000.0,
+                    'mortgage_balance': 900000.0,
+                    'mortgage_rate': 0.065,
+                    'mortgage_years_left': 28,
+                    'property_tax_rate': 0.012,
+                    'home_insurance': 2400.0,
+                    'maintenance_rate': 0.005,
+                    'upkeep_costs': 6000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year - 2, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 3, 'status': 'Sold', 'rental_income': 0.0}  # Sell when moving to Austin
+                    ]
+                },
+                {
+                    'name': 'Austin House',
+                    'purchase_year': current_year + 3,
+                    'purchase_price': 650000.0,
+                    'current_value': 650000.0,
+                    'mortgage_balance': 520000.0,
+                    'mortgage_rate': 0.055,
+                    'mortgage_years_left': 30,
+                    'property_tax_rate': 0.021,  # Texas property tax
+                    'home_insurance': 2000.0,
+                    'maintenance_rate': 0.008,
+                    'upkeep_costs': 5000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 3, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 8, 'status': 'Own_Rent', 'rental_income': 3200.0},  # Convert to rental
+                        {'year': current_year + 15, 'status': 'Sold', 'rental_income': 0.0}  # Eventually sell
+                    ]
+                },
+                {
+                    'name': 'Seattle House',
+                    'purchase_year': current_year + 8,
+                    'purchase_price': 950000.0,
+                    'current_value': 950000.0,
+                    'mortgage_balance': 760000.0,
+                    'mortgage_rate': 0.048,
+                    'mortgage_years_left': 30,
+                    'property_tax_rate': 0.01,
+                    'home_insurance': 1800.0,
+                    'maintenance_rate': 0.007,
+                    'upkeep_costs': 6500.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 8, 'status': 'Own_Live', 'rental_income': 0.0}
+                    ]
+                }
+            ],
+            'major_purchases': [
+                {
+                    'name': 'Sabbatical Year Living Expenses',
+                    'year': current_year + 6,
+                    'amount': 80000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': 'Home Renovation (Austin)',
+                    'year': current_year + 5,
+                    'amount': 75000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': 'Boat Purchase',
+                    'year': current_year + 10,
+                    'amount': 125000.0,
+                    'financing_years': 5,
+                    'interest_rate': 0.055,
+                    'asset_type': 'Depreciating',
+                    'appreciation_rate': -0.08
+                }
+            ],
+            'recurring_expenses': [
+                {
+                    'name': 'Tech Equipment',
+                    'category': 'Work Equipment',
+                    'amount': 5000.0,
+                    'frequency_years': 2,
+                    'start_year': current_year,
+                    'end_year': current_year + 22,  # Until retirement
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Electric Vehicles',
+                    'category': 'Vehicle',
+                    'amount': 65000.0,
+                    'frequency_years': 6,
+                    'start_year': current_year + 2,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Adventure Travel',
+                    'category': 'Travel',
+                    'amount': 15000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Boat Maintenance',
+                    'category': 'Recreation',
+                    'amount': 8000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 10,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Home Office Upgrades',
+                    'category': 'Work Equipment',
+                    'amount': 3000.0,
+                    'frequency_years': 3,
+                    'start_year': current_year + 1,
+                    'end_year': current_year + 22,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                }
+            ],
+            'state_timeline': [
+                {
+                    'year': current_year,
+                    'state': 'San Francisco',
+                    'spending_strategy': 'High-end'
+                },
+                {
+                    'year': current_year + 3,
+                    'state': 'Houston',  # Using Houston as proxy for Austin
+                    'spending_strategy': 'Average'  # Lower cost of living
+                },
+                {
+                    'year': current_year + 8,
+                    'state': 'Seattle',
+                    'spending_strategy': 'Average'
+                }
+            ],
+            'economic_params': asdict(EconomicParameters(0.08, 0.02, 0.02, 0.04, False, False, False, False)),
+            'ss_insolvency_enabled': True,
+            'ss_shortfall_percentage': 30.0
+        }
+
+        # Scenario 2: 3-Kid Family with Multiple Moves & Career Transitions
+        st.session_state.saved_scenarios["[DEMO] 3-Kid Family: Seattle→Portland→Denver, Career Change, 4 Properties"] = {
+            'current_year': current_year,
+            'parent1_name': "Mike",
+            'parent1_emoji': "👨",
+            'parent2_name': "Sarah",
+            'parent2_emoji': "👩",
+            'marriage_year': current_year - 12,
+            'parentX_age': 38,
+            'parentX_net_worth': 320000.0,
+            'parentX_income': 115000.0,
+            'parentX_raise': 3.5,
+            'parentX_retirement_age': 62,  # Slightly early retirement
+            'parentX_ss_benefit': 2800.0,
+            'parentY_age': 37,
+            'parentY_net_worth': 280000.0,
+            'parentY_income': 95000.0,  # Will have career change
+            'parentY_raise': 3.0,
+            'parentY_retirement_age': 63,  # Slightly early retirement
+            'parentY_ss_benefit': 2500.0,
+            'expenses': {
+                'Food & Groceries': 15600.0,
+                'Clothing': 4800.0,
+                'Transportation': 14400.0,
+                'Entertainment & Activities': 7200.0,
+                'Personal Care': 3600.0,
+                'Other Expenses': 8400.0
+            },
+            'children_list': [
+                {
+                    'name': 'Olivia',
+                    'birth_year': current_year - 10,
+                    'use_template': True,
+                    'template_state': 'Seattle',
+                    'template_strategy': 'Average',
+                    'school_type': 'Public',
+                    'college_type': 'Public',
+                    'college_location': 'Seattle'
+                },
+                {
+                    'name': 'Noah',
+                    'birth_year': current_year - 7,
+                    'use_template': True,
+                    'template_state': 'Seattle',
+                    'template_strategy': 'Average',
+                    'school_type': 'Public',
+                    'college_type': 'Public',
+                    'college_location': 'Seattle'
+                },
+                {
+                    'name': 'Sophia',
+                    'birth_year': current_year - 4,
+                    'use_template': True,
+                    'template_state': 'Seattle',
+                    'template_strategy': 'Average',
+                    'school_type': 'Public',
+                    'college_type': 'Private',
+                    'college_location': 'Seattle'
+                }
+            ],
+            'houses': [
+                {
+                    'name': 'Seattle Starter Home',
+                    'purchase_year': current_year - 8,
+                    'purchase_price': 650000.0,
+                    'current_value': 800000.0,
+                    'mortgage_balance': 420000.0,
+                    'mortgage_rate': 0.035,
+                    'mortgage_years_left': 22,
+                    'property_tax_rate': 0.01,
+                    'home_insurance': 1800.0,
+                    'maintenance_rate': 0.008,
+                    'upkeep_costs': 5000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year - 8, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 5, 'status': 'Own_Rent', 'rental_income': 2800.0},  # Convert to rental
+                        {'year': current_year + 18, 'status': 'Sold', 'rental_income': 0.0}
+                    ]
+                },
+                {
+                    'name': 'Portland Family Home',
+                    'purchase_year': current_year + 5,
+                    'purchase_price': 720000.0,
+                    'current_value': 720000.0,
+                    'mortgage_balance': 576000.0,
+                    'mortgage_rate': 0.045,
+                    'mortgage_years_left': 30,
+                    'property_tax_rate': 0.011,
+                    'home_insurance': 1900.0,
+                    'maintenance_rate': 0.009,
+                    'upkeep_costs': 5500.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 5, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 12, 'status': 'Sold', 'rental_income': 0.0}
+                    ]
+                },
+                {
+                    'name': 'Denver Home',
+                    'purchase_year': current_year + 12,
+                    'purchase_price': 680000.0,
+                    'current_value': 680000.0,
+                    'mortgage_balance': 544000.0,
+                    'mortgage_rate': 0.052,
+                    'mortgage_years_left': 30,
+                    'property_tax_rate': 0.0055,
+                    'home_insurance': 1700.0,
+                    'maintenance_rate': 0.008,
+                    'upkeep_costs': 5200.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 12, 'status': 'Own_Live', 'rental_income': 0.0}
+                    ]
+                },
+                {
+                    'name': 'Colorado Mountain Cabin',
+                    'purchase_year': current_year + 15,
+                    'purchase_price': 380000.0,
+                    'current_value': 380000.0,
+                    'mortgage_balance': 304000.0,
+                    'mortgage_rate': 0.055,
+                    'mortgage_years_left': 30,
+                    'property_tax_rate': 0.005,
+                    'home_insurance': 1200.0,
+                    'maintenance_rate': 0.012,
+                    'upkeep_costs': 4000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 15, 'status': 'Own_Live', 'rental_income': 0.0}  # Vacation home
+                    ]
+                }
+            ],
+            'major_purchases': [
+                {
+                    'name': "Olivia's Wedding",
+                    'year': current_year + 18,
+                    'amount': 32000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': "Career Change Education (Sarah MBA)",
+                    'year': current_year + 7,
+                    'amount': 65000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': 'Kitchen Renovation (Portland)',
+                    'year': current_year + 8,
+                    'amount': 55000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': 'RV Purchase',
+                    'year': current_year + 16,
+                    'amount': 95000.0,
+                    'financing_years': 7,
+                    'interest_rate': 0.058,
+                    'asset_type': 'Depreciating',
+                    'appreciation_rate': -0.10
+                }
+            ],
+            'recurring_expenses': [
+                {
+                    'name': 'Family Minivan',
+                    'category': 'Vehicle',
+                    'amount': 45000.0,
+                    'frequency_years': 8,
+                    'start_year': current_year + 3,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 5,
+                    'interest_rate': 0.045
+                },
+                {
+                    'name': 'Annual Family Vacation',
+                    'category': 'Travel',
+                    'amount': 8000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Ski Equipment & Passes',
+                    'category': 'Recreation',
+                    'amount': 4500.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 12,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Home Office Equipment',
+                    'category': 'Work Equipment',
+                    'amount': 2500.0,
+                    'frequency_years': 3,
+                    'start_year': current_year + 1,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'College Visiting Trips',
+                    'category': 'Children',
+                    'amount': 3000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 8,
+                    'end_year': current_year + 14,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                }
+            ],
+            'state_timeline': [
+                {
+                    'year': current_year,
+                    'state': 'Seattle',
+                    'spending_strategy': 'Average'
+                },
+                {
+                    'year': current_year + 5,
+                    'state': 'Portland',
+                    'spending_strategy': 'Average'
+                },
+                {
+                    'year': current_year + 12,
+                    'state': 'Sacramento',  # California city with expense data
+                    'spending_strategy': 'Conservative'  # Cost-conscious after career change
+                },
+                {
+                    'year': current_year + 18,
+                    'state': 'Sacramento',
+                    'spending_strategy': 'Average'  # Back to normal spending
+                }
+            ],
+            'economic_params': asdict(EconomicParameters(0.06, 0.03, 0.02, 0.045, False, False, False, False)),
+            'ss_insolvency_enabled': True,
+            'ss_shortfall_percentage': 30.0
+        }
+
+        # Scenario 3: Wealthy Executives with Early Retirement & International Lifestyle
+        st.session_state.saved_scenarios["[DEMO] Executives: NYC→Miami→Portugal, Early Retire @55, 5 Properties"] = {
+            'current_year': current_year,
+            'parent1_name': "David",
+            'parent1_emoji': "👨",
+            'parent2_name': "Jennifer",
+            'parent2_emoji': "👩",
+            'marriage_year': current_year - 15,
+            'parentX_age': 45,
+            'parentX_net_worth': 2500000.0,
+            'parentX_income': 350000.0,
+            'parentX_raise': 4.0,
+            'parentX_retirement_age': 55,  # Early retirement!
+            'parentX_ss_benefit': 4500.0,
+            'parentY_age': 43,
+            'parentY_net_worth': 2200000.0,
+            'parentY_income': 280000.0,
+            'parentY_raise': 3.5,
+            'parentY_retirement_age': 55,  # Early retirement!
+            'parentY_ss_benefit': 4000.0,
+            'expenses': {
+                'Food & Groceries': 24000.0,
+                'Clothing': 12000.0,
+                'Transportation': 18000.0,
+                'Entertainment & Activities': 24000.0,
+                'Personal Care': 9600.0,
+                'Other Expenses': 18000.0
+            },
+            'children_list': [
+                {
+                    'name': 'Isabella',
+                    'birth_year': current_year - 13,
+                    'use_template': True,
+                    'template_state': 'New York',
+                    'template_strategy': 'High-end',
+                    'school_type': 'Private',
+                    'college_type': 'Private',
+                    'college_location': 'New York'
+                },
+                {
+                    'name': 'William',
+                    'birth_year': current_year - 11,
+                    'use_template': True,
+                    'template_state': 'New York',
+                    'template_strategy': 'High-end',
+                    'school_type': 'Private',
+                    'college_type': 'Private',
+                    'college_location': 'New York'
+                }
+            ],
+            'houses': [
+                {
+                    'name': 'Manhattan Apartment',
+                    'purchase_year': current_year - 10,
+                    'purchase_price': 2500000.0,
+                    'current_value': 3200000.0,
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 0.008,
+                    'home_insurance': 4500.0,
+                    'maintenance_rate': 0.004,
+                    'upkeep_costs': 12000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year - 10, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 7, 'status': 'Sold', 'rental_income': 0.0}  # Sell when moving to Miami
+                    ]
+                },
+                {
+                    'name': 'Hamptons Summer Home',
+                    'purchase_year': current_year - 5,
+                    'purchase_price': 1800000.0,
+                    'current_value': 2100000.0,
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 0.025,
+                    'home_insurance': 3200.0,
+                    'maintenance_rate': 0.01,
+                    'upkeep_costs': 15000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year - 5, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 7, 'status': 'Own_Rent', 'rental_income': 8500.0},  # Convert to rental
+                        {'year': current_year + 15, 'status': 'Sold', 'rental_income': 0.0}
+                    ]
+                },
+                {
+                    'name': 'Miami Penthouse',
+                    'purchase_year': current_year + 7,
+                    'purchase_price': 2800000.0,
+                    'current_value': 2800000.0,
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 0.012,
+                    'home_insurance': 5500.0,
+                    'maintenance_rate': 0.005,
+                    'upkeep_costs': 14000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 7, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 15, 'status': 'Own_Rent', 'rental_income': 7000.0}  # Keep as rental when moving abroad
+                    ]
+                },
+                {
+                    'name': 'Portugal Villa (Algarve)',
+                    'purchase_year': current_year + 15,
+                    'purchase_price': 850000.0,
+                    'current_value': 850000.0,
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 0.004,
+                    'home_insurance': 2200.0,
+                    'maintenance_rate': 0.008,
+                    'upkeep_costs': 8000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 15, 'status': 'Own_Live', 'rental_income': 0.0}
+                    ]
+                },
+                {
+                    'name': 'Aspen Ski Chalet',
+                    'purchase_year': current_year + 3,
+                    'purchase_price': 1600000.0,
+                    'current_value': 1600000.0,
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 0.006,
+                    'home_insurance': 3800.0,
+                    'maintenance_rate': 0.012,
+                    'upkeep_costs': 18000.0
+                }
+            ],
+            'major_purchases': [
+                {
+                    'name': "Isabella's Wedding Reception",
+                    'year': current_year + 12,
+                    'amount': 75000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': "William's Wedding Reception",
+                    'year': current_year + 16,
+                    'amount': 80000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': 'Luxury Yacht Purchase',
+                    'year': current_year + 8,
+                    'amount': 450000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Depreciating',
+                    'appreciation_rate': -0.06
+                },
+                {
+                    'name': 'Art Collection Investment',
+                    'year': current_year + 5,
+                    'amount': 200000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Appreciating',
+                    'appreciation_rate': 0.04
+                }
+            ],
+            'recurring_expenses': [
+                {
+                    'name': 'Luxury Vehicles (2 Cars)',
+                    'category': 'Vehicle',
+                    'amount': 150000.0,
+                    'frequency_years': 4,
+                    'start_year': current_year + 2,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'International Luxury Travel',
+                    'category': 'Travel',
+                    'amount': 45000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Charitable Giving',
+                    'category': 'Philanthropy',
+                    'amount': 50000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': None,
+                    'inflation_adjust': False,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Yacht Maintenance',
+                    'category': 'Recreation',
+                    'amount': 35000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 8,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Wine Collection & Storage',
+                    'category': 'Lifestyle',
+                    'amount': 12000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Private Club Memberships',
+                    'category': 'Lifestyle',
+                    'amount': 25000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                }
+            ],
+            'state_timeline': [
+                {
+                    'year': current_year,
+                    'state': 'New York',
+                    'spending_strategy': 'High-end'
+                },
+                {
+                    'year': current_year + 7,
+                    'state': 'Los Angeles',  # Using LA as proxy for Miami
+                    'spending_strategy': 'High-end'
+                },
+                {
+                    'year': current_year + 15,
+                    'state': 'Paris',  # International lifestyle in Portugal
+                    'spending_strategy': 'Average'  # Lower cost of living abroad
+                }
+            ],
+            'economic_params': asdict(EconomicParameters(0.06, 0.03, 0.02, 0.045, False, False, False, False)),
+            'ss_insolvency_enabled': True,
+            'ss_shortfall_percentage': 30.0
+        }
+
+        # Scenario 4: Single Teacher with Career Growth & Multiple Relocations
+        st.session_state.saved_scenarios["[DEMO] Single Mom: Sacramento→San Diego, Teacher→Principal, 3 Properties"] = {
+            'current_year': current_year,
+            'parent1_name': "Maria",
+            'parent1_emoji': "👩",
+            'parent2_name': "N/A",
+            'parent2_emoji': "👤",
+            'marriage_year': "N/A",
+            'parentX_age': 35,
+            'parentX_net_worth': 95000.0,
+            'parentX_income': 72000.0,  # Teacher salary, will increase to VP then Principal
+            'parentX_raise': 2.5,
+            'parentX_retirement_age': 62,  # Early retirement with good pension
+            'parentX_ss_benefit': 2200.0,
+            'parentY_age': 35,
+            'parentY_net_worth': 0.0,
+            'parentY_income': 0.0,
+            'parentY_raise': 0.0,
+            'parentY_retirement_age': 67,
+            'parentY_ss_benefit': 0.0,
+            'expenses': {
+                'Food & Groceries': 9600.0,
+                'Clothing': 2400.0,
+                'Transportation': 7200.0,
+                'Entertainment & Activities': 3600.0,
+                'Personal Care': 2400.0,
+                'Other Expenses': 4800.0
+            },
+            'children_list': [
+                {
+                    'name': 'Diego',
+                    'birth_year': current_year - 8,
+                    'use_template': True,
+                    'template_state': 'Sacramento',
+                    'template_strategy': 'Average',
+                    'school_type': 'Public',
+                    'college_type': 'Public',
+                    'college_location': 'Sacramento'
+                }
+            ],
+            'houses': [
+                {
+                    'name': 'Sacramento Townhouse',
+                    'purchase_year': current_year - 3,
+                    'purchase_price': 420000.0,
+                    'current_value': 450000.0,
+                    'mortgage_balance': 336000.0,
+                    'mortgage_rate': 0.068,
+                    'mortgage_years_left': 27,
+                    'property_tax_rate': 0.011,
+                    'home_insurance': 1400.0,
+                    'maintenance_rate': 0.006,
+                    'upkeep_costs': 3000.0,
+                    'owner': 'ParentX',
+                    'timeline': [
+                        {'year': current_year - 3, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 6, 'status': 'Own_Rent', 'rental_income': 2400.0},  # Convert to rental when moving
+                        {'year': current_year + 18, 'status': 'Sold', 'rental_income': 0.0}
+                    ]
+                },
+                {
+                    'name': 'San Diego House',
+                    'purchase_year': current_year + 6,
+                    'purchase_price': 720000.0,
+                    'current_value': 720000.0,
+                    'mortgage_balance': 576000.0,
+                    'mortgage_rate': 0.058,
+                    'mortgage_years_left': 30,
+                    'property_tax_rate': 0.0073,
+                    'home_insurance': 1800.0,
+                    'maintenance_rate': 0.007,
+                    'upkeep_costs': 5000.0,
+                    'owner': 'ParentX',
+                    'timeline': [
+                        {'year': current_year + 6, 'status': 'Own_Live', 'rental_income': 0.0}
+                    ]
+                },
+                {
+                    'name': 'Lake Tahoe Cabin',
+                    'purchase_year': current_year + 12,
+                    'purchase_price': 420000.0,
+                    'current_value': 420000.0,
+                    'mortgage_balance': 336000.0,
+                    'mortgage_rate': 0.062,
+                    'mortgage_years_left': 30,
+                    'property_tax_rate': 0.0085,
+                    'home_insurance': 1300.0,
+                    'maintenance_rate': 0.01,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': 'Sabbatical Year (Educational Travel)',
+                    'year': current_year + 10,
+                    'amount': 35000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': "Diego's College Graduation Gift",
+                    'year': current_year + 18,
+                    'amount': 15000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                }
+            ],
+            'recurring_expenses': [
+                {
+                    'name': 'Reliable Sedan',
+                    'category': 'Vehicle',
+                    'amount': 32000.0,
+                    'frequency_years': 8,
+                    'start_year': current_year + 4,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'ParentX',
+                    'financing_years': 5,
+                    'interest_rate': 0.045
+                },
+                {
+                    'name': 'Summer Camp & Activities',
+                    'category': 'Children',
+                    'amount': 2500.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': current_year + 10,
+                    'inflation_adjust': True,
+                    'parent': 'ParentX',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Professional Development',
+                    'category': 'Work Equipment',
+                    'amount': 2000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': current_year + 27,
+                    'inflation_adjust': True,
+                    'parent': 'ParentX',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Annual Vacation',
+                    'category': 'Travel',
+                    'amount': 4500.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 6,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'ParentX',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                }
+            ],
+            'state_timeline': [
+                {
+                    'year': current_year,
+                    'state': 'Sacramento',
+                    'spending_strategy': 'Conservative'
+                },
+                {
+                    'year': current_year + 6,
+                    'state': 'San Francisco',  # Using SF as proxy for San Diego
+                    'spending_strategy': 'Average'  # Better income as VP/Principal
+                },
+                {
+                    'year': current_year + 15,
+                    'state': 'San Francisco',
+                    'spending_strategy': 'High-end'  # Principal salary, established career
+                }
+            ],
+            'economic_params': asdict(EconomicParameters(0.04, 0.03, 0.02, 0.05, False, False, False, False)),
+            'ss_insolvency_enabled': True,
+            'ss_shortfall_percentage': 30.0
+        }
+
+        # Scenario 5: Empty Nesters with Early Retirement & Snowbird Lifestyle
+        st.session_state.saved_scenarios["[DEMO] Empty Nesters: Early Retire @60, Portland→Arizona→RV, 4 Properties"] = {
+            'current_year': current_year,
+            'parent1_name': "Robert",
+            'parent1_emoji': "👨",
+            'parent2_name': "Linda",
+            'parent2_emoji': "👩",
+            'marriage_year': current_year - 32,
+            'parentX_age': 58,
+            'parentX_net_worth': 1200000.0,
+            'parentX_income': 125000.0,
+            'parentX_raise': 2.0,
+            'parentX_retirement_age': 60,  # Early retirement!
+            'parentX_ss_benefit': 3200.0,
+            'parentY_age': 57,
+            'parentY_net_worth': 950000.0,
+            'parentY_income': 98000.0,
+            'parentY_raise': 2.0,
+            'parentY_retirement_age': 60,  # Early retirement!
+            'parentY_ss_benefit': 2800.0,
+            'expenses': {
+                'Food & Groceries': 12000.0,
+                'Clothing': 3600.0,
+                'Transportation': 9600.0,
+                'Entertainment & Activities': 8400.0,
+                'Personal Care': 4200.0,
+                'Other Expenses': 7200.0
+            },
+            'children_list': [],
+            'houses': [
+                {
+                    'name': 'Portland Family Home',
+                    'purchase_year': current_year - 25,
+                    'purchase_price': 350000.0,
+                    'current_value': 720000.0,
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 0.009,
+                    'home_insurance': 1600.0,
+                    'maintenance_rate': 0.01,
+                    'upkeep_costs': 6000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year - 25, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 2, 'status': 'Sold', 'rental_income': 0.0}  # Sell early for retirement
+                    ]
+                },
+                {
+                    'name': 'Portland Downsized Condo',
+                    'purchase_year': current_year + 2,
+                    'purchase_price': 420000.0,
+                    'current_value': 420000.0,
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 0.009,
+                    'home_insurance': 1200.0,
+                    'maintenance_rate': 0.005,
+                    'upkeep_costs': 3000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 2, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 5, 'status': 'Own_Rent', 'rental_income': 2200.0},  # Rent while snowbirding
+                        {'year': current_year + 12, 'status': 'Sold', 'rental_income': 0.0}  # Sell when going full RV
+                    ]
+                },
+                {
+                    'name': 'Arizona Winter Home',
+                    'purchase_year': current_year + 5,
+                    'purchase_price': 380000.0,
+                    'current_value': 380000.0,
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 0.0062,
+                    'home_insurance': 1400.0,
+                    'maintenance_rate': 0.008,
+                    'upkeep_costs': 3500.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 5, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 12, 'status': 'Sold', 'rental_income': 0.0}  # Sell when going full RV
+                    ]
+                },
+                {
+                    'name': 'Montana Lakeside Cabin',
+                    'purchase_year': current_year + 8,
+                    'purchase_price': 320000.0,
+                    'current_value': 320000.0,
+                    'mortgage_balance': 0.0,
+                    'mortgage_rate': 0.0,
+                    'mortgage_years_left': 0,
+                    'property_tax_rate': 0.0081,
+                    'home_insurance': 1100.0,
+                    'maintenance_rate': 0.011,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': 'Luxury RV Purchase',
+                    'year': current_year + 12,
+                    'amount': 225000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Depreciating',
+                    'appreciation_rate': -0.09
+                },
+                {
+                    'name': 'World Cruise Retirement Trip',
+                    'year': current_year + 4,
+                    'amount': 45000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                }
+            ],
+            'recurring_expenses': [
+                {
+                    'name': 'Healthcare Premiums (Pre-Medicare)',
+                    'category': 'Healthcare',
+                    'amount': 18000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': current_year + 7,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Healthcare Costs (Post-Medicare)',
+                    'category': 'Healthcare',
+                    'amount': 8000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 7,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Help Adult Children',
+                    'category': 'Family Support',
+                    'amount': 15000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': current_year + 20,
+                    'inflation_adjust': False,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'RV Maintenance & Campgrounds',
+                    'category': 'Recreation',
+                    'amount': 18000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 12,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Active Retirement Travel',
+                    'category': 'Travel',
+                    'amount': 12000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 2,
+                    'end_year': current_year + 25,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Grandchildren Support & Gifts',
+                    'category': 'Family Support',
+                    'amount': 8000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 5,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Golf Club Membership',
+                    'category': 'Recreation',
+                    'amount': 6000.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 5,
+                    'end_year': current_year + 12,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                }
+            ],
+            'state_timeline': [
+                {
+                    'year': current_year,
+                    'state': 'Portland',
+                    'spending_strategy': 'Average'
+                },
+                {
+                    'year': current_year + 2,
+                    'state': 'Portland',
+                    'spending_strategy': 'Conservative'  # Downsized, early retirement
+                },
+                {
+                    'year': current_year + 5,
+                    'state': 'Houston',  # Using Houston as proxy for Arizona (snowbird)
+                    'spending_strategy': 'Average'  # Snowbird lifestyle
+                },
+                {
+                    'year': current_year + 12,
+                    'state': 'Los Angeles',  # California city with expense data for RV lifestyle
+                    'spending_strategy': 'Conservative'  # Full-time RV travel
+                }
+            ],
+            'economic_params': asdict(EconomicParameters(0.04, 0.03, 0.02, 0.05, False, False, False, False)),
+            'ss_insolvency_enabled': True,
+            'ss_shortfall_percentage': 30.0
+        }
+
+        # NEW: Custom children templates
+        st.session_state.custom_children_templates = {}
+
+        # NEW: Custom family expense templates with pre-populated Filipp&Erin strategy
+        st.session_state.custom_family_templates = {
+            "Sacramento": {
+                "Filipp&Erin Spending (custom)": {
+                    'Food & Groceries': 21000,  # Between Average (18k) and High-end (24k)
+                    'Clothing': 6000,  # Between Average (4.8k) and High-end (7.2k)
+                    'Transportation': 15500,  # Between Average (13k) and High-end (18k)
+                    'Entertainment & Activities': 7500,  # Between Average (6k) and High-end (9k)
+                    'Personal Care': 3600,  # Between Average (3k) and High-end (4.2k)
+                    'Utilities': 3000,  # Between Average (2.4k) and High-end (3.6k)
+                    'Internet & Phone': 2200,  # Between Average (1.8k) and High-end (2.6k)
+                    'Subscriptions': 900,  # Between Average (0.6k) and High-end (1.2k)
+                    'Other Expenses': 1800  # Between Average (1.2k) and High-end (2.4k)
+                }
+            }
+        }
+
+        # NEW: Custom location display names (for user-created cities)
+        st.session_state.custom_location_display_names = {}
+
+        # NEW: Custom location coordinates (for world map visualization)
+        st.session_state.custom_location_coordinates = {}
+
+        # NEW: Healthcare & Insurance
+        st.session_state.health_insurances = []
+        st.session_state.ltc_insurances = []
+        st.session_state.health_expenses = []
+        st.session_state.hsa_balance = 0.0
+        st.session_state.hsa_contribution = 0.0
+        st.session_state.medicare_part_b_premium = 174.70  # 2025 standard
+        st.session_state.medicare_part_d_premium = 55.0    # Average estimate
+        st.session_state.medigap_premium = 150.0           # Average estimate
+
+        # Tab visibility settings
+        st.session_state.show_family_expenses = False  # Off by default (advanced template management)
+        st.session_state.show_recurring_expenses = True  # On by default
+        st.session_state.show_healthcare = False  # Off by default
+        st.session_state.show_export = True  # On by default
+
+        st.session_state.initialized = True
+
+
+def get_state_for_year(year: int) -> tuple:
+    """Get the state and spending strategy for a given year"""
+    if not st.session_state.state_timeline:
+        return "Seattle", "Average (statistical)"
+
+    sorted_timeline = sorted(st.session_state.state_timeline, key=lambda x: x.year)
+
+    current_state = "Seattle"
+    current_strategy = "Average (statistical)"
+
+    for entry in sorted_timeline:
+        if entry.year <= year:
+            current_state = entry.state
+            # Normalize the strategy name for backward compatibility
+            current_strategy = normalize_strategy_name(entry.spending_strategy)
+        else:
+            break
+
+    return current_state, current_strategy
+
+
+def get_location_display_name(location: str) -> str:
+    """Get full display name for a location including country and state"""
+    # Check custom display names first, then built-in ones
+    if hasattr(st.session_state, 'custom_location_display_names'):
+        custom_name = st.session_state.custom_location_display_names.get(location)
+        if custom_name:
+            return custom_name
+    return LOCATION_DISPLAY_NAMES.get(location, location)
+
+
+def get_state_based_family_expenses(year: int) -> dict:
+    """Get family expenses based on the state for a given year"""
+    state, strategy = get_state_for_year(year)
+
+    # Use the helper function to get template data (handles both statistical and custom)
+    template_data = get_template_strategy_data(state, strategy, 'family')
+
+    if template_data:
+        return template_data
+    else:
+        return st.session_state.expenses.copy()
+
+
+def get_state_based_children_expenses(year: int, child_age: int) -> dict:
+    """Get children expenses for a specific age based on the state for a given year"""
+    state, strategy = get_state_for_year(year)
+
+    # Use the helper function to get template data (handles both statistical and custom)
+    template = get_template_strategy_data(state, strategy, 'children')
+
+    if template and 0 <= child_age < len(template.get('Food', [])):
+        child_expenses = {}
+
+        for category, values in template.items():
+            if child_age < len(values):
+                child_expenses[category] = values[child_age]
+            else:
+                child_expenses[category] = 0
+
+        return child_expenses
+    else:
+        if 0 <= child_age < len(st.session_state.children_expenses):
+            row = st.session_state.children_expenses.iloc[child_age]
+            return {col: row[col] for col in row.index if col != 'Age'}
+        else:
+            return {}
+
+
+def get_child_expenses(child: dict, year: int, current_year: int) -> dict:
+    """
+    Get expenses for a specific child in a specific year, accounting for:
+    - School type (public/private)
+    - College location (where they attend college)
+    - Living arrangement (at home vs at college)
+
+    Args:
+        child: Child dictionary with keys: name, birth_year, template_state, template_strategy,
+               school_type, college_location
+        year: The year to calculate expenses for
+        current_year: The current year (for age calculation)
+
+    Returns:
+        dict: Expense categories and amounts for this child in this year
+    """
+    child_age = year - child['birth_year']
+
+    # Child expenses only apply from age 0-25
+    if child_age < 0 or child_age > 30:
+        return {}
+
+    # Determine which location template to use
+    # Ages 18-21: Use college location (living at college)
+    # Other ages: Use family's template location
+    if 18 <= child_age <= 21:
+        location = child.get('college_location', 'Seattle')
+        lives_at_college = True
+    else:
+        location = child.get('template_state', 'Seattle')
+        lives_at_college = False
+
+    strategy = normalize_strategy_name(child.get('template_strategy', 'Average'))
+    school_type = child.get('school_type', 'Public')
+
+    # Get base expenses from template using helper function
+    template = get_template_strategy_data(location, strategy, 'children')
+
+    if template and 0 <= child_age < len(template.get('Food', [])):
+        child_expenses = {}
+
+        for category, values in template.items():
+            if child_age < len(values):
+                child_expenses[category] = values[child_age]
+            else:
+                child_expenses[category] = 0
+    else:
+        # Fallback to default template
+        if 0 <= child_age < len(st.session_state.children_expenses):
+            row = st.session_state.children_expenses.iloc[child_age]
+            child_expenses = {col: row[col] for col in row.index if col != 'Age'}
+        else:
+            child_expenses = {}
+
+    # Adjust for private school (ages 5-17, K-12 education)
+    if school_type == 'Private' and 5 <= child_age <= 17:
+        # Add private school tuition based on location
+        private_school_costs = {
+            'Seattle': 20000,  # Average private school in Seattle
+            'Sacramento': 18000,
+            'Houston': 15000,
+            'New York': 35000,
+            'San Francisco': 32000,
+            'Los Angeles': 25000,
+            'Portland': 17000
+        }
+        additional_tuition = private_school_costs.get(child.get('template_state', 'Seattle'), 20000)
+        child_expenses['Education'] = child_expenses.get('Education', 0) + additional_tuition
+
+    # Adjust expenses for living at college (ages 18-21)
+    if lives_at_college:
+        # College students living on campus have different expense patterns
+        # Room & board is included in Education costs
+        # Reduce home-based expenses (food, transportation, etc.)
+        child_expenses['Food'] = child_expenses.get('Food', 0) * 0.3  # Occasional meals at home
+        child_expenses['Transportation'] = child_expenses.get('Transportation', 0) * 0.4  # Less frequent trips home
+        child_expenses['Entertainment'] = child_expenses.get('Entertainment', 0) * 0.5  # Less at-home entertainment
+
+        # Education costs now include tuition + room & board
+        college_type = child.get('college_type', 'Public')
+
+        # Base tuition costs (public vs private)
+        if college_type == 'Public':
+            # Public college tuition by location
+            public_tuition = {
+                'Seattle': 12000,      # UW in-state
+                'Sacramento': 10000,   # UC in-state
+                'Houston': 11000,      # UT in-state
+                'New York': 13000,     # SUNY/CUNY in-state
+                'San Francisco': 10000, # UC in-state
+                'Los Angeles': 10000,  # UC in-state
+                'Portland': 12000      # Oregon in-state
+            }
+            tuition = public_tuition.get(location, 12000)
+        else:  # Private college
+            # Private college tuition by location (2-3x public costs)
+            private_tuition = {
+                'Seattle': 55000,      # Seattle University, etc.
+                'Sacramento': 50000,
+                'Houston': 48000,
+                'New York': 60000,     # NYU, Columbia, etc.
+                'San Francisco': 58000, # Stanford area schools
+                'Los Angeles': 56000,  # USC, etc.
+                'Portland': 52000
+            }
+            tuition = private_tuition.get(location, 55000)
+
+        # Room & board costs (~$15k-25k depending on location)
+        room_board_costs = {
+            'Seattle': 18000,
+            'Sacramento': 15000,
+            'Houston': 12000,
+            'New York': 25000,
+            'San Francisco': 24000,
+            'Los Angeles': 20000,
+            'Portland': 16000
+        }
+        room_board = room_board_costs.get(location, 18000)
+
+        # Total college costs = tuition + room & board
+        child_expenses['Education'] = child_expenses.get('Education', 0) + tuition + room_board
+
+    return child_expenses
+
+
+def get_income_for_year(base_income: float, raise_rate: float, job_changes_df: pd.DataFrame,
+                        current_year: int, target_year: int) -> float:
+    """
+    Calculate income for a specific year considering job changes and raises.
+
+    Args:
+        base_income: Starting income (current year)
+        raise_rate: Annual raise percentage
+        job_changes_df: DataFrame with 'Year' and 'New Income' columns
+        current_year: The current year (base year)
+        target_year: The year to calculate income for
+
+    Returns:
+        float: Income for the target year
+    """
+    # Find the most recent job change that applies to target_year
+    applicable_job_changes = job_changes_df[job_changes_df['Year'] <= target_year]
+
+    if len(applicable_job_changes) > 0:
+        # Get the most recent job change
+        most_recent = applicable_job_changes.sort_values('Year').iloc[-1]
+        last_change_year = most_recent['Year']
+        last_change_income = most_recent['New Income']
+
+        # Apply raises from the last job change to target year
+        years_since_change = target_year - last_change_year
+        income = last_change_income * (1 + raise_rate / 100) ** years_since_change
+    else:
+        # No job changes, apply raises from current year
+        years_from_now = target_year - current_year
+        income = base_income * (1 + raise_rate / 100) ** years_from_now
+
+    return income
+
+
+def get_historical_return_stats():
+    """Calculate statistics from historical returns"""
+    returns = np.array(HISTORICAL_STOCK_RETURNS)
+
+    stats = {
+        'mean': np.mean(returns),
+        'median': np.median(returns),
+        'std': np.std(returns),
+        'min': np.min(returns),
+        'max': np.max(returns),
+        'positive_years': np.sum(returns > 0),
+        'negative_years': np.sum(returns < 0),
+        'total_years': len(returns),
+        'positive_percentage': (np.sum(returns > 0) / len(returns)) * 100
+    }
+
+    return stats
+
+
+def calculate_federal_income_tax(taxable_income, filing_status="married_jointly", year=2024):
+    """Calculate federal income tax based on tax brackets"""
+
+    if filing_status == "married_jointly":
+        brackets = [
+            (0, 23200, 0.10),
+            (23200, 94300, 0.12),
+            (94300, 201050, 0.22),
+            (201050, 383900, 0.24),
+            (383900, 487450, 0.32),
+            (487450, 731200, 0.35),
+            (731200, float('inf'), 0.37)
+        ]
+    else:  # single
+        brackets = [
+            (0, 11600, 0.10),
+            (11600, 47150, 0.12),
+            (47150, 100525, 0.22),
+            (100525, 191950, 0.24),
+            (191950, 243725, 0.32),
+            (243725, 609350, 0.35),
+            (609350, float('inf'), 0.37)
+        ]
+
+    tax = 0
+    for i, (lower, upper, rate) in enumerate(brackets):
+        if taxable_income <= lower:
+            break
+
+        taxable_in_bracket = min(taxable_income, upper) - lower
+        tax += taxable_in_bracket * rate
+
+        if taxable_income <= upper:
+            break
+
+    return tax
+
+
+def calculate_annual_taxes(gross_income, pretax_deductions=0, state_tax_rate=0.0, filing_status="married_jointly"):
+    """Calculate total annual taxes including federal, state, and FICA"""
+
+    standard_deduction = 29200 if filing_status == "married_jointly" else 14600
+
+    adjusted_gross_income = max(0, gross_income - pretax_deductions)
+
+    taxable_income = max(0, adjusted_gross_income - standard_deduction)
+
+    federal_tax = calculate_federal_income_tax(taxable_income, filing_status)
+
+    state_tax = adjusted_gross_income * state_tax_rate
+
+    ss_wage_base = 160200
+    medicare_threshold = 250000 if filing_status == "married_jointly" else 200000
+
+    ss_tax = min(gross_income, ss_wage_base) * 0.062
+    medicare_tax = gross_income * 0.0145
+    additional_medicare = max(0, gross_income - medicare_threshold) * 0.009
+
+    fica_tax = ss_tax + medicare_tax + additional_medicare
+
+    total_tax = federal_tax + state_tax + fica_tax
+
+    return {
+        'federal_tax': federal_tax,
+        'state_tax': state_tax,
+        'fica_tax': fica_tax,
+        'total_tax': total_tax,
+        'effective_rate': (total_tax / gross_income * 100) if gross_income > 0 else 0,
+        'after_tax_income': gross_income - total_tax
+    }
+
+
+def calculate_monthly_house_payment(house):
+    """Calculate total monthly payment for a house (PITI)"""
+    if house.mortgage_years_left > 0:
+        monthly_rate = house.mortgage_rate / 12
+        num_payments = house.mortgage_years_left * 12
+
+        if monthly_rate > 0:
+            monthly_payment = house.mortgage_balance * (
+                    monthly_rate * (1 + monthly_rate) ** num_payments
+            ) / ((1 + monthly_rate) ** num_payments - 1)
+        else:
+            monthly_payment = house.mortgage_balance / num_payments
+    else:
+        monthly_payment = 0
+
+    monthly_property_tax = (house.current_value * house.property_tax_rate) / 12
+
+    monthly_insurance = house.home_insurance / 12
+
+    return monthly_payment + monthly_property_tax + monthly_insurance
+
+
+def plotly_fig_to_image(fig, width=6*inch, height=4*inch):
+    """
+    Convert a Plotly figure to a ReportLab Image object for PDF inclusion.
+
+    Args:
+        fig: Plotly figure object
+        width: Width of image in PDF (default 6 inches)
+        height: Height of image in PDF (default 4 inches)
+
+    Returns:
+        ReportLab Image object or None if conversion fails
+    """
+    try:
+        # Export figure to bytes (PNG format)
+        img_bytes = fig.to_image(format="png", width=800, height=600, scale=2)
+
+        # Create BytesIO object from bytes
+        img_buffer = io.BytesIO(img_bytes)
+
+        # Create ReportLab Image object
+        img = Image(img_buffer, width=width, height=height)
+        return img
+    except Exception as e:
+        # If kaleido is not installed or conversion fails, return None
+        print(f"Warning: Could not convert chart to image: {e}")
+        return None
+
+
+def main():
+    """Main application function"""
+    initialize_session_state()
+
+    st.title("💰 Financial Planning Suite v0.75")
+
+    # Build tab list dynamically based on visibility settings
+    tab_configs = [
+        ("⚙️ Settings", parent_settings_tab, True),  # Always shown
+        (f"{st.session_state.parent1_emoji} {st.session_state.parent1_name}", parent_x_tab, True),
+        (f"{st.session_state.parent2_emoji} {st.session_state.parent2_name}", parent_y_tab, True),
+        ("💸 Family Expenses", family_expenses_tab, st.session_state.get('show_family_expenses', False)),
+        ("🔄 Recurring & One-Time Expenses", recurring_one_time_expenses_tab, st.session_state.get('show_recurring_expenses', True)),
+        ("👶 Children", children_tab, True),
+        ("🏠 House Portfolio", house_tab, True),
+        ("🗓️ Timeline", timeline_tab, True),
+        ("📈 Economy", economy_tab, True),
+        ("🖼️ Retirement", retirement_tab, True),
+        ("🏥 Healthcare & Insurance", healthcare_insurance_tab, st.session_state.get('show_healthcare', False)),
+        ("💰 Deterministic Cashflow", deterministic_cashflow_tab, True),
+        ("🎲 Monte Carlo Simulation", monte_carlo_simulation_tab, True),
+        ("🧪 Stress Test", stress_test_tab, True),
+        ("📄 Export Reports", report_export_tab, st.session_state.get('show_export', True)),
+        ("💾 Save/Load", save_load_tab, True)
+    ]
+
+    # Filter to only enabled tabs
+    enabled_tabs = [(name, func) for name, func, enabled in tab_configs if enabled]
+    tab_names = [name for name, func in enabled_tabs]
+    tab_functions = [func for name, func in enabled_tabs]
+
+    # Create tabs
+    tabs = st.tabs(tab_names)
+
+    # Render each enabled tab
+    for idx, (tab, func) in enumerate(zip(tabs, tab_functions)):
+        with tab:
+            func()
+
+    # Display sidebar
+    display_sidebar()
+
+
+# Tab implementations
+def parent_settings_tab():
+    """Settings and Instructions tab"""
+    st.header("⚙️ Settings and Instructions")
+
+    st.subheader("📅 Current Year Setting")
+    st.session_state.current_year = st.number_input(
+        "Current Year",
+        min_value=2020,
+        max_value=2030,
+        value=int(st.session_state.current_year),
+        step=1
+    )
+
+    st.subheader("💍 Marriage Information")
+    marriage_options = ["N/A"] + list(range(1970, st.session_state.current_year + 1))
+
+    if st.session_state.marriage_year == "N/A":
+        marriage_index = 0
+    else:
+        try:
+            marriage_index = marriage_options.index(int(st.session_state.marriage_year))
+        except (ValueError, TypeError):
+            marriage_index = 0
+
+    selected_marriage = st.selectbox(
+        "Marriage Year",
+        options=marriage_options,
+        index=marriage_index
+    )
+
+    st.session_state.marriage_year = selected_marriage
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("🔧 Customize Parent 1")
+        st.session_state.parent1_name = st.text_input(
+            "Parent 1 Name",
+            value=st.session_state.parent1_name
+        )
+
+        emoji_options = ["👨", "👩", "🧑", "👤", "👼", "🏃", "⭐", "🎯"]
+        current_emoji_idx = emoji_options.index(
+            st.session_state.parent1_emoji) if st.session_state.parent1_emoji in emoji_options else 0
+
+        st.session_state.parent1_emoji = st.selectbox(
+            "Parent 1 Emoji",
+            emoji_options,
+            index=current_emoji_idx
+        )
+
+    with col2:
+        st.subheader("🔧 Customize Parent 2")
+        st.session_state.parent2_name = st.text_input(
+            "Parent 2 Name",
+            value=st.session_state.parent2_name
+        )
+
+        current_emoji_idx = emoji_options.index(
+            st.session_state.parent2_emoji) if st.session_state.parent2_emoji in emoji_options else 1
+
+        st.session_state.parent2_emoji = st.selectbox(
+            "Parent 2 Emoji",
+            emoji_options,
+            index=current_emoji_idx
+        )
+
+    st.info("💡 Changes to parent names and emojis will be reflected in all tabs after you navigate to them.")
+
+    # Tab Visibility Settings
+    st.markdown("---")
+    st.subheader("👁️ Tab Visibility Settings")
+    st.markdown("Choose which advanced features to show. Disabled tabs are hidden to simplify the interface.")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.checkbox(
+            "💸 Family Expenses",
+            value=st.session_state.get('show_family_expenses', False),
+            key='show_family_expenses',
+            help="Advanced template-based expense management for different cities"
+        )
+
+        st.checkbox(
+            "🔄 Recurring & One-Time Expenses",
+            value=st.session_state.get('show_recurring_expenses', True),
+            key='show_recurring_expenses',
+            help="Manage recurring and one-time expenses"
+        )
+
+        st.checkbox(
+            "🏥 Healthcare & Insurance",
+            value=st.session_state.get('show_healthcare', False),
+            key='show_healthcare',
+            help="Plan Medicare, HSA, long-term care, and health insurance"
+        )
+
+    with col2:
+        st.checkbox(
+            "📄 Export Reports",
+            value=st.session_state.get('show_export', True),
+            key='show_export',
+            help="Export financial data to Excel, CSV, or JSON"
+        )
+
+    st.info("💡 Changes take effect immediately. Disabled tabs are hidden from the navigation.")
+
+    # Instructions Section
+    st.markdown("---")
+    st.header("📖 Application Instructions")
+
+    st.markdown("""
+    ### Welcome to Financial Planning Suite
+
+    This application helps you plan and project your family's financial future through comprehensive
+    modeling of income, expenses, investments, and major life events.
+
+    #### Quick Start Guide
+
+    1. **Settings**: Configure current year, parent names, and which tabs to show
+    2. **Parent Tabs**: Enter age, net worth, income, retirement plans, and Social Security
+    3. **Family Expenses**: Define annual expenses, taxes, major purchases
+    4. **Children**: Add children and configure their education expenses
+    5. **Houses**: Track property ownership, mortgages, and timelines
+    6. **Economy**: Configure market returns and inflation assumptions
+    7. **Timeline**: Review consolidated timeline and plan relocations
+    8. **Analysis**: Run Monte Carlo simulations to project future outcomes
+    9. **Save/Load**: Save scenarios for future reference
+
+    #### Optional Advanced Features
+
+    Enable in Settings → Tab Visibility to access:
+    - **Healthcare & Insurance**: Plan Medicare, HSA, and long-term care costs
+    - **Export Reports**: Generate Excel/CSV/JSON reports
+
+    #### Key Capabilities
+
+    - Location-based expense templates for major U.S. cities
+    - Monte Carlo simulation with detailed percentile analysis
+    - Historical market data (100+ years of S&P 500 returns)
+    - Social Security insolvency modeling
+    - Inflation adjustment and today's dollars view
+    - Multiple scenario comparison
+    """)
+
+
+def parent_x_tab():
+    """Parent X financial details tab"""
+    st.header(f"{st.session_state.parent1_emoji} {st.session_state.parent1_name}'s Financial Details")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("Basic Information")
+        st.session_state.parentX_age = st.number_input(
+            "Current Age",
+            min_value=18,
+            max_value=100,
+            value=int(st.session_state.parentX_age),
+            step=1,
+            key="parentX_age_input"
+        )
+
+        st.session_state.parentX_net_worth = st.number_input(
+            "Current Net Worth ($)",
+            min_value=-10000000.0,
+            max_value=100000000.0,
+            value=float(st.session_state.parentX_net_worth),
+            step=1000.0,
+            format="%.0f",
+            key="parentX_net_worth_input"
+        )
+        st.caption(f"Formatted: {format_currency(st.session_state.parentX_net_worth, force_full=False)}")
+
+        st.session_state.parentX_income = st.number_input(
+            "Annual Income ($)",
+            min_value=0.0,
+            max_value=10000000.0,
+            value=float(st.session_state.parentX_income),
+            step=1000.0,
+            format="%.0f",
+            key="parentX_income_input"
+        )
+        st.caption(f"Formatted: {format_currency(st.session_state.parentX_income, force_full=False)}")
+
+        st.session_state.parentX_raise = st.number_input(
+            "Annual Raise (%)",
+            min_value=0.0,
+            max_value=20.0,
+            value=float(st.session_state.parentX_raise),
+            step=0.1,
+            format="%.2f",
+            key="parentX_raise_input"
+        )
+
+    with col2:
+        st.subheader("Retirement Information")
+        st.session_state.parentX_retirement_age = st.number_input(
+            "Retirement Age",
+            min_value=int(st.session_state.parentX_age),
+            max_value=100,
+            value=int(st.session_state.parentX_retirement_age),
+            step=1,
+            key="parentX_retirement_age_input"
+        )
+
+        st.session_state.parentX_ss_benefit = st.number_input(
+            "Monthly Social Security Benefit ($)",
+            min_value=0.0,
+            max_value=10000.0,
+            value=float(st.session_state.parentX_ss_benefit),
+            step=50.0,
+            format="%.0f",
+            key="parentX_ss_benefit_input"
+        )
+        st.caption(f"Annual: {format_currency(st.session_state.parentX_ss_benefit * 12, force_full=False)}")
+
+        st.session_state.parentX_death_age = st.number_input(
+            "Expected Death Age",
+            min_value=int(st.session_state.parentX_age),
+            max_value=120,
+            value=int(st.session_state.parentX_death_age),
+            step=1,
+            key="parentX_death_age_input"
+        )
+
+    st.subheader("Job Changes / Income Adjustments")
+    st.markdown("Plan for promotions, career changes, or income adjustments")
+    st.caption("💡 Tip: Click '+' to add rows, enter Year and New Income, changes save automatically")
+
+    # Use data_editor and capture its output properly
+    edited_job_changes = st.data_editor(
+        st.session_state.parentX_job_changes,
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={
+            "Year": st.column_config.NumberColumn(
+                "Year",
+                help="Year when income changes",
+                min_value=st.session_state.current_year,
+                max_value=2100,
+                step=1,
+                format="%d"
+            ),
+            "New Income": st.column_config.NumberColumn(
+                "New Income ($)",
+                help="New annual income starting this year",
+                min_value=0,
+                max_value=10000000,
+                step=1000,
+                format="$%d"
+            )
+        },
+        key="parentX_job_changes_editor"
+    )
+
+    # Update session state with the edited data
+    st.session_state.parentX_job_changes = edited_job_changes
+
+    # Annual Expenses Section
+    st.markdown("---")
+    st.subheader("💳 Annual Expenses")
+    st.markdown(f"Track {st.session_state.parent1_name}'s individual expenses (groceries, transportation, healthcare, etc.)")
+
+    # Expense template settings
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.session_state.parentX_use_template = st.checkbox(
+            "Use Expense Template",
+            value=st.session_state.parentX_use_template,
+            key="parentX_use_template_checkbox",
+            help="Use location/strategy-based expense template or enter custom amounts"
+        )
+
+    with col2:
+        st.session_state.parentX_expense_location = st.selectbox(
+            "Location",
+            options=["Seattle", "Sacramento", "Houston"],
+            index=["Seattle", "Sacramento", "Houston"].index(st.session_state.parentX_expense_location) if st.session_state.parentX_expense_location in ["Seattle", "Sacramento", "Houston"] else 0,
+            key="parentX_expense_location_select",
+            disabled=not st.session_state.parentX_use_template
+        )
+
+    with col3:
+        st.session_state.parentX_expense_strategy = st.selectbox(
+            "Spending Strategy",
+            options=STATISTICAL_STRATEGIES,
+            index=STATISTICAL_STRATEGIES.index(st.session_state.parentX_expense_strategy) if st.session_state.parentX_expense_strategy in STATISTICAL_STRATEGIES else 1,
+            key="parentX_expense_strategy_select",
+            disabled=not st.session_state.parentX_use_template
+        )
+
+    # Load template if using template mode
+    if st.session_state.parentX_use_template:
+        if st.button("📥 Load Template", key="parentX_load_template"):
+            template_data = get_adult_expense_template(
+                st.session_state.parentX_expense_location,
+                st.session_state.parentX_expense_strategy
+            )
+            st.session_state.parentX_expenses = template_data.copy()
+            st.success(f"✅ Loaded {st.session_state.parentX_expense_strategy} template for {st.session_state.parentX_expense_location}")
+
+    # Display expenses by category group
+    st.markdown("#### Expense Categories")
+
+    total_parentX_expenses = 0
+
+    for group_name, categories in ADULT_EXPENSE_CATEGORIES.items():
+        with st.expander(f"**{group_name}**", expanded=False):
+            cols = st.columns(2)
+            for idx, category in enumerate(categories):
+                with cols[idx % 2]:
+                    if category not in st.session_state.parentX_expenses:
+                        st.session_state.parentX_expenses[category] = 0
+
+                    st.session_state.parentX_expenses[category] = st.number_input(
+                        category,
+                        min_value=0.0,
+                        max_value=1000000.0,
+                        value=float(st.session_state.parentX_expenses[category]),
+                        step=100.0,
+                        format="%.0f",
+                        key=f"parentX_expense_{category}",
+                        help=f"Annual amount for {category}"
+                    )
+                    total_parentX_expenses += st.session_state.parentX_expenses[category]
+
+    st.markdown("---")
+    st.metric("**Total Annual Expenses**", format_currency(total_parentX_expenses, force_full=False))
+
+
+def parent_y_tab():
+    """Parent Y financial details tab"""
+    st.header(f"{st.session_state.parent2_emoji} {st.session_state.parent2_name}'s Financial Details")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("Basic Information")
+        st.session_state.parentY_age = st.number_input(
+            "Current Age",
+            min_value=18,
+            max_value=100,
+            value=int(st.session_state.parentY_age),
+            step=1,
+            key="parentY_age_input"
+        )
+
+        st.session_state.parentY_net_worth = st.number_input(
+            "Current Net Worth ($)",
+            min_value=-10000000.0,
+            max_value=100000000.0,
+            value=float(st.session_state.parentY_net_worth),
+            step=1000.0,
+            format="%.0f",
+            key="parentY_net_worth_input"
+        )
+        st.caption(f"Formatted: {format_currency(st.session_state.parentY_net_worth, force_full=False)}")
+
+        st.session_state.parentY_income = st.number_input(
+            "Annual Income ($)",
+            min_value=0.0,
+            max_value=10000000.0,
+            value=float(st.session_state.parentY_income),
+            step=1000.0,
+            format="%.0f",
+            key="parentY_income_input"
+        )
+        st.caption(f"Formatted: {format_currency(st.session_state.parentY_income, force_full=False)}")
+
+        st.session_state.parentY_raise = st.number_input(
+            "Annual Raise (%)",
+            min_value=0.0,
+            max_value=20.0,
+            value=float(st.session_state.parentY_raise),
+            step=0.1,
+            format="%.2f",
+            key="parentY_raise_input"
+        )
+
+    with col2:
+        st.subheader("Retirement Information")
+        st.session_state.parentY_retirement_age = st.number_input(
+            "Retirement Age",
+            min_value=int(st.session_state.parentY_age),
+            max_value=100,
+            value=int(st.session_state.parentY_retirement_age),
+            step=1,
+            key="parentY_retirement_age_input"
+        )
+
+        st.session_state.parentY_ss_benefit = st.number_input(
+            "Monthly Social Security Benefit ($)",
+            min_value=0.0,
+            max_value=10000.0,
+            value=float(st.session_state.parentY_ss_benefit),
+            step=50.0,
+            format="%.0f",
+            key="parentY_ss_benefit_input"
+        )
+        st.caption(f"Annual: {format_currency(st.session_state.parentY_ss_benefit * 12, force_full=False)}")
+
+        st.session_state.parentY_death_age = st.number_input(
+            "Expected Death Age",
+            min_value=int(st.session_state.parentY_age),
+            max_value=120,
+            value=int(st.session_state.parentY_death_age),
+            step=1,
+            key="parentY_death_age_input"
+        )
+
+    st.subheader("Job Changes / Income Adjustments")
+    st.markdown("Plan for promotions, career changes, or income adjustments")
+    st.caption("💡 Tip: Click '+' to add rows, enter Year and New Income, changes save automatically")
+
+    # Use data_editor and capture its output properly
+    edited_job_changes = st.data_editor(
+        st.session_state.parentY_job_changes,
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={
+            "Year": st.column_config.NumberColumn(
+                "Year",
+                help="Year when income changes",
+                min_value=st.session_state.current_year,
+                max_value=2100,
+                step=1,
+                format="%d"
+            ),
+            "New Income": st.column_config.NumberColumn(
+                "New Income ($)",
+                help="New annual income starting this year",
+                min_value=0,
+                max_value=10000000,
+                step=1000,
+                format="$%d"
+            )
+        },
+        key="parentY_job_changes_editor"
+    )
+
+    # Update session state with the edited data
+    st.session_state.parentY_job_changes = edited_job_changes
+
+    # Annual Expenses Section
+    st.markdown("---")
+    st.subheader("💳 Annual Expenses")
+    st.markdown(f"Track {st.session_state.parent2_name}'s individual expenses (groceries, transportation, healthcare, etc.)")
+
+    # Expense template settings
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.session_state.parentY_use_template = st.checkbox(
+            "Use Expense Template",
+            value=st.session_state.parentY_use_template,
+            key="parentY_use_template_checkbox",
+            help="Use location/strategy-based expense template or enter custom amounts"
+        )
+
+    with col2:
+        st.session_state.parentY_expense_location = st.selectbox(
+            "Location",
+            options=["Seattle", "Sacramento", "Houston"],
+            index=["Seattle", "Sacramento", "Houston"].index(st.session_state.parentY_expense_location) if st.session_state.parentY_expense_location in ["Seattle", "Sacramento", "Houston"] else 0,
+            key="parentY_expense_location_select",
+            disabled=not st.session_state.parentY_use_template
+        )
+
+    with col3:
+        st.session_state.parentY_expense_strategy = st.selectbox(
+            "Spending Strategy",
+            options=STATISTICAL_STRATEGIES,
+            index=STATISTICAL_STRATEGIES.index(st.session_state.parentY_expense_strategy) if st.session_state.parentY_expense_strategy in STATISTICAL_STRATEGIES else 1,
+            key="parentY_expense_strategy_select",
+            disabled=not st.session_state.parentY_use_template
+        )
+
+    # Load template if using template mode
+    if st.session_state.parentY_use_template:
+        if st.button("📥 Load Template", key="parentY_load_template"):
+            template_data = get_adult_expense_template(
+                st.session_state.parentY_expense_location,
+                st.session_state.parentY_expense_strategy
+            )
+            st.session_state.parentY_expenses = template_data.copy()
+            st.success(f"✅ Loaded {st.session_state.parentY_expense_strategy} template for {st.session_state.parentY_expense_location}")
+
+    # Display expenses by category group
+    st.markdown("#### Expense Categories")
+
+    total_parentY_expenses = 0
+
+    for group_name, categories in ADULT_EXPENSE_CATEGORIES.items():
+        with st.expander(f"**{group_name}**", expanded=False):
+            cols = st.columns(2)
+            for idx, category in enumerate(categories):
+                with cols[idx % 2]:
+                    if category not in st.session_state.parentY_expenses:
+                        st.session_state.parentY_expenses[category] = 0
+
+                    st.session_state.parentY_expenses[category] = st.number_input(
+                        category,
+                        min_value=0.0,
+                        max_value=1000000.0,
+                        value=float(st.session_state.parentY_expenses[category]),
+                        step=100.0,
+                        format="%.0f",
+                        key=f"parentY_expense_{category}",
+                        help=f"Annual amount for {category}"
+                    )
+                    total_parentY_expenses += st.session_state.parentY_expenses[category]
+
+    st.markdown("---")
+    st.metric("**Total Annual Expenses**", format_currency(total_parentY_expenses, force_full=False))
+
+
+def family_expenses_tab():
+    """Family expenses tab with template browsing, modification, and custom city creation"""
+    st.header("💸 Family Expenses")
+
+    # Show inflation adjustment info
+    st.info(f"ℹ️ All expense templates are inflation-adjusted to **{EXPENSE_TEMPLATE_BASE_YEAR}** dollars")
+
+    # Create tabs for different views
+    expense_tab1, expense_tab2, expense_tab3 = st.tabs([
+        "📊 Browse Templates",
+        "✏️ Edit Templates",
+        "🌍 Create Custom City"
+    ])
+
+    # TAB 1: Browse Templates
+    with expense_tab1:
+        st.subheader("📊 Browse Expense Templates by Location")
+
+        # Get all available locations (built-in + custom)
+        all_templates = {**FAMILY_EXPENSE_TEMPLATES, **st.session_state.custom_family_templates}
+        available_locations = sorted(all_templates.keys())
+
+        if not available_locations:
+            st.warning("No templates available. Please create a custom city in the 'Create Custom City' tab.")
+            return
+
+        # Create display options with full location names
+        location_display_options = [get_location_display_name(loc) for loc in available_locations]
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            selected_display = st.selectbox(
+                "Select Location/City:",
+                options=location_display_options,
+                index=0,
+                key="browse_location"
+            )
+            # Get the actual location key from the display name
+            selected_location = available_locations[location_display_options.index(selected_display)]
+
+        # Get available strategies for selected location
+        available_strategies = list(all_templates[selected_location].keys())
+
+        with col2:
+            selected_strategy = st.selectbox(
+                "Select Spending Strategy:",
+                options=available_strategies,
+                index=0,
+                key="browse_strategy"
+            )
+
+        # Display template details
+        template = all_templates[selected_location][selected_strategy]
+
+        st.markdown("---")
+        st.subheader(f"📋 {get_location_display_name(selected_location)} - {selected_strategy} Strategy")
+
+        # Show template as visualization and table
+        col_chart, col_table = st.columns([1, 1])
+
+        with col_chart:
+            # Create pie chart
+            categories = list(template.keys())
+            amounts = list(template.values())
+
+            fig = go.Figure(data=[go.Pie(
+                labels=categories,
+                values=amounts,
+                hole=0.4,
+                textinfo='label+percent',
+                marker=dict(colors=px.colors.qualitative.Set3)
+            )])
+
+            fig.update_layout(
+                title=f"Expense Breakdown",
+                height=400,
+                showlegend=True
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col_table:
+            # Create detailed table
+            template_df = pd.DataFrame({
+                'Category': categories,
+                'Annual Amount': [f"${amt:,.0f}" for amt in amounts],
+                'Monthly Amount': [f"${amt/12:,.0f}" for amt in amounts]
+            })
+
+            st.dataframe(template_df, hide_index=True, use_container_width=True)
+
+            total = sum(amounts)
+            st.metric("Total Annual Expenses", f"${total:,.0f}")
+            st.caption(f"Monthly: ${total/12:,.0f}")
+
+        # Display data sources
+        st.markdown("---")
+        data_source = get_expense_data_source(selected_location)
+
+        st.markdown("### 📚 Data Sources")
+        st.markdown(f"**Source:** {data_source['source']}")
+
+        # Display URLs as clickable links
+        urls = data_source['url'].split(', ')
+        if len(urls) == 1 and urls[0] != 'N/A':
+            st.markdown(f"**URL:** [{urls[0]}]({urls[0]})")
+        elif urls[0] != 'N/A':
+            st.markdown("**URLs:**")
+            for url in urls:
+                url = url.strip()
+                st.markdown(f"- [{url}]({url})")
+
+        st.markdown(f"**Data Year:** {data_source['year']}")
+
+        if data_source['notes']:
+            with st.expander("📝 Additional Notes"):
+                st.markdown(data_source['notes'])
+
+        # Quick save button
+        st.markdown("---")
+        col_save1, col_save2 = st.columns([3, 1])
+
+        with col_save1:
+            st.markdown(f"**Save this template for future use?**")
+            st.caption("This will save the template to your custom templates.")
+
+        with col_save2:
+            if st.button("💾 Save Template", type="primary", key="save_template_btn"):
+                # Save to custom templates
+                if selected_location not in st.session_state.custom_family_templates:
+                    st.session_state.custom_family_templates[selected_location] = {}
+                st.session_state.custom_family_templates[selected_location][selected_strategy] = template.copy()
+                st.success(f"✅ Saved {selected_strategy} template for {get_location_display_name(selected_location)}!")
+                st.rerun()
+
+    # TAB 2: Edit Templates
+    with expense_tab2:
+        st.subheader("✏️ Edit and Save Templates")
+
+        st.markdown("""
+        Modify expense templates and save them. You can:
+        - Edit existing built-in templates (saved as custom versions)
+        - Modify your custom templates
+        - Create variations of existing templates
+        """)
+
+        # Select template to edit
+        all_templates = {**FAMILY_EXPENSE_TEMPLATES, **st.session_state.custom_family_templates}
+        available_locations = sorted(all_templates.keys())
+        location_display_options = [get_location_display_name(loc) for loc in available_locations]
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            edit_display = st.selectbox(
+                "Location to Edit:",
+                options=location_display_options,
+                key="edit_location"
+            )
+            edit_location = available_locations[location_display_options.index(edit_display)]
+
+        available_strategies = list(all_templates[edit_location].keys())
+
+        with col2:
+            edit_strategy = st.selectbox(
+                "Strategy to Edit:",
+                options=available_strategies,
+                key="edit_strategy"
+            )
+
+        with col3:
+            save_as_new = st.checkbox("Save as new strategy", value=False, key="save_as_new")
+
+        # Load template for editing
+        current_template = all_templates[edit_location][edit_strategy].copy()
+
+        st.markdown("---")
+        st.markdown(f"### Editing: {get_location_display_name(edit_location)} - {edit_strategy}")
+
+        # Edit each category
+        edited_template = {}
+
+        for category, value in current_template.items():
+            col_cat, col_val = st.columns([2, 1])
+
+            with col_cat:
+                st.markdown(f"**{category}**")
+
+            with col_val:
+                new_value = st.number_input(
+                    f"Amount for {category}",
+                    min_value=0.0,
+                    max_value=1000000.0,
+                    value=float(value),
+                    step=100.0,
+                    key=f"edit_{category}",
+                    label_visibility="collapsed"
+                )
+                edited_template[category] = new_value
+
+        # Show total
+        total_edited = sum(edited_template.values())
+        st.metric("Total Annual Expenses", f"${total_edited:,.0f}")
+
+        # Save options
+        st.markdown("---")
+        st.subheader("💾 Save Changes")
+
+        # Option to save as a completely new city/location
+        save_as_new_city = st.checkbox("Save as new city/location", value=False, key="save_as_new_city")
+
+        if save_as_new_city:
+            new_city_location = st.text_input(
+                "New City/Location Name:",
+                value=f"{edit_location} (Copy)",
+                key="new_city_location",
+                help="Enter a new city/location name to save this template under"
+            )
+            # Get base name without suffix for input
+            base_strategy = get_strategy_base_name(edit_strategy)
+            new_strategy_base = st.text_input(
+                "Strategy Name:",
+                value=base_strategy,
+                key="new_strategy_name_city",
+                help="Custom strategy name (without suffix). Will be saved with '(custom)' suffix."
+            )
+            new_strategy_name = f"{new_strategy_base} (custom)"
+            save_location = new_city_location
+        elif save_as_new:
+            # Get base name without suffix for input
+            base_strategy = get_strategy_base_name(edit_strategy)
+            new_strategy_base = st.text_input(
+                "New Strategy Name:",
+                value=base_strategy,
+                key="new_strategy_name",
+                help="Custom strategy name (without suffix). Will be saved with '(custom)' suffix."
+            )
+            new_strategy_name = f"{new_strategy_base} (custom)"
+            save_location = edit_location
+        else:
+            # Check if trying to overwrite a statistical strategy
+            if is_statistical_strategy(edit_strategy):
+                st.error("❌ Cannot overwrite statistical (built-in) strategies. Please check 'Save as new strategy' to create a custom version.")
+                new_strategy_name = None
+                save_location = None
+            elif is_custom_strategy(edit_strategy):
+                # Can overwrite custom strategies
+                new_strategy_name = edit_strategy
+                save_location = edit_location
+            else:
+                # Legacy strategy name - save as custom
+                new_strategy_name = f"{edit_strategy} (custom)"
+                save_location = edit_location
+
+        col_save1, col_save2, col_save3 = st.columns([2, 1, 1])
+
+        with col_save1:
+            if save_as_new_city:
+                st.info(f"Will save as new city: **{new_city_location} - {new_strategy_name}**")
+            elif save_as_new:
+                st.info(f"Will save as: **{get_location_display_name(edit_location)} - {new_strategy_name}**")
+            elif new_strategy_name:
+                if is_custom_strategy(edit_strategy):
+                    st.warning(f"⚠️ Will overwrite: **{get_location_display_name(edit_location)} - {edit_strategy}**")
+                else:
+                    st.warning(f"⚠️ Will save as custom template: **{get_location_display_name(edit_location)} - {new_strategy_name}**")
+
+        with col_save2:
+            if new_strategy_name and st.button("💾 Save Template", type="primary", key="save_edited_template"):
+                # Initialize location if needed
+                if save_location not in st.session_state.custom_family_templates:
+                    st.session_state.custom_family_templates[save_location] = {}
+
+                # Save the template
+                st.session_state.custom_family_templates[save_location][new_strategy_name] = edited_template.copy()
+
+                st.success(f"✅ Saved template: {save_location} - {new_strategy_name}")
+                st.rerun()
+
+        with col_save3:
+            # Delete button for custom strategies only
+            if is_custom_strategy(edit_strategy):
+                if st.button("🗑️ Delete", type="secondary", key="delete_strategy_btn"):
+                    st.session_state['confirm_delete_strategy'] = {
+                        'location': edit_location,
+                        'strategy': edit_strategy
+                    }
+                    st.rerun()
+
+        # Confirmation dialog for deletion
+        if 'confirm_delete_strategy' in st.session_state:
+            st.markdown("---")
+            st.warning(f"⚠️ **Confirm Deletion**")
+            st.write(f"Are you sure you want to delete the strategy **'{st.session_state.confirm_delete_strategy['strategy']}'** for **{st.session_state.confirm_delete_strategy['location']}**?")
+            st.write("This action cannot be undone.")
+
+            col_confirm1, col_confirm2, col_confirm3 = st.columns([1, 1, 2])
+            with col_confirm1:
+                if st.button("✅ Yes, Delete", type="primary", key="confirm_delete_yes"):
+                    loc = st.session_state.confirm_delete_strategy['location']
+                    strat = st.session_state.confirm_delete_strategy['strategy']
+
+                    if loc in st.session_state.custom_family_templates:
+                        if strat in st.session_state.custom_family_templates[loc]:
+                            del st.session_state.custom_family_templates[loc][strat]
+                            st.success(f"✅ Deleted strategy: {strat}")
+
+                            # Clean up empty locations
+                            if not st.session_state.custom_family_templates[loc]:
+                                del st.session_state.custom_family_templates[loc]
+
+                    del st.session_state['confirm_delete_strategy']
+                    st.rerun()
+
+            with col_confirm2:
+                if st.button("❌ Cancel", key="confirm_delete_no"):
+                    del st.session_state['confirm_delete_strategy']
+                    st.rerun()
+
+    # TAB 3: Create Custom City
+    with expense_tab3:
+        st.subheader("🌍 Create Custom City/Location Template")
+
+        st.markdown("""
+        Create a brand new location template from scratch or copy an existing one as a starting point.
+        """)
+
+        # Option to copy from existing or start fresh
+        creation_mode = st.radio(
+            "Creation Mode:",
+            options=["Start from scratch", "Copy from existing template"],
+            horizontal=True,
+            key="creation_mode"
+        )
+
+        # New city name
+        new_city_name = st.text_input(
+            "New City/Location Name:",
+            value="",
+            placeholder="e.g., Miami, FL, USA or London, UK",
+            key="new_city_name",
+            help="Include city, state (for USA), and country for clarity"
+        )
+
+        new_strategy_name_city = st.text_input(
+            "Strategy Name:",
+            value="Average",
+            key="new_strategy_name_city"
+        )
+
+        # Geographic coordinates for world map
+        st.markdown("---")
+        st.markdown("**🗺️ Geographic Coordinates (Optional)**")
+        st.markdown("Provide coordinates to display this city on the Timeline World Map visualization.")
+
+        coord_col1, coord_col2 = st.columns(2)
+        with coord_col1:
+            new_city_lat = st.number_input(
+                "Latitude",
+                min_value=-90.0,
+                max_value=90.0,
+                value=0.0,
+                step=0.1,
+                key="new_city_lat",
+                help="Latitude: -90 (South Pole) to +90 (North Pole). Use a mapping service to find coordinates."
+            )
+        with coord_col2:
+            new_city_lon = st.number_input(
+                "Longitude",
+                min_value=-180.0,
+                max_value=180.0,
+                value=0.0,
+                step=0.1,
+                key="new_city_lon",
+                help="Longitude: -180 to +180. Negative = West, Positive = East"
+            )
+
+        # Show link to help find coordinates
+        st.info("💡 Tip: Use [Google Maps](https://www.google.com/maps) or [LatLong.net](https://www.latlong.net/) to find coordinates for your city.")
+
+        if creation_mode == "Copy from existing template":
+            # Select template to copy
+            all_templates = {**FAMILY_EXPENSE_TEMPLATES, **st.session_state.custom_family_templates}
+            available_locations = sorted(all_templates.keys())
+            location_display_options = [get_location_display_name(loc) for loc in available_locations]
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                copy_display = st.selectbox(
+                    "Copy from Location:",
+                    options=location_display_options,
+                    key="copy_location"
+                )
+                copy_location = available_locations[location_display_options.index(copy_display)]
+
+            available_strategies = list(all_templates[copy_location].keys())
+
+            with col2:
+                copy_strategy = st.selectbox(
+                    "Copy from Strategy:",
+                    options=available_strategies,
+                    key="copy_strategy"
+                )
+
+            # Load template to use as base
+            base_template = all_templates[copy_location][copy_strategy].copy()
+        else:
+            # Start with default categories and zero values
+            base_template = {
+                'Food & Groceries': 0.0,
+                'Clothing': 0.0,
+                'Transportation': 0.0,
+                'Entertainment & Activities': 0.0,
+                'Personal Care': 0.0,
+                'Other Expenses': 0.0
+            }
+
+        st.markdown("---")
+        st.subheader(f"💵 Set Expense Values for {new_city_name if new_city_name else '(enter city name above)'}")
+
+        # Edit template values
+        new_template = {}
+
+        for category, value in base_template.items():
+            col_cat, col_val = st.columns([2, 1])
+
+            with col_cat:
+                st.markdown(f"**{category}**")
+
+            with col_val:
+                new_value = st.number_input(
+                    f"Amount for {category}",
+                    min_value=0.0,
+                    max_value=1000000.0,
+                    value=float(value),
+                    step=100.0,
+                    key=f"new_{category}",
+                    label_visibility="collapsed"
+                )
+                new_template[category] = new_value
+
+        # Show total
+        total_new = sum(new_template.values())
+        st.metric("Total Annual Expenses", f"${total_new:,.0f}")
+
+        # Create button
+        st.markdown("---")
+        col_create1, col_create2 = st.columns([3, 1])
+
+        with col_create1:
+            if new_city_name:
+                st.info(f"Will create: **{new_city_name} - {new_strategy_name_city}**")
+            else:
+                st.warning("⚠️ Please enter a city name above")
+
+        with col_create2:
+            if st.button("🌍 Create City", type="primary", key="create_city_btn", disabled=not new_city_name):
+                # Initialize location
+                if new_city_name not in st.session_state.custom_family_templates:
+                    st.session_state.custom_family_templates[new_city_name] = {}
+
+                # Save the template
+                st.session_state.custom_family_templates[new_city_name][new_strategy_name_city] = new_template.copy()
+
+                # Save coordinates if provided (not at default 0,0)
+                if new_city_lat != 0.0 or new_city_lon != 0.0:
+                    st.session_state.custom_location_coordinates[new_city_name] = {
+                        'lat': new_city_lat,
+                        'lon': new_city_lon
+                    }
+
+                st.success(f"✅ Created new city: {new_city_name} - {new_strategy_name_city}!")
+                if new_city_lat != 0.0 or new_city_lon != 0.0:
+                    st.info(f"📍 Coordinates saved: {new_city_lat}°, {new_city_lon}° - City will appear on world map!")
+                st.balloons()
+                st.rerun()
+
+    # Show current expenses section at bottom (always visible)
+    st.markdown("---")
+    st.subheader("💳 Your Current Annual Family Expenses")
+
+    current_state, current_strategy = get_state_for_year(st.session_state.current_year)
+    st.info(f"📍 Current State from Timeline: **{current_state}** | Strategy: **{current_strategy}**")
+
+    for category in st.session_state.expense_categories:
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            amount = st.number_input(
+                f"{category}",
+                min_value=0.0,
+                max_value=1000000.0,
+                value=float(st.session_state.expenses.get(category, 0.0)),
+                step=100.0,
+                format="%.0f",
+                key=f"expense_{category}"
+            )
+            st.session_state.expenses[category] = amount
+        with col2:
+            st.caption(format_currency(amount))
+
+    total_expenses = sum(st.session_state.expenses.values())
+    st.metric("Total Annual Family Expenses", format_currency(total_expenses))
+
+    # Tax Settings
+    st.subheader("💼 Tax Settings")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.session_state.state_tax_rate = st.number_input(
+            "State Tax Rate (%)",
+            min_value=0.0,
+            max_value=15.0,
+            value=float(st.session_state.state_tax_rate),
+            step=0.1,
+            format="%.2f"
+        )
+
+    with col2:
+        st.session_state.pretax_401k = st.number_input(
+            "Pre-tax 401k Contribution ($)",
+            min_value=0.0,
+            max_value=100000.0,
+            value=float(st.session_state.pretax_401k),
+            step=500.0,
+            format="%.0f"
+        )
+
+
+def recurring_one_time_expenses_tab():
+    """Recurring expenses and one-time major purchases tab"""
+    st.header("🔄 Recurring & One-Time Expenses")
+
+    st.markdown("""
+    Manage recurring expenses (like vehicle purchases every N years) and one-time major purchases.
+    These expenses are included in all financial simulations and projections.
+    """)
+
+    if st.button("➕ Add Major Purchase"):
+        new_purchase = MajorPurchase(
+            name="New Purchase",
+            year=st.session_state.current_year,
+            amount=50000.0,
+            financing_years=0,
+            interest_rate=0.0,
+            asset_type="Expense",
+            appreciation_rate=0.0
+        )
+        st.session_state.major_purchases.append(new_purchase)
+        st.rerun()
+
+    for idx, purchase in enumerate(st.session_state.major_purchases):
+        with st.expander(f"🛍️ {purchase.name} - {format_currency(purchase.amount)} ({purchase.year})"):
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                purchase.name = st.text_input("Name", value=purchase.name, key=f"mp_name_{idx}")
+                purchase.year = st.number_input("Year", min_value=2020, max_value=2100, value=purchase.year, key=f"mp_year_{idx}")
+                purchase.amount = st.number_input("Amount ($)", min_value=0.0, value=float(purchase.amount), step=1000.0, key=f"mp_amount_{idx}")
+
+            with col2:
+                purchase.asset_type = st.selectbox(
+                    "Asset Type",
+                    ["Expense", "Real Estate", "Vehicle", "Investment"],
+                    index=["Expense", "Real Estate", "Vehicle", "Investment"].index(purchase.asset_type) if purchase.asset_type in ["Expense", "Real Estate", "Vehicle", "Investment"] else 0,
+                    key=f"mp_asset_type_{idx}"
+                )
+                purchase.appreciation_rate = st.number_input(
+                    "Appreciation Rate (% per year)",
+                    min_value=-20.0,
+                    max_value=50.0,
+                    value=float(purchase.appreciation_rate * 100),
+                    step=0.5,
+                    key=f"mp_appreciation_{idx}"
+                ) / 100.0
+
+            with col3:
+                purchase.financing_years = st.number_input("Financing Years", min_value=0, max_value=30, value=purchase.financing_years, key=f"mp_financing_{idx}")
+                purchase.interest_rate = st.number_input(
+                    "Interest Rate (%)",
+                    min_value=0.0,
+                    max_value=20.0,
+                    value=float(purchase.interest_rate * 100),
+                    step=0.1,
+                    key=f"mp_interest_{idx}"
+                ) / 100.0
+
+            if st.button(f"🗑️ Delete {purchase.name}", key=f"delete_mp_{idx}"):
+                st.session_state.major_purchases.pop(idx)
+                st.rerun()
+
+    # Recurring Expenses
+    st.markdown("---")
+    st.subheader("🔄 Recurring Expenses")
+
+    st.markdown("""
+    Add expenses that repeat every N years (e.g., buying a new car every 7 years,
+    home renovations every 15 years).
+    """)
+
+    if st.button("➕ Add Recurring Expense"):
+        new_recurring = RecurringExpense(
+            name="New Recurring",
+            category="Other",
+            amount=10000.0,
+            frequency_years=5,
+            start_year=st.session_state.current_year,
+            end_year=None,
+            inflation_adjust=True,
+            parent="Both",
+            financing_years=0,
+            interest_rate=0.0
+        )
+        st.session_state.recurring_expenses.append(new_recurring)
+        st.rerun()
+
+    for idx, recurring in enumerate(st.session_state.recurring_expenses):
+        with st.expander(f"🔁 {recurring.name} - Every {recurring.frequency_years} years"):
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                recurring.name = st.text_input("Name", value=recurring.name, key=f"re_name_{idx}")
+                recurring.category = st.text_input("Category", value=recurring.category, key=f"re_category_{idx}")
+                recurring.amount = st.number_input("Amount ($)", min_value=0.0, value=float(recurring.amount), step=1000.0, key=f"re_amount_{idx}")
+
+            with col2:
+                recurring.frequency_years = st.number_input("Frequency (years)", min_value=1, max_value=50, value=recurring.frequency_years, key=f"re_freq_{idx}")
+                recurring.start_year = st.number_input("Start Year", min_value=2020, max_value=2100, value=recurring.start_year, key=f"re_start_{idx}")
+                end_year_value = recurring.end_year if recurring.end_year is not None else 2100
+                end_year = st.number_input("End Year (or max for no end)", min_value=recurring.start_year, max_value=2100, value=end_year_value, key=f"re_end_{idx}")
+                recurring.end_year = end_year if end_year < 2100 else None
+
+            with col3:
+                recurring.inflation_adjust = st.checkbox("Inflation Adjust", value=recurring.inflation_adjust, key=f"re_inflate_{idx}")
+                owner_options = ["Both", st.session_state.parent1_name, st.session_state.parent2_name]
+                # Map old values to new values for backwards compatibility
+                if recurring.parent == "ParentX":
+                    recurring.parent = st.session_state.parent1_name
+                elif recurring.parent == "ParentY":
+                    recurring.parent = st.session_state.parent2_name
+                recurring.parent = st.selectbox("Owner", owner_options, index=owner_options.index(recurring.parent) if recurring.parent in owner_options else 0, key=f"re_parent_{idx}")
+                recurring.financing_years = st.number_input("Financing Years", min_value=0, max_value=30, value=recurring.financing_years, key=f"re_financing_{idx}")
+                recurring.interest_rate = st.number_input(
+                    "Interest Rate (%)",
+                    min_value=0.0,
+                    max_value=20.0,
+                    value=float(recurring.interest_rate * 100),
+                    step=0.1,
+                    key=f"re_interest_{idx}"
+                ) / 100.0
+
+            if st.button(f"🗑️ Delete {recurring.name}", key=f"delete_re_{idx}"):
+                st.session_state.recurring_expenses.pop(idx)
+                st.rerun()
+
+
+def children_tab():
+    """Children tab"""
+    st.header("👶 Children")
+
+    st.info("💡 **About Children Expenses**: All child-related expenses shown in the templates are calculated in today's dollars and will be automatically inflation-adjusted going forward based on your selected economic scenario.")
+
+    st.subheader("Add a Child")
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        child_name = st.text_input("Child Name", key="new_child_name")
+    with col2:
+        child_birth_year = st.number_input(
+            "Birth Year",
+            min_value=1990,
+            max_value=st.session_state.current_year + 20,
+            value=st.session_state.current_year,
+            key="new_child_birth_year"
+        )
+    with col3:
+        st.write("")  # Spacing
+        st.write("")  # Spacing
+        if st.button("➕ Add Child"):
+            # Check for duplicate names
+            if any(child['name'] == child_name for child in st.session_state.children_list):
+                st.error(f"A child named '{child_name}' already exists. Please use a different name.")
+            elif child_name.strip() == "":
+                st.error("Please enter a child name.")
+            else:
+                st.session_state.children_list.append({
+                    'name': child_name,
+                    'birth_year': child_birth_year,
+                    'use_template': True,
+                    'template_state': 'Seattle',
+                    'template_strategy': 'Average',
+                    'school_type': 'Public',  # K-12: Public or Private
+                    'college_type': 'Public',  # College: Public or Private
+                    'college_location': 'Seattle'  # Where they attend college
+                })
+                st.success(f"Added {child_name}")
+                st.rerun()
+
+    # Display existing children
+    if st.session_state.children_list:
+        st.subheader("Your Children")
+
+        for idx, child in enumerate(st.session_state.children_list):
+            current_age = st.session_state.current_year - child['birth_year']
+
+            with st.expander(f"👶 {child['name']} (Age {current_age}, Born {child['birth_year']})"):
+                col1, col2, col3 = st.columns(3)
+
+                with col1:
+                    child['name'] = st.text_input("Name", value=child['name'], key=f"child_name_{idx}")
+                    child['birth_year'] = st.number_input(
+                        "Birth Year",
+                        min_value=1990,
+                        max_value=st.session_state.current_year + 20,
+                        value=child['birth_year'],
+                        key=f"child_birth_{idx}"
+                    )
+
+                with col2:
+                    child['use_template'] = st.checkbox(
+                        "Use State Template",
+                        value=child.get('use_template', True),
+                        key=f"child_template_{idx}"
+                    )
+
+                    if child['use_template']:
+                        child['template_state'] = st.selectbox(
+                            "Template Location",
+                            AVAILABLE_LOCATIONS_CHILDREN,
+                            index=AVAILABLE_LOCATIONS_CHILDREN.index(child.get('template_state', 'Seattle')) if child.get('template_state', 'Seattle') in AVAILABLE_LOCATIONS_CHILDREN else 1,
+                            key=f"child_state_{idx}"
+                        )
+                        # Get available strategies for this location
+                        available_child_strategies = get_available_strategies_for_location(child.get('template_state', 'Seattle'), 'children')
+                        # Normalize the stored strategy name to handle backward compatibility
+                        current_strategy = normalize_strategy_name(child.get('template_strategy', 'Average'))
+                        default_idx = available_child_strategies.index(current_strategy) if current_strategy in available_child_strategies else 1
+                        child['template_strategy'] = st.selectbox(
+                            "Spending Level",
+                            available_child_strategies,
+                            index=default_idx,
+                            key=f"child_strategy_{idx}"
+                        )
+
+                with col3:
+                    st.write("")  # Spacing
+                    st.write("")  # Spacing
+                    if st.button(f"🗑️ Remove {child['name']}", key=f"remove_child_{idx}"):
+                        st.session_state.children_list.pop(idx)
+                        st.rerun()
+
+                # Add new row for school type and college location
+                st.markdown("---")
+                col1, col2, col3 = st.columns(3)
+
+                with col1:
+                    child['school_type'] = st.selectbox(
+                        "K-12 School Type",
+                        ["Public", "Private"],
+                        index=["Public", "Private"].index(child.get('school_type', 'Public')),
+                        key=f"child_school_{idx}",
+                        help="Private schools typically add $10k-30k/year to education costs"
+                    )
+
+                with col2:
+                    child['college_type'] = st.selectbox(
+                        "College Type",
+                        ["Public", "Private"],
+                        index=["Public", "Private"].index(child.get('college_type', 'Public')),
+                        key=f"child_college_type_{idx}",
+                        help="Private colleges typically cost 2-3x more than public colleges"
+                    )
+
+                with col3:
+                    child['college_location'] = st.selectbox(
+                        "College Location",
+                        AVAILABLE_LOCATIONS_CHILDREN,
+                        index=AVAILABLE_LOCATIONS_CHILDREN.index(child.get('college_location', 'Seattle')) if child.get('college_location', 'Seattle') in AVAILABLE_LOCATIONS_CHILDREN else 0,
+                        key=f"child_college_{idx}",
+                        help="Location where child will attend college (ages 18-21). Room & board included."
+                    )
+    else:
+        st.info("No children added yet. Add children using the form above.")
+
+    # Children expense templates preview
+    st.subheader("📊 Children Expense Templates Preview")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        preview_state = st.selectbox("Preview Location", AVAILABLE_LOCATIONS_CHILDREN, key="preview_state")
+    with col2:
+        preview_available_strategies = get_available_strategies_for_location(preview_state, 'children')
+        preview_strategy = st.selectbox("Preview Strategy", preview_available_strategies, key="preview_strategy")
+
+    col3, col4 = st.columns(2)
+    with col3:
+        preview_school_type = st.selectbox(
+            "K-12 School Type",
+            ["Public", "Private"],
+            key="preview_school_type",
+            help="Private schools typically add $10k-30k/year to education costs (ages 5-17)"
+        )
+    with col4:
+        preview_college_type = st.selectbox(
+            "College Type",
+            ["Public", "Private"],
+            key="preview_college_type",
+            help="Private colleges typically cost 2-3x more than public colleges"
+        )
+
+    # Use helper function to get template data
+    template = get_template_strategy_data(preview_state, preview_strategy, 'children')
+
+    if template:
+
+        # Adjust for private K-12 school (ages 5-17)
+        if preview_school_type == "Private":
+            # Add private school tuition based on location
+            private_school_costs = {
+                'Seattle': 20000,
+                'Sacramento': 15000,
+                'Houston': 12000,
+                'New York': 30000,
+                'San Francisco': 28000,
+                'Los Angeles': 22000,
+                'Portland': 18000,
+                'Auckland': 16000,
+                'Wellington': 15000
+            }
+            additional_tuition = private_school_costs.get(preview_state, 20000)
+
+            # Apply to ages 5-17 (indices 5-17)
+            for age in range(5, 18):
+                if age < len(template['Education']):
+                    template['Education'][age] += additional_tuition
+
+        # Adjust education costs based on college type
+        if preview_college_type == "Private":
+            # Private colleges cost approximately 2.5x more than public colleges
+            template['Education'] = [cost * 2.5 for cost in template['Education']]
+
+        # Create a preview dataframe
+        preview_df = pd.DataFrame({
+            'Age': list(range(31)),
+            **{category: values for category, values in template.items()}
+        })
+
+        st.dataframe(preview_df, use_container_width=True, height=400)
+
+        # Show totals by age
+        age_totals = preview_df.set_index('Age').sum(axis=1)
+
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=list(range(31)),
+            y=age_totals.values,
+            name="Total Annual Expenses"
+        ))
+        fig.update_layout(
+            title=f"Total Annual Child Expenses by Age - {preview_state} {preview_strategy}<br>({preview_school_type} K-12, {preview_college_type} College)",
+            xaxis_title="Child Age",
+            yaxis_title="Annual Expenses ($)",
+            height=400
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Display data sources for children's expense template
+        st.markdown("---")
+        data_source = get_expense_data_source(preview_state)
+
+        st.markdown("### 📚 Data Sources")
+        st.markdown(f"**Source:** {data_source['source']}")
+
+        # Display URLs as clickable links
+        urls = data_source['url'].split(', ')
+        if len(urls) == 1 and urls[0] != 'N/A':
+            st.markdown(f"**URL:** [{urls[0]}]({urls[0]})")
+        elif urls[0] != 'N/A':
+            st.markdown("**URLs:**")
+            for url in urls:
+                url = url.strip()
+                st.markdown(f"- [{url}]({url})")
+
+        st.markdown(f"**Data Year:** {data_source['year']}")
+
+        if data_source['notes']:
+            with st.expander("📝 Additional Notes"):
+                st.markdown(data_source['notes'])
+
+
+def house_tab():
+    """House portfolio tab"""
+    st.header("🏠 House Portfolio")
+
+    if st.button("➕ Add House"):
+        new_house = House(
+            name="New Property",
+            purchase_year=st.session_state.current_year,
+            purchase_price=500000.0,
+            current_value=500000.0,
+            mortgage_balance=400000.0,
+            mortgage_rate=0.065,
+            mortgage_years_left=30,
+            property_tax_rate=0.01,
+            home_insurance=1500.0,
+            maintenance_rate=0.01,
+            upkeep_costs=3000.0,
+            owner="Shared",
+            timeline=[HouseTimelineEntry(st.session_state.current_year, "Own_Live", 0.0)]
+        )
+        st.session_state.houses.append(new_house)
+        st.rerun()
+
+    for idx, house in enumerate(st.session_state.houses):
+        monthly_payment = calculate_monthly_house_payment(house)
+        annual_payment = monthly_payment * 12
+
+        with st.expander(f"🏡 {house.name} - {format_currency(house.current_value)} (Monthly: {format_currency(monthly_payment)})"):
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.subheader("Basic Information")
+                house.name = st.text_input("Property Name", value=house.name, key=f"house_name_{idx}")
+                house.purchase_year = st.number_input("Purchase Year", min_value=1950, max_value=2100, value=house.purchase_year, key=f"house_pyear_{idx}")
+                house.purchase_price = st.number_input("Purchase Price ($)", min_value=0.0, value=float(house.purchase_price), step=10000.0, key=f"house_pprice_{idx}")
+                house.current_value = st.number_input("Current Value ($)", min_value=0.0, value=float(house.current_value), step=10000.0, key=f"house_cvalue_{idx}")
+                st.caption(f"Formatted: {format_currency(house.current_value)}")
+
+            with col2:
+                st.subheader("Mortgage Information")
+                house.mortgage_balance = st.number_input("Mortgage Balance ($)", min_value=0.0, value=float(house.mortgage_balance), step=10000.0, key=f"house_mbalance_{idx}")
+                house.mortgage_rate = st.number_input(
+                    "Mortgage Rate (%)",
+                    min_value=0.0,
+                    max_value=20.0,
+                    value=float(house.mortgage_rate * 100),
+                    step=0.1,
+                    key=f"house_mrate_{idx}"
+                ) / 100.0
+                house.mortgage_years_left = st.number_input("Years Left", min_value=0, max_value=50, value=house.mortgage_years_left, key=f"house_myears_{idx}")
+
+            with col3:
+                st.subheader("Annual Costs")
+                house.property_tax_rate = st.number_input(
+                    "Property Tax Rate (%)",
+                    min_value=0.0,
+                    max_value=5.0,
+                    value=float(house.property_tax_rate * 100),
+                    step=0.01,
+                    key=f"house_ptax_{idx}"
+                ) / 100.0
+                house.home_insurance = st.number_input("Home Insurance ($/year)", min_value=0.0, value=float(house.home_insurance), step=100.0, key=f"house_insurance_{idx}")
+                house.maintenance_rate = st.number_input(
+                    "Maintenance Rate (% of value)",
+                    min_value=0.0,
+                    max_value=10.0,
+                    value=float(house.maintenance_rate * 100),
+                    step=0.1,
+                    key=f"house_maint_{idx}"
+                ) / 100.0
+                house.upkeep_costs = st.number_input("Additional Upkeep ($/year)", min_value=0.0, value=float(house.upkeep_costs), step=100.0, key=f"house_upkeep_{idx}")
+
+            owner_options = ["Shared", st.session_state.parent1_name, st.session_state.parent2_name]
+            # Map old values to new values for backwards compatibility
+            if house.owner == "ParentX":
+                house.owner = st.session_state.parent1_name
+            elif house.owner == "ParentY":
+                house.owner = st.session_state.parent2_name
+            house.owner = st.selectbox(
+                "Owner",
+                owner_options,
+                index=owner_options.index(house.owner) if house.owner in owner_options else 0,
+                key=f"house_owner_{idx}"
+            )
+
+            # Timeline
+            st.subheader("Property Timeline")
+            st.markdown("Define how the property status changes over time")
+
+            timeline_data = []
+            for entry in house.timeline:
+                timeline_data.append({
+                    'Year': entry.year,
+                    'Status': entry.status,
+                    'Rental Income': entry.rental_income
+                })
+
+            timeline_df = pd.DataFrame(timeline_data)
+            edited_timeline = st.data_editor(
+                timeline_df,
+                num_rows="dynamic",
+                column_config={
+                    "Status": st.column_config.SelectboxColumn(
+                        "Status",
+                        options=["Own_Live", "Own_Rent", "Sold"],
+                        required=True
+                    )
+                },
+                key=f"house_timeline_{idx}"
+            )
+
+            # Update timeline
+            house.timeline = [
+                HouseTimelineEntry(row['Year'], row['Status'], row['Rental Income'])
+                for _, row in edited_timeline.iterrows()
+            ]
+
+            # Payment breakdown
+            st.subheader("Payment Breakdown")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Monthly Payment (PITI)", format_currency(monthly_payment))
+            with col2:
+                st.metric("Annual Payment", format_currency(annual_payment))
+            with col3:
+                annual_property_tax = house.current_value * house.property_tax_rate
+                st.metric("Annual Property Tax", format_currency(annual_property_tax))
+
+            if st.button(f"🗑️ Delete {house.name}", key=f"delete_house_{idx}"):
+                st.session_state.houses.pop(idx)
+                st.rerun()
+
+
+def economy_tab():
+    """Economy parameters configuration tab"""
+    st.header("📈 Economy & Market Parameters")
+
+    st.markdown("""
+    Configure the economic assumptions used in your financial projections.
+    You can use historical averages or specify custom values for returns and inflation.
+    """)
+
+    params = st.session_state.economic_params
+
+    # Calculate historical stats
+    stats = get_historical_return_stats()
+    historical_return = stats['mean']
+    historical_inflation = 0.03  # Historical US average ~3%
+    historical_expense_growth = 0.02  # Historical average ~2% (close to inflation)
+    historical_healthcare_inflation = 0.055  # Historical average ~5.5% (healthcare grows faster than general inflation)
+
+    # Investment Returns Section
+    st.subheader("📊 Investment Returns")
+
+    col1, col2 = st.columns([1, 2])
+
+    with col1:
+        return_mode = st.radio(
+            "Return Source",
+            ["Historical Average", "Custom Value"],
+            index=0 if params.use_historical_returns else 1,
+            key="return_mode"
+        )
+        params.use_historical_returns = (return_mode == "Historical Average")
+
+    with col2:
+        if params.use_historical_returns:
+            st.info(f"📈 Using historical S&P 500 average: **{historical_return*100:.2f}%**")
+            st.caption(f"Based on {stats['total_years']} years of data (1924-2023)")
+            params.investment_return = historical_return
+        else:
+            params.investment_return = st.number_input(
+                "Annual Investment Return (%)",
+                min_value=-20.0,
+                max_value=50.0,
+                value=float(params.investment_return * 100),
+                step=0.5,
+                help="Expected annual return on your investment portfolio"
+            ) / 100.0
+
+    # Inflation Section
+    st.subheader("💸 Inflation")
+
+    col1, col2 = st.columns([1, 2])
+
+    with col1:
+        inflation_mode = st.radio(
+            "Inflation Source",
+            ["Historical Average", "Custom Value"],
+            index=0 if params.use_historical_inflation else 1,
+            key="inflation_mode"
+        )
+        params.use_historical_inflation = (inflation_mode == "Historical Average")
+
+    with col2:
+        if params.use_historical_inflation:
+            st.info(f"📈 Using historical US average: **{historical_inflation*100:.1f}%**")
+            st.caption("Long-term historical average inflation rate")
+            params.inflation_rate = historical_inflation
+        else:
+            params.inflation_rate = st.number_input(
+                "Annual Inflation Rate (%)",
+                min_value=-5.0,
+                max_value=20.0,
+                value=float(params.inflation_rate * 100),
+                step=0.1,
+                help="Expected annual inflation rate for general expenses"
+            ) / 100.0
+
+    # Other Parameters Section
+    st.subheader("⚙️ Additional Parameters")
+
+    # Expense Growth Rate
+    st.markdown("#### 📈 Expense Growth Rate")
+    col1, col2 = st.columns([1, 2])
+
+    with col1:
+        expense_growth_mode = st.radio(
+            "Expense Growth Source",
+            ["Historical Average", "Custom Value"],
+            index=0 if params.use_historical_expense_growth else 1,
+            key="expense_growth_mode"
+        )
+        params.use_historical_expense_growth = (expense_growth_mode == "Historical Average")
+
+    with col2:
+        if params.use_historical_expense_growth:
+            st.info(f"📈 Using historical average: **{historical_expense_growth*100:.1f}%**")
+            st.caption("Long-term average expense growth rate (typically close to inflation)")
+            params.expense_growth_rate = historical_expense_growth
+        else:
+            params.expense_growth_rate = st.number_input(
+                "Annual Expense Growth Rate (%)",
+                min_value=-5.0,
+                max_value=20.0,
+                value=float(params.expense_growth_rate * 100),
+                step=0.1,
+                help="Annual growth rate for expenses (separate from inflation)"
+            ) / 100.0
+
+    # Healthcare Inflation
+    st.markdown("#### 🏥 Healthcare Inflation")
+    col1, col2 = st.columns([1, 2])
+
+    with col1:
+        healthcare_inflation_mode = st.radio(
+            "Healthcare Inflation Source",
+            ["Historical Average", "Custom Value"],
+            index=0 if params.use_historical_healthcare_inflation else 1,
+            key="healthcare_inflation_mode"
+        )
+        params.use_historical_healthcare_inflation = (healthcare_inflation_mode == "Historical Average")
+
+    with col2:
+        if params.use_historical_healthcare_inflation:
+            st.info(f"📈 Using historical average: **{historical_healthcare_inflation*100:.1f}%**")
+            st.caption("Healthcare costs historically grow faster than general inflation")
+            params.healthcare_inflation_rate = historical_healthcare_inflation
+        else:
+            params.healthcare_inflation_rate = st.number_input(
+                "Annual Healthcare Inflation (%)",
+                min_value=-5.0,
+                max_value=30.0,
+                value=float(params.healthcare_inflation_rate * 100),
+                step=0.5,
+                help="Healthcare costs typically grow faster than general inflation"
+            ) / 100.0
+
+    # Summary Box
+    st.divider()
+    st.subheader("📋 Current Parameters Summary")
+
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Investment Return", f"{params.investment_return*100:.2f}%",
+                 help="Historical" if params.use_historical_returns else "Custom")
+    with col2:
+        st.metric("Inflation Rate", f"{params.inflation_rate*100:.2f}%",
+                 help="Historical" if params.use_historical_inflation else "Custom")
+    with col3:
+        st.metric("Expense Growth", f"{params.expense_growth_rate*100:.2f}%",
+                 help="Historical" if params.use_historical_expense_growth else "Custom")
+    with col4:
+        st.metric("Healthcare Inflation", f"{params.healthcare_inflation_rate*100:.2f}%",
+                 help="Historical" if params.use_historical_healthcare_inflation else "Custom")
+
+    # Historical Market Data Reference
+    st.divider()
+    st.subheader("📜 Historical S&P 500 Returns Reference")
+
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Mean Return", f"{stats['mean']*100:.2f}%")
+    with col2:
+        st.metric("Median Return", f"{stats['median']*100:.2f}%")
+    with col3:
+        st.metric("Std Deviation", f"{stats['std']*100:.2f}%")
+    with col4:
+        st.metric("Positive Years", f"{stats['positive_percentage']:.1f}%")
+
+    # Historical returns chart
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=list(range(1924, 1924 + len(HISTORICAL_STOCK_RETURNS))),
+        y=[r * 100 for r in HISTORICAL_STOCK_RETURNS],
+        marker_color=['green' if r > 0 else 'red' for r in HISTORICAL_STOCK_RETURNS],
+        name="Annual Return %"
+    ))
+    fig.update_layout(
+        title="Historical S&P 500 Annual Returns (1924-2023)",
+        xaxis_title="Year",
+        yaxis_title="Return (%)",
+        height=400
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def retirement_tab():
+    """Retirement planning tab"""
+    st.header("🖼️ Retirement Planning")
+
+    # Calculate retirement years
+    parentX_birth_year = st.session_state.current_year - st.session_state.parentX_age
+    parentY_birth_year = st.session_state.current_year - st.session_state.parentY_age
+
+    parentX_retirement_year = parentX_birth_year + st.session_state.parentX_retirement_age
+    parentY_retirement_year = parentY_birth_year + st.session_state.parentY_retirement_age
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader(f"{st.session_state.parent1_emoji} {st.session_state.parent1_name}")
+        st.metric("Retirement Year", parentX_retirement_year)
+        st.metric("Years Until Retirement", max(0, parentX_retirement_year - st.session_state.current_year))
+        st.metric("Monthly SS Benefit", format_currency(st.session_state.parentX_ss_benefit))
+        st.metric("Annual SS Benefit", format_currency(st.session_state.parentX_ss_benefit * 12))
+
+    with col2:
+        st.subheader(f"{st.session_state.parent2_emoji} {st.session_state.parent2_name}")
+        st.metric("Retirement Year", parentY_retirement_year)
+        st.metric("Years Until Retirement", max(0, parentY_retirement_year - st.session_state.current_year))
+        st.metric("Monthly SS Benefit", format_currency(st.session_state.parentY_ss_benefit))
+        st.metric("Annual SS Benefit", format_currency(st.session_state.parentY_ss_benefit * 12))
+
+    # Social Security Insolvency Settings
+    st.subheader("🔴 Social Security Insolvency Modeling")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.session_state.ss_insolvency_enabled = st.checkbox(
+            "Enable SS Insolvency Modeling",
+            value=st.session_state.ss_insolvency_enabled,
+            help="Model potential Social Security benefit shortfall"
+        )
+
+    with col2:
+        st.session_state.ss_shortfall_percentage = st.number_input(
+            "Benefit Shortfall (%)",
+            min_value=0.0,
+            max_value=100.0,
+            value=float(st.session_state.ss_shortfall_percentage),
+            step=1.0,
+            help="Percentage reduction in benefits after insolvency (default 30%)",
+            disabled=not st.session_state.ss_insolvency_enabled
+        )
+
+    if st.session_state.ss_insolvency_enabled:
+        st.warning(f"⚠️ Modeling {st.session_state.ss_shortfall_percentage}% benefit reduction after 2034")
+
+        # Show impact
+        parentX_reduced = st.session_state.parentX_ss_benefit * (1 - st.session_state.ss_shortfall_percentage / 100)
+        parentY_reduced = st.session_state.parentY_ss_benefit * (1 - st.session_state.ss_shortfall_percentage / 100)
+
+        st.info(f"""
+        **After insolvency:**
+        - {st.session_state.parent1_name}: {format_currency(st.session_state.parentX_ss_benefit)}/mo → {format_currency(parentX_reduced)}/mo
+        - {st.session_state.parent2_name}: {format_currency(st.session_state.parentY_ss_benefit)}/mo → {format_currency(parentY_reduced)}/mo
+        """)
+
+
+def timeline_tab():
+    """Timeline and state relocation tab"""
+    st.header("🗓️ Timeline & State Planning")
+
+    st.markdown("""
+    Plan your relocations and spending strategy changes over time.
+    Expenses will automatically adjust based on state and spending level.
+    """)
+
+    st.subheader("State & Spending Timeline")
+
+    # Convert timeline to DataFrame
+    timeline_data = []
+    for entry in st.session_state.state_timeline:
+        timeline_data.append({
+            'Year': entry.year,
+            'State': entry.state,
+            'Spending Strategy': entry.spending_strategy
+        })
+
+    timeline_df = pd.DataFrame(timeline_data)
+
+    # Build dynamic location list including custom cities
+    available_locations = list(AVAILABLE_LOCATIONS_FAMILY)
+    if hasattr(st.session_state, 'custom_family_templates') and st.session_state.custom_family_templates:
+        # Add custom cities that aren't already in the list
+        custom_cities = list(st.session_state.custom_family_templates.keys())
+        for city in custom_cities:
+            if city not in available_locations:
+                available_locations.append(city)
+
+    edited_timeline = st.data_editor(
+        timeline_df,
+        num_rows="dynamic",
+        column_config={
+            "State": st.column_config.SelectboxColumn(
+                "Location",
+                options=available_locations,
+                required=True,
+                help="Select your living location - expenses will adjust automatically"
+            ),
+            "Spending Strategy": st.column_config.SelectboxColumn(
+                "Spending Strategy",
+                options=STATISTICAL_STRATEGIES,
+                required=True
+            )
+        },
+        use_container_width=True
+    )
+
+    # Update state timeline
+    st.session_state.state_timeline = [
+        StateTimelineEntry(row['Year'], row['State'], row['Spending Strategy'])
+        for _, row in edited_timeline.iterrows()
+    ]
+
+    # Visualization
+    if len(edited_timeline) > 0:
+        st.subheader("Timeline Visualization")
+
+        # Calculate when both parents reach their death age
+        parent1_death_year = (st.session_state.current_year - st.session_state.parentX_age) + st.session_state.parentX_death_age
+        parent2_death_year = (st.session_state.current_year - st.session_state.parentY_age) + st.session_state.parentY_death_age
+        end_year = max(parent1_death_year, parent2_death_year)
+
+        # Create timeline data for all years from current to end
+        all_years = list(range(st.session_state.current_year, end_year + 1))
+
+        # Create a horizontal timeline showing state/spending for each year
+        timeline_states = []
+        timeline_spending = []
+
+        for year in all_years:
+            state, strategy = get_state_for_year(year)
+            timeline_states.append(state)
+            timeline_spending.append(strategy)
+
+        # Create a Gantt-style timeline
+        fig = go.Figure()
+
+        # Group consecutive years with same state/strategy
+        segments = []
+        if timeline_states:
+            current_state = timeline_states[0]
+            current_strategy = timeline_spending[0]
+            start_year = all_years[0]
+
+            for i in range(1, len(all_years)):
+                if timeline_states[i] != current_state or timeline_spending[i] != current_strategy:
+                    # End of current segment
+                    segments.append({
+                        'state': current_state,
+                        'strategy': current_strategy,
+                        'start': start_year,
+                        'end': all_years[i-1]
+                    })
+                    current_state = timeline_states[i]
+                    current_strategy = timeline_spending[i]
+                    start_year = all_years[i]
+
+            # Add final segment
+            segments.append({
+                'state': current_state,
+                'strategy': current_strategy,
+                'start': start_year,
+                'end': all_years[-1]
+            })
+
+        # Plot segments as horizontal bars
+        for seg in segments:
+            duration = seg['end'] - seg['start'] + 1
+            location_full_name = get_location_display_name(seg['state'])
+            fig.add_trace(go.Bar(
+                x=[duration],
+                y=['Timeline'],
+                orientation='h',
+                name=f"{location_full_name} - {seg['strategy']}",
+                text=f"{location_full_name}<br>{seg['strategy']}<br>{seg['start']}-{seg['end']}",
+                textposition='inside',
+                hovertemplate=f"<b>{location_full_name}</b><br>{seg['strategy']}<br>Years: {seg['start']}-{seg['end']}<br>Duration: {duration} years<extra></extra>",
+                base=seg['start']
+            ))
+
+        fig.update_layout(
+            title=f"State & Spending Timeline (Until Both Parents Reach Age 100)",
+            xaxis_title="Year",
+            xaxis=dict(
+                tickmode='linear',
+                tick0=st.session_state.current_year,
+                dtick=5,  # Show tick every 5 years
+                range=[st.session_state.current_year, end_year]
+            ),
+            yaxis=dict(showticklabels=False),
+            height=200,
+            showlegend=True,
+            barmode='stack',
+            bargap=0
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Show key milestones
+        st.markdown(f"**Timeline extends to {end_year}** ({st.session_state.parent1_name} age {st.session_state.parentX_death_age}: {parent1_death_year}, {st.session_state.parent2_name} age {st.session_state.parentY_death_age}: {parent2_death_year})")
+
+        # Add world map visualization
+        st.markdown("---")
+        st.subheader("🌍 World Map: Your Relocation Journey")
+
+        # Get unique locations from timeline in chronological order
+        timeline_locations = []
+        seen_states = set()
+
+        for entry in sorted(st.session_state.state_timeline, key=lambda x: x.year):
+            if entry.state not in seen_states:
+                # Check built-in coordinates first, then custom coordinates
+                coords = LOCATION_COORDINATES.get(entry.state)
+                if coords is None and hasattr(st.session_state, 'custom_location_coordinates'):
+                    coords = st.session_state.custom_location_coordinates.get(entry.state)
+
+                timeline_locations.append({
+                    'state': entry.state,
+                    'year': entry.year,
+                    'coords': coords
+                })
+                seen_states.add(entry.state)
+
+        # Only show map if we have valid coordinates for at least 2 locations
+        valid_locations = [loc for loc in timeline_locations if loc['coords'] is not None]
+
+        if len(valid_locations) >= 2:
+            # Create map figure
+            map_fig = go.Figure()
+
+            # Add flight path lines between consecutive locations
+            for i in range(len(valid_locations) - 1):
+                loc1 = valid_locations[i]
+                loc2 = valid_locations[i + 1]
+
+                # Add curved line (great circle route simulation)
+                map_fig.add_trace(go.Scattergeo(
+                    lon=[loc1['coords']['lon'], loc2['coords']['lon']],
+                    lat=[loc1['coords']['lat'], loc2['coords']['lat']],
+                    mode='lines',
+                    line=dict(width=2, color='rgb(255, 100, 100)'),
+                    opacity=0.6,
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+
+            # Add location markers
+            lats = [loc['coords']['lat'] for loc in valid_locations]
+            lons = [loc['coords']['lon'] for loc in valid_locations]
+            texts = [f"{get_location_display_name(loc['state'])}<br>Year: {loc['year']}" for loc in valid_locations]
+            markers = [f"📍 {loc['state']}<br>{loc['year']}" for loc in valid_locations]
+
+            map_fig.add_trace(go.Scattergeo(
+                lon=lons,
+                lat=lats,
+                mode='markers+text',
+                marker=dict(
+                    size=15,
+                    color='rgb(50, 120, 255)',
+                    line=dict(width=3, color='white'),
+                    symbol='circle'
+                ),
+                text=[f"{i+1}" for i in range(len(valid_locations))],  # Number each location
+                textfont=dict(size=10, color='white', family='Arial Black'),
+                textposition='middle center',
+                hovertext=texts,
+                hoverinfo='text',
+                showlegend=False
+            ))
+
+            # Update map layout
+            map_fig.update_layout(
+                title=dict(
+                    text='Your Life Journey: Where You\'ll Live',
+                    font=dict(size=18)
+                ),
+                geo=dict(
+                    projection_type='natural earth',
+                    showland=True,
+                    landcolor='rgb(243, 243, 243)',
+                    coastlinecolor='rgb(204, 204, 204)',
+                    countrycolor='rgb(204, 204, 204)',
+                    showcountries=True,
+                    showocean=True,
+                    oceancolor='rgb(230, 245, 255)',
+                    showlakes=True,
+                    lakecolor='rgb(230, 245, 255)',
+                    projection=dict(
+                        rotation=dict(
+                            lon=-60,  # Center roughly on Atlantic
+                            lat=20
+                        )
+                    )
+                ),
+                height=600,
+                margin=dict(l=0, r=0, t=50, b=0)
+            )
+
+            st.plotly_chart(map_fig, use_container_width=True)
+
+            # Show location journey summary
+            st.markdown("**🛫 Your Relocation Journey:**")
+            for i, loc in enumerate(valid_locations):
+                if i == 0:
+                    st.info(f"**{loc['year']}:** 🏠 Start in {get_location_display_name(loc['state'])}")
+                else:
+                    prev_loc = valid_locations[i-1]
+                    years_duration = loc['year'] - prev_loc['year']
+                    st.success(f"**{loc['year']}:** ✈️ Move to {get_location_display_name(loc['state'])} (after {years_duration} years in {get_location_display_name(prev_loc['state'])})")
+
+        elif len(valid_locations) == 1:
+            loc = valid_locations[0]
+            st.info(f"📍 You're staying in **{get_location_display_name(loc['state'])}** throughout the timeline. Add more locations in the table above to see your relocation journey on the map!")
+        else:
+            # Check if there are locations without coordinates
+            missing_coords = [loc['state'] for loc in timeline_locations if loc['coords'] is None]
+            if missing_coords:
+                st.warning(f"⚠️ The following custom cities are missing coordinates: **{', '.join(missing_coords)}**")
+                st.info("💡 To display custom cities on the world map, edit them in the Family Expenses tab and add their latitude/longitude coordinates.")
+            else:
+                st.warning("⚠️ No valid location coordinates found. Please ensure your timeline includes recognized locations.")
+
+    # Show current and future states
+    st.subheader("Timeline Summary")
+
+    current_state, current_strategy = get_state_for_year(st.session_state.current_year)
+    st.info(f"**Current ({st.session_state.current_year}):** {current_state} - {current_strategy}")
+
+    # Show next 5 years
+    st.markdown("**Upcoming Changes:**")
+    for year in range(st.session_state.current_year + 1, st.session_state.current_year + 6):
+        state, strategy = get_state_for_year(year)
+        prev_state, prev_strategy = get_state_for_year(year - 1)
+
+        if state != prev_state or strategy != prev_strategy:
+            st.success(f"**{year}:** → {state} - {strategy}")
+
+
+# ============================================================================
+# TAX DATABASE: Location-based tax information
+# ============================================================================
+
+# US State Tax Information
+US_STATE_TAX_INFO = {
+    # States with no income tax
+    'Alaska': {'type': 'none', 'rate': 0.0},
+    'Florida': {'type': 'none', 'rate': 0.0},
+    'Nevada': {'type': 'none', 'rate': 0.0},
+    'New Hampshire': {'type': 'none', 'rate': 0.0},  # Only taxes dividends/interest
+    'South Dakota': {'type': 'none', 'rate': 0.0},
+    'Tennessee': {'type': 'none', 'rate': 0.0},
+    'Texas': {'type': 'none', 'rate': 0.0},
+    'Washington': {'type': 'none', 'rate': 0.0},
+    'Wyoming': {'type': 'none', 'rate': 0.0},
+
+    # States with flat tax rates
+    'Arizona': {'type': 'flat', 'rate': 0.025},
+    'Colorado': {'type': 'flat', 'rate': 0.044},
+    'Idaho': {'type': 'flat', 'rate': 0.058},
+    'Illinois': {'type': 'flat', 'rate': 0.0495},
+    'Indiana': {'type': 'flat', 'rate': 0.0315},
+    'Kentucky': {'type': 'flat', 'rate': 0.045},
+    'Massachusetts': {'type': 'flat', 'rate': 0.05},
+    'Michigan': {'type': 'flat', 'rate': 0.0425},
+    'Mississippi': {'type': 'flat', 'rate': 0.05},
+    'North Carolina': {'type': 'flat', 'rate': 0.045},
+    'Pennsylvania': {'type': 'flat', 'rate': 0.0307},
+    'Utah': {'type': 'flat', 'rate': 0.0465},
+
+    # States with progressive tax brackets (showing top marginal rate as approximation)
+    'Alabama': {'type': 'progressive', 'rate': 0.05},
+    'Arkansas': {'type': 'progressive', 'rate': 0.047},
+    'California': {'type': 'progressive', 'rate': 0.133, 'note': 'Highest in US'},
+    'Connecticut': {'type': 'progressive', 'rate': 0.0699},
+    'Delaware': {'type': 'progressive', 'rate': 0.066},
+    'Georgia': {'type': 'progressive', 'rate': 0.0575},
+    'Hawaii': {'type': 'progressive', 'rate': 0.11},
+    'Iowa': {'type': 'progressive', 'rate': 0.06},
+    'Kansas': {'type': 'progressive', 'rate': 0.057},
+    'Louisiana': {'type': 'progressive', 'rate': 0.0425},
+    'Maine': {'type': 'progressive', 'rate': 0.0715},
+    'Maryland': {'type': 'progressive', 'rate': 0.0575},
+    'Minnesota': {'type': 'progressive', 'rate': 0.0985},
+    'Missouri': {'type': 'progressive', 'rate': 0.054},
+    'Montana': {'type': 'progressive', 'rate': 0.0675},
+    'Nebraska': {'type': 'progressive', 'rate': 0.0684},
+    'New Jersey': {'type': 'progressive', 'rate': 0.1075},
+    'New Mexico': {'type': 'progressive', 'rate': 0.059},
+    'New York': {'type': 'progressive', 'rate': 0.109},
+    'North Dakota': {'type': 'progressive', 'rate': 0.029},
+    'Ohio': {'type': 'progressive', 'rate': 0.0385},
+    'Oklahoma': {'type': 'progressive', 'rate': 0.0475},
+    'Oregon': {'type': 'progressive', 'rate': 0.099},
+    'Rhode Island': {'type': 'progressive', 'rate': 0.0599},
+    'South Carolina': {'type': 'progressive', 'rate': 0.07},
+    'Vermont': {'type': 'progressive', 'rate': 0.0875},
+    'Virginia': {'type': 'progressive', 'rate': 0.0575},
+    'West Virginia': {'type': 'progressive', 'rate': 0.065},
+    'Wisconsin': {'type': 'progressive', 'rate': 0.0765},
+    'District of Columbia': {'type': 'progressive', 'rate': 0.1075},
+}
+
+# Country Tax Information (simplified - using approximate effective rates)
+COUNTRY_TAX_INFO = {
+    'United States': {'type': 'federal_state', 'federal_rate': 'progressive', 'has_fica': True},
+
+    # Major developed countries
+    'Canada': {'type': 'federal_provincial', 'effective_rate': 0.33, 'has_fica': False, 'note': 'CPP/EI separate'},
+    'United Kingdom': {'type': 'national', 'effective_rate': 0.40, 'has_fica': False, 'note': 'NI separate'},
+    'Germany': {'type': 'national', 'effective_rate': 0.45, 'has_fica': False, 'note': 'Social insurance separate'},
+    'France': {'type': 'national', 'effective_rate': 0.45, 'has_fica': False},
+    'Australia': {'type': 'national', 'effective_rate': 0.37, 'has_fica': False},
+    'Japan': {'type': 'national', 'effective_rate': 0.33, 'has_fica': False},
+    'South Korea': {'type': 'national', 'effective_rate': 0.38, 'has_fica': False},
+    'Singapore': {'type': 'national', 'effective_rate': 0.22, 'has_fica': False, 'note': 'Low tax'},
+    'Hong Kong': {'type': 'territorial', 'effective_rate': 0.15, 'has_fica': False, 'note': 'Very low tax'},
+    'Switzerland': {'type': 'cantonal', 'effective_rate': 0.30, 'has_fica': False},
+    'Netherlands': {'type': 'national', 'effective_rate': 0.49, 'has_fica': False},
+    'Sweden': {'type': 'national', 'effective_rate': 0.52, 'has_fica': False, 'note': 'High tax, high services'},
+    'Norway': {'type': 'national', 'effective_rate': 0.38, 'has_fica': False},
+    'Denmark': {'type': 'national', 'effective_rate': 0.55, 'has_fica': False, 'note': 'Highest in developed world'},
+    'Finland': {'type': 'national', 'effective_rate': 0.51, 'has_fica': False},
+    'Belgium': {'type': 'national', 'effective_rate': 0.50, 'has_fica': False},
+    'Austria': {'type': 'national', 'effective_rate': 0.48, 'has_fica': False},
+    'Italy': {'type': 'national', 'effective_rate': 0.43, 'has_fica': False},
+    'Spain': {'type': 'national', 'effective_rate': 0.43, 'has_fica': False},
+    'Portugal': {'type': 'national', 'effective_rate': 0.48, 'has_fica': False},
+    'Ireland': {'type': 'national', 'effective_rate': 0.48, 'has_fica': False},
+    'New Zealand': {'type': 'national', 'effective_rate': 0.33, 'has_fica': False},
+
+    # Other locations
+    'United Arab Emirates': {'type': 'none', 'effective_rate': 0.0, 'has_fica': False, 'note': 'No income tax'},
+    'Saudi Arabia': {'type': 'none', 'effective_rate': 0.0, 'has_fica': False, 'note': 'No income tax for individuals'},
+    'Bahamas': {'type': 'none', 'effective_rate': 0.0, 'has_fica': False, 'note': 'No income tax'},
+    'Cayman Islands': {'type': 'none', 'effective_rate': 0.0, 'has_fica': False, 'note': 'No income tax'},
+    'Monaco': {'type': 'none', 'effective_rate': 0.0, 'has_fica': False, 'note': 'No income tax'},
+
+    # Latin America
+    'Mexico': {'type': 'national', 'effective_rate': 0.35, 'has_fica': False},
+    'Brazil': {'type': 'national', 'effective_rate': 0.275, 'has_fica': False},
+    'Argentina': {'type': 'national', 'effective_rate': 0.35, 'has_fica': False},
+    'Chile': {'type': 'national', 'effective_rate': 0.40, 'has_fica': False},
+    'Costa Rica': {'type': 'national', 'effective_rate': 0.25, 'has_fica': False},
+
+    # Asia
+    'China': {'type': 'national', 'effective_rate': 0.45, 'has_fica': False},
+    'India': {'type': 'national', 'effective_rate': 0.30, 'has_fica': False},
+    'Thailand': {'type': 'national', 'effective_rate': 0.35, 'has_fica': False},
+    'Vietnam': {'type': 'national', 'effective_rate': 0.35, 'has_fica': False},
+    'Philippines': {'type': 'national', 'effective_rate': 0.35, 'has_fica': False},
+    'Malaysia': {'type': 'national', 'effective_rate': 0.28, 'has_fica': False},
+    'Indonesia': {'type': 'national', 'effective_rate': 0.30, 'has_fica': False},
+    'Taiwan': {'type': 'national', 'effective_rate': 0.40, 'has_fica': False},
+
+    # Middle East
+    'Israel': {'type': 'national', 'effective_rate': 0.47, 'has_fica': False},
+    'Turkey': {'type': 'national', 'effective_rate': 0.35, 'has_fica': False},
+}
+
+def get_location_type(location):
+    """
+    Determine if a location is a US state, a country, or unknown.
+
+    Returns:
+        tuple: (location_type, tax_info) where location_type is 'us_state', 'country', or 'unknown'
+    """
+    # Check if it's a US state
+    if location in US_STATE_TAX_INFO:
+        return 'us_state', US_STATE_TAX_INFO[location]
+
+    # Check if it's a country
+    if location in COUNTRY_TAX_INFO:
+        return 'country', COUNTRY_TAX_INFO[location]
+
+    # Check if it's a common custom city (map to state)
+    CITY_TO_STATE = {
+        'Seattle': 'Washington',
+        'San Francisco': 'California',
+        'Los Angeles': 'California',
+        'San Diego': 'California',
+        'Sacramento': 'California',
+        'Portland': 'Oregon',
+        'Austin': 'Texas',
+        'Houston': 'Texas',
+        'Dallas': 'Texas',
+        'New York City': 'New York',
+        'NYC': 'New York',
+        'Boston': 'Massachusetts',
+        'Chicago': 'Illinois',
+        'Miami': 'Florida',
+        'Denver': 'Colorado',
+        'Phoenix': 'Arizona',
+        'Las Vegas': 'Nevada',
+        'Atlanta': 'Georgia',
+        'Philadelphia': 'Pennsylvania',
+        'Washington DC': 'District of Columbia',
+        'DC': 'District of Columbia',
+    }
+
+    if location in CITY_TO_STATE:
+        state = CITY_TO_STATE[location]
+        return 'us_state', US_STATE_TAX_INFO[state]
+
+    # Unknown location - return None so user can configure
+    return 'unknown', None
+
+
+def calculate_federal_income_tax(taxable_income, filing_status='married'):
+    """
+    Calculate federal income tax using 2024 tax brackets.
+
+    Args:
+        taxable_income: Total taxable income for the year
+        filing_status: 'single' or 'married' (default: 'married')
+
+    Returns:
+        float: Federal income tax amount
+    """
+    if filing_status == 'married':
+        # 2024 Married Filing Jointly brackets
+        brackets = [
+            (22000, 0.10),      # 10% on first $22,000
+            (89075, 0.12),      # 12% on $22,001 to $89,075
+            (190750, 0.22),     # 22% on $89,076 to $190,750
+            (364200, 0.24),     # 24% on $190,751 to $364,200
+            (462500, 0.32),     # 32% on $364,201 to $462,500
+            (693750, 0.35),     # 35% on $462,501 to $693,750
+            (float('inf'), 0.37)  # 37% on $693,751+
+        ]
+    else:
+        # 2024 Single filer brackets
+        brackets = [
+            (11000, 0.10),
+            (44725, 0.12),
+            (95375, 0.22),
+            (182100, 0.24),
+            (231250, 0.32),
+            (578125, 0.35),
+            (float('inf'), 0.37)
+        ]
+
+    tax = 0
+    previous_limit = 0
+
+    for limit, rate in brackets:
+        if taxable_income > previous_limit:
+            taxable_in_bracket = min(taxable_income, limit) - previous_limit
+            tax += taxable_in_bracket * rate
+            previous_limit = limit
+        else:
+            break
+
+    return tax
+
+def calculate_fica_tax(wage_income):
+    """
+    Calculate FICA taxes (Social Security + Medicare).
+
+    Args:
+        wage_income: W-2 wages subject to FICA
+
+    Returns:
+        float: Total FICA tax (employee portion)
+    """
+    # Social Security: 6.2% up to wage base ($160,200 in 2024)
+    ss_wage_base = 160200
+    social_security_tax = min(wage_income, ss_wage_base) * 0.062
+
+    # Medicare: 1.45% on all wages, plus 0.9% Additional Medicare Tax on high earners
+    medicare_wage_threshold = 250000  # For married filing jointly
+
+    if wage_income <= medicare_wage_threshold:
+        medicare_tax = wage_income * 0.0145
+    else:
+        medicare_tax = (medicare_wage_threshold * 0.0145) + \
+                      ((wage_income - medicare_wage_threshold) * 0.0235)  # 1.45% + 0.9%
+
+    return social_security_tax + medicare_tax
+
+def calculate_ss_taxable_amount(ss_income, other_income):
+    """
+    Calculate taxable portion of Social Security benefits.
+    Uses provisional income method.
+
+    Args:
+        ss_income: Social Security benefits received
+        other_income: Other taxable income (wages, pensions, etc.)
+
+    Returns:
+        float: Taxable portion of Social Security benefits
+    """
+    # Provisional income = AGI + 50% of SS benefits + tax-exempt interest
+    provisional_income = other_income + (ss_income * 0.5)
+
+    # Married filing jointly thresholds
+    threshold_1 = 32000
+    threshold_2 = 44000
+
+    if provisional_income <= threshold_1:
+        # No SS benefits taxed
+        return 0
+    elif provisional_income <= threshold_2:
+        # Up to 50% of benefits may be taxed
+        excess = provisional_income - threshold_1
+        return min(excess, ss_income * 0.5)
+    else:
+        # Up to 85% of benefits may be taxed
+        excess_1 = threshold_2 - threshold_1
+        excess_2 = provisional_income - threshold_2
+        return min(excess_1 + (excess_2 * 0.85), ss_income * 0.85)
+
+def calculate_total_taxes(parent1_income, parent2_income, ss_income, location=None, state_tax_rate=None, filing_status='married'):
+    """
+    Calculate total taxes for the year based on location.
+
+    Args:
+        parent1_income: Parent 1 wage income
+        parent2_income: Parent 2 wage income
+        ss_income: Social Security benefits
+        location: Location name (US state or country). If None, uses state_tax_rate fallback
+        state_tax_rate: Manual override for state/local tax rate (for unknown locations)
+        filing_status: 'single' or 'married'
+
+    Returns:
+        dict: Breakdown of all taxes including location info
+    """
+    wage_income = parent1_income + parent2_income
+
+    # Determine location type and tax rules
+    location_type = 'unknown'
+    tax_info = None
+
+    if location:
+        location_type, tax_info = get_location_type(location)
+
+    # Initialize tax components
+    federal_tax = 0
+    state_tax = 0
+    fica_tax = 0
+    foreign_tax = 0
+
+    # Calculate taxes based on location type
+    if location_type == 'us_state':
+        # US State: Apply federal + FICA + state taxes
+
+        # 1. Calculate FICA on wage income
+        fica_tax = calculate_fica_tax(wage_income)
+
+        # 2. Calculate taxable Social Security
+        taxable_ss = calculate_ss_taxable_amount(ss_income, wage_income)
+
+        # 3. Total taxable income with standard deduction
+        standard_deduction = 29200 if filing_status == 'married' else 14600
+        taxable_income = max(0, wage_income + taxable_ss - standard_deduction)
+
+        # 4. Calculate federal income tax
+        federal_tax = calculate_federal_income_tax(taxable_income, filing_status)
+
+        # 5. Calculate state tax using location's rate
+        state_rate = tax_info.get('rate', 0.0)
+        state_tax = taxable_income * state_rate
+
+    elif location_type == 'country' and tax_info:
+        # Foreign Country: Apply country's tax system
+        # Note: US citizens still owe US taxes on worldwide income, but we'll simplify
+        # by assuming they're using Foreign Earned Income Exclusion or Foreign Tax Credit
+
+        if tax_info.get('type') == 'federal_state':
+            # It's the United States as a country
+            # Apply US federal taxes + FICA
+            fica_tax = calculate_fica_tax(wage_income)
+            taxable_ss = calculate_ss_taxable_amount(ss_income, wage_income)
+            standard_deduction = 29200 if filing_status == 'married' else 14600
+            taxable_income = max(0, wage_income + taxable_ss - standard_deduction)
+            federal_tax = calculate_federal_income_tax(taxable_income, filing_status)
+            # No state tax since it's just "United States" without a specific state
+            state_tax = 0
+        else:
+            # Foreign country - apply their tax system
+            # Use effective rate on total income (simplified)
+            effective_rate = tax_info.get('effective_rate', 0.35)
+
+            # Most countries don't have standard deductions like the US
+            # Some have personal allowances, but we'll simplify
+            total_income = wage_income + ss_income
+            foreign_tax = total_income * effective_rate
+
+            # FICA only applies if working for US employer
+            # We'll assume foreign employment = no FICA
+            if tax_info.get('has_fica', False):
+                fica_tax = calculate_fica_tax(wage_income)
+
+    else:
+        # Unknown location - use manual state_tax_rate if provided
+        # Default to US tax system
+        fica_tax = calculate_fica_tax(wage_income)
+        taxable_ss = calculate_ss_taxable_amount(ss_income, wage_income)
+        standard_deduction = 29200 if filing_status == 'married' else 14600
+        taxable_income = max(0, wage_income + taxable_ss - standard_deduction)
+        federal_tax = calculate_federal_income_tax(taxable_income, filing_status)
+
+        # Use manual override or default to 5%
+        if state_tax_rate is not None:
+            state_tax = taxable_income * state_tax_rate
+        else:
+            state_tax = taxable_income * 0.05
+
+    # Calculate total
+    total_taxes = federal_tax + state_tax + fica_tax + foreign_tax
+
+    return {
+        'federal_income_tax': federal_tax,
+        'state_tax': state_tax,
+        'fica_tax': fica_tax,
+        'foreign_tax': foreign_tax,
+        'total_taxes': total_taxes,
+        'location': location if location else 'Unknown',
+        'location_type': location_type,
+        'tax_note': tax_info.get('note', '') if tax_info else ''
+    }
+
+def calculate_lifetime_cashflow():
+    """
+    Calculate detailed year-by-year cashflow for entire lifetime (current year to age 100).
+    Now includes tax calculations.
+
+    Returns:
+        list: List of dictionaries with year-by-year financial data
+    """
+    # Calculate timeline end (when both parents reach their death age)
+    parent1_death_year = (st.session_state.current_year - st.session_state.parentX_age) + st.session_state.parentX_death_age
+    parent2_death_year = (st.session_state.current_year - st.session_state.parentY_age) + st.session_state.parentY_death_age
+    timeline_end = max(parent1_death_year, parent2_death_year)
+
+    results = []
+    cumulative_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
+
+    for year in range(st.session_state.current_year, timeline_end + 1):
+        # Calculate ages
+        parent1_age = st.session_state.parentX_age + (year - st.session_state.current_year)
+        parent2_age = st.session_state.parentY_age + (year - st.session_state.current_year)
+
+        # Calculate income
+        parent1_working = parent1_age < st.session_state.parentX_retirement_age
+        parent2_working = parent2_age < st.session_state.parentY_retirement_age
+
+        parent1_income = 0
+        parent2_income = 0
+        ss_income = 0
+
+        if parent1_working:
+            parent1_income = get_income_for_year(
+                st.session_state.parentX_income,
+                st.session_state.parentX_raise,
+                st.session_state.parentX_job_changes,
+                st.session_state.current_year,
+                year
+            )
+        else:
+            parent1_ss = st.session_state.parentX_ss_benefit * 12
+            if st.session_state.ss_insolvency_enabled and year >= 2034:
+                parent1_ss *= (1 - st.session_state.ss_shortfall_percentage / 100)
+            ss_income += parent1_ss
+
+        if parent2_working:
+            parent2_income = get_income_for_year(
+                st.session_state.parentY_income,
+                st.session_state.parentY_raise,
+                st.session_state.parentY_job_changes,
+                st.session_state.current_year,
+                year
+            )
+        else:
+            parent2_ss = st.session_state.parentY_ss_benefit * 12
+            if st.session_state.ss_insolvency_enabled and year >= 2034:
+                parent2_ss *= (1 - st.session_state.ss_shortfall_percentage / 100)
+            ss_income += parent2_ss
+
+        total_income = parent1_income + parent2_income + ss_income
+
+        # Calculate taxes based on location for this year
+        # Get the location (state or country) for this year
+        location, _ = get_state_for_year(year)
+
+        # Get manual tax rate override from session state if set
+        state_tax_rate = st.session_state.get('state_tax_rate', None)
+        filing_status = st.session_state.get('tax_filing_status', 'married')
+
+        tax_breakdown = calculate_total_taxes(
+            parent1_income,
+            parent2_income,
+            ss_income,
+            location=location,
+            state_tax_rate=state_tax_rate,
+            filing_status=filing_status
+        )
+
+        total_taxes = tax_breakdown['total_taxes']
+
+        # Calculate expenses
+        # Parent + Family expenses (with inflation)
+        years_from_now = year - st.session_state.current_year
+
+        # Parent X individual expenses (with inflation)
+        parentX_expenses_inflated = {}
+        for category, amount in st.session_state.parentX_expenses.items():
+            parentX_expenses_inflated[category] = amount * (1.03 ** years_from_now)
+        parentX_total = sum(parentX_expenses_inflated.values())
+
+        # Parent Y individual expenses (with inflation)
+        parentY_expenses_inflated = {}
+        for category, amount in st.session_state.parentY_expenses.items():
+            parentY_expenses_inflated[category] = amount * (1.03 ** years_from_now)
+        parentY_total = sum(parentY_expenses_inflated.values())
+
+        # Family shared expenses (with inflation)
+        family_expenses_inflated = {}
+        for category, amount in st.session_state.family_shared_expenses.items():
+            family_expenses_inflated[category] = amount * (1.03 ** years_from_now)
+        family_total = sum(family_expenses_inflated.values())
+
+        # Total base expenses = ParentX + ParentY + Family Shared
+        base_expenses = parentX_total + parentY_total + family_total
+
+        # Create combined breakdown for reporting
+        base_expenses_dict_inflated = {
+            **{f"ParentX_{k}": v for k, v in parentX_expenses_inflated.items()},
+            **{f"ParentY_{k}": v for k, v in parentY_expenses_inflated.items()},
+            **{f"Family_{k}": v for k, v in family_expenses_inflated.items()}
+        }
+
+        # Children expenses (state-based)
+        children_expenses = 0
+        children_in_college = []
+        children_expense_details = []  # Store detailed breakdown per child
+        for child in st.session_state.children_list:
+            child_exp = get_child_expenses(child, year, st.session_state.current_year)
+            child_total = sum(child_exp.values())
+            children_expenses += child_total
+
+            # Store detailed breakdown for this child (only if there are expenses)
+            if child_total > 0:
+                children_expense_details.append({
+                    'child_name': child['name'],
+                    'expenses': child_exp.copy()
+                })
+
+            # Track who's in college
+            child_age = year - child['birth_year']
+            if 18 <= child_age <= 21:
+                children_in_college.append(child['name'])
+
+        # Recurring expenses
+        recurring_expenses_total = 0
+        recurring_expense_details = []  # Store detailed breakdown
+        for recurring in st.session_state.recurring_expenses:
+            # Check if this expense occurs this year
+            if year >= recurring.start_year:
+                if recurring.end_year is None or year <= recurring.end_year:
+                    # Check if it's a year when this recurring expense occurs
+                    years_since_start = year - recurring.start_year
+                    if years_since_start % recurring.frequency_years == 0:
+                        expense_amount = recurring.amount
+                        if recurring.inflation_adjust:
+                            expense_amount *= (1.03 ** years_from_now)
+                        recurring_expenses_total += expense_amount
+
+                        # Store details
+                        recurring_expense_details.append({
+                            'name': recurring.name,
+                            'amount': expense_amount
+                        })
+
+        # One-time major purchases
+        major_purchase_expenses = 0
+        major_purchase_details = []  # Store detailed breakdown
+        for purchase in st.session_state.major_purchases:
+            if purchase.year == year:
+                major_purchase_expenses += purchase.amount
+                major_purchase_details.append({
+                    'name': purchase.name,
+                    'amount': purchase.amount
+                })
+
+        # Healthcare costs
+        healthcare_expenses = 0
+        healthcare_expense_details = {}  # Store detailed breakdown
+
+        # Health insurance premiums (pre-Medicare, includes early retirement)
+        if 'health_insurances' in st.session_state:
+            for insurance in st.session_state.health_insurances:
+                # Check if this insurance applies to either parent based on age
+                annual_premium = 0
+                if insurance.covered_by in ["Parent 1", "Both", "Family"] and insurance.start_age <= parent1_age <= insurance.end_age:
+                    annual_premium = insurance.monthly_premium * 12
+                elif insurance.covered_by == "Parent 2" and insurance.start_age <= parent2_age <= insurance.end_age:
+                    annual_premium = insurance.monthly_premium * 12
+                elif insurance.covered_by in ["Both", "Family"]:
+                    # For Both/Family, check if either parent is in age range
+                    if (insurance.start_age <= parent1_age <= insurance.end_age) or (insurance.start_age <= parent2_age <= insurance.end_age):
+                        annual_premium = insurance.monthly_premium * 12
+
+                if annual_premium > 0:
+                    healthcare_expenses += annual_premium
+                    key = f"Health Insurance ({insurance.covered_by})"
+                    healthcare_expense_details[key] = healthcare_expense_details.get(key, 0) + annual_premium
+
+        # Medicare costs (age 65+)
+        medicare_expenses = 0
+        if 'medicare_part_b_premium' in st.session_state:
+            if parent1_age >= 65:
+                part_b = st.session_state.medicare_part_b_premium * 12
+                part_d = st.session_state.get('medicare_part_d_premium', 55.0) * 12
+                medigap = st.session_state.get('medigap_premium', 150.0) * 12
+                medicare_expenses += part_b + part_d + medigap
+                healthcare_expense_details[f"Medicare Part B ({st.session_state.parent1_name})"] = part_b
+                healthcare_expense_details[f"Medicare Part D ({st.session_state.parent1_name})"] = part_d
+                healthcare_expense_details[f"Medigap ({st.session_state.parent1_name})"] = medigap
+            if parent2_age >= 65:
+                part_b = st.session_state.medicare_part_b_premium * 12
+                part_d = st.session_state.get('medicare_part_d_premium', 55.0) * 12
+                medigap = st.session_state.get('medigap_premium', 150.0) * 12
+                medicare_expenses += part_b + part_d + medigap
+                healthcare_expense_details[f"Medicare Part B ({st.session_state.parent2_name})"] = part_b
+                healthcare_expense_details[f"Medicare Part D ({st.session_state.parent2_name})"] = part_d
+                healthcare_expense_details[f"Medigap ({st.session_state.parent2_name})"] = medigap
+
+        healthcare_expenses += medicare_expenses
+
+        # Long-term care insurance premiums
+        if 'ltc_insurances' in st.session_state:
+            for ltc in st.session_state.ltc_insurances:
+                if ltc.covered_person == "Parent 1" and parent1_age >= ltc.start_age:
+                    ltc_annual = ltc.monthly_premium * 12
+                    healthcare_expenses += ltc_annual
+                    healthcare_expense_details[f"Long-term Care ({st.session_state.parent1_name})"] = ltc_annual
+                elif ltc.covered_person == "Parent 2" and parent2_age >= ltc.start_age:
+                    ltc_annual = ltc.monthly_premium * 12
+                    healthcare_expenses += ltc_annual
+                    healthcare_expense_details[f"Long-term Care ({st.session_state.parent2_name})"] = ltc_annual
+
+        # House expenses (property tax, insurance, maintenance, upkeep)
+        house_expenses = 0
+        house_expense_details = []  # Store detailed breakdown
+        if 'houses' in st.session_state:
+            for house in st.session_state.houses:
+                # Check if the house is owned during this year based on timeline
+                is_owned = False
+                for timeline_entry in house.timeline:
+                    if timeline_entry.year <= year:
+                        if timeline_entry.status in ["Own_Live", "Own_Rent"]:
+                            is_owned = True
+                        elif timeline_entry.status == "Sold":
+                            is_owned = False
+
+                if is_owned:
+                    # Calculate house value with appreciation (assume 3% annual appreciation)
+                    years_since_purchase = year - house.purchase_year
+                    current_house_value = house.current_value * (1.03 ** years_from_now)
+
+                    # Property tax (based on current house value)
+                    property_tax = current_house_value * house.property_tax_rate
+                    house_expenses += property_tax
+
+                    # Home insurance (with inflation)
+                    home_insurance = house.home_insurance * (1.03 ** years_from_now)
+                    house_expenses += home_insurance
+
+                    # Maintenance (based on current house value)
+                    maintenance = current_house_value * house.maintenance_rate
+                    house_expenses += maintenance
+
+                    # Upkeep costs (with inflation)
+                    upkeep = house.upkeep_costs * (1.03 ** years_from_now)
+                    house_expenses += upkeep
+
+                    # Store breakdown
+                    house_expense_details.append({
+                        'name': house.name,
+                        'property_tax': property_tax,
+                        'home_insurance': home_insurance,
+                        'maintenance': maintenance,
+                        'upkeep': upkeep
+                    })
+
+        total_expenses = base_expenses + children_expenses + recurring_expenses_total + major_purchase_expenses + healthcare_expenses + house_expenses
+
+        # Calculate cashflow (Income - Taxes - Expenses)
+        cashflow = total_income - total_taxes - total_expenses
+
+        # Update net worth (cashflow + investment return based on user's expected return rate)
+        investment_return = cumulative_net_worth * st.session_state.economic_params.investment_return
+        cumulative_net_worth += cashflow + investment_return
+
+        # Track events
+        events = []
+
+        # Job changes
+        for _, row in st.session_state.parentX_job_changes.iterrows():
+            if int(row['Year']) == year:
+                events.append(('job_change', st.session_state.parent1_name, row['New Income']))
+        for _, row in st.session_state.parentY_job_changes.iterrows():
+            if int(row['Year']) == year:
+                events.append(('job_change', st.session_state.parent2_name, row['New Income']))
+
+        # College events
+        if children_in_college:
+            events.append(('college', children_in_college))
+
+        # Retirement events
+        if parent1_age == st.session_state.parentX_retirement_age:
+            events.append(('retirement', st.session_state.parent1_name))
+        if parent2_age == st.session_state.parentY_retirement_age:
+            events.append(('retirement', st.session_state.parent2_name))
+
+        results.append({
+            'year': year,
+            'parent1_age': parent1_age,
+            'parent2_age': parent2_age,
+            'parent1_income': parent1_income,
+            'parent2_income': parent2_income,
+            'ss_income': ss_income,
+            'investment_income': investment_return,  # Add investment returns
+            'total_income': total_income,
+            'taxes': total_taxes,  # Total taxes
+            'tax_breakdown': tax_breakdown,  # Detailed tax breakdown
+            'base_expenses': base_expenses,
+            'base_expenses_breakdown': base_expenses_dict_inflated,
+            'children_expenses': children_expenses,
+            'children_expense_details': children_expense_details,
+            'healthcare_expenses': healthcare_expenses,
+            'healthcare_expense_details': healthcare_expense_details,
+            'house_expenses': house_expenses,
+            'house_expense_details': house_expense_details,
+            'recurring_expenses': recurring_expenses_total,
+            'recurring_expense_details': recurring_expense_details,
+            'major_purchases': major_purchase_expenses,
+            'major_purchase_details': major_purchase_details,
+            'total_expenses': total_expenses,
+            'cashflow': cashflow,
+            'net_worth': cumulative_net_worth,
+            'children_in_college': children_in_college,
+            'events': events
+        })
+
+    return results
+
+
+def deterministic_cashflow_tab():
+    """Deterministic Lifetime Cashflow Analysis"""
+    st.header("💰 Deterministic Lifetime Cashflow")
+
+    st.markdown("""
+    See exactly how money flows through your entire life from now until age 100.
+    This deterministic view shows your baseline plan without uncertainty.
+    **Click on any year in the chart to see detailed income and expense breakdown.**
+    """)
+
+    # Initialize session state for cashflow calculation
+    if 'cashflow_data_cached' not in st.session_state:
+        st.session_state.cashflow_data_cached = None
+    if 'selected_cashflow_year' not in st.session_state:
+        st.session_state.selected_cashflow_year = None
+
+    # Add calculate/recalculate button
+    st.info("💡 Click the button below to calculate or recalculate your lifetime cashflow based on your current life plan.")
+
+    if st.button("🏦 Calculate Lifetime Cashflow", type="primary", use_container_width=True, key="calc_cashflow"):
+        with st.spinner("Calculating lifetime cashflow..."):
+            st.session_state.cashflow_data_cached = calculate_lifetime_cashflow()
+        if st.session_state.cashflow_data_cached:
+            st.success("✅ Calculation complete! Scroll down to view results.")
+        st.rerun()
+
+    # Check if we have calculated data to show
+    if st.session_state.cashflow_data_cached is not None:
+        cashflow_data = st.session_state.cashflow_data_cached
+
+        if cashflow_data:
+            # Create tabs for different views
+            cashflow_tab1, cashflow_tab2, cashflow_tab3 = st.tabs(["📈 Timeline View", "📊 Critical Years Table", "📅 Life Stages"])
+
+            with cashflow_tab1:
+                st.subheader("Lifetime Income vs Expenses Timeline")
+
+                # Prepare data for plotting
+                years = [d['year'] for d in cashflow_data]
+                income = [d['total_income'] for d in cashflow_data]
+                expenses = [d['total_expenses'] for d in cashflow_data]
+                cashflow = [d['cashflow'] for d in cashflow_data]
+
+                # Create figure
+                fig = go.Figure()
+
+                # Add income line
+                fig.add_trace(go.Scatter(
+                    x=years,
+                    y=income,
+                    mode='lines',
+                    name='Income',
+                    line=dict(color='green', width=2),
+                    hovertemplate='<b>Year %{x}</b><br>Income: $%{y:,.0f}<br>Click for details<extra></extra>'
+                ))
+
+                # Add expenses line
+                fig.add_trace(go.Scatter(
+                    x=years,
+                    y=expenses,
+                    mode='lines',
+                    name='Expenses',
+                    line=dict(color='red', width=2),
+                    hovertemplate='<b>Year %{x}</b><br>Expenses: $%{y:,.0f}<br>Click for details<extra></extra>'
+                ))
+
+                # Add cashflow area (positive)
+                cashflow_positive = [max(0, cf) for cf in cashflow]
+                fig.add_trace(go.Scatter(
+                    x=years,
+                    y=cashflow_positive,
+                    mode='none',
+                    name='Positive Cashflow',
+                    fill='tozeroy',
+                    fillcolor='rgba(0, 255, 0, 0.1)',
+                    hovertemplate='<b>Year %{x}</b><br>Surplus: $%{y:,.0f}<extra></extra>'
+                ))
+
+                # Add cashflow area (negative)
+                cashflow_negative = [min(0, cf) for cf in cashflow]
+                fig.add_trace(go.Scatter(
+                    x=years,
+                    y=cashflow_negative,
+                    mode='none',
+                    name='Deficit',
+                    fill='tozeroy',
+                    fillcolor='rgba(255, 0, 0, 0.1)',
+                    hovertemplate='<b>Year %{x}</b><br>Deficit: $%{y:,.0f}<extra></extra>'
+                ))
+
+                # Add major event markers
+                major_events = []
+                for d in cashflow_data:
+                    for event_type, *event_data in d['events']:
+                        if event_type == 'job_change':
+                            major_events.append({'year': d['year'], 'type': 'job_change', 'label': f"💼 {event_data[0]}", 'value': d['total_income']})
+                        elif event_type == 'retirement':
+                            major_events.append({'year': d['year'], 'type': 'retirement', 'label': f"🏖️ {event_data[0]}", 'value': d['total_income']})
+
+                college_years_list = [d['year'] for d in cashflow_data if d['children_in_college']]
+                if college_years_list:
+                    first_college = min(college_years_list)
+                    last_college = max(college_years_list)
+                    first_college_data = next(d for d in cashflow_data if d['year'] == first_college)
+                    major_events.append({'year': first_college, 'type': 'college_start', 'label': '🎓 College Starts', 'value': first_college_data['total_expenses']})
+                    if last_college != first_college:
+                        last_college_data = next(d for d in cashflow_data if d['year'] == last_college)
+                        major_events.append({'year': last_college, 'type': 'college_end', 'label': '🎓 College Ends', 'value': last_college_data['total_expenses']})
+
+                if major_events:
+                    event_years = [e['year'] for e in major_events]
+                    event_values = [e['value'] for e in major_events]
+                    event_labels = [e['label'] for e in major_events]
+                    fig.add_trace(go.Scatter(
+                        x=event_years,
+                        y=event_values,
+                        mode='markers',
+                        name='Major Events',
+                        marker=dict(size=15, color='blue', symbol='star', line=dict(width=2, color='white')),
+                        hovertemplate='<b>%{customdata}</b><br>Year: %{x}<extra></extra>',
+                        customdata=event_labels
+                    ))
+
+                fig.update_layout(
+                    title="Lifetime Income, Expenses, and Cashflow (Click any year for details)",
+                    xaxis_title="Year",
+                    yaxis_title="Amount ($)",
+                    height=700,
+                    hovermode='x unified',
+                    showlegend=True,
+                    clickmode='event+select'
+                )
+
+                selected_points = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="cashflow_chart_main")
+
+                # Handle year selection via manual input
+                st.markdown("---")
+                col_select1, col_select2 = st.columns([3, 1])
+                with col_select1:
+                    selected_year = st.selectbox("Select a year to see detailed breakdown:", options=years, index=0, key="year_selector_main")
+                with col_select2:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("Show Details", type="primary", key="show_details_btn"):
+                        st.session_state.selected_cashflow_year = selected_year
+
+                # Show detailed breakdown if year is selected
+                if st.session_state.selected_cashflow_year:
+                    year_data = next((d for d in cashflow_data if d['year'] == st.session_state.selected_cashflow_year), None)
+                    if year_data:
+                        st.markdown("---")
+                        st.subheader(f"📊 Detailed Breakdown for {st.session_state.selected_cashflow_year}")
+
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.markdown("#### 💵 Income Breakdown")
+                            income_breakdown = []
+                            if year_data['parent1_income'] > 0:
+                                income_breakdown.append({'Source': f"{st.session_state.parent1_name} Salary", 'Amount': year_data['parent1_income']})
+                            if year_data['parent2_income'] > 0:
+                                income_breakdown.append({'Source': f"{st.session_state.parent2_name} Salary", 'Amount': year_data['parent2_income']})
+                            if year_data['ss_income'] > 0:
+                                income_breakdown.append({'Source': 'Social Security', 'Amount': year_data['ss_income']})
+                            if year_data.get('investment_income', 0) > 0:
+                                income_breakdown.append({'Source': '📈 Investment Returns', 'Amount': year_data['investment_income']})
+
+                            if income_breakdown:
+                                income_df = pd.DataFrame(income_breakdown)
+                                income_fig = go.Figure(data=[go.Pie(labels=income_df['Source'], values=income_df['Amount'], hole=0.3, marker_colors=['#2ecc71', '#27ae60', '#16a085', '#1abc9c'])])
+                                income_fig.update_layout(height=300, showlegend=True)
+                                st.plotly_chart(income_fig, use_container_width=True)
+                                income_df['Amount'] = income_df['Amount'].apply(lambda x: f"${x:,.0f}")
+                                st.dataframe(income_df, hide_index=True, use_container_width=True)
+
+                                # Calculate total including investment returns
+                                total_with_investments = year_data['total_income'] + year_data.get('investment_income', 0)
+                                st.metric("Total Earned Income", f"${year_data['total_income']:,.0f}")
+                                if year_data.get('investment_income', 0) > 0:
+                                    st.metric("Total with Investments", f"${total_with_investments:,.0f}")
+                            else:
+                                st.info("No income for this year")
+
+                        with col2:
+                            st.markdown("#### 💳 Expense Breakdown")
+                            expense_breakdown = []
+                            # Add taxes first (critical expense)
+                            if year_data.get('taxes', 0) > 0:
+                                expense_breakdown.append({'Category': '💸 Taxes', 'Amount': year_data['taxes']})
+                            if year_data['base_expenses'] > 0:
+                                expense_breakdown.append({'Category': 'Family Living Expenses', 'Amount': year_data['base_expenses']})
+                            if year_data['children_expenses'] > 0:
+                                expense_breakdown.append({'Category': 'Children Expenses', 'Amount': year_data['children_expenses']})
+                            if year_data.get('healthcare_expenses', 0) > 0:
+                                expense_breakdown.append({'Category': 'Healthcare & Insurance', 'Amount': year_data['healthcare_expenses']})
+                            if year_data.get('house_expenses', 0) > 0:
+                                expense_breakdown.append({'Category': 'House Expenses', 'Amount': year_data['house_expenses']})
+                            if year_data.get('recurring_expenses', 0) > 0:
+                                expense_breakdown.append({'Category': 'Recurring Expenses', 'Amount': year_data['recurring_expenses']})
+                            if year_data.get('major_purchases', 0) > 0:
+                                expense_breakdown.append({'Category': 'One-Time Major Purchases', 'Amount': year_data['major_purchases']})
+
+                            if expense_breakdown:
+                                expense_df = pd.DataFrame(expense_breakdown)
+                                expense_fig = go.Figure(data=[go.Pie(labels=expense_df['Category'], values=expense_df['Amount'], hole=0.3, marker_colors=['#e74c3c', '#c0392b', '#9b59b6', '#8e44ad', '#d35400', '#e67e22'])])
+                                expense_fig.update_layout(height=300, showlegend=True)
+                                st.plotly_chart(expense_fig, use_container_width=True)
+                                expense_df['Amount'] = expense_df['Amount'].apply(lambda x: f"${x:,.0f}")
+                                st.dataframe(expense_df, hide_index=True, use_container_width=True)
+                                st.metric("Total Expenses", f"${year_data['total_expenses']:,.0f}")
+
+                                # Sankey Diagram for Money Flow
+                                st.markdown("---")
+                                st.markdown("#### 💰 Money Flow Visualization (Sankey Diagram)")
+                                st.caption("See how money flows from income sources (including investment returns) through various expense categories to savings")
+
+                                # Build Sankey diagram data
+                                sankey_labels = []
+                                sankey_source = []
+                                sankey_target = []
+                                sankey_values = []
+                                sankey_colors = []
+
+                                # Define node indices
+                                node_index = 0
+                                node_map = {}
+
+                                # Income sources (left side)
+                                income_sources = []
+                                if year_data['parent1_income'] > 0:
+                                    income_sources.append({
+                                        'name': f"{st.session_state.parent1_name} Salary",
+                                        'value': year_data['parent1_income'],
+                                        'color': '#2ecc71'
+                                    })
+                                if year_data['parent2_income'] > 0:
+                                    income_sources.append({
+                                        'name': f"{st.session_state.parent2_name} Salary",
+                                        'value': year_data['parent2_income'],
+                                        'color': '#27ae60'
+                                    })
+                                if year_data['ss_income'] > 0:
+                                    income_sources.append({
+                                        'name': 'Social Security',
+                                        'value': year_data['ss_income'],
+                                        'color': '#16a085'
+                                    })
+                                if year_data.get('investment_income', 0) > 0:
+                                    income_sources.append({
+                                        'name': '📈 Investment Returns',
+                                        'value': year_data['investment_income'],
+                                        'color': '#1abc9c'
+                                    })
+
+                                # Add income source nodes
+                                for source in income_sources:
+                                    sankey_labels.append(source['name'])
+                                    node_map[source['name']] = node_index
+                                    node_index += 1
+
+                                # Add "Total Income" middle node
+                                sankey_labels.append("Total Income")
+                                node_map["Total Income"] = node_index
+                                total_income_idx = node_index
+                                node_index += 1
+
+                                # Connect income sources to Total Income
+                                for source in income_sources:
+                                    sankey_source.append(node_map[source['name']])
+                                    sankey_target.append(total_income_idx)
+                                    sankey_values.append(source['value'])
+                                    sankey_colors.append(source['color'])
+
+                                # Expense categories (right side)
+                                expense_categories = []
+
+                                # Taxes come first (critical expense)
+                                if year_data.get('taxes', 0) > 0:
+                                    expense_categories.append({
+                                        'name': '💸 Taxes',
+                                        'value': year_data['taxes'],
+                                        'color': 'rgba(52, 73, 94, 0.7)'  # Dark gray-blue
+                                    })
+
+                                if year_data['base_expenses'] > 0:
+                                    expense_categories.append({
+                                        'name': 'Family Living',
+                                        'value': year_data['base_expenses'],
+                                        'color': 'rgba(231, 76, 60, 0.6)'
+                                    })
+                                if year_data['children_expenses'] > 0:
+                                    expense_categories.append({
+                                        'name': 'Children',
+                                        'value': year_data['children_expenses'],
+                                        'color': 'rgba(192, 57, 43, 0.6)'
+                                    })
+                                if year_data.get('healthcare_expenses', 0) > 0:
+                                    expense_categories.append({
+                                        'name': 'Healthcare',
+                                        'value': year_data['healthcare_expenses'],
+                                        'color': 'rgba(155, 89, 182, 0.6)'
+                                    })
+                                if year_data.get('house_expenses', 0) > 0:
+                                    expense_categories.append({
+                                        'name': 'House',
+                                        'value': year_data['house_expenses'],
+                                        'color': 'rgba(142, 68, 173, 0.6)'
+                                    })
+                                if year_data.get('recurring_expenses', 0) > 0:
+                                    expense_categories.append({
+                                        'name': 'Recurring',
+                                        'value': year_data['recurring_expenses'],
+                                        'color': 'rgba(211, 84, 0, 0.6)'
+                                    })
+                                if year_data.get('major_purchases', 0) > 0:
+                                    expense_categories.append({
+                                        'name': 'Major Purchases',
+                                        'value': year_data['major_purchases'],
+                                        'color': 'rgba(230, 126, 34, 0.6)'
+                                    })
+
+                                # Add expense category nodes
+                                for category in expense_categories:
+                                    sankey_labels.append(category['name'])
+                                    node_map[category['name']] = node_index
+                                    node_index += 1
+
+                                # Add Savings/Deficit node
+                                cashflow_value = year_data['cashflow']
+                                if cashflow_value > 0:
+                                    sankey_labels.append("💰 Savings")
+                                    node_map["Savings"] = node_index
+                                    savings_idx = node_index
+                                    node_index += 1
+                                    savings_color = 'rgba(46, 204, 113, 0.6)'
+                                elif cashflow_value < 0:
+                                    sankey_labels.append("⚠️ Deficit")
+                                    node_map["Deficit"] = node_index
+                                    deficit_idx = node_index
+                                    node_index += 1
+                                    deficit_color = 'rgba(231, 76, 60, 0.8)'
+
+                                # Connect Total Income to expense categories
+                                for category in expense_categories:
+                                    sankey_source.append(total_income_idx)
+                                    sankey_target.append(node_map[category['name']])
+                                    sankey_values.append(category['value'])
+                                    sankey_colors.append(category['color'])
+
+                                # Connect Total Income to Savings or show Deficit
+                                if cashflow_value > 0:
+                                    sankey_source.append(total_income_idx)
+                                    sankey_target.append(savings_idx)
+                                    sankey_values.append(cashflow_value)
+                                    sankey_colors.append(savings_color)
+
+                                # Create node colors list
+                                node_colors = []
+                                for label in sankey_labels:
+                                    if 'Salary' in label:
+                                        node_colors.append('#2ecc71')
+                                    elif 'Social Security' in label:
+                                        node_colors.append('#16a085')
+                                    elif 'Investment Returns' in label:
+                                        node_colors.append('#1abc9c')
+                                    elif 'Total Income' in label:
+                                        node_colors.append('#3498db')
+                                    elif 'Savings' in label:
+                                        node_colors.append('#2ecc71')
+                                    elif 'Deficit' in label:
+                                        node_colors.append('#e74c3c')
+                                    else:
+                                        node_colors.append('#95a5a6')
+
+                                # Create Sankey diagram
+                                sankey_fig = go.Figure(data=[go.Sankey(
+                                    node=dict(
+                                        pad=15,
+                                        thickness=20,
+                                        line=dict(color="black", width=0.5),
+                                        label=sankey_labels,
+                                        color=node_colors,
+                                        customdata=[f"${year_data['parent1_income']:,.0f}" if i == 0 and year_data['parent1_income'] > 0 else
+                                                   f"${year_data['parent2_income']:,.0f}" if 'parent2' in sankey_labels[i].lower() else
+                                                   f"${val:,.0f}" for i, val in enumerate([0]*len(sankey_labels))],
+                                        hovertemplate='%{label}<br>$%{value:,.0f}<extra></extra>'
+                                    ),
+                                    link=dict(
+                                        source=sankey_source,
+                                        target=sankey_target,
+                                        value=sankey_values,
+                                        color=sankey_colors,
+                                        hovertemplate='%{source.label} → %{target.label}<br>$%{value:,.0f}<extra></extra>'
+                                    )
+                                )])
+
+                                sankey_fig.update_layout(
+                                    title=f"Money Flow for {st.session_state.selected_cashflow_year}",
+                                    font=dict(size=12),
+                                    height=600,
+                                    margin=dict(l=20, r=20, t=40, b=20)
+                                )
+
+                                st.plotly_chart(sankey_fig, use_container_width=True)
+
+                                # Add summary below Sankey
+                                total_available = year_data['total_income'] + year_data.get('investment_income', 0)
+                                if cashflow_value >= 0:
+                                    # Include investment returns in the savings calculation
+                                    total_added_to_savings = cashflow_value + year_data.get('investment_income', 0)
+                                    st.success(f"💰 **Net Addition to Savings: ${total_added_to_savings:,.0f}** ({(total_added_to_savings/total_available*100):.1f}% of total available funds)")
+                                    if year_data.get('investment_income', 0) > 0:
+                                        st.info(f"📊 Breakdown: ${cashflow_value:,.0f} from earned income surplus + ${year_data['investment_income']:,.0f} from investments")
+                                else:
+                                    st.error(f"⚠️ **Deficit: ${abs(cashflow_value):,.0f}** (spending {(abs(cashflow_value)/year_data['total_income']*100):.1f}% more than earned income)")
+                                    if year_data.get('investment_income', 0) > 0:
+                                        net_change = cashflow_value + year_data['investment_income']
+                                        if net_change >= 0:
+                                            st.warning(f"⚖️ Investment returns of ${year_data['investment_income']:,.0f} cover the deficit with ${net_change:,.0f} remaining")
+                                        else:
+                                            st.error(f"⚖️ Even with ${year_data['investment_income']:,.0f} investment returns, net change is ${net_change:,.0f}")
+
+                                # Detailed subcategory breakdowns
+                                st.markdown("---")
+                                st.markdown("#### 📋 Detailed Expense Breakdown - All Line Items")
+
+                                # Tax breakdown (show first - critical expense)
+                                if year_data.get('taxes', 0) > 0 and year_data.get('tax_breakdown'):
+                                    with st.expander("💸 Tax Details", expanded=True):
+                                        tax_breakdown = year_data['tax_breakdown']
+
+                                        # Show location info if available
+                                        if tax_breakdown.get('location'):
+                                            location_type = tax_breakdown.get('location_type', 'unknown')
+                                            location_emoji = '🇺🇸' if location_type == 'us_state' else ('🌍' if location_type == 'country' else '📍')
+                                            st.info(f"{location_emoji} **Tax Location:** {tax_breakdown['location']}")
+                                            if tax_breakdown.get('tax_note'):
+                                                st.caption(f"Note: {tax_breakdown['tax_note']}")
+
+                                        # Build tax table based on what taxes apply
+                                        tax_rows = []
+                                        if tax_breakdown.get('federal_income_tax', 0) > 0:
+                                            tax_rows.append({'Tax Type': 'Federal Income Tax', 'Amount': f"${tax_breakdown['federal_income_tax']:,.0f}"})
+                                        if tax_breakdown.get('state_tax', 0) > 0:
+                                            tax_rows.append({'Tax Type': 'State/Local Income Tax', 'Amount': f"${tax_breakdown['state_tax']:,.0f}"})
+                                        if tax_breakdown.get('fica_tax', 0) > 0:
+                                            tax_rows.append({'Tax Type': 'FICA (Social Security + Medicare)', 'Amount': f"${tax_breakdown['fica_tax']:,.0f}"})
+                                        if tax_breakdown.get('foreign_tax', 0) > 0:
+                                            tax_rows.append({'Tax Type': 'Foreign Income Tax', 'Amount': f"${tax_breakdown['foreign_tax']:,.0f}"})
+
+                                        if tax_rows:
+                                            tax_df = pd.DataFrame(tax_rows)
+                                            st.dataframe(tax_df, hide_index=True, use_container_width=True)
+
+                                        st.markdown(f"**Total Taxes: ${tax_breakdown['total_taxes']:,.0f}**")
+
+                                        # Show effective tax rate
+                                        effective_rate = (tax_breakdown['total_taxes'] / year_data['total_income'] * 100) if year_data['total_income'] > 0 else 0
+                                        st.caption(f"Effective tax rate on total income: {effective_rate:.1f}%")
+
+                                # Family Living Expenses breakdown
+                                if year_data['base_expenses'] > 0 and year_data.get('base_expenses_breakdown'):
+                                    with st.expander("🏠 Family Living Expenses Details", expanded=True):
+                                        family_breakdown = year_data['base_expenses_breakdown']
+                                        family_df = pd.DataFrame([
+                                            {'Category': k, 'Amount': f"${v:,.0f}"}
+                                            for k, v in family_breakdown.items() if v > 0
+                                        ])
+                                        if not family_df.empty:
+                                            st.dataframe(family_df, hide_index=True, use_container_width=True)
+                                            st.markdown(f"**Family Total: ${sum(family_breakdown.values()):,.0f}**")
+
+                                # Children Expenses breakdown
+                                if year_data['children_expenses'] > 0 and year_data.get('children_expense_details'):
+                                    with st.expander("👶 Children Expenses Details (Per Child)", expanded=True):
+                                        for child_detail in year_data['children_expense_details']:
+                                            st.markdown(f"### {child_detail['child_name']}")
+                                            child_df = pd.DataFrame([
+                                                {'Category': k, 'Amount': f"${v:,.0f}"}
+                                                for k, v in child_detail['expenses'].items() if v > 0
+                                            ])
+                                            if not child_df.empty:
+                                                st.dataframe(child_df, hide_index=True, use_container_width=True)
+                                                child_total = sum(child_detail['expenses'].values())
+                                                st.markdown(f"**{child_detail['child_name']} Total: ${child_total:,.0f}**")
+                                            st.markdown("")  # Add spacing
+
+                                        # Show total for all children
+                                        total_children = sum(sum(child['expenses'].values()) for child in year_data['children_expense_details'])
+                                        st.markdown(f"### **All Children Total: ${total_children:,.0f}**")
+
+                                # Healthcare Expenses breakdown
+                                if year_data.get('healthcare_expenses', 0) > 0 and year_data.get('healthcare_expense_details'):
+                                    with st.expander("🏥 Healthcare & Insurance Details", expanded=True):
+                                        healthcare_breakdown = year_data['healthcare_expense_details']
+                                        healthcare_df = pd.DataFrame([
+                                            {'Category': k, 'Amount': f"${v:,.0f}"}
+                                            for k, v in healthcare_breakdown.items() if v > 0
+                                        ])
+                                        if not healthcare_df.empty:
+                                            st.dataframe(healthcare_df, hide_index=True, use_container_width=True)
+                                            st.markdown(f"**Healthcare Total: ${sum(healthcare_breakdown.values()):,.0f}**")
+
+                                # House Expenses breakdown
+                                if year_data.get('house_expenses', 0) > 0 and year_data.get('house_expense_details'):
+                                    with st.expander("🏡 House Expenses Details", expanded=True):
+                                        for house_detail in year_data['house_expense_details']:
+                                            st.markdown(f"### {house_detail['name']}")
+                                            house_df = pd.DataFrame([
+                                                {'Category': 'Property Tax', 'Amount': f"${house_detail['property_tax']:,.0f}"},
+                                                {'Category': 'Home Insurance', 'Amount': f"${house_detail['home_insurance']:,.0f}"},
+                                                {'Category': 'Maintenance', 'Amount': f"${house_detail['maintenance']:,.0f}"},
+                                                {'Category': 'Upkeep', 'Amount': f"${house_detail['upkeep']:,.0f}"}
+                                            ])
+                                            st.dataframe(house_df, hide_index=True, use_container_width=True)
+                                            house_total = house_detail['property_tax'] + house_detail['home_insurance'] + house_detail['maintenance'] + house_detail['upkeep']
+                                            st.markdown(f"**{house_detail['name']} Total: ${house_total:,.0f}**")
+                                            st.markdown("")  # Add spacing
+
+                                        # Show total for all houses
+                                        if len(year_data['house_expense_details']) > 1:
+                                            total_houses = sum(
+                                                h['property_tax'] + h['home_insurance'] + h['maintenance'] + h['upkeep']
+                                                for h in year_data['house_expense_details']
+                                            )
+                                            st.markdown(f"### **All Houses Total: ${total_houses:,.0f}**")
+
+                                # Recurring Expenses breakdown
+                                if year_data.get('recurring_expenses', 0) > 0 and year_data.get('recurring_expense_details'):
+                                    with st.expander("🔁 Recurring Expenses Details", expanded=True):
+                                        recurring_df = pd.DataFrame([
+                                            {'Item': item['name'], 'Amount': f"${item['amount']:,.0f}"}
+                                            for item in year_data['recurring_expense_details']
+                                        ])
+                                        st.dataframe(recurring_df, hide_index=True, use_container_width=True)
+                                        total_recurring = sum(item['amount'] for item in year_data['recurring_expense_details'])
+                                        st.markdown(f"**Recurring Total: ${total_recurring:,.0f}**")
+
+                                # One-Time Major Purchases breakdown
+                                if year_data.get('major_purchases', 0) > 0 and year_data.get('major_purchase_details'):
+                                    with st.expander("🛒 One-Time Major Purchases Details", expanded=True):
+                                        purchases_df = pd.DataFrame([
+                                            {'Item': item['name'], 'Amount': f"${item['amount']:,.0f}"}
+                                            for item in year_data['major_purchase_details']
+                                        ])
+                                        st.dataframe(purchases_df, hide_index=True, use_container_width=True)
+                                        total_purchases = sum(item['amount'] for item in year_data['major_purchase_details'])
+                                        st.markdown(f"**Purchases Total: ${total_purchases:,.0f}**")
+
+                            else:
+                                st.info("No expenses for this year")
+
+                        # Comprehensive expense summary table
+                        if expense_breakdown:
+                            st.markdown("---")
+                            st.markdown("#### 💰 Complete Expense Summary")
+
+                            # Build comprehensive summary
+                            summary_data = []
+
+                            # Family expenses
+                            if year_data['base_expenses'] > 0 and year_data.get('base_expenses_breakdown'):
+                                summary_data.append({'Category': '🏠 FAMILY LIVING EXPENSES', 'Amount': f"${year_data['base_expenses']:,.0f}"})
+                                for k, v in year_data['base_expenses_breakdown'].items():
+                                    if v > 0:
+                                        summary_data.append({'Category': f"   • {k}", 'Amount': f"${v:,.0f}"})
+
+                            # Children expenses
+                            if year_data['children_expenses'] > 0 and year_data.get('children_expense_details'):
+                                summary_data.append({'Category': '👶 CHILDREN EXPENSES', 'Amount': f"${year_data['children_expenses']:,.0f}"})
+                                for child_detail in year_data['children_expense_details']:
+                                    child_total = sum(child_detail['expenses'].values())
+                                    summary_data.append({'Category': f"   {child_detail['child_name']}:", 'Amount': f"${child_total:,.0f}"})
+                                    for k, v in child_detail['expenses'].items():
+                                        if v > 0:
+                                            summary_data.append({'Category': f"      • {k}", 'Amount': f"${v:,.0f}"})
+
+                            # Healthcare expenses
+                            if year_data.get('healthcare_expenses', 0) > 0 and year_data.get('healthcare_expense_details'):
+                                summary_data.append({'Category': '🏥 HEALTHCARE & INSURANCE', 'Amount': f"${year_data['healthcare_expenses']:,.0f}"})
+                                for k, v in year_data['healthcare_expense_details'].items():
+                                    if v > 0:
+                                        summary_data.append({'Category': f"   • {k}", 'Amount': f"${v:,.0f}"})
+
+                            # House expenses
+                            if year_data.get('house_expenses', 0) > 0 and year_data.get('house_expense_details'):
+                                summary_data.append({'Category': '🏡 HOUSE EXPENSES', 'Amount': f"${year_data['house_expenses']:,.0f}"})
+                                for house_detail in year_data['house_expense_details']:
+                                    house_total = house_detail['property_tax'] + house_detail['home_insurance'] + house_detail['maintenance'] + house_detail['upkeep']
+                                    summary_data.append({'Category': f"   {house_detail['name']}:", 'Amount': f"${house_total:,.0f}"})
+                                    summary_data.append({'Category': f"      • Property Tax", 'Amount': f"${house_detail['property_tax']:,.0f}"})
+                                    summary_data.append({'Category': f"      • Home Insurance", 'Amount': f"${house_detail['home_insurance']:,.0f}"})
+                                    summary_data.append({'Category': f"      • Maintenance", 'Amount': f"${house_detail['maintenance']:,.0f}"})
+                                    summary_data.append({'Category': f"      • Upkeep", 'Amount': f"${house_detail['upkeep']:,.0f}"})
+
+                            # Recurring expenses
+                            if year_data.get('recurring_expenses', 0) > 0 and year_data.get('recurring_expense_details'):
+                                summary_data.append({'Category': '🔁 RECURRING EXPENSES', 'Amount': f"${year_data['recurring_expenses']:,.0f}"})
+                                for item in year_data['recurring_expense_details']:
+                                    summary_data.append({'Category': f"   • {item['name']}", 'Amount': f"${item['amount']:,.0f}"})
+
+                            # Major purchases
+                            if year_data.get('major_purchases', 0) > 0 and year_data.get('major_purchase_details'):
+                                summary_data.append({'Category': '🛒 ONE-TIME PURCHASES', 'Amount': f"${year_data['major_purchases']:,.0f}"})
+                                for item in year_data['major_purchase_details']:
+                                    summary_data.append({'Category': f"   • {item['name']}", 'Amount': f"${item['amount']:,.0f}"})
+
+                            # Display the comprehensive summary
+                            if summary_data:
+                                summary_df = pd.DataFrame(summary_data)
+                                st.dataframe(summary_df, hide_index=True, use_container_width=True, height=min(600, len(summary_data) * 35 + 38))
+                                st.markdown(f"### **TOTAL EXPENSES: ${year_data['total_expenses']:,.0f}**")
+
+                        # Show summary metrics
+                        st.markdown("#### 📈 Year Summary")
+                        sum_col1, sum_col2, sum_col3, sum_col4 = st.columns(4)
+                        with sum_col1:
+                            st.metric("Ages", f"{year_data['parent1_age']} / {year_data['parent2_age']}")
+                        with sum_col2:
+                            cashflow_val = year_data['cashflow']
+                            cashflow_delta = "Surplus" if cashflow_val >= 0 else "Deficit"
+                            st.metric("Cashflow", f"${abs(cashflow_val):,.0f}", cashflow_delta)
+                        with sum_col3:
+                            st.metric("Net Worth", f"${year_data['net_worth']:,.0f}")
+                        with sum_col4:
+                            if year_data['children_in_college']:
+                                st.metric("In College", ", ".join(year_data['children_in_college']))
+                            else:
+                                st.metric("In College", "None")
+
+            with cashflow_tab2:
+                # Critical Years Table
+                st.subheader("Critical Years Analysis")
+                critical_years_data = []
+                for d in cashflow_data:
+                    if d['cashflow'] < 0 or d['net_worth'] < 0 or d['children_in_college'] or any(e[0] in ['retirement', 'job_change'] for e in d['events']):
+                        critical_years_data.append({
+                            'Year': d['year'],
+                            'Ages': f"{d['parent1_age']} / {d['parent2_age']}",
+                            'Cashflow': f"${d['cashflow']:,.0f}",
+                            'Net Worth': f"${d['net_worth']:,.0f}",
+                            'Events': ', '.join([f"{e[1]}" if len(e) > 1 else e[0] for e in d['events']]) if d['events'] else '-',
+                            'In College': ', '.join(d['children_in_college']) if d['children_in_college'] else '-'
+                        })
+
+                if critical_years_data:
+                    critical_df = pd.DataFrame(critical_years_data)
+                    st.dataframe(critical_df, use_container_width=True, hide_index=True, height=400)
+                else:
+                    st.info("No critical years identified in your plan.")
+
+            with cashflow_tab3:
+                # Life Stages View
+                st.subheader("Life Stages Financial Summary")
+
+                stages = {
+                    'Working Years (Pre-Retirement)': [],
+                    'Early Retirement': [],
+                    'Late Retirement': []
+                }
+
+                for d in cashflow_data:
+                    parent1_retired = d['parent1_age'] >= st.session_state.parentX_retirement_age
+                    parent2_retired = d['parent2_age'] >= st.session_state.parentY_retirement_age
+                    both_retired = parent1_retired and parent2_retired
+
+                    if not both_retired:
+                        stages['Working Years (Pre-Retirement)'].append(d)
+                    elif d['parent1_age'] < 75 and d['parent2_age'] < 75:
+                        stages['Early Retirement'].append(d)
+                    else:
+                        stages['Late Retirement'].append(d)
+
+                for stage_name, stage_data in stages.items():
+                    if stage_data:
+                        st.markdown(f"### {stage_name}")
+                        avg_income = sum(d['total_income'] for d in stage_data) / len(stage_data)
+                        avg_expenses = sum(d['total_expenses'] for d in stage_data) / len(stage_data)
+                        avg_cashflow = sum(d['cashflow'] for d in stage_data) / len(stage_data)
+
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("Years", len(stage_data))
+                        with col2:
+                            st.metric("Avg Income", f"${avg_income:,.0f}")
+                        with col3:
+                            st.metric("Avg Expenses", f"${avg_expenses:,.0f}")
+                        with col4:
+                            st.metric("Avg Cashflow", f"${avg_cashflow:,.0f}")
+        else:
+            st.warning("No cashflow data available. Please configure your financial details first.")
+    else:
+        st.warning("⚠️ No cashflow data calculated yet. Click the button above to generate your lifetime cashflow analysis.")
+
+
+
+def monte_carlo_simulation_tab():
+    """Monte Carlo Simulation Analysis"""
+    st.header("🎲 Monte Carlo Simulation")
+
+    st.markdown("""
+    Add uncertainty to your plan and see the range of possible outcomes.
+    This probabilistic view shows how market volatility and life's unpredictability might affect your financial future.
+
+    **Focus:** Net worth trajectories and probability of success (not income/expense details - see Section 1 for that).
+    """)
+
+    st.subheader("⚙️ Simulation Settings")
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.session_state.mc_start_year = st.number_input("Start Year", min_value=st.session_state.current_year, max_value=2100, value=int(st.session_state.mc_start_year), key="mc_start_v071")
+        st.number_input("Projection Years", min_value=1, max_value=80, value=int(st.session_state.mc_years), key="mc_years_v071")
+
+    with col2:
+        st.session_state.mc_simulations = st.number_input("Number of Simulations", min_value=100, max_value=10000, value=int(st.session_state.mc_simulations), step=100, key="mc_sims_v071")
+        st.session_state.mc_use_historical = st.checkbox("Use Historical Returns", value=st.session_state.mc_use_historical, help="Use actual historical S&P 500 returns instead of random generation", key="mc_hist_v071")
+
+    with col3:
+        st.session_state.mc_normalize_to_today_dollars = st.checkbox(
+            "Normalize to Today's Dollars",
+            value=st.session_state.mc_normalize_to_today_dollars,
+            help="Adjusts all future values to reflect today's purchasing power by removing the effect of inflation. This reveals your actual wealth accumulation over time — if the line goes up, you're genuinely getting wealthier, not just keeping pace with rising prices. For example, $1M in 2050 might look impressive, but normalized to today's dollars shows what that money can actually buy in current terms.",
+            key="mc_norm_v071"
+        )
+
+    st.markdown("---")
+    st.subheader("📊 Variability Settings")
+    use_asymmetric = st.checkbox("Use Asymmetric Variability", value=True, help="Set different positive and negative variability ranges", key="mc_asym_v071")
+
+    if use_asymmetric:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.markdown("**Income Variability**")
+            st.session_state.mc_income_variability_positive = st.number_input("Positive (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_income_variability_positive), step=1.0, key="income_var_pos_v071")
+            st.session_state.mc_income_variability_negative = st.number_input("Negative (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_income_variability_negative), step=1.0, key="income_var_neg_v071")
+        with col2:
+            st.markdown("**Expense Variability**")
+            st.session_state.mc_expense_variability_positive = st.number_input("Positive (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_expense_variability_positive), step=1.0, key="expense_var_pos_v071")
+            st.session_state.mc_expense_variability_negative = st.number_input("Negative (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_expense_variability_negative), step=1.0, key="expense_var_neg_v071")
+        with col3:
+            st.markdown("**Return Variability**")
+            st.session_state.mc_return_variability_positive = st.number_input("Positive (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_return_variability_positive), step=1.0, key="return_var_pos_v071")
+            st.session_state.mc_return_variability_negative = st.number_input("Negative (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.mc_return_variability_negative), step=1.0, key="return_var_neg_v071")
+    else:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.session_state.mc_income_variability = st.slider("Income Variability (%)", 0.0, 100.0, 10.0, key="income_var_v071")
+        with col2:
+            st.session_state.mc_expense_variability = st.slider("Expense Variability (%)", 0.0, 100.0, 5.0, key="expense_var_v071")
+        with col3:
+            st.session_state.mc_return_variability = st.slider("Return Variability (%)", 0.0, 100.0, 15.0, key="return_var_v071")
+
+    # Run Monte Carlo Simulation Button
+    if st.button("🎲 Run Monte Carlo Simulation", type="primary", use_container_width=True, key="run_mc_v071"):
+        with st.spinner("Running Monte Carlo simulation... This may take a minute."):
+            # Get economic parameters
+            scenario = st.session_state.economic_params
+
+            num_sims = min(st.session_state.mc_simulations, 1000)
+            all_sim_results = []
+
+            initial_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
+
+            progress_bar = st.progress(0)
+
+            for sim in range(num_sims):
+                sim_net_worth = []
+                net_worth = initial_net_worth
+
+                for year_offset in range(st.session_state.mc_years):
+                    year = st.session_state.mc_start_year + year_offset
+
+                    # Calculate base income (same as deterministic)
+                    parentX_working = (year - (st.session_state.current_year - st.session_state.parentX_age)) < st.session_state.parentX_retirement_age
+                    parentY_working = (year - (st.session_state.current_year - st.session_state.parentY_age)) < st.session_state.parentY_retirement_age
+
+                    income = 0
+                    if parentX_working:
+                        parentX_year_income = get_income_for_year(st.session_state.parentX_income, st.session_state.parentX_raise, st.session_state.parentX_job_changes, st.session_state.current_year, year)
+                        income += parentX_year_income
+                    else:
+                        ss_benefit = st.session_state.parentX_ss_benefit * 12
+                        if st.session_state.ss_insolvency_enabled and year >= 2034:
+                            ss_benefit *= (1 - st.session_state.ss_shortfall_percentage / 100)
+                        income += ss_benefit
+
+                    if parentY_working:
+                        parentY_year_income = get_income_for_year(st.session_state.parentY_income, st.session_state.parentY_raise, st.session_state.parentY_job_changes, st.session_state.current_year, year)
+                        income += parentY_year_income
+                    else:
+                        ss_benefit = st.session_state.parentY_ss_benefit * 12
+                        if st.session_state.ss_insolvency_enabled and year >= 2034:
+                            ss_benefit *= (1 - st.session_state.ss_shortfall_percentage / 100)
+                        income += ss_benefit
+
+                    # Add variability to income
+                    if use_asymmetric:
+                        if np.random.random() > 0.5:
+                            income *= (1 + np.random.uniform(0, st.session_state.mc_income_variability_positive / 100))
+                        else:
+                            income *= (1 - np.random.uniform(0, st.session_state.mc_income_variability_negative / 100))
+                    else:
+                        income *= (1 + np.random.uniform(-st.session_state.mc_income_variability / 100, st.session_state.mc_income_variability / 100))
+
+                    # Calculate base expenses (Parent X + Parent Y + Family)
+                    years_from_now = year - st.session_state.current_year
+
+                    # Parent X + Parent Y + Family expenses (with inflation)
+                    parentX_total = sum(st.session_state.parentX_expenses.values()) * (1.03 ** years_from_now)
+                    parentY_total = sum(st.session_state.parentY_expenses.values()) * (1.03 ** years_from_now)
+                    family_total = sum(st.session_state.family_shared_expenses.values()) * (1.03 ** years_from_now)
+                    base_expenses = parentX_total + parentY_total + family_total
+
+                    # Children expenses (same calculation as deterministic cashflow)
+                    children_expenses = 0
+                    for child in st.session_state.children_list:
+                        child_exp = get_child_expenses(child, year, st.session_state.current_year)
+                        child_total = sum(child_exp.values())
+                        children_expenses += child_total
+
+                    # Recurring expenses
+                    recurring_expenses_total = 0
+                    for recurring in st.session_state.recurring_expenses:
+                        if year >= recurring.start_year:
+                            if recurring.end_year is None or year <= recurring.end_year:
+                                years_since_start = year - recurring.start_year
+                                if years_since_start % recurring.frequency_years == 0:
+                                    expense_amount = recurring.amount
+                                    if recurring.inflation_adjust:
+                                        expense_amount *= (1.03 ** years_from_now)
+                                    recurring_expenses_total += expense_amount
+
+                    # One-time major purchases
+                    major_purchase_expenses = 0
+                    for purchase in st.session_state.major_purchases:
+                        if purchase.year == year:
+                            major_purchase_expenses += purchase.amount
+
+                    # Healthcare costs
+                    healthcare_expenses = 0
+                    parent1_age = st.session_state.parentX_age + (year - st.session_state.current_year)
+                    parent2_age = st.session_state.parentY_age + (year - st.session_state.current_year)
+
+                    if 'health_insurances' in st.session_state:
+                        for insurance in st.session_state.health_insurances:
+                            if insurance.covered_by in ["Parent 1", "Both", "Family"] and insurance.start_age <= parent1_age <= insurance.end_age:
+                                healthcare_expenses += insurance.monthly_premium * 12
+                            elif insurance.covered_by == "Parent 2" and insurance.start_age <= parent2_age <= insurance.end_age:
+                                healthcare_expenses += insurance.monthly_premium * 12
+                            elif insurance.covered_by in ["Both", "Family"]:
+                                if (insurance.start_age <= parent1_age <= insurance.end_age) or (insurance.start_age <= parent2_age <= insurance.end_age):
+                                    healthcare_expenses += insurance.monthly_premium * 12
+
+                    # Medicare costs (age 65+)
+                    medicare_expenses = 0
+                    if 'medicare_part_b_premium' in st.session_state:
+                        if parent1_age >= 65:
+                            medicare_expenses += st.session_state.medicare_part_b_premium * 12
+                            medicare_expenses += st.session_state.get('medicare_part_d_premium', 55.0) * 12
+                            medicare_expenses += st.session_state.get('medigap_premium', 150.0) * 12
+                        if parent2_age >= 65:
+                            medicare_expenses += st.session_state.medicare_part_b_premium * 12
+                            medicare_expenses += st.session_state.get('medicare_part_d_premium', 55.0) * 12
+                            medicare_expenses += st.session_state.get('medigap_premium', 150.0) * 12
+                    healthcare_expenses += medicare_expenses
+
+                    # Long-term care insurance premiums
+                    if 'ltc_insurances' in st.session_state:
+                        for ltc in st.session_state.ltc_insurances:
+                            if ltc.covered_person == "Parent 1" and parent1_age >= ltc.start_age:
+                                healthcare_expenses += ltc.monthly_premium * 12
+                            elif ltc.covered_person == "Parent 2" and parent2_age >= ltc.start_age:
+                                healthcare_expenses += ltc.monthly_premium * 12
+
+                    total_expenses = base_expenses + children_expenses + recurring_expenses_total + major_purchase_expenses + healthcare_expenses
+
+                    # Add variability to expenses
+                    if use_asymmetric:
+                        if np.random.random() > 0.5:
+                            total_expenses *= (1 + np.random.uniform(0, st.session_state.mc_expense_variability_positive / 100))
+                        else:
+                            total_expenses *= (1 - np.random.uniform(0, st.session_state.mc_expense_variability_negative / 100))
+                    else:
+                        total_expenses *= (1 + np.random.uniform(-st.session_state.mc_expense_variability / 100, st.session_state.mc_expense_variability / 100))
+
+                    # Calculate return
+                    if use_asymmetric:
+                        if np.random.random() > 0.5:
+                            investment_return = scenario.investment_return * (1 + np.random.uniform(0, st.session_state.mc_return_variability_positive / 100))
+                        else:
+                            investment_return = scenario.investment_return * (1 - np.random.uniform(0, st.session_state.mc_return_variability_negative / 100))
+                    else:
+                        investment_return = scenario.investment_return * (1 + np.random.uniform(-st.session_state.mc_return_variability / 100, st.session_state.mc_return_variability / 100))
+
+                    # Update net worth
+                    cashflow = income - total_expenses
+                    net_worth = net_worth + cashflow + (net_worth * investment_return)
+
+                    # Normalize if requested
+                    if st.session_state.mc_normalize_to_today_dollars:
+                        inflation_factor = (1 + scenario.inflation_rate) ** year_offset
+                        sim_net_worth.append(net_worth / inflation_factor)
+                    else:
+                        sim_net_worth.append(net_worth)
+
+                all_sim_results.append(sim_net_worth)
+                progress_bar.progress((sim + 1) / num_sims)
+
+            progress_bar.empty()
+
+            # Calculate percentiles
+            years_array = list(range(st.session_state.mc_start_year, st.session_state.mc_start_year + st.session_state.mc_years))
+            percentiles_data = {
+                '10th': [],
+                '25th': [],
+                '50th': [],
+                '75th': [],
+                '90th': []
+            }
+
+            for year_idx in range(st.session_state.mc_years):
+                year_values = [sim[year_idx] for sim in all_sim_results]
+                percentiles_data['10th'].append(np.percentile(year_values, 10))
+                percentiles_data['25th'].append(np.percentile(year_values, 25))
+                percentiles_data['50th'].append(np.percentile(year_values, 50))
+                percentiles_data['75th'].append(np.percentile(year_values, 75))
+                percentiles_data['90th'].append(np.percentile(year_values, 90))
+
+            # Store results
+            st.session_state.mc_results = {
+                'years': years_array,
+                'percentiles': percentiles_data,
+                'scenario': scenario,
+                'all_simulations': all_sim_results
+            }
+
+            st.success("✅ Monte Carlo simulation complete! Results below.")
+            st.rerun()
+
+    # Display Monte Carlo Results
+    if 'mc_results' in st.session_state and st.session_state.mc_results:
+        mc_data = st.session_state.mc_results
+
+        st.markdown("### Monte Carlo Results: Net Worth Trajectories")
+
+        # Create percentile fan chart
+        fig = go.Figure()
+
+        years = mc_data['years']
+        percentiles = mc_data['percentiles']
+
+        # Add percentile bands
+        fig.add_trace(go.Scatter(x=years, y=percentiles['90th'], mode='lines', name='90th Percentile', line=dict(color='rgba(0,100,255,0.2)', width=1)))
+        fig.add_trace(go.Scatter(x=years, y=percentiles['75th'], mode='lines', name='75th Percentile', line=dict(color='rgba(0,150,255,0.3)', width=1), fill='tonexty', fillcolor='rgba(0,100,255,0.1)'))
+        fig.add_trace(go.Scatter(x=years, y=percentiles['50th'], mode='lines', name='50th Percentile (Median)', line=dict(color='blue', width=3)))
+        fig.add_trace(go.Scatter(x=years, y=percentiles['25th'], mode='lines', name='25th Percentile', line=dict(color='rgba(255,150,0,0.3)', width=1), fill='tonexty', fillcolor='rgba(100,150,255,0.1)'))
+        fig.add_trace(go.Scatter(x=years, y=percentiles['10th'], mode='lines', name='10th Percentile', line=dict(color='rgba(255,0,0,0.3)', width=1), fill='tonexty', fillcolor='rgba(255,100,0,0.1)'))
+
+        # Add zero line
+        fig.add_hline(y=0, line_dash="dash", line_color="red", annotation_text="Broke", annotation_position="right")
+
+        fig.update_layout(
+            title=f"Net Worth Trajectories: Monte Carlo Simulation ({len(mc_data.get('all_simulations', []))} simulations)",
+            xaxis_title="Year",
+            yaxis_title="Net Worth ($)" + (" - Today's Dollars" if st.session_state.mc_normalize_to_today_dollars else ""),
+            height=600,
+            hovermode='x unified'
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Calculate success probability
+        final_year_values = [sim[-1] for sim in mc_data.get('all_simulations', [])]
+        success_rate = sum(1 for v in final_year_values if v > 0) / len(final_year_values) * 100 if final_year_values else 0
+
+        st.markdown("### 📊 Probability Analysis")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Success Probability", f"{success_rate:.1f}%", help="Probability of not running out of money")
+        with col2:
+            median_final = percentiles['50th'][-1] if percentiles['50th'] else 0
+            st.metric("Median Final Net Worth", f"${median_final:,.0f}")
+        with col3:
+            worst_case = percentiles['10th'][-1] if percentiles['10th'] else 0
+            st.metric("10th Percentile Outcome", f"${worst_case:,.0f}")
+
+        if success_rate < 80:
+            st.warning("⚠️ Your plan has less than 80% probability of success. Consider adjusting your savings rate, retirement age, or spending.")
+        else:
+            st.success("✅ Your plan shows strong resilience to market uncertainty!")
+
+        st.info("💡 **Next Step:** Use the Stress Test tab to test against catastrophic scenarios.")
+    else:
+        st.info("⏸️ Click 'Run Monte Carlo Simulation' above to see probabilistic outcomes and success rates.")
+
+def test_net_worth_loss_scenario(percentiles_data, config):
+    """
+    Test net worth loss scenario with configurable loss percentage.
+
+    Args:
+        percentiles_data: Dict containing percentile data with 'percentiles', 'years', 'scenario'
+        config: Dict with 'loss_percent' key (e.g., {'loss_percent': 50})
+
+    Returns:
+        Dict with event name and results for each percentile
+    """
+    percentiles = percentiles_data['percentiles']
+    years = percentiles_data['years']
+    scenario = percentiles_data['scenario']
+    percentile_names = ['10th', '25th', '50th', '75th', '90th']
+
+    loss_percent = config.get('loss_percent', 50)
+    loss_multiplier = 1 - (loss_percent / 100)
+
+    event_results = {'event': f'{loss_percent}% Net Worth Loss (Worst Year)'}
+
+    for pct_name in percentile_names:
+        pct_values = percentiles[pct_name]
+        worst_final_nw = float('inf')
+        worst_year = None
+
+        # Try each year as the crash year
+        for crash_idx in range(len(years)):
+            # Simulate from crash year forward
+            net_worth = pct_values[crash_idx] * loss_multiplier
+
+            # Continue simulation from crash year to end
+            final_nw = net_worth
+            for future_idx in range(crash_idx + 1, len(years)):
+                return_rate = scenario.investment_return
+                investment_return = final_nw * return_rate
+
+                # Implied cashflow from percentile trajectory
+                if future_idx < len(pct_values) - 1:
+                    implied_cashflow = (pct_values[future_idx + 1] - pct_values[future_idx]) - (pct_values[future_idx] * scenario.investment_return)
+                    final_nw = final_nw + implied_cashflow + investment_return
+                else:
+                    final_nw = final_nw + investment_return
+
+            # Track worst case
+            if final_nw < worst_final_nw:
+                worst_final_nw = final_nw
+                worst_year = years[crash_idx]
+
+        # Store result
+        status = "✅" if worst_final_nw > 0 else "❌"
+        event_results[pct_name] = {
+            'status': status,
+            'worst_year': worst_year,
+            'final_nw': worst_final_nw
+        }
+
+    return event_results
+
+
+def test_disabled_child_scenario(percentiles_data, config):
+    """
+    Test disabled child scenario where one parent retires immediately.
+
+    Args:
+        percentiles_data: Dict containing percentile data
+        config: Dict with 'child_idx' and 'child_birth_year' keys
+
+    Returns:
+        Dict with event name and results for each percentile
+    """
+    percentiles = percentiles_data['percentiles']
+    years = percentiles_data['years']
+    scenario = percentiles_data['scenario']
+    percentile_names = ['10th', '25th', '50th', '75th', '90th']
+
+    child_idx = config.get('child_idx', 0)
+    child_birth_year = config.get('child_birth_year')
+
+    event_results = {'event': f'Disabled Child #{child_idx + 1} (Birth Year {child_birth_year})'}
+
+    for pct_name in percentile_names:
+        pct_values = percentiles[pct_name]
+
+        # Find index of birth year
+        if child_birth_year not in years:
+            event_results[pct_name] = {'status': 'N/A', 'final_nw': 0}
+            continue
+
+        birth_idx = years.index(child_birth_year)
+        net_worth = pct_values[birth_idx]
+
+        for future_idx in range(birth_idx + 1, len(years)):
+            year_offset = future_idx - birth_idx
+
+            # Reduced cashflow due to lost income
+            if future_idx < len(pct_values) - 1:
+                normal_cashflow = (pct_values[future_idx + 1] - pct_values[future_idx]) - (pct_values[future_idx] * scenario.investment_return)
+                reduced_cashflow = normal_cashflow - (st.session_state.parentY_income * (1 + scenario.inflation_rate) ** year_offset)
+            else:
+                reduced_cashflow = 0
+
+            investment_return = net_worth * scenario.investment_return
+            net_worth = net_worth + reduced_cashflow + investment_return
+
+        status = "✅" if net_worth > 0 else "❌"
+        event_results[pct_name] = {
+            'status': status,
+            'final_nw': net_worth
+        }
+
+    return event_results
+
+
+def find_worst_case_disabled_child(percentiles_data, children_list):
+    """
+    Determine which child scenario results in the worst financial outcome.
+
+    Args:
+        percentiles_data: Dict containing percentile data
+        children_list: List of children with their information
+
+    Returns:
+        Dict with 'child_idx', 'child_name', and 'child_birth_year' for worst case
+    """
+    if not children_list:
+        return None
+
+    percentile_names = ['10th', '25th', '50th', '75th', '90th']
+    worst_child = None
+    worst_avg_final_nw = float('inf')
+
+    for child_idx, child in enumerate(children_list):
+        child_birth_year = child['birth_year']
+
+        # Run scenario for this child
+        config = {
+            'child_idx': child_idx,
+            'child_birth_year': child_birth_year
+        }
+        results = test_disabled_child_scenario(percentiles_data, config)
+
+        # Calculate average final net worth across all percentiles
+        total_nw = 0
+        valid_percentiles = 0
+        for pct_name in percentile_names:
+            if pct_name in results and isinstance(results[pct_name], dict):
+                total_nw += results[pct_name]['final_nw']
+                valid_percentiles += 1
+
+        if valid_percentiles > 0:
+            avg_final_nw = total_nw / valid_percentiles
+
+            # Track the worst case (lowest average net worth)
+            if avg_final_nw < worst_avg_final_nw:
+                worst_avg_final_nw = avg_final_nw
+                worst_child = {
+                    'child_idx': child_idx,
+                    'child_name': child['name'],
+                    'child_birth_year': child_birth_year
+                }
+
+    return worst_child
+
+
+def test_unemployment_scenario(percentiles_data, config):
+    """
+    Test forced unemployment scenario.
+
+    Args:
+        percentiles_data: Dict containing percentile data
+        config: Dict with 'parent_name', 'parent_income', and 'duration_years' keys
+
+    Returns:
+        Dict with event name and results for each percentile
+    """
+    percentiles = percentiles_data['percentiles']
+    years = percentiles_data['years']
+    scenario = percentiles_data['scenario']
+    percentile_names = ['10th', '25th', '50th', '75th', '90th']
+
+    parent_name = config.get('parent_name', 'Parent')
+    parent_income = config.get('parent_income', 0)
+    duration_years = config.get('duration_years', 3)
+
+    event_results = {'event': f'{parent_name} Unemployed {duration_years} Years (Worst Year)'}
+
+    for pct_name in percentile_names:
+        pct_values = percentiles[pct_name]
+        worst_final_nw = float('inf')
+        worst_year = None
+
+        # Try each year as the unemployment start
+        for unemp_start_idx in range(len(years) - duration_years):
+            net_worth = pct_values[unemp_start_idx]
+
+            # Simulate unemployment period plus recovery
+            for future_idx in range(unemp_start_idx, len(years)):
+                year_offset = future_idx - unemp_start_idx
+
+                # Calculate cashflow impact
+                if future_idx < len(pct_values) - 1:
+                    normal_cashflow = (pct_values[future_idx + 1] - pct_values[future_idx]) - (pct_values[future_idx] * scenario.investment_return)
+
+                    # During unemployment, lose this parent's income
+                    if year_offset < duration_years:
+                        income_loss = parent_income * ((1 + scenario.inflation_rate) ** year_offset)
+                        reduced_cashflow = normal_cashflow - income_loss
+                    else:
+                        reduced_cashflow = normal_cashflow
+                else:
+                    reduced_cashflow = 0
+
+                investment_return = net_worth * scenario.investment_return
+                net_worth = net_worth + reduced_cashflow + investment_return
+
+            # Track worst case
+            if net_worth < worst_final_nw:
+                worst_final_nw = net_worth
+                worst_year = years[unemp_start_idx]
+
+        status = "✅" if worst_final_nw > 0 else "❌"
+        event_results[pct_name] = {
+            'status': status,
+            'worst_year': worst_year,
+            'final_nw': worst_final_nw
+        }
+
+    return event_results
+
+
+def test_hyperinflation_scenario(percentiles_data, config):
+    """
+    Test hyperinflation scenario with elevated inflation rate.
+
+    Args:
+        percentiles_data: Dict containing percentile data
+        config: Dict with 'inflation_years' and 'inflation_rate' keys
+
+    Returns:
+        Dict with event name and results for each percentile
+    """
+    percentiles = percentiles_data['percentiles']
+    years = percentiles_data['years']
+    scenario = percentiles_data['scenario']
+    percentile_names = ['10th', '25th', '50th', '75th', '90th']
+
+    inflation_years = config.get('inflation_years', 5)
+    inflation_rate = config.get('inflation_rate', 0.15)  # 15% inflation
+
+    event_results = {'event': f'Hyperinflation: {int(inflation_rate*100)}% for {inflation_years} Years (Worst Year)'}
+
+    for pct_name in percentile_names:
+        pct_values = percentiles[pct_name]
+        worst_final_nw = float('inf')
+        worst_year = None
+
+        # Try each year as the hyperinflation start
+        for inflation_start_idx in range(len(years) - inflation_years):
+            net_worth = pct_values[inflation_start_idx]
+
+            # Simulate hyperinflation period plus recovery
+            for future_idx in range(inflation_start_idx, len(years)):
+                year_offset = future_idx - inflation_start_idx
+
+                # Calculate cashflow impact
+                if future_idx < len(pct_values) - 1:
+                    normal_cashflow = (pct_values[future_idx + 1] - pct_values[future_idx]) - (pct_values[future_idx] * scenario.investment_return)
+
+                    # During hyperinflation, expenses increase dramatically
+                    if year_offset < inflation_years:
+                        # Expenses increase with hyperinflation, income may lag
+                        expense_increase = (st.session_state.parentX_income + st.session_state.parentY_income) * 0.3 * ((1 + inflation_rate) ** year_offset)
+                        reduced_cashflow = normal_cashflow - expense_increase
+                    else:
+                        reduced_cashflow = normal_cashflow
+                else:
+                    reduced_cashflow = 0
+
+                investment_return = net_worth * scenario.investment_return
+                net_worth = net_worth + reduced_cashflow + investment_return
+
+            # Track worst case
+            if net_worth < worst_final_nw:
+                worst_final_nw = net_worth
+                worst_year = years[inflation_start_idx]
+
+        status = "✅" if worst_final_nw > 0 else "❌"
+        event_results[pct_name] = {
+            'status': status,
+            'worst_year': worst_year,
+            'final_nw': worst_final_nw
+        }
+
+    return event_results
+
+
+def stress_test_tab():
+    """Stress testing tab for catastrophic scenarios"""
+    st.header("🧪 Stress Test Analysis")
+    st.markdown("""
+    Stress-test your financial plan against rare catastrophic events.
+    This analysis shows whether your plan can withstand worst-case scenarios across different Monte Carlo percentiles.
+
+    **⚠️ Note:** You must run the Monte Carlo simulation first in the Analysis & Cashflow tab.
+    """)
+
+    # Check if Monte Carlo results exist
+    if 'mc_results' not in st.session_state:
+        st.warning("⚠️ Please run the Monte Carlo simulation first in the 📊 Analysis & Cashflow tab.")
+        return
+
+    mc_data = st.session_state.mc_results
+    percentiles = mc_data['percentiles']
+    years = mc_data['years']
+    scenario = mc_data['scenario']
+
+    st.info(f"📊 Analyzing {len(years)} years across 5 percentiles (10th, 25th, 50th, 75th, 90th)")
+
+    # Define percentile names for iteration
+    percentile_names = ['10th', '25th', '50th', '75th', '90th']
+
+    # Store results for stoplight table
+    stress_test_results = []
+
+    # Prepare percentiles_data for all tests
+    percentiles_data = {
+        'percentiles': percentiles,
+        'years': years,
+        'scenario': scenario
+    }
+
+    # Individual Stress Tests Section
+    st.markdown("---")
+    st.markdown("## 📋 Individual Stress Tests")
+    st.markdown("*Configure and run individual stress test scenarios*")
+
+    with st.spinner("🔍 Analyzing individual stress test scenarios..."):
+
+        # Market Crash Scenario
+        st.markdown("---")
+        st.markdown("### 💥 Market Crash Scenario")
+        loss_percent = st.slider(
+            "Net Worth Loss Percentage",
+            min_value=10,
+            max_value=90,
+            value=50,
+            step=5,
+            help="Test how your plan handles a market crash of this magnitude",
+            key="market_crash_slider"
+        )
+
+        st.markdown(f"*Finding the worst year to experience a {loss_percent}% market crash for each percentile*")
+
+        config = {'loss_percent': loss_percent}
+        event_results = test_net_worth_loss_scenario(percentiles_data, config)
+        stress_test_results.append(event_results)
+
+        # Hyperinflation Scenario
+        st.markdown("---")
+        st.markdown("### 📈 Hyperinflation Scenario")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            hyperinflation_rate = st.slider(
+                "Inflation Rate (%)",
+                min_value=5,
+                max_value=30,
+                value=15,
+                step=1,
+                help="Annual inflation rate during hyperinflation period",
+                key="hyperinflation_rate_slider"
+            )
+        with col2:
+            hyperinflation_years = st.slider(
+                "Duration (Years)",
+                min_value=2,
+                max_value=10,
+                value=5,
+                step=1,
+                help="How many years of hyperinflation to test",
+                key="hyperinflation_years_slider"
+            )
+
+        st.markdown(f"*Finding the worst year to experience {hyperinflation_years} years of {hyperinflation_rate}% inflation*")
+
+        config = {
+            'inflation_years': hyperinflation_years,
+            'inflation_rate': hyperinflation_rate / 100
+        }
+        event_results = test_hyperinflation_scenario(percentiles_data, config)
+        stress_test_results.append(event_results)
+
+        # Disabled Child Scenarios
+        if st.session_state.children_list:
+            st.markdown("---")
+            st.markdown("### 👶 Disabled Child Birth (Parent Retires Immediately)")
+            st.markdown("*Testing if one parent can immediately retire to care for a disabled child*")
+
+            for child_idx, child in enumerate(st.session_state.children_list):
+                child_birth_year = child['birth_year']
+
+                config = {
+                    'child_idx': child_idx,
+                    'child_birth_year': child_birth_year
+                }
+
+                event_results = test_disabled_child_scenario(percentiles_data, config)
+                stress_test_results.append(event_results)
+
+        # Unemployment Scenarios
+        st.markdown("---")
+        st.markdown("### 💼 Forced Unemployment")
+        st.markdown("*Testing 3-year unemployment periods at the worst possible time*")
+
+        for parent_name, parent_income in [(st.session_state.parent1_name, st.session_state.parentX_income),
+                                            (st.session_state.parent2_name, st.session_state.parentY_income)]:
+            config = {
+                'parent_name': parent_name,
+                'parent_income': parent_income,
+                'duration_years': 3
+            }
+
+            event_results = test_unemployment_scenario(percentiles_data, config)
+            stress_test_results.append(event_results)
+
+    # Compound Stress Tests Section
+    st.markdown("---")
+    st.markdown("## ⚡ Compound Stress Tests")
+    st.markdown("*Combine multiple stress scenarios to test worst-case situations*")
+
+    st.markdown("""
+    Select which individual stress tests to combine. The compound test will apply all selected scenarios
+    simultaneously and find the worst possible year for this combination to occur.
+    """)
+
+    # Create checkboxes for each stress test type
+    st.markdown("### Select Scenarios to Combine:")
+
+    compound_col1, compound_col2 = st.columns(2)
+
+    with compound_col1:
+        include_market_crash = st.checkbox(
+            "💥 Market Crash",
+            value=False,
+            help="Include market crash in compound scenario"
+        )
+        if include_market_crash:
+            compound_crash_percent = st.slider(
+                "Market Crash Loss %",
+                min_value=10,
+                max_value=90,
+                value=30,
+                step=5,
+                key="compound_crash_slider"
+            )
+
+        include_hyperinflation = st.checkbox(
+            "📈 Hyperinflation",
+            value=False,
+            help="Include hyperinflation in compound scenario"
+        )
+        if include_hyperinflation:
+            compound_inflation_rate = st.slider(
+                "Compound Inflation Rate (%)",
+                min_value=5,
+                max_value=30,
+                value=10,
+                step=1,
+                key="compound_inflation_rate_slider"
+            )
+            compound_inflation_years = st.slider(
+                "Compound Inflation Duration (Years)",
+                min_value=2,
+                max_value=10,
+                value=3,
+                step=1,
+                key="compound_inflation_years_slider"
+            )
+
+    with compound_col2:
+        include_unemployment = st.checkbox(
+            "💼 Unemployment",
+            value=False,
+            help="Include unemployment in compound scenario"
+        )
+        if include_unemployment:
+            compound_unemployment_parent = st.selectbox(
+                "Which Parent Loses Job",
+                options=[st.session_state.parent1_name, st.session_state.parent2_name],
+                key="compound_unemployment_parent"
+            )
+            compound_unemployment_years = st.slider(
+                "Unemployment Duration (Years)",
+                min_value=1,
+                max_value=5,
+                value=2,
+                step=1,
+                key="compound_unemployment_years_slider"
+            )
+
+        include_disabled_child = st.checkbox(
+            "👶 Disabled Child",
+            value=False,
+            help="Include disabled child scenario (parent retires) - worst case child will be automatically selected"
+        )
+
+    # Run compound test if at least 2 scenarios are selected
+    num_selected = sum([include_market_crash, include_hyperinflation, include_unemployment, include_disabled_child])
+
+    if num_selected >= 2:
+        st.markdown("---")
+        if st.button("🔥 Run Compound Stress Test", type="primary", use_container_width=True):
+            with st.spinner("🔍 Running compound stress test... This may take a moment."):
+                # Determine worst-case child if disabled child scenario is included
+                worst_case_child = None
+                if include_disabled_child and st.session_state.children_list:
+                    worst_case_child = find_worst_case_disabled_child(percentiles_data, st.session_state.children_list)
+
+                # Build scenario description
+                scenario_parts = []
+                if include_market_crash:
+                    scenario_parts.append(f"{compound_crash_percent}% Crash")
+                if include_hyperinflation:
+                    scenario_parts.append(f"{compound_inflation_years}yr {compound_inflation_rate}% Inflation")
+                if include_unemployment:
+                    scenario_parts.append(f"{compound_unemployment_parent} Unemployed {compound_unemployment_years}yr")
+                if include_disabled_child and worst_case_child:
+                    scenario_parts.append(f"Disabled {worst_case_child['child_name']} (Worst Case)")
+
+                event_name = "Compound: " + " + ".join(scenario_parts)
+
+                event_results = {'event': event_name}
+
+                # Run compound simulation for each percentile
+                for pct_name in percentile_names:
+                    pct_values = percentiles[pct_name]
+                    worst_final_nw = float('inf')
+                    worst_year = None
+
+                    # Try each year as the compound event start
+                    max_duration = max(
+                        compound_inflation_years if include_hyperinflation else 0,
+                        compound_unemployment_years if include_unemployment else 0,
+                        1
+                    )
+
+                    for event_start_idx in range(len(years) - max_duration):
+                        # Start with base net worth
+                        net_worth = pct_values[event_start_idx]
+
+                        # Apply market crash immediately
+                        if include_market_crash:
+                            net_worth *= (1 - compound_crash_percent / 100)
+
+                        # Get unemployment parent income
+                        unemployment_parent_income = 0
+                        if include_unemployment:
+                            if compound_unemployment_parent == st.session_state.parent1_name:
+                                unemployment_parent_income = st.session_state.parentX_income
+                            else:
+                                unemployment_parent_income = st.session_state.parentY_income
+
+                        # Get disabled child parent income (assuming parent 2 retires)
+                        disabled_child_parent_income = 0
+                        if include_disabled_child:
+                            disabled_child_parent_income = st.session_state.parentY_income
+
+                        # Simulate future years with combined impacts
+                        for future_idx in range(event_start_idx, len(years)):
+                            year_offset = future_idx - event_start_idx
+
+                            # Calculate normal cashflow
+                            if future_idx < len(pct_values) - 1:
+                                normal_cashflow = (pct_values[future_idx + 1] - pct_values[future_idx]) - (pct_values[future_idx] * scenario.investment_return)
+
+                                # Apply hyperinflation impact (increased expenses)
+                                if include_hyperinflation and year_offset < compound_inflation_years:
+                                    # Estimate expense impact as 40% of normal cashflow affected by extra inflation
+                                    extra_inflation = (compound_inflation_rate / 100) - scenario.inflation_rate
+                                    hyperinflation_expense_increase = abs(normal_cashflow) * 0.4 * extra_inflation * (year_offset + 1)
+                                    normal_cashflow -= hyperinflation_expense_increase
+
+                                # Apply unemployment income loss
+                                if include_unemployment and year_offset < compound_unemployment_years:
+                                    income_loss = unemployment_parent_income * ((1 + scenario.inflation_rate) ** year_offset)
+                                    normal_cashflow -= income_loss
+
+                                # Apply disabled child income loss (parent retires permanently)
+                                if include_disabled_child:
+                                    income_loss = disabled_child_parent_income * ((1 + scenario.inflation_rate) ** year_offset)
+                                    normal_cashflow -= income_loss
+
+                                reduced_cashflow = normal_cashflow
+                            else:
+                                reduced_cashflow = 0
+
+                            investment_return = net_worth * scenario.investment_return
+                            net_worth = net_worth + reduced_cashflow + investment_return
+
+                        # Track worst case
+                        if net_worth < worst_final_nw:
+                            worst_final_nw = net_worth
+                            worst_year = years[event_start_idx]
+
+                    status = "✅" if worst_final_nw > 0 else "❌"
+                    event_results[pct_name] = {
+                        'status': status,
+                        'worst_year': worst_year,
+                        'final_nw': worst_final_nw
+                    }
+
+                stress_test_results.append(event_results)
+                st.success(f"✅ Compound test '{event_name}' completed!")
+    elif num_selected == 1:
+        st.info("ℹ️ Please select at least 2 scenarios to create a compound stress test.")
+    else:
+        st.info("ℹ️ Select scenarios above to create a compound stress test.")
+
+    # Display Stoplight Table
+    st.markdown("---")
+    st.markdown("## 🚦 Stress Test Stoplight Analysis")
+    st.markdown("**Green ✅**: Plan survives | **Red ❌**: Plan fails")
+
+    # Create DataFrame for display
+    table_data = []
+    for result in stress_test_results:
+        row = {'Event': result['event']}
+        for pct_name in percentile_names:
+            if pct_name in result:
+                pct_result = result[pct_name]
+                if isinstance(pct_result, dict):
+                    status = pct_result['status']
+                    if 'worst_year' in pct_result:
+                        row[pct_name] = f"{status} ({pct_result['worst_year']})"
+                    else:
+                        row[pct_name] = status
+                else:
+                    row[pct_name] = pct_result
+        table_data.append(row)
+
+    results_df = pd.DataFrame(table_data)
+
+    # Display table with color coding
+    st.dataframe(results_df, use_container_width=True, hide_index=True)
+
+    # Detailed Results
+    st.markdown("---")
+    st.markdown("## 📋 Detailed Results")
+
+    for result in stress_test_results:
+        with st.expander(f"🔍 {result['event']}", expanded=False):
+            detail_data = []
+            for pct_name in percentile_names:
+                if pct_name in result and isinstance(result[pct_name], dict):
+                    pct_result = result[pct_name]
+                    detail_row = {
+                        'Percentile': pct_name,
+                        'Status': pct_result['status'],
+                        'Final Net Worth': format_currency(pct_result['final_nw'])
+                    }
+                    if 'worst_year' in pct_result:
+                        detail_row['Worst Year'] = pct_result['worst_year']
+                    detail_data.append(detail_row)
+
+            if detail_data:
+                detail_df = pd.DataFrame(detail_data)
+                st.dataframe(detail_df, use_container_width=True, hide_index=True)
+
+    # Summary Statistics
+    st.markdown("---")
+    st.markdown("## 📊 Summary Statistics")
+
+    total_scenarios = len(stress_test_results) * len(percentile_names)
+    passed_scenarios = 0
+
+    for result in stress_test_results:
+        for pct_name in percentile_names:
+            if pct_name in result and isinstance(result[pct_name], dict):
+                if result[pct_name]['status'] == "✅":
+                    passed_scenarios += 1
+
+    success_rate = (passed_scenarios / total_scenarios * 100) if total_scenarios > 0 else 0
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Scenarios Tested", total_scenarios)
+    with col2:
+        st.metric("Scenarios Passed", f"{passed_scenarios} / {total_scenarios}")
+    with col3:
+        st.metric("Overall Success Rate", f"{success_rate:.1f}%")
+
+    if success_rate >= 80:
+        st.success("✅ **Excellent!** Your financial plan is highly resilient to stress test scenarios.")
+    elif success_rate >= 60:
+        st.info("⚠️ **Good** - Your plan handles most scenarios but consider building more buffer.")
+    elif success_rate >= 40:
+        st.warning("⚠️ **Moderate Risk** - Your plan struggles with many catastrophic scenarios. Consider increasing savings or reducing expenses.")
+    else:
+        st.error("❌ **High Risk** - Your plan is vulnerable to stress test scenarios. Significant adjustments recommended.")
+
+
+def save_load_tab():
+    """Save and load scenarios tab"""
+    st.header("💾 Save & Load Scenarios")
+
+    st.markdown("Save and load complete financial planning scenarios")
+
+    # Internal scenario library
+    st.subheader("📚 Internal Scenario Library")
+
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        scenario_name = st.text_input(
+            "Scenario Name",
+            value="My Scenario",
+            key="save_scenario_name"
+        )
+
+    with col2:
+        st.write("")  # Spacing
+        st.write("")  # Spacing
+        if st.button("💾 Save to Library", use_container_width=True):
+            # Save all session state to internal library
+            scenario_data = {
+                'current_year': st.session_state.current_year,
+                'parent1_name': st.session_state.parent1_name,
+                'parent1_emoji': st.session_state.parent1_emoji,
+                'parent2_name': st.session_state.parent2_name,
+                'parent2_emoji': st.session_state.parent2_emoji,
+                'marriage_year': st.session_state.marriage_year,
+                'parentX_age': st.session_state.parentX_age,
+                'parentX_net_worth': st.session_state.parentX_net_worth,
+                'parentX_income': st.session_state.parentX_income,
+                'parentX_raise': st.session_state.parentX_raise,
+                'parentX_retirement_age': st.session_state.parentX_retirement_age,
+                'parentX_ss_benefit': st.session_state.parentX_ss_benefit,
+                'parentY_age': st.session_state.parentY_age,
+                'parentY_net_worth': st.session_state.parentY_net_worth,
+                'parentY_income': st.session_state.parentY_income,
+                'parentY_raise': st.session_state.parentY_raise,
+                'parentY_retirement_age': st.session_state.parentY_retirement_age,
+                'parentY_ss_benefit': st.session_state.parentY_ss_benefit,
+                'expenses': st.session_state.expenses,
+                'children_list': st.session_state.children_list,
+                'houses': [asdict(h) for h in st.session_state.houses],
+                'major_purchases': [asdict(mp) for mp in st.session_state.major_purchases],
+                'recurring_expenses': [asdict(re) for re in st.session_state.recurring_expenses],
+                'state_timeline': [asdict(st) for st in st.session_state.state_timeline],
+                'economic_params': asdict(st.session_state.economic_params),
+                'ss_insolvency_enabled': st.session_state.ss_insolvency_enabled,
+                'ss_shortfall_percentage': st.session_state.ss_shortfall_percentage,
+            }
+
+            st.session_state.saved_scenarios[scenario_name] = scenario_data
+            st.success(f"✅ Saved scenario '{scenario_name}' to library")
+
+    # Display saved scenarios
+    if st.session_state.saved_scenarios:
+        st.markdown("**Saved Scenarios:**")
+
+        for name in list(st.session_state.saved_scenarios.keys()):
+            col1, col2, col3 = st.columns([3, 1, 1])
+
+            with col1:
+                st.text(f"📋 {name}")
+
+            with col2:
+                if st.button("📥 Load", key=f"load_{name}"):
+                    scenario_data = st.session_state.saved_scenarios[name]
+
+                    # Restore session state
+                    for key, value in scenario_data.items():
+                        if key == 'houses':
+                            # Convert timeline dicts to HouseTimelineEntry objects
+                            houses = []
+                            for h in value:
+                                house_dict = h.copy()
+                                if 'timeline' in house_dict and house_dict['timeline']:
+                                    house_dict['timeline'] = [HouseTimelineEntry(**entry) for entry in house_dict['timeline']]
+                                houses.append(House(**house_dict))
+                            st.session_state.houses = houses
+                        elif key == 'major_purchases':
+                            st.session_state.major_purchases = [MajorPurchase(**mp) for mp in value]
+                        elif key == 'recurring_expenses':
+                            st.session_state.recurring_expenses = [RecurringExpense(**re) for re in value]
+                        elif key == 'state_timeline':
+                            st.session_state.state_timeline = [StateTimelineEntry(**st_entry) for st_entry in value]
+                        elif key == 'economic_params':
+                            st.session_state.economic_params = EconomicParameters(**value)
+                        else:
+                            st.session_state[key] = value
+
+                    st.success(f"✅ Loaded scenario '{name}'")
+                    st.rerun()
+
+            with col3:
+                if st.button("🗑️ Delete", key=f"delete_{name}"):
+                    del st.session_state.saved_scenarios[name]
+                    st.success(f"🗑️ Deleted scenario '{name}'")
+                    st.rerun()
+    else:
+        st.info("No scenarios saved yet. Save your first scenario above!")
+
+    st.divider()
+
+    # File export/import
+    st.subheader("📁 Export/Import Files")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("**Export to JSON File**")
+
+        if st.button("💾 Export Current Scenario"):
+            export_data = {
+                'current_year': st.session_state.current_year,
+                'parent1_name': st.session_state.parent1_name,
+                'parent1_emoji': st.session_state.parent1_emoji,
+                'parent2_name': st.session_state.parent2_name,
+                'parent2_emoji': st.session_state.parent2_emoji,
+                'marriage_year': st.session_state.marriage_year,
+                'parentX_age': st.session_state.parentX_age,
+                'parentX_net_worth': st.session_state.parentX_net_worth,
+                'parentX_income': st.session_state.parentX_income,
+                'parentX_raise': st.session_state.parentX_raise,
+                'parentX_retirement_age': st.session_state.parentX_retirement_age,
+                'parentX_ss_benefit': st.session_state.parentX_ss_benefit,
+                'parentY_age': st.session_state.parentY_age,
+                'parentY_net_worth': st.session_state.parentY_net_worth,
+                'parentY_income': st.session_state.parentY_income,
+                'parentY_raise': st.session_state.parentY_raise,
+                'parentY_retirement_age': st.session_state.parentY_retirement_age,
+                'parentY_ss_benefit': st.session_state.parentY_ss_benefit,
+                'expenses': st.session_state.expenses,
+                'children_list': st.session_state.children_list,
+                'houses': [asdict(h) for h in st.session_state.houses],
+                'major_purchases': [asdict(mp) for mp in st.session_state.major_purchases],
+                'recurring_expenses': [asdict(re) for re in st.session_state.recurring_expenses],
+                'state_timeline': [asdict(st_entry) for st_entry in st.session_state.state_timeline],
+                'economic_params': asdict(st.session_state.economic_params),
+                'ss_insolvency_enabled': st.session_state.ss_insolvency_enabled,
+                'ss_shortfall_percentage': st.session_state.ss_shortfall_percentage,
+            }
+
+            json_str = json.dumps(export_data, indent=2)
+
+            # Show file save dialog
+            if TKINTER_AVAILABLE:
+                file_path = get_save_file_path(
+                    f"financial_plan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    [("JSON files", "*.json"), ("All files", "*.*")]
+                )
+
+                if file_path:
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(json_str)
+                    st.success(f"✅ Scenario exported successfully to: {file_path}")
+                else:
+                    st.info("ℹ️ Export cancelled")
+            else:
+                # Fallback to download button if tkinter not available
+                st.download_button(
+                    label="📥 Download JSON",
+                    data=json_str,
+                    file_name=f"financial_plan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json"
+                )
+
+    with col2:
+        st.markdown("**Import from JSON File**")
+
+        uploaded_file = st.file_uploader("Choose a JSON file", type=['json'])
+
+        if uploaded_file is not None:
+            try:
+                import_data = json.load(uploaded_file)
+
+                # Restore session state
+                for key, value in import_data.items():
+                    if key == 'houses':
+                        # Convert timeline dicts to HouseTimelineEntry objects
+                        houses = []
+                        for h in value:
+                            house_dict = h.copy()
+                            if 'timeline' in house_dict and house_dict['timeline']:
+                                house_dict['timeline'] = [HouseTimelineEntry(**entry) for entry in house_dict['timeline']]
+                            houses.append(House(**house_dict))
+                        st.session_state.houses = houses
+                    elif key == 'major_purchases':
+                        st.session_state.major_purchases = [MajorPurchase(**mp) for mp in value]
+                    elif key == 'recurring_expenses':
+                        st.session_state.recurring_expenses = [RecurringExpense(**re) for re in value]
+                    elif key == 'state_timeline':
+                        st.session_state.state_timeline = [StateTimelineEntry(**st_entry) for st_entry in value]
+                    elif key == 'economic_params':
+                        st.session_state.economic_params = EconomicParameters(**value)
+                    else:
+                        st.session_state[key] = value
+
+                st.success("✅ Successfully imported scenario!")
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"❌ Error importing file: {str(e)}")
+
+
+# NEW TAB 1: Healthcare & Insurance
+def healthcare_insurance_tab():
+    """Healthcare and Insurance Planning Tab"""
+    st.header("🏥 Healthcare & Insurance Planning")
+
+    st.markdown("""
+    Plan for healthcare costs throughout retirement, including Medicare, insurance premiums,
+    out-of-pocket expenses, and long-term care insurance.
+    """)
+
+    # Ensure healthcare variables are initialized (defensive programming for old sessions)
+    if 'health_insurances' not in st.session_state:
+        st.session_state.health_insurances = []
+    if 'ltc_insurances' not in st.session_state:
+        st.session_state.ltc_insurances = []
+    if 'health_expenses' not in st.session_state:
+        st.session_state.health_expenses = []
+    if 'hsa_balance' not in st.session_state:
+        st.session_state.hsa_balance = 0.0
+    if 'hsa_contribution' not in st.session_state:
+        st.session_state.hsa_contribution = 0.0
+    if 'medicare_part_b_premium' not in st.session_state:
+        st.session_state.medicare_part_b_premium = 174.70
+    if 'medicare_part_d_premium' not in st.session_state:
+        st.session_state.medicare_part_d_premium = 55.0
+    if 'medigap_premium' not in st.session_state:
+        st.session_state.medigap_premium = 150.0
+
+    # HSA Account
+    st.subheader("💰 Health Savings Account (HSA)")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.session_state.hsa_balance = st.number_input(
+            "Current HSA Balance",
+            min_value=0.0,
+            value=float(st.session_state.hsa_balance),
+            step=1000.0,
+            format="%.2f"
+        )
+    with col2:
+        st.session_state.hsa_contribution = st.number_input(
+            "Annual HSA Contribution",
+            min_value=0.0,
+            max_value=8300.0,  # 2025 family limit
+            value=float(st.session_state.hsa_contribution),
+            step=100.0,
+            format="%.2f"
+        )
+
+    st.info("💡 HSA Triple Tax Advantage: Tax-deductible contributions, tax-free growth, tax-free withdrawals for medical expenses")
+
+    # Health Insurance Plans
+    st.subheader("🏥 Health Insurance Plans")
+
+    if st.button("➕ Add Health Insurance Plan"):
+        new_insurance = HealthInsurance(
+            name="New Health Plan",
+            type="Employer",
+            monthly_premium=500.0,
+            annual_deductible=3000.0,
+            annual_out_of_pocket_max=8000.0,
+            copay_primary=25.0,
+            copay_specialist=50.0,
+            covered_by="Family",
+            start_age=0,
+            end_age=65
+        )
+        st.session_state.health_insurances.append(new_insurance)
+        st.rerun()
+
+    for idx, insurance in enumerate(st.session_state.health_insurances):
+        with st.expander(f"📋 {insurance.name}"):
+            col1, col2, col3 = st.columns([3, 3, 1])
+
+            with col1:
+                insurance.name = st.text_input(f"Plan Name##ins{idx}", value=insurance.name)
+                insurance.type = st.selectbox(
+                    f"Insurance Type##ins{idx}",
+                    ["Employer", "Marketplace", "Medicare", "Medicaid"],
+                    index=["Employer", "Marketplace", "Medicare", "Medicaid"].index(insurance.type) if insurance.type in ["Employer", "Marketplace", "Medicare", "Medicaid"] else 0
+                )
+                insurance.monthly_premium = st.number_input(
+                    f"Monthly Premium##ins{idx}",
+                    min_value=0.0,
+                    value=float(insurance.monthly_premium),
+                    step=50.0
+                )
+
+            with col2:
+                insurance.annual_deductible = st.number_input(
+                    f"Annual Deductible##ins{idx}",
+                    min_value=0.0,
+                    value=float(insurance.annual_deductible),
+                    step=100.0
+                )
+                insurance.annual_out_of_pocket_max = st.number_input(
+                    f"Out-of-Pocket Maximum##ins{idx}",
+                    min_value=0.0,
+                    value=float(insurance.annual_out_of_pocket_max),
+                    step=500.0
+                )
+                insurance.covered_by = st.selectbox(
+                    f"Covered By##ins{idx}",
+                    ["Parent 1", "Parent 2", "Both", "Family"],
+                    index=["Parent 1", "Parent 2", "Both", "Family"].index(insurance.covered_by) if insurance.covered_by in ["Parent 1", "Parent 2", "Both", "Family"] else 3
+                )
+
+            with col3:
+                if st.button(f"🗑️ Delete##{idx}_insurance"):
+                    st.session_state.health_insurances.pop(idx)
+                    st.rerun()
+
+            st.session_state.health_insurances[idx] = insurance
+
+    # Medicare Settings
+    st.subheader("🩺 Medicare Planning (Age 65+)")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.session_state.medicare_part_b_premium = st.number_input(
+            "Medicare Part B Premium (Monthly)",
+            min_value=0.0,
+            value=float(st.session_state.medicare_part_b_premium),
+            step=10.0,
+            help="Standard 2025 premium: $174.70/month"
+        )
+    with col2:
+        st.session_state.medicare_part_d_premium = st.number_input(
+            "Medicare Part D Premium (Monthly)",
+            min_value=0.0,
+            value=float(st.session_state.medicare_part_d_premium),
+            step=10.0,
+            help="Average prescription drug plan premium"
+        )
+    with col3:
+        st.session_state.medigap_premium = st.number_input(
+            "Medigap Supplement Premium (Monthly)",
+            min_value=0.0,
+            value=float(st.session_state.medigap_premium),
+            step=10.0,
+            help="Optional supplemental coverage"
+        )
+
+    # Long-Term Care Insurance
+    st.subheader("🏨 Long-Term Care Insurance")
+
+    if st.button("➕ Add LTC Insurance Policy"):
+        new_ltc = LongTermCareInsurance(
+            name="LTC Policy",
+            monthly_premium=300.0,
+            daily_benefit=200.0,
+            benefit_period_days=1095,  # 3 years
+            elimination_period_days=90,
+            covered_person="Parent 1",
+            start_age=55,
+            inflation_protection=0.03
+        )
+        st.session_state.ltc_insurances.append(new_ltc)
+        st.rerun()
+
+    for idx, ltc in enumerate(st.session_state.ltc_insurances):
+        with st.expander(f"🏨 {ltc.name} - {ltc.covered_person}"):
+            col1, col2, col3 = st.columns([3, 3, 1])
+
+            with col1:
+                ltc.name = st.text_input(f"Policy Name##ltc{idx}", value=ltc.name)
+                ltc.covered_person = st.selectbox(
+                    f"Covered Person##ltc{idx}",
+                    ["Parent 1", "Parent 2"],
+                    index=["Parent 1", "Parent 2"].index(ltc.covered_person) if ltc.covered_person in ["Parent 1", "Parent 2"] else 0
+                )
+                ltc.monthly_premium = st.number_input(
+                    f"Monthly Premium##ltc{idx}",
+                    min_value=0.0,
+                    value=float(ltc.monthly_premium),
+                    step=50.0
+                )
+
+            with col2:
+                ltc.daily_benefit = st.number_input(
+                    f"Daily Benefit##ltc{idx}",
+                    min_value=0.0,
+                    value=float(ltc.daily_benefit),
+                    step=25.0,
+                    help="Daily benefit amount for care"
+                )
+                ltc.benefit_period_days = st.number_input(
+                    f"Benefit Period (days)##ltc{idx}",
+                    min_value=0,
+                    value=int(ltc.benefit_period_days),
+                    step=365,
+                    help="Total days of coverage (e.g., 1095 = 3 years)"
+                )
+                ltc.start_age = st.number_input(
+                    f"Coverage Start Age##ltc{idx}",
+                    min_value=30,
+                    max_value=80,
+                    value=int(ltc.start_age),
+                    step=1
+                )
+
+            with col3:
+                if st.button(f"🗑️ Delete##ltc{idx}"):
+                    st.session_state.ltc_insurances.pop(idx)
+                    st.rerun()
+
+            st.session_state.ltc_insurances[idx] = ltc
+
+    # Healthcare Cost Summary
+    st.subheader("📊 Healthcare Cost Projection")
+
+    total_annual_premium = sum([ins.monthly_premium * 12 for ins in st.session_state.health_insurances])
+    total_ltc_premium = sum([ltc.monthly_premium * 12 for ltc in st.session_state.ltc_insurances])
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Annual Health Insurance", format_currency(total_annual_premium))
+    col2.metric("Annual LTC Insurance", format_currency(total_ltc_premium))
+    col3.metric("Total Insurance Cost", format_currency(total_annual_premium + total_ltc_premium))
+
+
+# NEW TAB 5: Report Export
+def report_export_tab():
+    """PDF/Excel Report Export Tab"""
+    st.header("📄 Export Financial Reports")
+
+    st.markdown("""
+    Generate comprehensive financial planning reports in PDF or Excel format.
+    Share with financial advisors, partners, or keep for your records.
+    """)
+
+    # Report Configuration
+    st.subheader("📊 Report Configuration")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        report_name = st.text_input(
+            "Report Name",
+            value=f"Financial_Plan_{st.session_state.current_year}",
+            help="Name for your exported report"
+        )
+
+        include_sections = st.multiselect(
+            "Include Sections",
+            ["Summary", "Income & Expenses", "Children", "Healthcare", "Timeline"],
+            default=["Summary", "Income & Expenses"]
+        )
+
+    with col2:
+        # Build format options based on library availability
+        format_options = ["Excel (.xlsx)", "CSV (Multiple Files)", "JSON (Data Export)"]
+        if REPORTLAB_AVAILABLE:
+            format_options.insert(0, "PDF (.pdf)")
+
+        report_format = st.selectbox(
+            "Export Format",
+            format_options,
+            index=0
+        )
+
+        include_charts = st.checkbox(
+            "Include Charts & Visualizations",
+            value=True,
+            help="Include Plotly charts as images (Excel only)"
+        )
+
+        if not REPORTLAB_AVAILABLE and report_format == "PDF (.pdf)":
+            st.warning("⚠️ PDF export requires reportlab library. Install with: pip install reportlab")
+
+    # Generate Report Button
+    st.subheader("📥 Generate Report")
+
+    if st.button("🚀 Generate Report", type="primary"):
+        with st.spinner("Generating your financial report..."):
+            try:
+                # Calculate lifetime cashflow projections
+                cashflow_projections = calculate_lifetime_cashflow()
+
+                # Prepare report data
+                report_data = {
+                    "metadata": {
+                        "report_name": report_name,
+                        "generated_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "current_year": st.session_state.current_year,
+                        "planning_horizon": st.session_state.mc_years
+                    },
+                    "summary": {
+                        "combined_net_worth": st.session_state.parentX_net_worth + st.session_state.parentY_net_worth,
+                        "combined_income": st.session_state.parentX_income + st.session_state.parentY_income,
+                        "total_expenses": sum(st.session_state.expenses.values()),
+                        "num_children": len(st.session_state.children_list),
+                        "num_houses": len(st.session_state.houses)
+                    },
+                    "parents": {
+                        "parent1": {
+                            "name": st.session_state.parent1_name,
+                            "age": st.session_state.parentX_age,
+                            "income": st.session_state.parentX_income,
+                            "net_worth": st.session_state.parentX_net_worth,
+                            "retirement_age": st.session_state.parentX_retirement_age,
+                            "ss_benefit": st.session_state.parentX_ss_benefit
+                        },
+                        "parent2": {
+                            "name": st.session_state.parent2_name,
+                            "age": st.session_state.parentY_age,
+                            "income": st.session_state.parentY_income,
+                            "net_worth": st.session_state.parentY_net_worth,
+                            "retirement_age": st.session_state.parentY_retirement_age,
+                            "ss_benefit": st.session_state.parentY_ss_benefit
+                        }
+                    },
+                    "expenses": st.session_state.expenses,
+                    "children": [{"name": c["name"], "age": st.session_state.current_year - c["birth_year"], "birth_year": c["birth_year"]} for c in st.session_state.children_list],
+                    "healthcare": {
+                        "health_insurances": [asdict(h) for h in st.session_state.health_insurances],
+                        "ltc_insurances": [asdict(l) for l in st.session_state.ltc_insurances],
+                        "hsa_balance": st.session_state.hsa_balance
+                    },
+                    "houses": [asdict(h) for h in st.session_state.houses] if hasattr(st.session_state, 'houses') else [],
+                    "major_purchases": [asdict(mp) for mp in st.session_state.major_purchases] if hasattr(st.session_state, 'major_purchases') else [],
+                    "recurring_expenses": [asdict(re) for re in st.session_state.recurring_expenses] if hasattr(st.session_state, 'recurring_expenses') else [],
+                    "state_timeline": [asdict(st_entry) for st_entry in st.session_state.state_timeline] if hasattr(st.session_state, 'state_timeline') else [],
+                    "cashflow_projections": cashflow_projections,
+                    "monte_carlo_results": st.session_state.mc_results if hasattr(st.session_state, 'mc_results') and st.session_state.mc_results else None
+                }
+
+                if report_format == "PDF (.pdf)":
+                    # Generate PDF report
+                    output = io.BytesIO()
+                    doc = SimpleDocTemplate(output, pagesize=letter,
+                                          rightMargin=72, leftMargin=72,
+                                          topMargin=72, bottomMargin=18)
+
+                    # Container for the 'Flowable' objects
+                    elements = []
+
+                    # Define styles
+                    styles = getSampleStyleSheet()
+                    title_style = ParagraphStyle(
+                        'CustomTitle',
+                        parent=styles['Heading1'],
+                        fontSize=24,
+                        textColor=colors.HexColor('#1f77b4'),
+                        spaceAfter=30,
+                    )
+                    heading_style = ParagraphStyle(
+                        'CustomHeading',
+                        parent=styles['Heading2'],
+                        fontSize=16,
+                        textColor=colors.HexColor('#2ca02c'),
+                        spaceAfter=12,
+                    )
+
+                    # Title
+                    title = Paragraph(f"Financial Planning Report", title_style)
+                    elements.append(title)
+                    elements.append(Spacer(1, 12))
+
+                    # Metadata
+                    metadata_text = f"""
+                    <b>Report Name:</b> {report_data['metadata']['report_name']}<br/>
+                    <b>Generated:</b> {report_data['metadata']['generated_date']}<br/>
+                    <b>Planning Year:</b> {report_data['metadata']['current_year']}<br/>
+                    <b>Planning Horizon:</b> {report_data['metadata']['planning_horizon']} years
+                    """
+                    elements.append(Paragraph(metadata_text, styles['Normal']))
+                    elements.append(Spacer(1, 20))
+
+                    # Summary Section
+                    if "Summary" in include_sections:
+                        elements.append(Paragraph("Financial Summary", heading_style))
+                        summary_data = [
+                            ['Metric', 'Value'],
+                            ['Combined Net Worth', f"${report_data['summary']['combined_net_worth']:,.2f}"],
+                            ['Combined Income', f"${report_data['summary']['combined_income']:,.2f}"],
+                            ['Total Expenses', f"${report_data['summary']['total_expenses']:,.2f}"],
+                            ['Number of Children', str(report_data['summary']['num_children'])],
+                            ['Number of Properties', str(report_data['summary']['num_houses'])]
+                        ]
+                        summary_table = Table(summary_data, colWidths=[3*inch, 3*inch])
+                        summary_table.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                            ('FONTSIZE', (0, 0), (-1, 0), 12),
+                            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                        ]))
+                        elements.append(summary_table)
+                        elements.append(Spacer(1, 20))
+
+                    # Parents Section
+                    if "Income & Expenses" in include_sections:
+                        elements.append(Paragraph("Parents Information", heading_style))
+                        parents_data = [
+                            ['', 'Parent 1', 'Parent 2'],
+                            ['Name', report_data['parents']['parent1']['name'], report_data['parents']['parent2']['name']],
+                            ['Age', str(report_data['parents']['parent1']['age']), str(report_data['parents']['parent2']['age'])],
+                            ['Income', f"${report_data['parents']['parent1']['income']:,.2f}", f"${report_data['parents']['parent2']['income']:,.2f}"],
+                            ['Net Worth', f"${report_data['parents']['parent1']['net_worth']:,.2f}", f"${report_data['parents']['parent2']['net_worth']:,.2f}"],
+                            ['Retirement Age', str(report_data['parents']['parent1']['retirement_age']), str(report_data['parents']['parent2']['retirement_age'])],
+                            ['SS Benefit', f"${report_data['parents']['parent1']['ss_benefit']:,.2f}", f"${report_data['parents']['parent2']['ss_benefit']:,.2f}"]
+                        ]
+                        parents_table = Table(parents_data, colWidths=[2*inch, 2*inch, 2*inch])
+                        parents_table.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                            ('FONTSIZE', (0, 0), (-1, 0), 12),
+                            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                        ]))
+                        elements.append(parents_table)
+                        elements.append(Spacer(1, 20))
+
+                    # Children Section
+                    if "Children" in include_sections and report_data['children']:
+                        elements.append(Paragraph("Children", heading_style))
+                        children_data = [['Name', 'Age', 'Birth Year']]
+                        for child in report_data['children']:
+                            children_data.append([child['name'], str(child['age']), str(child['birth_year'])])
+
+                        children_table = Table(children_data, colWidths=[2*inch, 2*inch, 2*inch])
+                        children_table.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                        ]))
+                        elements.append(children_table)
+                        elements.append(Spacer(1, 20))
+
+                    # Expenses Section
+                    if "Income & Expenses" in include_sections and report_data.get('expenses'):
+                        elements.append(Paragraph("Annual Expense Breakdown", heading_style))
+
+                        # Create detailed expense table
+                        expenses = report_data['expenses']
+                        expense_data = [['Category', 'Annual Amount']]
+
+                        # Add all expense categories
+                        for category, amount in expenses.items():
+                            if amount > 0:
+                                # Format category name (replace underscores with spaces, title case)
+                                formatted_category = category.replace('_', ' ').title()
+                                expense_data.append([formatted_category, f"${amount:,.2f}"])
+
+                        # Add total row
+                        total_expenses = sum(expenses.values())
+                        expense_data.append(['Total Annual Expenses', f"${total_expenses:,.2f}"])
+
+                        if len(expense_data) > 1:  # More than just header
+                            expense_table = Table(expense_data, colWidths=[3.5*inch, 2.5*inch])
+                            expense_table.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                                ('BACKGROUND', (0, 1), (-1, -2), colors.beige),
+                                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+                                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                                ('LINEABOVE', (0, -1), (-1, -1), 2, colors.black),
+                                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                            ]))
+                            elements.append(expense_table)
+                            elements.append(Spacer(1, 12))
+
+                            # Generate and add expense breakdown pie chart
+                            try:
+                                # Prepare data for pie chart (exclude total row)
+                                expense_categories = []
+                                expense_amounts = []
+                                for category, amount in expenses.items():
+                                    if amount > 0:
+                                        formatted_category = category.replace('_', ' ').title()
+                                        expense_categories.append(formatted_category)
+                                        expense_amounts.append(amount)
+
+                                if expense_categories:
+                                    # Create pie chart
+                                    expense_pie_fig = go.Figure(data=[go.Pie(
+                                        labels=expense_categories,
+                                        values=expense_amounts,
+                                        hole=0.3
+                                    )])
+                                    expense_pie_fig.update_layout(
+                                        title="Annual Expense Distribution",
+                                        height=400,
+                                        showlegend=True
+                                    )
+
+                                    # Convert to image and add to PDF
+                                    expense_chart_img = plotly_fig_to_image(expense_pie_fig, width=5*inch, height=3.5*inch)
+                                    if expense_chart_img:
+                                        elements.append(expense_chart_img)
+                                        elements.append(Spacer(1, 12))
+                            except Exception as e:
+                                # If chart generation fails, just skip it
+                                pass
+
+                            elements.append(Spacer(1, 20))
+
+                    # Healthcare Section
+                    if "Healthcare" in include_sections and report_data.get('healthcare'):
+                        healthcare = report_data['healthcare']
+
+                        # Health Insurance
+                        if healthcare.get('health_insurances'):
+                            elements.append(Paragraph("Health Insurance Coverage", heading_style))
+                            for idx, insurance in enumerate(healthcare['health_insurances'], 1):
+                                insurance_data = [
+                                    ['Field', 'Value'],
+                                    ['Policy Type', insurance.get('policy_type', 'N/A')],
+                                    ['Annual Premium', f"${insurance.get('annual_premium', 0):,.2f}"],
+                                    ['Annual Deductible', f"${insurance.get('annual_deductible', 0):,.2f}"],
+                                    ['Annual OOP Max', f"${insurance.get('annual_oop_max', 0):,.2f}"]
+                                ]
+
+                                insurance_table = Table(insurance_data, colWidths=[2.5*inch, 3.5*inch])
+                                insurance_table.setStyle(TableStyle([
+                                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                                ]))
+                                elements.append(insurance_table)
+                                elements.append(Spacer(1, 12))
+
+                        # HSA Balance
+                        if healthcare.get('hsa_balance', 0) > 0:
+                            hsa_text = f"<b>HSA Balance:</b> ${healthcare['hsa_balance']:,.2f}"
+                            elements.append(Paragraph(hsa_text, styles['Normal']))
+                            elements.append(Spacer(1, 20))
+
+                    # Houses/Properties Section
+                    if report_data.get('houses'):
+                        elements.append(Paragraph("Real Estate Properties", heading_style))
+                        for idx, house in enumerate(report_data['houses'], 1):
+                            house_name = house.get('name', f'Property {idx}')
+                            elements.append(Paragraph(f"<b>{house_name}</b>", styles['Heading3']))
+
+                            house_data = [
+                                ['Field', 'Value'],
+                                ['Purchase Year', str(house.get('purchase_year', 'N/A'))],
+                                ['Purchase Price', f"${house.get('purchase_price', 0):,.2f}"],
+                                ['Down Payment', f"${house.get('down_payment', 0):,.2f}"],
+                                ['Interest Rate', f"{house.get('interest_rate', 0):.2f}%"],
+                                ['Loan Term', f"{house.get('loan_term_years', 0)} years"],
+                                ['Property Tax Rate', f"{house.get('property_tax_rate', 0):.3f}%"],
+                                ['Home Insurance', f"${house.get('home_insurance_annual', 0):,.2f}"],
+                                ['Maintenance Rate', f"{house.get('maintenance_rate', 0):.2f}%"],
+                                ['Upkeep Rate', f"{house.get('upkeep_rate', 0):.2f}%"],
+                                ['Owner', house.get('owner', 'N/A')]
+                            ]
+
+                            house_table = Table(house_data, colWidths=[2.5*inch, 3.5*inch])
+                            house_table.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                            ]))
+                            elements.append(house_table)
+                            elements.append(Spacer(1, 12))
+
+                    # Major Purchases Section
+                    if report_data.get('major_purchases'):
+                        elements.append(Paragraph("Major Purchases", heading_style))
+                        major_purchases_data = [['Item', 'Year', 'Cost', 'Owner']]
+                        for mp in report_data['major_purchases']:
+                            major_purchases_data.append([
+                                mp.get('item_name', 'N/A'),
+                                str(mp.get('purchase_year', 'N/A')),
+                                f"${mp.get('cost', 0):,.2f}",
+                                mp.get('owner', 'N/A')
+                            ])
+
+                        if len(major_purchases_data) > 1:
+                            mp_table = Table(major_purchases_data, colWidths=[2*inch, 1.5*inch, 1.5*inch, 1.5*inch])
+                            mp_table.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('ALIGN', (2, 0), (2, -1), 'RIGHT'),
+                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                            ]))
+                            elements.append(mp_table)
+                            elements.append(Spacer(1, 20))
+
+                    # Recurring Expenses Section
+                    if report_data.get('recurring_expenses'):
+                        elements.append(Paragraph("Recurring Expenses", heading_style))
+                        recurring_data = [['Description', 'Amount', 'Start Year', 'End Year', 'Owner']]
+                        for re in report_data['recurring_expenses']:
+                            recurring_data.append([
+                                re.get('description', 'N/A'),
+                                f"${re.get('annual_amount', 0):,.2f}",
+                                str(re.get('start_year', 'N/A')),
+                                str(re.get('end_year', 'N/A')),
+                                re.get('owner', 'N/A')
+                            ])
+
+                        if len(recurring_data) > 1:
+                            recurring_table = Table(recurring_data, colWidths=[2*inch, 1.2*inch, 1.2*inch, 1.2*inch, 1*inch])
+                            recurring_table.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                            ]))
+                            elements.append(recurring_table)
+                            elements.append(Spacer(1, 20))
+
+                    # State Timeline Section
+                    if "Timeline" in include_sections and report_data.get('state_timeline'):
+                        elements.append(Paragraph("State & Cost-of-Living Timeline", heading_style))
+                        timeline_data = [['Year', 'State/Location', 'Spending Strategy']]
+                        for entry in report_data['state_timeline']:
+                            timeline_data.append([
+                                str(entry.get('year', 'N/A')),
+                                entry.get('state', 'N/A'),
+                                entry.get('spending_strategy', 'N/A')
+                            ])
+
+                        if len(timeline_data) > 1:
+                            timeline_table = Table(timeline_data, colWidths=[1.5*inch, 2.5*inch, 2.5*inch])
+                            timeline_table.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                            ]))
+                            elements.append(timeline_table)
+                            elements.append(Spacer(1, 20))
+
+                    # Cashflow Projection Summary Section
+                    if "Timeline" in include_sections and report_data.get('cashflow_projections'):
+                        elements.append(Paragraph("Lifetime Financial Projection Summary", heading_style))
+
+                        cashflow_proj = report_data['cashflow_projections']
+
+                        # Calculate key metrics
+                        final_year = cashflow_proj[-1]
+                        retirement_years = [y for y in cashflow_proj if y['parent1_age'] >= st.session_state.parentX_retirement_age or y['parent2_age'] >= st.session_state.parentY_retirement_age]
+
+                        min_net_worth_year = min(cashflow_proj, key=lambda x: x['net_worth'])
+                        max_net_worth_year = max(cashflow_proj, key=lambda x: x['net_worth'])
+
+                        avg_income_working = sum(y['total_income'] for y in cashflow_proj if y['parent1_age'] < st.session_state.parentX_retirement_age or y['parent2_age'] < st.session_state.parentY_retirement_age) / len([y for y in cashflow_proj if y['parent1_age'] < st.session_state.parentX_retirement_age or y['parent2_age'] < st.session_state.parentY_retirement_age]) if len([y for y in cashflow_proj if y['parent1_age'] < st.session_state.parentX_retirement_age or y['parent2_age'] < st.session_state.parentY_retirement_age]) > 0 else 0
+
+                        avg_expenses = sum(y['total_expenses'] for y in cashflow_proj) / len(cashflow_proj)
+
+                        summary_text = f"""
+                        <b>Planning Horizon:</b> {cashflow_proj[0]['year']} - {final_year['year']} ({len(cashflow_proj)} years)<br/>
+                        <b>Final Net Worth (Year {final_year['year']}):</b> ${final_year['net_worth']:,.0f}<br/>
+                        <b>Minimum Net Worth:</b> ${min_net_worth_year['net_worth']:,.0f} (Year {min_net_worth_year['year']})<br/>
+                        <b>Maximum Net Worth:</b> ${max_net_worth_year['net_worth']:,.0f} (Year {max_net_worth_year['year']})<br/>
+                        <b>Average Annual Income (Working Years):</b> ${avg_income_working:,.0f}<br/>
+                        <b>Average Annual Expenses (Lifetime):</b> ${avg_expenses:,.0f}<br/>
+                        <b>Retirement Years Covered:</b> {len(retirement_years)} years
+                        """
+                        elements.append(Paragraph(summary_text, styles['Normal']))
+                        elements.append(Spacer(1, 12))
+
+                        # Add note about detailed data
+                        note_text = "<i>Note: Full year-by-year cashflow projections with detailed expense breakdowns are available in the Excel export. The Excel file includes comprehensive data on income, expenses, net worth trajectory, and all expense categories for each year of your financial plan.</i>"
+                        elements.append(Paragraph(note_text, styles['Normal']))
+                        elements.append(Spacer(1, 12))
+
+                        # Generate and add cashflow chart
+                        try:
+                            years = [d['year'] for d in cashflow_proj]
+                            income = [d['total_income'] for d in cashflow_proj]
+                            expenses = [d['total_expenses'] for d in cashflow_proj]
+                            net_worth = [d['net_worth'] for d in cashflow_proj]
+
+                            # Create cashflow chart with dual y-axis
+                            from plotly.subplots import make_subplots
+                            cashflow_fig = make_subplots(
+                                specs=[[{"secondary_y": True}]]
+                            )
+
+                            # Add income and expenses on primary y-axis
+                            cashflow_fig.add_trace(
+                                go.Scatter(x=years, y=income, mode='lines', name='Income',
+                                          line=dict(color='green', width=2)),
+                                secondary_y=False
+                            )
+                            cashflow_fig.add_trace(
+                                go.Scatter(x=years, y=expenses, mode='lines', name='Expenses',
+                                          line=dict(color='red', width=2)),
+                                secondary_y=False
+                            )
+
+                            # Add net worth on secondary y-axis
+                            cashflow_fig.add_trace(
+                                go.Scatter(x=years, y=net_worth, mode='lines', name='Net Worth',
+                                          line=dict(color='blue', width=2, dash='dot')),
+                                secondary_y=True
+                            )
+
+                            cashflow_fig.update_xaxes(title_text="Year")
+                            cashflow_fig.update_yaxes(title_text="Income/Expenses ($)", secondary_y=False)
+                            cashflow_fig.update_yaxes(title_text="Net Worth ($)", secondary_y=True)
+                            cashflow_fig.update_layout(
+                                title="Lifetime Income, Expenses, and Net Worth",
+                                height=500,
+                                showlegend=True,
+                                hovermode='x unified'
+                            )
+
+                            # Convert to image and add to PDF
+                            chart_img = plotly_fig_to_image(cashflow_fig, width=6.5*inch, height=4*inch)
+                            if chart_img:
+                                elements.append(chart_img)
+                                elements.append(Spacer(1, 12))
+                        except Exception as e:
+                            # If chart generation fails, just skip it
+                            pass
+
+                        elements.append(Spacer(1, 20))
+
+                    # Monte Carlo Results Summary
+                    if report_data.get('monte_carlo_results'):
+                        elements.append(Paragraph("Monte Carlo Simulation Results", heading_style))
+
+                        mc_results = report_data['monte_carlo_results']
+                        final_year_idx = -1
+
+                        mc_summary_text = f"""
+                        <b>Simulation Scenario:</b> {mc_results.get('scenario', 'N/A')}<br/>
+                        <b>Number of Simulations:</b> 1,000<br/>
+                        <b>Final Year Net Worth Percentiles:</b><br/>
+                        • 10th Percentile: ${mc_results['percentiles']['10th'][final_year_idx]:,.0f}<br/>
+                        • 25th Percentile: ${mc_results['percentiles']['25th'][final_year_idx]:,.0f}<br/>
+                        • Median (50th): ${mc_results['percentiles']['50th'][final_year_idx]:,.0f}<br/>
+                        • 75th Percentile: ${mc_results['percentiles']['75th'][final_year_idx]:,.0f}<br/>
+                        • 90th Percentile: ${mc_results['percentiles']['90th'][final_year_idx]:,.0f}
+                        """
+                        elements.append(Paragraph(mc_summary_text, styles['Normal']))
+                        elements.append(Spacer(1, 12))
+
+                        note_text = "<i>Note: Complete Monte Carlo results with year-by-year percentile data are available in the Excel export.</i>"
+                        elements.append(Paragraph(note_text, styles['Normal']))
+                        elements.append(Spacer(1, 12))
+
+                        # Generate and add Monte Carlo chart
+                        try:
+                            mc_years = mc_results['years']
+                            percentiles = mc_results['percentiles']
+
+                            # Create Monte Carlo percentile fan chart
+                            mc_fig = go.Figure()
+
+                            # Add percentile bands
+                            mc_fig.add_trace(go.Scatter(
+                                x=mc_years, y=percentiles['90th'],
+                                mode='lines', name='90th Percentile',
+                                line=dict(color='rgba(0,100,255,0.2)', width=1)
+                            ))
+                            mc_fig.add_trace(go.Scatter(
+                                x=mc_years, y=percentiles['75th'],
+                                mode='lines', name='75th Percentile',
+                                line=dict(color='rgba(0,150,255,0.3)', width=1),
+                                fill='tonexty', fillcolor='rgba(0,100,255,0.1)'
+                            ))
+                            mc_fig.add_trace(go.Scatter(
+                                x=mc_years, y=percentiles['50th'],
+                                mode='lines', name='Median (50th)',
+                                line=dict(color='blue', width=3)
+                            ))
+                            mc_fig.add_trace(go.Scatter(
+                                x=mc_years, y=percentiles['25th'],
+                                mode='lines', name='25th Percentile',
+                                line=dict(color='rgba(255,150,0,0.3)', width=1),
+                                fill='tonexty', fillcolor='rgba(100,150,255,0.1)'
+                            ))
+                            mc_fig.add_trace(go.Scatter(
+                                x=mc_years, y=percentiles['10th'],
+                                mode='lines', name='10th Percentile',
+                                line=dict(color='rgba(255,0,0,0.3)', width=1),
+                                fill='tonexty', fillcolor='rgba(255,100,0,0.1)'
+                            ))
+
+                            # Add zero line
+                            mc_fig.add_hline(y=0, line_dash="dash", line_color="red")
+
+                            mc_fig.update_layout(
+                                title="Net Worth Trajectories: Monte Carlo Simulation",
+                                xaxis_title="Year",
+                                yaxis_title="Net Worth ($)",
+                                height=500,
+                                showlegend=True,
+                                hovermode='x unified'
+                            )
+
+                            # Convert to image and add to PDF
+                            mc_chart_img = plotly_fig_to_image(mc_fig, width=6.5*inch, height=4*inch)
+                            if mc_chart_img:
+                                elements.append(mc_chart_img)
+                                elements.append(Spacer(1, 12))
+                        except Exception as e:
+                            # If chart generation fails, just skip it
+                            pass
+
+                        elements.append(Spacer(1, 20))
+
+                    # Build PDF
+                    doc.build(elements)
+                    output.seek(0)
+
+                    # Show file save dialog
+                    if TKINTER_AVAILABLE:
+                        file_path = get_save_file_path(
+                            f"{report_name}.pdf",
+                            [("PDF files", "*.pdf"), ("All files", "*.*")]
+                        )
+
+                        if file_path:
+                            with open(file_path, 'wb') as f:
+                                f.write(output.getvalue())
+                            st.success(f"✅ PDF report saved successfully to: {file_path}")
+                        else:
+                            st.info("ℹ️ Save cancelled")
+                    else:
+                        # Fallback to download button if tkinter not available
+                        st.download_button(
+                            label="📥 Download PDF Report",
+                            data=output,
+                            file_name=f"{report_name}.pdf",
+                            mime="application/pdf"
+                        )
+                        st.success("✅ PDF report generated successfully!")
+
+                elif report_format == "Excel (.xlsx)":
+                    # Create Excel workbook
+                    output = io.BytesIO()
+
+                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                        # Summary Sheet
+                        if "Summary" in include_sections:
+                            summary_df = pd.DataFrame([report_data["summary"]]).T
+                            summary_df.columns = ["Value"]
+                            summary_df.to_excel(writer, sheet_name='Summary')
+
+                        # Parents Sheet
+                        if "Income & Expenses" in include_sections:
+                            parents_df = pd.DataFrame(report_data["parents"]).T
+                            parents_df.to_excel(writer, sheet_name='Parents')
+
+                            expenses_df = pd.DataFrame([report_data["expenses"]]).T
+                            expenses_df.columns = ["Annual Amount"]
+                            expenses_df.to_excel(writer, sheet_name='Expenses')
+
+                        # Children Sheet
+                        if "Children" in include_sections and st.session_state.children_list:
+                            children_df = pd.DataFrame(report_data["children"])
+                            children_df.to_excel(writer, sheet_name='Children', index=False)
+
+                        # Healthcare Sheet
+                        if "Healthcare" in include_sections and st.session_state.health_insurances:
+                            healthcare_df = pd.DataFrame(report_data["healthcare"]["health_insurances"])
+                            healthcare_df.to_excel(writer, sheet_name='Healthcare', index=False)
+
+                        # Houses Sheet
+                        if report_data.get("houses"):
+                            houses_df = pd.DataFrame(report_data["houses"])
+                            houses_df.to_excel(writer, sheet_name='Houses', index=False)
+
+                        # Major Purchases Sheet
+                        if report_data.get("major_purchases"):
+                            major_purchases_df = pd.DataFrame(report_data["major_purchases"])
+                            major_purchases_df.to_excel(writer, sheet_name='Major Purchases', index=False)
+
+                        # Recurring Expenses Sheet
+                        if report_data.get("recurring_expenses"):
+                            recurring_df = pd.DataFrame(report_data["recurring_expenses"])
+                            recurring_df.to_excel(writer, sheet_name='Recurring Expenses', index=False)
+
+                        # State Timeline Sheet
+                        if "Timeline" in include_sections and report_data.get("state_timeline"):
+                            timeline_df = pd.DataFrame(report_data["state_timeline"])
+                            timeline_df.to_excel(writer, sheet_name='State Timeline', index=False)
+
+                        # Cashflow Projections Sheet - THIS IS THE KEY DATA!
+                        if "Timeline" in include_sections and report_data.get("cashflow_projections"):
+                            # Simplify the cashflow data for Excel (remove nested dicts)
+                            cashflow_simple = []
+                            for year_data in report_data["cashflow_projections"]:
+                                cashflow_simple.append({
+                                    'Year': year_data['year'],
+                                    'Parent1 Age': year_data['parent1_age'],
+                                    'Parent2 Age': year_data['parent2_age'],
+                                    'Parent1 Income': year_data['parent1_income'],
+                                    'Parent2 Income': year_data['parent2_income'],
+                                    'Social Security': year_data['ss_income'],
+                                    'Total Income': year_data['total_income'],
+                                    'Base Expenses': year_data['base_expenses'],
+                                    'Children Expenses': year_data['children_expenses'],
+                                    'Healthcare Expenses': year_data['healthcare_expenses'],
+                                    'House Expenses': year_data['house_expenses'],
+                                    'Recurring Expenses': year_data['recurring_expenses'],
+                                    'Major Purchases': year_data['major_purchases'],
+                                    'Total Expenses': year_data['total_expenses'],
+                                    'Cashflow': year_data['cashflow'],
+                                    'Net Worth': year_data['net_worth']
+                                })
+                            cashflow_df = pd.DataFrame(cashflow_simple)
+                            cashflow_df.to_excel(writer, sheet_name='Cashflow Projections', index=False)
+
+                        # Monte Carlo Results Sheet
+                        if report_data.get("monte_carlo_results"):
+                            mc_results = report_data["monte_carlo_results"]
+                            mc_data = {
+                                'Year': mc_results['years'],
+                                '10th Percentile': mc_results['percentiles']['10th'],
+                                '25th Percentile': mc_results['percentiles']['25th'],
+                                'Median (50th)': mc_results['percentiles']['50th'],
+                                '75th Percentile': mc_results['percentiles']['75th'],
+                                '90th Percentile': mc_results['percentiles']['90th']
+                            }
+                            mc_df = pd.DataFrame(mc_data)
+                            mc_df.to_excel(writer, sheet_name='Monte Carlo Results', index=False)
+
+                    output.seek(0)
+
+                    # Show file save dialog
+                    if TKINTER_AVAILABLE:
+                        file_path = get_save_file_path(
+                            f"{report_name}.xlsx",
+                            [("Excel files", "*.xlsx"), ("All files", "*.*")]
+                        )
+
+                        if file_path:
+                            with open(file_path, 'wb') as f:
+                                f.write(output.getvalue())
+                            st.success(f"✅ Excel report saved successfully to: {file_path}")
+                        else:
+                            st.info("ℹ️ Save cancelled")
+                    else:
+                        # Fallback to download button if tkinter not available
+                        st.download_button(
+                            label="📥 Download Excel Report",
+                            data=output,
+                            file_name=f"{report_name}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+                        st.success("✅ Excel report generated successfully!")
+
+                elif report_format == "JSON (Data Export)":
+                    json_str = json.dumps(report_data, indent=2, default=str)
+
+                    # Show file save dialog
+                    if TKINTER_AVAILABLE:
+                        file_path = get_save_file_path(
+                            f"{report_name}.json",
+                            [("JSON files", "*.json"), ("All files", "*.*")]
+                        )
+
+                        if file_path:
+                            with open(file_path, 'w', encoding='utf-8') as f:
+                                f.write(json_str)
+                            st.success(f"✅ JSON export saved successfully to: {file_path}")
+                        else:
+                            st.info("ℹ️ Save cancelled")
+                    else:
+                        # Fallback to download button if tkinter not available
+                        st.download_button(
+                            label="📥 Download JSON Data",
+                            data=json_str,
+                            file_name=f"{report_name}.json",
+                            mime="application/json"
+                        )
+                        st.success("✅ JSON export generated successfully!")
+
+                elif report_format == "CSV (Multiple Files)":
+                    # Summary CSV
+                    if "Summary" in include_sections:
+                        summary_df = pd.DataFrame([report_data["summary"]]).T
+                        summary_csv = summary_df.to_csv()
+
+                        # Show file save dialog
+                        if TKINTER_AVAILABLE:
+                            file_path = get_save_file_path(
+                                f"{report_name}_summary.csv",
+                                [("CSV files", "*.csv"), ("All files", "*.*")]
+                            )
+
+                            if file_path:
+                                with open(file_path, 'w', encoding='utf-8') as f:
+                                    f.write(summary_csv)
+                                st.success(f"✅ CSV file saved successfully to: {file_path}")
+                            else:
+                                st.info("ℹ️ Save cancelled")
+                        else:
+                            # Fallback to download button if tkinter not available
+                            st.info("📊 CSV export will generate multiple files. Download them separately:")
+                            st.download_button(
+                                "Download Summary.csv",
+                                summary_csv,
+                                f"{report_name}_summary.csv",
+                                "text/csv"
+                            )
+                            st.success("✅ CSV files ready for download!")
+
+            except Exception as e:
+                st.error(f"❌ Error generating report: {str(e)}")
+                st.exception(e)
+
+    # Report Preview
+    st.subheader("👁️ Report Preview")
+
+    with st.expander("View Summary Data"):
+        col1, col2, col3 = st.columns(3)
+
+        total_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
+        total_income = st.session_state.parentX_income + st.session_state.parentY_income
+        total_expenses = sum(st.session_state.expenses.values())
+
+        col1.metric("Combined Net Worth", format_currency(total_net_worth))
+        col2.metric("Combined Annual Income", format_currency(total_income))
+        col3.metric("Total Annual Expenses", format_currency(total_expenses))
+
+        if st.session_state.children_list:
+            col3.metric("Number of Children", len(st.session_state.children_list))
+
+
+def display_sidebar():
+    """Display sidebar with summary information"""
+    with st.sidebar:
+        st.title("📊 Quick Summary")
+
+        # Net Worth
+        total_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
+        st.metric("Combined Net Worth", format_currency(total_net_worth))
+
+        # Income
+        total_income = st.session_state.parentX_income + st.session_state.parentY_income
+        st.metric("Combined Annual Income", format_currency(total_income))
+
+        # Expenses
+        total_expenses = sum(st.session_state.expenses.values())
+        st.metric("Annual Family Expenses", format_currency(total_expenses))
+
+        # Children
+        st.metric("Number of Children", len(st.session_state.children_list))
+
+        # Houses
+        st.metric("Number of Properties", len(st.session_state.houses))
+
+        st.divider()
+
+        # Current State
+        current_state, current_strategy = get_state_for_year(st.session_state.current_year)
+        st.subheader("Current Location")
+        st.info(f"{current_state}\n{current_strategy}")
+
+
+if __name__ == "__main__":
+    main()
