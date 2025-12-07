@@ -77,6 +77,22 @@ AVAILABLE_LOCATIONS_CHILDREN = [
     "Auckland", "Wellington"
 ]
 
+AVAILABLE_LOCATIONS_ADULTS = [
+    # Major US Cities
+    "Seattle", "Sacramento", "Houston",
+    "New York", "San Francisco", "Los Angeles", "Portland",
+    # Canada
+    "Toronto", "Vancouver",
+    # France
+    "Paris", "Toulouse",
+    # Germany
+    "Berlin", "Munich",
+    # Australia
+    "Sydney", "Melbourne", "Brisbane",
+    # New Zealand
+    "Auckland", "Wellington"
+]
+
 AVAILABLE_LOCATIONS_FAMILY = [
     # Major US Cities
     "Seattle", "Sacramento", "Houston",
@@ -506,6 +522,1161 @@ ADULT_EXPENSE_TEMPLATES = {
             'Phone': 1100,
             'Other Personal': 2000
         }
+    },
+    "New York": {
+        "Conservative (statistical)": {
+            'Groceries': 6240,
+            'Dining Out': 3120,
+            'Coffee Shops': 780,
+            'Auto Payment': 4680,
+            'Gas & Fuel': 2340,
+            'Auto Maintenance': 1040,
+            'Auto Insurance': 1820,
+            'Parking & Tolls': 1560,
+            'Public Transit': 1560,
+            'Ride Shares': 780,
+            'Clothing': 1300,
+            'Personal Care': 520,
+            'Grooming': 520,
+            'Medical': 1040,
+            'Dental': 520,
+            'Vision': 260,
+            'Fitness': 624,
+            'Mental Health': 0,
+            'Entertainment': 1560,
+            'Hobbies': 780,
+            'Subscriptions': 520,
+            'Phone': 1040,
+            'Other Personal': 1040
+        },
+        "Average (statistical)": {
+            'Groceries': 7800,
+            'Dining Out': 4680,
+            'Coffee Shops': 1560,
+            'Auto Payment': 7800,
+            'Gas & Fuel': 3120,
+            'Auto Maintenance': 1560,
+            'Auto Insurance': 2340,
+            'Parking & Tolls': 1560,
+            'Public Transit': 1560,
+            'Ride Shares': 780,
+            'Clothing': 1950,
+            'Personal Care': 780,
+            'Grooming': 780,
+            'Medical': 1560,
+            'Dental': 780,
+            'Vision': 390,
+            'Fitness': 936,
+            'Mental Health': 780,
+            'Entertainment': 2340,
+            'Hobbies': 1560,
+            'Subscriptions': 780,
+            'Phone': 1300,
+            'Other Personal': 1560
+        },
+        "High-end (statistical)": {
+            'Groceries': 10920,
+            'Dining Out': 7800,
+            'Coffee Shops': 3120,
+            'Auto Payment': 15600,
+            'Gas & Fuel': 4680,
+            'Auto Maintenance': 2600,
+            'Auto Insurance': 3120,
+            'Parking & Tolls': 2340,
+            'Public Transit': 2340,
+            'Ride Shares': 1560,
+            'Clothing': 3900,
+            'Personal Care': 1560,
+            'Grooming': 1560,
+            'Medical': 2600,
+            'Dental': 1300,
+            'Vision': 650,
+            'Fitness': 1872,
+            'Mental Health': 1560,
+            'Entertainment': 4680,
+            'Hobbies': 3120,
+            'Subscriptions': 1560,
+            'Phone': 1560,
+            'Other Personal': 3120
+        }
+    },
+    "San Francisco": {
+        "Conservative (statistical)": {
+            'Groceries': 6480,
+            'Dining Out': 3240,
+            'Coffee Shops': 810,
+            'Auto Payment': 4860,
+            'Gas & Fuel': 2430,
+            'Auto Maintenance': 1080,
+            'Auto Insurance': 1890,
+            'Parking & Tolls': 810,
+            'Public Transit': 1080,
+            'Ride Shares': 540,
+            'Clothing': 1350,
+            'Personal Care': 540,
+            'Grooming': 540,
+            'Medical': 1080,
+            'Dental': 540,
+            'Vision': 270,
+            'Fitness': 648,
+            'Mental Health': 0,
+            'Entertainment': 1620,
+            'Hobbies': 810,
+            'Subscriptions': 540,
+            'Phone': 1080,
+            'Other Personal': 1080
+        },
+        "Average (statistical)": {
+            'Groceries': 8100,
+            'Dining Out': 4860,
+            'Coffee Shops': 1620,
+            'Auto Payment': 8100,
+            'Gas & Fuel': 3240,
+            'Auto Maintenance': 1620,
+            'Auto Insurance': 2430,
+            'Parking & Tolls': 1080,
+            'Public Transit': 1620,
+            'Ride Shares': 810,
+            'Clothing': 2025,
+            'Personal Care': 810,
+            'Grooming': 810,
+            'Medical': 1620,
+            'Dental': 810,
+            'Vision': 405,
+            'Fitness': 972,
+            'Mental Health': 810,
+            'Entertainment': 2430,
+            'Hobbies': 1620,
+            'Subscriptions': 810,
+            'Phone': 1350,
+            'Other Personal': 1620
+        },
+        "High-end (statistical)": {
+            'Groceries': 11340,
+            'Dining Out': 8100,
+            'Coffee Shops': 3240,
+            'Auto Payment': 16200,
+            'Gas & Fuel': 4860,
+            'Auto Maintenance': 2700,
+            'Auto Insurance': 3240,
+            'Parking & Tolls': 1890,
+            'Public Transit': 2430,
+            'Ride Shares': 1620,
+            'Clothing': 4050,
+            'Personal Care': 1620,
+            'Grooming': 1620,
+            'Medical': 2700,
+            'Dental': 1350,
+            'Vision': 675,
+            'Fitness': 1944,
+            'Mental Health': 1620,
+            'Entertainment': 4860,
+            'Hobbies': 3240,
+            'Subscriptions': 1620,
+            'Phone': 1620,
+            'Other Personal': 3240
+        }
+    },
+    "Los Angeles": {
+        "Conservative (statistical)": {
+            'Groceries': 5520,
+            'Dining Out': 2760,
+            'Coffee Shops': 690,
+            'Auto Payment': 4140,
+            'Gas & Fuel': 2070,
+            'Auto Maintenance': 920,
+            'Auto Insurance': 1610,
+            'Parking & Tolls': 690,
+            'Public Transit': 920,
+            'Ride Shares': 460,
+            'Clothing': 1150,
+            'Personal Care': 460,
+            'Grooming': 460,
+            'Medical': 920,
+            'Dental': 460,
+            'Vision': 230,
+            'Fitness': 552,
+            'Mental Health': 0,
+            'Entertainment': 1380,
+            'Hobbies': 690,
+            'Subscriptions': 460,
+            'Phone': 920,
+            'Other Personal': 920
+        },
+        "Average (statistical)": {
+            'Groceries': 6900,
+            'Dining Out': 4140,
+            'Coffee Shops': 1380,
+            'Auto Payment': 6900,
+            'Gas & Fuel': 2760,
+            'Auto Maintenance': 1380,
+            'Auto Insurance': 2070,
+            'Parking & Tolls': 920,
+            'Public Transit': 1380,
+            'Ride Shares': 690,
+            'Clothing': 1725,
+            'Personal Care': 690,
+            'Grooming': 690,
+            'Medical': 1380,
+            'Dental': 690,
+            'Vision': 345,
+            'Fitness': 828,
+            'Mental Health': 690,
+            'Entertainment': 2070,
+            'Hobbies': 1380,
+            'Subscriptions': 690,
+            'Phone': 1150,
+            'Other Personal': 1380
+        },
+        "High-end (statistical)": {
+            'Groceries': 9660,
+            'Dining Out': 6900,
+            'Coffee Shops': 2760,
+            'Auto Payment': 13800,
+            'Gas & Fuel': 4140,
+            'Auto Maintenance': 2300,
+            'Auto Insurance': 2760,
+            'Parking & Tolls': 1610,
+            'Public Transit': 2070,
+            'Ride Shares': 1380,
+            'Clothing': 3450,
+            'Personal Care': 1380,
+            'Grooming': 1380,
+            'Medical': 2300,
+            'Dental': 1150,
+            'Vision': 575,
+            'Fitness': 1656,
+            'Mental Health': 1380,
+            'Entertainment': 4140,
+            'Hobbies': 2760,
+            'Subscriptions': 1380,
+            'Phone': 1380,
+            'Other Personal': 2760
+        }
+    },
+    "Portland": {
+        "Conservative (statistical)": {
+            'Groceries': 4560,
+            'Dining Out': 2280,
+            'Coffee Shops': 570,
+            'Auto Payment': 3420,
+            'Gas & Fuel': 1710,
+            'Auto Maintenance': 760,
+            'Auto Insurance': 1330,
+            'Parking & Tolls': 380,
+            'Public Transit': 760,
+            'Ride Shares': 380,
+            'Clothing': 950,
+            'Personal Care': 380,
+            'Grooming': 380,
+            'Medical': 760,
+            'Dental': 380,
+            'Vision': 190,
+            'Fitness': 456,
+            'Mental Health': 0,
+            'Entertainment': 1140,
+            'Hobbies': 570,
+            'Subscriptions': 380,
+            'Phone': 760,
+            'Other Personal': 760
+        },
+        "Average (statistical)": {
+            'Groceries': 5700,
+            'Dining Out': 3420,
+            'Coffee Shops': 1140,
+            'Auto Payment': 5700,
+            'Gas & Fuel': 2280,
+            'Auto Maintenance': 1140,
+            'Auto Insurance': 1710,
+            'Parking & Tolls': 570,
+            'Public Transit': 1140,
+            'Ride Shares': 570,
+            'Clothing': 1425,
+            'Personal Care': 570,
+            'Grooming': 570,
+            'Medical': 1140,
+            'Dental': 570,
+            'Vision': 285,
+            'Fitness': 684,
+            'Mental Health': 570,
+            'Entertainment': 1710,
+            'Hobbies': 1140,
+            'Subscriptions': 570,
+            'Phone': 950,
+            'Other Personal': 1140
+        },
+        "High-end (statistical)": {
+            'Groceries': 7980,
+            'Dining Out': 5700,
+            'Coffee Shops': 2280,
+            'Auto Payment': 11400,
+            'Gas & Fuel': 3420,
+            'Auto Maintenance': 1900,
+            'Auto Insurance': 2280,
+            'Parking & Tolls': 1140,
+            'Public Transit': 1710,
+            'Ride Shares': 1140,
+            'Clothing': 2850,
+            'Personal Care': 1140,
+            'Grooming': 1140,
+            'Medical': 1900,
+            'Dental': 950,
+            'Vision': 475,
+            'Fitness': 1368,
+            'Mental Health': 1140,
+            'Entertainment': 3420,
+            'Hobbies': 2280,
+            'Subscriptions': 1140,
+            'Phone': 1140,
+            'Other Personal': 2280
+        }
+    },
+    "Toronto": {
+        "Conservative (statistical)": {
+            'Groceries': 4560,
+            'Dining Out': 2280,
+            'Coffee Shops': 570,
+            'Auto Payment': 3420,
+            'Gas & Fuel': 1710,
+            'Auto Maintenance': 760,
+            'Auto Insurance': 1330,
+            'Parking & Tolls': 380,
+            'Public Transit': 760,
+            'Ride Shares': 380,
+            'Clothing': 950,
+            'Personal Care': 380,
+            'Grooming': 380,
+            'Medical': 760,
+            'Dental': 380,
+            'Vision': 190,
+            'Fitness': 456,
+            'Mental Health': 0,
+            'Entertainment': 1140,
+            'Hobbies': 570,
+            'Subscriptions': 380,
+            'Phone': 760,
+            'Other Personal': 760
+        },
+        "Average (statistical)": {
+            'Groceries': 5700,
+            'Dining Out': 3420,
+            'Coffee Shops': 1140,
+            'Auto Payment': 5700,
+            'Gas & Fuel': 2280,
+            'Auto Maintenance': 1140,
+            'Auto Insurance': 1710,
+            'Parking & Tolls': 570,
+            'Public Transit': 1140,
+            'Ride Shares': 570,
+            'Clothing': 1425,
+            'Personal Care': 570,
+            'Grooming': 570,
+            'Medical': 1140,
+            'Dental': 570,
+            'Vision': 285,
+            'Fitness': 684,
+            'Mental Health': 570,
+            'Entertainment': 1710,
+            'Hobbies': 1140,
+            'Subscriptions': 570,
+            'Phone': 950,
+            'Other Personal': 1140
+        },
+        "High-end (statistical)": {
+            'Groceries': 7980,
+            'Dining Out': 5700,
+            'Coffee Shops': 2280,
+            'Auto Payment': 11400,
+            'Gas & Fuel': 3420,
+            'Auto Maintenance': 1900,
+            'Auto Insurance': 2280,
+            'Parking & Tolls': 1140,
+            'Public Transit': 1710,
+            'Ride Shares': 1140,
+            'Clothing': 2850,
+            'Personal Care': 1140,
+            'Grooming': 1140,
+            'Medical': 1900,
+            'Dental': 950,
+            'Vision': 475,
+            'Fitness': 1368,
+            'Mental Health': 1140,
+            'Entertainment': 3420,
+            'Hobbies': 2280,
+            'Subscriptions': 1140,
+            'Phone': 1140,
+            'Other Personal': 2280
+        }
+    },
+    "Vancouver": {
+        "Conservative (statistical)": {
+            'Groceries': 5040,
+            'Dining Out': 2520,
+            'Coffee Shops': 630,
+            'Auto Payment': 3780,
+            'Gas & Fuel': 1890,
+            'Auto Maintenance': 840,
+            'Auto Insurance': 1470,
+            'Parking & Tolls': 420,
+            'Public Transit': 840,
+            'Ride Shares': 420,
+            'Clothing': 1050,
+            'Personal Care': 420,
+            'Grooming': 420,
+            'Medical': 840,
+            'Dental': 420,
+            'Vision': 210,
+            'Fitness': 504,
+            'Mental Health': 0,
+            'Entertainment': 1260,
+            'Hobbies': 630,
+            'Subscriptions': 420,
+            'Phone': 840,
+            'Other Personal': 840
+        },
+        "Average (statistical)": {
+            'Groceries': 6300,
+            'Dining Out': 3780,
+            'Coffee Shops': 1260,
+            'Auto Payment': 6300,
+            'Gas & Fuel': 2520,
+            'Auto Maintenance': 1260,
+            'Auto Insurance': 1890,
+            'Parking & Tolls': 630,
+            'Public Transit': 1260,
+            'Ride Shares': 630,
+            'Clothing': 1575,
+            'Personal Care': 630,
+            'Grooming': 630,
+            'Medical': 1260,
+            'Dental': 630,
+            'Vision': 315,
+            'Fitness': 756,
+            'Mental Health': 630,
+            'Entertainment': 1890,
+            'Hobbies': 1260,
+            'Subscriptions': 630,
+            'Phone': 1050,
+            'Other Personal': 1260
+        },
+        "High-end (statistical)": {
+            'Groceries': 8820,
+            'Dining Out': 6300,
+            'Coffee Shops': 2520,
+            'Auto Payment': 12600,
+            'Gas & Fuel': 3780,
+            'Auto Maintenance': 2100,
+            'Auto Insurance': 2520,
+            'Parking & Tolls': 1260,
+            'Public Transit': 1890,
+            'Ride Shares': 1260,
+            'Clothing': 3150,
+            'Personal Care': 1260,
+            'Grooming': 1260,
+            'Medical': 2100,
+            'Dental': 1050,
+            'Vision': 525,
+            'Fitness': 1512,
+            'Mental Health': 1260,
+            'Entertainment': 3780,
+            'Hobbies': 2520,
+            'Subscriptions': 1260,
+            'Phone': 1260,
+            'Other Personal': 2520
+        }
+    },
+    "Paris": {
+        "Conservative (statistical)": {
+            'Groceries': 5760,
+            'Dining Out': 2880,
+            'Coffee Shops': 720,
+            'Auto Payment': 4320,
+            'Gas & Fuel': 2160,
+            'Auto Maintenance': 960,
+            'Auto Insurance': 1680,
+            'Parking & Tolls': 480,
+            'Public Transit': 960,
+            'Ride Shares': 480,
+            'Clothing': 1200,
+            'Personal Care': 480,
+            'Grooming': 480,
+            'Medical': 960,
+            'Dental': 480,
+            'Vision': 240,
+            'Fitness': 576,
+            'Mental Health': 0,
+            'Entertainment': 1440,
+            'Hobbies': 720,
+            'Subscriptions': 480,
+            'Phone': 960,
+            'Other Personal': 960
+        },
+        "Average (statistical)": {
+            'Groceries': 7200,
+            'Dining Out': 4320,
+            'Coffee Shops': 1440,
+            'Auto Payment': 7200,
+            'Gas & Fuel': 2880,
+            'Auto Maintenance': 1440,
+            'Auto Insurance': 2160,
+            'Parking & Tolls': 720,
+            'Public Transit': 1440,
+            'Ride Shares': 720,
+            'Clothing': 1800,
+            'Personal Care': 720,
+            'Grooming': 720,
+            'Medical': 1440,
+            'Dental': 720,
+            'Vision': 360,
+            'Fitness': 864,
+            'Mental Health': 720,
+            'Entertainment': 2160,
+            'Hobbies': 1440,
+            'Subscriptions': 720,
+            'Phone': 1200,
+            'Other Personal': 1440
+        },
+        "High-end (statistical)": {
+            'Groceries': 10080,
+            'Dining Out': 7200,
+            'Coffee Shops': 2880,
+            'Auto Payment': 14400,
+            'Gas & Fuel': 4320,
+            'Auto Maintenance': 2400,
+            'Auto Insurance': 2880,
+            'Parking & Tolls': 1440,
+            'Public Transit': 2160,
+            'Ride Shares': 1440,
+            'Clothing': 3600,
+            'Personal Care': 1440,
+            'Grooming': 1440,
+            'Medical': 2400,
+            'Dental': 1200,
+            'Vision': 600,
+            'Fitness': 1728,
+            'Mental Health': 1440,
+            'Entertainment': 4320,
+            'Hobbies': 2880,
+            'Subscriptions': 1440,
+            'Phone': 1440,
+            'Other Personal': 2880
+        }
+    },
+    "Toulouse": {
+        "Conservative (statistical)": {
+            'Groceries': 4320,
+            'Dining Out': 2160,
+            'Coffee Shops': 540,
+            'Auto Payment': 3240,
+            'Gas & Fuel': 1620,
+            'Auto Maintenance': 720,
+            'Auto Insurance': 1260,
+            'Parking & Tolls': 360,
+            'Public Transit': 720,
+            'Ride Shares': 360,
+            'Clothing': 900,
+            'Personal Care': 360,
+            'Grooming': 360,
+            'Medical': 720,
+            'Dental': 360,
+            'Vision': 180,
+            'Fitness': 432,
+            'Mental Health': 0,
+            'Entertainment': 1080,
+            'Hobbies': 540,
+            'Subscriptions': 360,
+            'Phone': 720,
+            'Other Personal': 720
+        },
+        "Average (statistical)": {
+            'Groceries': 5400,
+            'Dining Out': 3240,
+            'Coffee Shops': 1080,
+            'Auto Payment': 5400,
+            'Gas & Fuel': 2160,
+            'Auto Maintenance': 1080,
+            'Auto Insurance': 1620,
+            'Parking & Tolls': 540,
+            'Public Transit': 1080,
+            'Ride Shares': 540,
+            'Clothing': 1350,
+            'Personal Care': 540,
+            'Grooming': 540,
+            'Medical': 1080,
+            'Dental': 540,
+            'Vision': 270,
+            'Fitness': 648,
+            'Mental Health': 540,
+            'Entertainment': 1620,
+            'Hobbies': 1080,
+            'Subscriptions': 540,
+            'Phone': 900,
+            'Other Personal': 1080
+        },
+        "High-end (statistical)": {
+            'Groceries': 7560,
+            'Dining Out': 5400,
+            'Coffee Shops': 2160,
+            'Auto Payment': 10800,
+            'Gas & Fuel': 3240,
+            'Auto Maintenance': 1800,
+            'Auto Insurance': 2160,
+            'Parking & Tolls': 1080,
+            'Public Transit': 1620,
+            'Ride Shares': 1080,
+            'Clothing': 2700,
+            'Personal Care': 1080,
+            'Grooming': 1080,
+            'Medical': 1800,
+            'Dental': 900,
+            'Vision': 450,
+            'Fitness': 1296,
+            'Mental Health': 1080,
+            'Entertainment': 3240,
+            'Hobbies': 2160,
+            'Subscriptions': 1080,
+            'Phone': 1080,
+            'Other Personal': 2160
+        }
+    },
+    "Berlin": {
+        "Conservative (statistical)": {
+            'Groceries': 4080,
+            'Dining Out': 2040,
+            'Coffee Shops': 510,
+            'Auto Payment': 3060,
+            'Gas & Fuel': 1530,
+            'Auto Maintenance': 680,
+            'Auto Insurance': 1190,
+            'Parking & Tolls': 340,
+            'Public Transit': 680,
+            'Ride Shares': 340,
+            'Clothing': 850,
+            'Personal Care': 340,
+            'Grooming': 340,
+            'Medical': 680,
+            'Dental': 340,
+            'Vision': 170,
+            'Fitness': 408,
+            'Mental Health': 0,
+            'Entertainment': 1020,
+            'Hobbies': 510,
+            'Subscriptions': 340,
+            'Phone': 680,
+            'Other Personal': 680
+        },
+        "Average (statistical)": {
+            'Groceries': 5100,
+            'Dining Out': 3060,
+            'Coffee Shops': 1020,
+            'Auto Payment': 5100,
+            'Gas & Fuel': 2040,
+            'Auto Maintenance': 1020,
+            'Auto Insurance': 1530,
+            'Parking & Tolls': 510,
+            'Public Transit': 1020,
+            'Ride Shares': 510,
+            'Clothing': 1275,
+            'Personal Care': 510,
+            'Grooming': 510,
+            'Medical': 1020,
+            'Dental': 510,
+            'Vision': 255,
+            'Fitness': 612,
+            'Mental Health': 510,
+            'Entertainment': 1530,
+            'Hobbies': 1020,
+            'Subscriptions': 510,
+            'Phone': 850,
+            'Other Personal': 1020
+        },
+        "High-end (statistical)": {
+            'Groceries': 7140,
+            'Dining Out': 5100,
+            'Coffee Shops': 2040,
+            'Auto Payment': 10200,
+            'Gas & Fuel': 3060,
+            'Auto Maintenance': 1700,
+            'Auto Insurance': 2040,
+            'Parking & Tolls': 1020,
+            'Public Transit': 1530,
+            'Ride Shares': 1020,
+            'Clothing': 2550,
+            'Personal Care': 1020,
+            'Grooming': 1020,
+            'Medical': 1700,
+            'Dental': 850,
+            'Vision': 425,
+            'Fitness': 1224,
+            'Mental Health': 1020,
+            'Entertainment': 3060,
+            'Hobbies': 2040,
+            'Subscriptions': 1020,
+            'Phone': 1020,
+            'Other Personal': 2040
+        }
+    },
+    "Munich": {
+        "Conservative (statistical)": {
+            'Groceries': 4800,
+            'Dining Out': 2400,
+            'Coffee Shops': 600,
+            'Auto Payment': 3600,
+            'Gas & Fuel': 1800,
+            'Auto Maintenance': 800,
+            'Auto Insurance': 1400,
+            'Parking & Tolls': 400,
+            'Public Transit': 800,
+            'Ride Shares': 400,
+            'Clothing': 1000,
+            'Personal Care': 400,
+            'Grooming': 400,
+            'Medical': 800,
+            'Dental': 400,
+            'Vision': 200,
+            'Fitness': 480,
+            'Mental Health': 0,
+            'Entertainment': 1200,
+            'Hobbies': 600,
+            'Subscriptions': 400,
+            'Phone': 800,
+            'Other Personal': 800
+        },
+        "Average (statistical)": {
+            'Groceries': 6000,
+            'Dining Out': 3600,
+            'Coffee Shops': 1200,
+            'Auto Payment': 6000,
+            'Gas & Fuel': 2400,
+            'Auto Maintenance': 1200,
+            'Auto Insurance': 1800,
+            'Parking & Tolls': 600,
+            'Public Transit': 1200,
+            'Ride Shares': 600,
+            'Clothing': 1500,
+            'Personal Care': 600,
+            'Grooming': 600,
+            'Medical': 1200,
+            'Dental': 600,
+            'Vision': 300,
+            'Fitness': 720,
+            'Mental Health': 600,
+            'Entertainment': 1800,
+            'Hobbies': 1200,
+            'Subscriptions': 600,
+            'Phone': 1000,
+            'Other Personal': 1200
+        },
+        "High-end (statistical)": {
+            'Groceries': 8400,
+            'Dining Out': 6000,
+            'Coffee Shops': 2400,
+            'Auto Payment': 12000,
+            'Gas & Fuel': 3600,
+            'Auto Maintenance': 2000,
+            'Auto Insurance': 2400,
+            'Parking & Tolls': 1200,
+            'Public Transit': 1800,
+            'Ride Shares': 1200,
+            'Clothing': 3000,
+            'Personal Care': 1200,
+            'Grooming': 1200,
+            'Medical': 2000,
+            'Dental': 1000,
+            'Vision': 500,
+            'Fitness': 1440,
+            'Mental Health': 1200,
+            'Entertainment': 3600,
+            'Hobbies': 2400,
+            'Subscriptions': 1200,
+            'Phone': 1200,
+            'Other Personal': 2400
+        }
+    },
+    "Sydney": {
+        "Conservative (statistical)": {
+            'Groceries': 5280,
+            'Dining Out': 2640,
+            'Coffee Shops': 660,
+            'Auto Payment': 3960,
+            'Gas & Fuel': 1980,
+            'Auto Maintenance': 880,
+            'Auto Insurance': 1540,
+            'Parking & Tolls': 440,
+            'Public Transit': 880,
+            'Ride Shares': 440,
+            'Clothing': 1100,
+            'Personal Care': 440,
+            'Grooming': 440,
+            'Medical': 880,
+            'Dental': 440,
+            'Vision': 220,
+            'Fitness': 528,
+            'Mental Health': 0,
+            'Entertainment': 1320,
+            'Hobbies': 660,
+            'Subscriptions': 440,
+            'Phone': 880,
+            'Other Personal': 880
+        },
+        "Average (statistical)": {
+            'Groceries': 6600,
+            'Dining Out': 3960,
+            'Coffee Shops': 1320,
+            'Auto Payment': 6600,
+            'Gas & Fuel': 2640,
+            'Auto Maintenance': 1320,
+            'Auto Insurance': 1980,
+            'Parking & Tolls': 660,
+            'Public Transit': 1320,
+            'Ride Shares': 660,
+            'Clothing': 1650,
+            'Personal Care': 660,
+            'Grooming': 660,
+            'Medical': 1320,
+            'Dental': 660,
+            'Vision': 330,
+            'Fitness': 792,
+            'Mental Health': 660,
+            'Entertainment': 1980,
+            'Hobbies': 1320,
+            'Subscriptions': 660,
+            'Phone': 1100,
+            'Other Personal': 1320
+        },
+        "High-end (statistical)": {
+            'Groceries': 9240,
+            'Dining Out': 6600,
+            'Coffee Shops': 2640,
+            'Auto Payment': 13200,
+            'Gas & Fuel': 3960,
+            'Auto Maintenance': 2200,
+            'Auto Insurance': 2640,
+            'Parking & Tolls': 1320,
+            'Public Transit': 1980,
+            'Ride Shares': 1320,
+            'Clothing': 3300,
+            'Personal Care': 1320,
+            'Grooming': 1320,
+            'Medical': 2200,
+            'Dental': 1100,
+            'Vision': 550,
+            'Fitness': 1584,
+            'Mental Health': 1320,
+            'Entertainment': 3960,
+            'Hobbies': 2640,
+            'Subscriptions': 1320,
+            'Phone': 1320,
+            'Other Personal': 2640
+        }
+    },
+    "Melbourne": {
+        "Conservative (statistical)": {
+            'Groceries': 5040,
+            'Dining Out': 2520,
+            'Coffee Shops': 630,
+            'Auto Payment': 3780,
+            'Gas & Fuel': 1890,
+            'Auto Maintenance': 840,
+            'Auto Insurance': 1470,
+            'Parking & Tolls': 420,
+            'Public Transit': 840,
+            'Ride Shares': 420,
+            'Clothing': 1050,
+            'Personal Care': 420,
+            'Grooming': 420,
+            'Medical': 840,
+            'Dental': 420,
+            'Vision': 210,
+            'Fitness': 504,
+            'Mental Health': 0,
+            'Entertainment': 1260,
+            'Hobbies': 630,
+            'Subscriptions': 420,
+            'Phone': 840,
+            'Other Personal': 840
+        },
+        "Average (statistical)": {
+            'Groceries': 6300,
+            'Dining Out': 3780,
+            'Coffee Shops': 1260,
+            'Auto Payment': 6300,
+            'Gas & Fuel': 2520,
+            'Auto Maintenance': 1260,
+            'Auto Insurance': 1890,
+            'Parking & Tolls': 630,
+            'Public Transit': 1260,
+            'Ride Shares': 630,
+            'Clothing': 1575,
+            'Personal Care': 630,
+            'Grooming': 630,
+            'Medical': 1260,
+            'Dental': 630,
+            'Vision': 315,
+            'Fitness': 756,
+            'Mental Health': 630,
+            'Entertainment': 1890,
+            'Hobbies': 1260,
+            'Subscriptions': 630,
+            'Phone': 1050,
+            'Other Personal': 1260
+        },
+        "High-end (statistical)": {
+            'Groceries': 8820,
+            'Dining Out': 6300,
+            'Coffee Shops': 2520,
+            'Auto Payment': 12600,
+            'Gas & Fuel': 3780,
+            'Auto Maintenance': 2100,
+            'Auto Insurance': 2520,
+            'Parking & Tolls': 1260,
+            'Public Transit': 1890,
+            'Ride Shares': 1260,
+            'Clothing': 3150,
+            'Personal Care': 1260,
+            'Grooming': 1260,
+            'Medical': 2100,
+            'Dental': 1050,
+            'Vision': 525,
+            'Fitness': 1512,
+            'Mental Health': 1260,
+            'Entertainment': 3780,
+            'Hobbies': 2520,
+            'Subscriptions': 1260,
+            'Phone': 1260,
+            'Other Personal': 2520
+        }
+    },
+    "Brisbane": {
+        "Conservative (statistical)": {
+            'Groceries': 4560,
+            'Dining Out': 2280,
+            'Coffee Shops': 570,
+            'Auto Payment': 3420,
+            'Gas & Fuel': 1710,
+            'Auto Maintenance': 760,
+            'Auto Insurance': 1330,
+            'Parking & Tolls': 380,
+            'Public Transit': 760,
+            'Ride Shares': 380,
+            'Clothing': 950,
+            'Personal Care': 380,
+            'Grooming': 380,
+            'Medical': 760,
+            'Dental': 380,
+            'Vision': 190,
+            'Fitness': 456,
+            'Mental Health': 0,
+            'Entertainment': 1140,
+            'Hobbies': 570,
+            'Subscriptions': 380,
+            'Phone': 760,
+            'Other Personal': 760
+        },
+        "Average (statistical)": {
+            'Groceries': 5700,
+            'Dining Out': 3420,
+            'Coffee Shops': 1140,
+            'Auto Payment': 5700,
+            'Gas & Fuel': 2280,
+            'Auto Maintenance': 1140,
+            'Auto Insurance': 1710,
+            'Parking & Tolls': 570,
+            'Public Transit': 1140,
+            'Ride Shares': 570,
+            'Clothing': 1425,
+            'Personal Care': 570,
+            'Grooming': 570,
+            'Medical': 1140,
+            'Dental': 570,
+            'Vision': 285,
+            'Fitness': 684,
+            'Mental Health': 570,
+            'Entertainment': 1710,
+            'Hobbies': 1140,
+            'Subscriptions': 570,
+            'Phone': 950,
+            'Other Personal': 1140
+        },
+        "High-end (statistical)": {
+            'Groceries': 7980,
+            'Dining Out': 5700,
+            'Coffee Shops': 2280,
+            'Auto Payment': 11400,
+            'Gas & Fuel': 3420,
+            'Auto Maintenance': 1900,
+            'Auto Insurance': 2280,
+            'Parking & Tolls': 1140,
+            'Public Transit': 1710,
+            'Ride Shares': 1140,
+            'Clothing': 2850,
+            'Personal Care': 1140,
+            'Grooming': 1140,
+            'Medical': 1900,
+            'Dental': 950,
+            'Vision': 475,
+            'Fitness': 1368,
+            'Mental Health': 1140,
+            'Entertainment': 3420,
+            'Hobbies': 2280,
+            'Subscriptions': 1140,
+            'Phone': 1140,
+            'Other Personal': 2280
+        }
+    },
+    "Auckland": {
+        "Conservative (statistical)": {
+            'Groceries': 4320,
+            'Dining Out': 2160,
+            'Coffee Shops': 540,
+            'Auto Payment': 3240,
+            'Gas & Fuel': 1620,
+            'Auto Maintenance': 720,
+            'Auto Insurance': 1260,
+            'Parking & Tolls': 360,
+            'Public Transit': 720,
+            'Ride Shares': 360,
+            'Clothing': 900,
+            'Personal Care': 360,
+            'Grooming': 360,
+            'Medical': 720,
+            'Dental': 360,
+            'Vision': 180,
+            'Fitness': 432,
+            'Mental Health': 0,
+            'Entertainment': 1080,
+            'Hobbies': 540,
+            'Subscriptions': 360,
+            'Phone': 720,
+            'Other Personal': 720
+        },
+        "Average (statistical)": {
+            'Groceries': 5400,
+            'Dining Out': 3240,
+            'Coffee Shops': 1080,
+            'Auto Payment': 5400,
+            'Gas & Fuel': 2160,
+            'Auto Maintenance': 1080,
+            'Auto Insurance': 1620,
+            'Parking & Tolls': 540,
+            'Public Transit': 1080,
+            'Ride Shares': 540,
+            'Clothing': 1350,
+            'Personal Care': 540,
+            'Grooming': 540,
+            'Medical': 1080,
+            'Dental': 540,
+            'Vision': 270,
+            'Fitness': 648,
+            'Mental Health': 540,
+            'Entertainment': 1620,
+            'Hobbies': 1080,
+            'Subscriptions': 540,
+            'Phone': 900,
+            'Other Personal': 1080
+        },
+        "High-end (statistical)": {
+            'Groceries': 7560,
+            'Dining Out': 5400,
+            'Coffee Shops': 2160,
+            'Auto Payment': 10800,
+            'Gas & Fuel': 3240,
+            'Auto Maintenance': 1800,
+            'Auto Insurance': 2160,
+            'Parking & Tolls': 1080,
+            'Public Transit': 1620,
+            'Ride Shares': 1080,
+            'Clothing': 2700,
+            'Personal Care': 1080,
+            'Grooming': 1080,
+            'Medical': 1800,
+            'Dental': 900,
+            'Vision': 450,
+            'Fitness': 1296,
+            'Mental Health': 1080,
+            'Entertainment': 3240,
+            'Hobbies': 2160,
+            'Subscriptions': 1080,
+            'Phone': 1080,
+            'Other Personal': 2160
+        }
+    },
+    "Wellington": {
+        "Conservative (statistical)": {
+            'Groceries': 4416,
+            'Dining Out': 2208,
+            'Coffee Shops': 552,
+            'Auto Payment': 3312,
+            'Gas & Fuel': 1656,
+            'Auto Maintenance': 736,
+            'Auto Insurance': 1288,
+            'Parking & Tolls': 368,
+            'Public Transit': 736,
+            'Ride Shares': 368,
+            'Clothing': 920,
+            'Personal Care': 368,
+            'Grooming': 368,
+            'Medical': 736,
+            'Dental': 368,
+            'Vision': 184,
+            'Fitness': 442,
+            'Mental Health': 0,
+            'Entertainment': 1104,
+            'Hobbies': 552,
+            'Subscriptions': 368,
+            'Phone': 736,
+            'Other Personal': 736
+        },
+        "Average (statistical)": {
+            'Groceries': 5520,
+            'Dining Out': 3312,
+            'Coffee Shops': 1104,
+            'Auto Payment': 5520,
+            'Gas & Fuel': 2208,
+            'Auto Maintenance': 1104,
+            'Auto Insurance': 1656,
+            'Parking & Tolls': 552,
+            'Public Transit': 1104,
+            'Ride Shares': 552,
+            'Clothing': 1380,
+            'Personal Care': 552,
+            'Grooming': 552,
+            'Medical': 1104,
+            'Dental': 552,
+            'Vision': 276,
+            'Fitness': 662,
+            'Mental Health': 552,
+            'Entertainment': 1656,
+            'Hobbies': 1104,
+            'Subscriptions': 552,
+            'Phone': 920,
+            'Other Personal': 1104
+        },
+        "High-end (statistical)": {
+            'Groceries': 7728,
+            'Dining Out': 5520,
+            'Coffee Shops': 2208,
+            'Auto Payment': 11040,
+            'Gas & Fuel': 3312,
+            'Auto Maintenance': 1840,
+            'Auto Insurance': 2208,
+            'Parking & Tolls': 1104,
+            'Public Transit': 1656,
+            'Ride Shares': 1104,
+            'Clothing': 2760,
+            'Personal Care': 1104,
+            'Grooming': 1104,
+            'Medical': 1840,
+            'Dental': 920,
+            'Vision': 460,
+            'Fitness': 1325,
+            'Mental Health': 1104,
+            'Entertainment': 3312,
+            'Hobbies': 2208,
+            'Subscriptions': 1104,
+            'Phone': 1104,
+            'Other Personal': 2208
+        }
     }
 }
 
@@ -609,6 +1780,42 @@ def get_adult_expense_template(location, strategy_name):
     # Last resort: return zeros for all categories
     return {cat: 0 for cat in ADULT_EXPENSE_CATEGORIES_FLAT}
 
+def get_children_expense_template(location, strategy_name):
+    """
+    Get children expense template for a specific location and strategy.
+    Generates template from adult template using age-based scaling.
+
+    Args:
+        location: Location name
+        strategy_name: Strategy name (with or without suffix)
+
+    Returns:
+        Dictionary with lists of 31 annual expense amounts (ages 0-30) per category
+    """
+    # First check if we have a legacy template
+    if location in CHILDREN_EXPENSE_TEMPLATES:
+        if strategy_name in CHILDREN_EXPENSE_TEMPLATES[location]:
+            return CHILDREN_EXPENSE_TEMPLATES[location][strategy_name].copy()
+
+        # Try legacy name
+        base_name = get_strategy_base_name(strategy_name)
+        if base_name in CHILDREN_EXPENSE_TEMPLATES[location]:
+            return CHILDREN_EXPENSE_TEMPLATES[location][base_name].copy()
+
+    # If no legacy template, generate from adult template
+    adult_template = get_adult_expense_template(location, strategy_name)
+
+    # Determine strategy level for scaling
+    if 'Conservative' in strategy_name:
+        strategy_level = 'Conservative'
+    elif 'High-end' in strategy_name or 'High' in strategy_name:
+        strategy_level = 'High-end'
+    else:
+        strategy_level = 'Average'
+
+    # Generate children template from adult
+    return generate_children_template_from_adult(adult_template, strategy_level)
+
 def migrate_legacy_children_expenses_to_new_structure(legacy_data, child_age):
     """
     Migrate legacy children expense data (single age) to new category structure.
@@ -707,6 +1914,121 @@ def migrate_legacy_children_expenses_to_new_structure(legacy_data, child_age):
 
     return new_data
 
+def generate_children_template_from_adult(adult_template, strategy_level='Average'):
+    """
+    Generate age-based children expense template (ages 0-30) from adult template.
+    Applies age-appropriate scaling and includes teenage car ownership costs.
+
+    Args:
+        adult_template: Dict of adult annual expenses by category
+        strategy_level: 'Conservative', 'Average', or 'High-end' for scaling
+
+    Returns:
+        Dict with lists of 31 values (one per age 0-30) for each category
+    """
+    # Age scaling factors (0.0-1.0) for different age ranges
+    # These determine what fraction of adult expense applies at each age
+    def get_age_scale(age):
+        if age < 2: return 0.25   # Baby
+        elif age < 5: return 0.30  # Toddler
+        elif age < 12: return 0.40 # Child
+        elif age < 16: return 0.50 # Pre-teen/Early teen
+        elif age < 19: return 0.70 # Late teen (peak spending)
+        elif age < 23: return 0.50 # College age
+        elif age < 26: return 0.30 # Young adult (partial support)
+        else: return 0.0            # Independent
+
+    template = {}
+
+    # Food categories (Groceries, Dining Out, Coffee Shops)
+    template['Groceries'] = [adult_template['Groceries'] * get_age_scale(i) for i in range(31)]
+
+    dining_scale = [0, 0, 0.05, 0.05, 0.10, 0.10, 0.15, 0.15, 0.20, 0.20, 0.25, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55,
+                    0.40, 0.35, 0.30, 0.25, 0.20, 0, 0, 0, 0, 0, 0, 0, 0]
+    template['Dining Out'] = [adult_template['Dining Out'] * dining_scale[i] for i in range(31)]
+
+    coffee_scale = [0]*13 + [0.1, 0.15, 0.20, 0.30, 0.40, 0.35, 0.30, 0.25, 0.20, 0.15] + [0]*9
+    template['Coffee Shops'] = [adult_template['Coffee Shops'] * coffee_scale[i] for i in range(31)]
+
+    # Transportation - includes TEENAGE CAR OWNERSHIP
+    # Auto Payment (car loan/lease) - primarily for teens 16-22
+    auto_payment_scale = [0]*16 + [0.5, 0.6, 0.6, 0.5, 0.5, 0.5, 0.4] + [0]*8
+    template['Auto Payment'] = [adult_template['Auto Payment'] * auto_payment_scale[i] for i in range(31)]
+
+    # Gas & Fuel - starts when driving
+    gas_scale = [0.05]*13 + [0.15, 0.20, 0.25, 0.40, 0.50, 0.45, 0.40, 0.35, 0.30, 0.25] + [0]*8
+    template['Gas & Fuel'] = [adult_template['Gas & Fuel'] * gas_scale[i] for i in range(31)]
+
+    # Auto Maintenance
+    maint_scale = [0.02]*13 + [0.10, 0.15, 0.20, 0.35, 0.40, 0.35, 0.30, 0.25, 0.20, 0.15] + [0]*8
+    template['Auto Maintenance'] = [adult_template['Auto Maintenance'] * maint_scale[i] for i in range(31)]
+
+    # Auto Insurance - HIGH for teens, then drops
+    insurance_scale = [0]*16 + [1.2, 1.1, 1.0, 0.8, 0.7, 0.6, 0.5] + [0]*8  # Teens pay MORE than adults!
+    template['Auto Insurance'] = [adult_template['Auto Insurance'] * insurance_scale[i] for i in range(31)]
+
+    # Parking & Tolls
+    parking_scale = [0]*16 + [0.3, 0.4, 0.4, 0.3, 0.3, 0.2, 0.2] + [0]*8
+    template['Parking & Tolls'] = [adult_template['Parking & Tolls'] * parking_scale[i] for i in range(31)]
+
+    # Public Transit - before driving age
+    transit_scale = [0.05, 0.05, 0.05, 0.05, 0.05, 0.10, 0.10, 0.10, 0.15, 0.15, 0.20, 0.20, 0.25, 0.30, 0.30, 0.20, 0, 0, 0, 0, 0, 0, 0] + [0]*8
+    template['Public Transit'] = [adult_template['Public Transit'] * transit_scale[i] for i in range(31)]
+
+    # Ride Shares
+    ride_scale = [0]*13 + [0.15, 0.20, 0.25, 0.30, 0.35, 0.30, 0.25, 0.20, 0.15, 0.10] + [0]*8
+    template['Ride Shares'] = [adult_template['Ride Shares'] * ride_scale[i] for i in range(31)]
+
+    # Personal categories
+    template['Clothing'] = [adult_template['Clothing'] * get_age_scale(i) for i in range(31)]
+    template['Personal Care'] = [adult_template['Personal Care'] * get_age_scale(i) for i in range(31)]
+    template['Grooming'] = [adult_template['Grooming'] * get_age_scale(i) * (1.2 if 13 <= i < 19 else 1.0) for i in range(31)]  # Teens spend more on grooming
+
+    # Health
+    template['Medical'] = [adult_template['Medical'] * get_age_scale(i) for i in range(31)]
+    template['Dental'] = [adult_template['Dental'] * get_age_scale(i) for i in range(31)]
+    template['Vision'] = [adult_template['Vision'] * get_age_scale(i) for i in range(31)]
+    template['Fitness'] = [adult_template['Fitness'] * (0.3 if 13 <= i < 23 else 0) for i in range(31)]
+    template['Mental Health'] = [adult_template['Mental Health'] * (0.3 if 13 <= i < 23 else 0) for i in range(31)]
+
+    # Entertainment & Lifestyle
+    template['Entertainment'] = [adult_template['Entertainment'] * get_age_scale(i) for i in range(31)]
+    template['Hobbies'] = [adult_template['Hobbies'] * get_age_scale(i) for i in range(31)]
+    template['Subscriptions'] = [adult_template['Subscriptions'] * (0.3 if 13 <= i < 23 else 0) for i in range(31)]
+    template['Phone'] = [adult_template['Phone'] * (0.6 if 13 <= i < 23 else 0) for i in range(31)]
+
+    # Child-specific categories
+    # Baby Equipment - only ages 0-4
+    baby_equip_base = 5000 if strategy_level == 'High-end' else 3000 if strategy_level == 'Average' else 2000
+    template['Baby Equipment'] = [baby_equip_base, baby_equip_base*0.15, baby_equip_base*0.10, baby_equip_base*0.07, baby_equip_base*0.05] + [0]*26
+
+    # Daycare - ages 0-8 (after-school for older kids)
+    daycare_base = 30000 if strategy_level == 'High-end' else 22000 if strategy_level == 'Average' else 18000
+    template['Daycare'] = ([daycare_base]*5 + [daycare_base*0.4, daycare_base*0.3, daycare_base*0.2, daycare_base*0.1] + [0]*22)
+
+    # School Supplies
+    supplies_base = 800 if strategy_level == 'High-end' else 500 if strategy_level == 'Average' else 300
+    template['School Supplies'] = ([supplies_base*0.1]*5 + [supplies_base*i/13 for i in range(1, 14)] + [0]*13)
+
+    # Activities & Sports - peaks in middle/high school
+    activities_base = 3000 if strategy_level == 'High-end' else 2000 if strategy_level == 'Average' else 1200
+    activities_scale = [0.05, 0.10, 0.15, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                        0.5, 0.4, 0.3, 0.2, 0.15] + [0]*8
+    template['Activities & Sports'] = [activities_base * activities_scale[i] for i in range(31)]
+
+    # Gifts & Celebrations
+    gifts_base = 1000 if strategy_level == 'High-end' else 700 if strategy_level == 'Average' else 500
+    template['Gifts & Celebrations'] = [gifts_base * (0.5 if i < 18 else 0.7 if i < 30 else 0) for i in range(31)]
+
+    # Education (college) - ages 18-21
+    education_base = 55000 if strategy_level == 'High-end' else 35000 if strategy_level == 'Average' else 25000
+    template['Education'] = ([0]*18 + [education_base]*4 + [0]*9)
+
+    # Other Child Expenses
+    template['Other Child Expenses'] = [adult_template['Other Personal'] * get_age_scale(i) * 0.5 for i in range(31)]
+
+    return template
+
 def get_template_strategy_data(location, strategy_name, template_type='family'):
     """
     Get the template data for a specific location and strategy.
@@ -722,12 +2044,11 @@ def get_template_strategy_data(location, strategy_name, template_type='family'):
     """
     if template_type == 'adult':
         return get_adult_expense_template(location, strategy_name)
+    elif template_type == 'children':
+        return get_children_expense_template(location, strategy_name)
     elif template_type == 'family':
         base_templates = FAMILY_EXPENSE_TEMPLATES
         custom_templates = st.session_state.get('custom_family_templates', {})
-    else:  # children
-        base_templates = CHILDREN_EXPENSE_TEMPLATES
-        custom_templates = st.session_state.get('custom_children_templates', {})
 
     # Try to get from base templates first (statistical)
     if location in base_templates:
@@ -4561,8 +5882,8 @@ def parent_x_tab():
     with col2:
         st.session_state.parentX_expense_location = st.selectbox(
             "Location",
-            options=["Seattle", "Sacramento", "Houston"],
-            index=["Seattle", "Sacramento", "Houston"].index(st.session_state.parentX_expense_location) if st.session_state.parentX_expense_location in ["Seattle", "Sacramento", "Houston"] else 0,
+            options=AVAILABLE_LOCATIONS_ADULTS,
+            index=AVAILABLE_LOCATIONS_ADULTS.index(st.session_state.parentX_expense_location) if st.session_state.parentX_expense_location in AVAILABLE_LOCATIONS_ADULTS else 0,
             key="parentX_expense_location_select",
             disabled=not st.session_state.parentX_use_template
         )
@@ -4747,8 +6068,8 @@ def parent_y_tab():
     with col2:
         st.session_state.parentY_expense_location = st.selectbox(
             "Location",
-            options=["Seattle", "Sacramento", "Houston"],
-            index=["Seattle", "Sacramento", "Houston"].index(st.session_state.parentY_expense_location) if st.session_state.parentY_expense_location in ["Seattle", "Sacramento", "Houston"] else 0,
+            options=AVAILABLE_LOCATIONS_ADULTS,
+            index=AVAILABLE_LOCATIONS_ADULTS.index(st.session_state.parentY_expense_location) if st.session_state.parentY_expense_location in AVAILABLE_LOCATIONS_ADULTS else 0,
             key="parentY_expense_location_select",
             disabled=not st.session_state.parentY_use_template
         )
