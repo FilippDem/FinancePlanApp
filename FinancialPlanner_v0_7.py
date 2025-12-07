@@ -6119,7 +6119,10 @@ def calculate_lifetime_cashflow():
     timeline_end = max(parent1_death_year, parent2_death_year)
 
     results = []
-    cumulative_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
+    # Track net worth separately for each parent
+    parent1_net_worth = st.session_state.parentX_net_worth
+    parent2_net_worth = st.session_state.parentY_net_worth
+    cumulative_net_worth = parent1_net_worth + parent2_net_worth
 
     for year in range(st.session_state.current_year, timeline_end + 1):
         # Calculate ages
@@ -6357,9 +6360,24 @@ def calculate_lifetime_cashflow():
         # Calculate cashflow (Income - Taxes - Expenses)
         cashflow = total_income - total_taxes - total_expenses
 
-        # Update net worth (cashflow + investment return based on user's expected return rate)
-        investment_return = cumulative_net_worth * st.session_state.economic_params.investment_return
-        cumulative_net_worth += cashflow + investment_return
+        # Calculate investment returns separately for each parent
+        parent1_investment_return = parent1_net_worth * st.session_state.economic_params.investment_return
+        parent2_investment_return = parent2_net_worth * st.session_state.economic_params.investment_return
+        investment_return = parent1_investment_return + parent2_investment_return
+
+        # Allocate cashflow proportionally to each parent based on their net worth
+        if cumulative_net_worth > 0:
+            parent1_cashflow_allocation = cashflow * (parent1_net_worth / cumulative_net_worth)
+            parent2_cashflow_allocation = cashflow * (parent2_net_worth / cumulative_net_worth)
+        else:
+            # If net worth is 0 or negative, split 50/50
+            parent1_cashflow_allocation = cashflow * 0.5
+            parent2_cashflow_allocation = cashflow * 0.5
+
+        # Update each parent's net worth separately
+        parent1_net_worth += parent1_cashflow_allocation + parent1_investment_return
+        parent2_net_worth += parent2_cashflow_allocation + parent2_investment_return
+        cumulative_net_worth = parent1_net_worth + parent2_net_worth
 
         # Track events
         events = []
@@ -6389,7 +6407,11 @@ def calculate_lifetime_cashflow():
             'parent1_income': parent1_income,
             'parent2_income': parent2_income,
             'ss_income': ss_income,
-            'investment_income': investment_return,  # Add investment returns
+            'investment_income': investment_return,  # Total investment returns
+            'parent1_investment_income': parent1_investment_return,  # Parent 1 investment returns
+            'parent2_investment_income': parent2_investment_return,  # Parent 2 investment returns
+            'parent1_net_worth': parent1_net_worth,  # Parent 1 net worth
+            'parent2_net_worth': parent2_net_worth,  # Parent 2 net worth
             'total_income': total_income,
             'taxes': total_taxes,  # Total taxes
             'tax_breakdown': tax_breakdown,  # Detailed tax breakdown
@@ -6577,8 +6599,10 @@ def deterministic_cashflow_tab():
                                 income_breakdown.append({'Source': f"{st.session_state.parent2_name} Salary", 'Amount': year_data['parent2_income']})
                             if year_data['ss_income'] > 0:
                                 income_breakdown.append({'Source': 'Social Security', 'Amount': year_data['ss_income']})
-                            if year_data.get('investment_income', 0) > 0:
-                                income_breakdown.append({'Source': '📈 Investment Returns', 'Amount': year_data['investment_income']})
+                            if year_data.get('parent1_investment_income', 0) > 0:
+                                income_breakdown.append({'Source': f"📈 {st.session_state.parent1_name} Investments", 'Amount': year_data['parent1_investment_income']})
+                            if year_data.get('parent2_investment_income', 0) > 0:
+                                income_breakdown.append({'Source': f"📈 {st.session_state.parent2_name} Investments", 'Amount': year_data['parent2_investment_income']})
 
                             if income_breakdown:
                                 income_df = pd.DataFrame(income_breakdown)
@@ -6660,11 +6684,17 @@ def deterministic_cashflow_tab():
                                 'value': year_data['ss_income'],
                                 'color': '#16a085'
                             })
-                        if year_data.get('investment_income', 0) > 0:
+                        if year_data.get('parent1_investment_income', 0) > 0:
                             income_sources.append({
-                                'name': '📈 Investment Returns',
-                                'value': year_data['investment_income'],
+                                'name': f"📈 {st.session_state.parent1_name} Investments",
+                                'value': year_data['parent1_investment_income'],
                                 'color': '#1abc9c'
+                            })
+                        if year_data.get('parent2_investment_income', 0) > 0:
+                            income_sources.append({
+                                'name': f"📈 {st.session_state.parent2_name} Investments",
+                                'value': year_data['parent2_investment_income'],
+                                'color': '#17a589'
                             })
 
                         # Add income source nodes
@@ -6776,7 +6806,7 @@ def deterministic_cashflow_tab():
                                 node_colors.append('#2ecc71')
                             elif 'Social Security' in label:
                                 node_colors.append('#16a085')
-                            elif 'Investment Returns' in label:
+                            elif 'Investments' in label:
                                 node_colors.append('#1abc9c')
                             elif 'Total Income' in label:
                                 node_colors.append('#3498db')
