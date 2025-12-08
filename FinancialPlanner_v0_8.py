@@ -4,7 +4,11 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
+import plotly.io as pio
 import json
+
+# Configure Plotly to use dark theme
+pio.templates.default = "plotly_dark"
 from datetime import datetime
 import io
 from dataclasses import dataclass, asdict
@@ -5621,14 +5625,14 @@ def apply_custom_css_theme():
         --warning-color: #f39c12;
         --danger-color: #e74c3c;
         --info-color: #3498db;
-        --light-bg: #f8f9fa;
-        --dark-text: #2c3e50;
-        --medium-text: #7f8c8d;
+        --light-bg: #2d2d44;
+        --dark-text: #ffffff;
+        --medium-text: #b0b0c0;
     }
 
-    /* Main app background */
+    /* Main app background - Dark theme */
     .stApp {
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
     }
 
     /* ============================================================================
@@ -5636,7 +5640,7 @@ def apply_custom_css_theme():
        ============================================================================ */
 
     h1, h2, h3, h4, h5, h6 {
-        color: var(--dark-text) !important;
+        color: #ffffff !important;
         font-weight: 600 !important;
     }
 
@@ -5653,6 +5657,7 @@ def apply_custom_css_theme():
         border-left: 4px solid var(--primary-color);
         padding-left: 15px;
         margin: 25px 0 15px 0 !important;
+        color: #e0e0e0 !important;
     }
 
     h3 {
@@ -5682,11 +5687,11 @@ def apply_custom_css_theme():
     }
 
     div[data-testid="metric-container"] {
-        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        background: linear-gradient(135deg, #2d2d44 0%, #3a3a54 100%);
         padding: 20px;
         border-radius: 12px;
-        border: 1px solid #e0e0e0;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border: 1px solid #4a4a6a;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
 
@@ -5738,7 +5743,9 @@ def apply_custom_css_theme():
     .stNumberInput > div > div > input,
     .stSelectbox > div > div > select {
         border-radius: 8px;
-        border: 2px solid #e0e0e0;
+        border: 2px solid #4a4a6a;
+        background-color: #2d2d44;
+        color: #ffffff;
         padding: 0.6rem 0.8rem;
         transition: border-color 0.3s ease, box-shadow 0.3s ease;
     }
@@ -5762,10 +5769,10 @@ def apply_custom_css_theme():
 
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
-        background-color: white;
+        background-color: #2d2d44;
         padding: 10px;
         border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
 
     .stTabs [data-baseweb="tab"] {
@@ -5779,8 +5786,8 @@ def apply_custom_css_theme():
     }
 
     .stTabs [data-baseweb="tab"]:hover {
-        background-color: rgba(102, 126, 234, 0.08);
-        color: var(--primary-color);
+        background-color: rgba(102, 126, 234, 0.2);
+        color: #8fa3f5;
     }
 
     .stTabs [aria-selected="true"] {
@@ -5797,9 +5804,9 @@ def apply_custom_css_theme():
        ============================================================================ */
 
     .streamlit-expanderHeader {
-        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        background: linear-gradient(135deg, #2d2d44 0%, #3a3a54 100%);
         border-radius: 10px;
-        border: 1px solid #e0e0e0;
+        border: 1px solid #4a4a6a;
         padding: 12px 16px;
         font-weight: 500;
         color: var(--dark-text);
@@ -5807,13 +5814,13 @@ def apply_custom_css_theme():
     }
 
     .streamlit-expanderHeader:hover {
-        background: linear-gradient(135deg, #f8f9fa 0%, #ecf0f1 100%);
+        background: linear-gradient(135deg, #3a3a54 0%, #4545668 100%);
         border-color: var(--primary-color);
     }
 
     .streamlit-expanderContent {
-        background-color: white;
-        border: 1px solid #e0e0e0;
+        background-color: #252538;
+        border: 1px solid #4a4a6a;
         border-top: none;
         border-radius: 0 0 10px 10px;
         padding: 16px;
@@ -5837,13 +5844,23 @@ def apply_custom_css_theme():
         border: none;
     }
 
+    .dataframe tbody tr {
+        background-color: #2d2d44;
+        color: #ffffff;
+    }
+
     .dataframe tbody tr:nth-child(even) {
-        background-color: #f8f9fa;
+        background-color: #3a3a54;
     }
 
     .dataframe tbody tr:hover {
-        background-color: rgba(102, 126, 234, 0.08);
+        background-color: rgba(102, 126, 234, 0.25);
         transition: background-color 0.2s ease;
+    }
+
+    .dataframe tbody td {
+        color: #ffffff !important;
+        border-color: #4a4a6a !important;
     }
 
     /* Data editor */
@@ -5890,31 +5907,35 @@ def apply_custom_css_theme():
        ============================================================================ */
 
     .stSuccess {
-        background-color: #d4edda;
+        background-color: rgba(46, 204, 113, 0.15);
         border-left: 4px solid #2ecc71;
         border-radius: 8px;
         padding: 12px 16px;
+        color: #90ee90;
     }
 
     .stInfo {
-        background-color: #d1ecf1;
+        background-color: rgba(52, 152, 219, 0.15);
         border-left: 4px solid #3498db;
         border-radius: 8px;
         padding: 12px 16px;
+        color: #87ceeb;
     }
 
     .stWarning {
-        background-color: #fff3cd;
+        background-color: rgba(243, 156, 18, 0.15);
         border-left: 4px solid #f39c12;
         border-radius: 8px;
         padding: 12px 16px;
+        color: #ffdb99;
     }
 
     .stError {
-        background-color: #f8d7da;
+        background-color: rgba(231, 76, 60, 0.15);
         border-left: 4px solid #e74c3c;
         border-radius: 8px;
         padding: 12px 16px;
+        color: #ff9999;
     }
 
     /* ============================================================================
@@ -5924,8 +5945,8 @@ def apply_custom_css_theme():
     .js-plotly-plot {
         border-radius: 12px;
         overflow: hidden;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-        background: white;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+        background: #2d2d44;
     }
 
     /* ============================================================================
