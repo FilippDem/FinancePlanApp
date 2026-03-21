@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # =====================================================
+  # Financial Planning App (internal only - not exposed directly)
+  # =====================================================
+  financial-planner:
+    build: .
+    container_name: financial-planner
+    # NO public ports - only accessible through the reverse proxy
+    expose:
+      - "8501"
+    volumes:
+      - ./app-data:/app/data
+    environment:
+      - DATA_DIR=/app/data
+    restart: unless-stopped
+    networks:
+      - internal
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 512M
+
+  # =====================================================
+  # Nginx Proxy Manager - handles HTTPS + Let's Encrypt
+  # =====================================================
+  nginx-proxy:
+    image: 'jc21/nginx-proxy-manager:latest'
+    container_name: nginx-proxy
+    restart: unless-stopped
+    ports:
+      - '80:80'     # HTTP  (redirects to HTTPS)
+      - '443:443'   # HTTPS (encrypted traffic)
+      - '81:81'     # Admin panel (LOCAL access only - do NOT port forward this)
+    volumes:
+      - ./nginx-data:/data
+      - ./nginx-letsencrypt:/etc/letsencrypt
+    environment:
+      TZ: "America/Los_Angeles"
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge

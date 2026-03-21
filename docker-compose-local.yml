@@ -1,0 +1,25 @@
+version: '3.8'
+
+# =====================================================
+# LOCAL-ONLY VERSION (no HTTPS, no reverse proxy)
+# Use this for testing on your home network first
+# Access at: http://NAS_IP:8501
+# =====================================================
+
+services:
+  financial-planner:
+    build: .
+    container_name: financial-planner
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./app-data:/app/data
+    environment:
+      - DATA_DIR=/app/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 512M
