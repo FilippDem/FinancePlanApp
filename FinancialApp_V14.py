@@ -179,6 +179,31 @@ def get_household_info(household_id: str) -> dict:
         return {}
 
 
+def save_household_scenarios(household_id: str, scenarios: dict):
+    """Save named scenarios to household file"""
+    ensure_data_dirs()
+    household_file = HOUSEHOLDS_DIR / f"{household_id}.json"
+    try:
+        with open(household_file, 'r') as f:
+            household = json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        household = {}
+    household['scenarios'] = scenarios
+    with open(household_file, 'w') as f:
+        json.dump(household, f, indent=2)
+
+
+def load_household_scenarios(household_id: str) -> dict:
+    """Load named scenarios from household file"""
+    household_file = HOUSEHOLDS_DIR / f"{household_id}.json"
+    try:
+        with open(household_file, 'r') as f:
+            household = json.load(f)
+        return household.get('scenarios', {})
+    except (json.JSONDecodeError, FileNotFoundError):
+        return {}
+
+
 def login_page():
     """Display login/registration page"""
     st.title("💰 Financial Planning Suite")
@@ -806,8 +831,11 @@ def initialize_session_state():
         st.session_state.inflation_adjusted_display = True
         st.session_state.default_inflation_rate = 0.025
 
-        # NEW: Internal save/load system
-        st.session_state.saved_scenarios = {}  # Dictionary to store named scenarios
+        # NEW: Internal save/load system — load from household storage if authenticated
+        if st.session_state.get('authenticated') and st.session_state.get('household_id'):
+            st.session_state.saved_scenarios = load_household_scenarios(st.session_state.household_id)
+        else:
+            st.session_state.saved_scenarios = {}
 
         st.session_state.initialized = True
 
@@ -3673,7 +3701,8 @@ def combined_simulation_tab():
 
                 success_message = f"✅ Analysis completed using {'historical performance data' if st.session_state.mc_use_historical else 'traditional Monte Carlo'}! "
                 success_message += f"Generated {st.session_state.mc_simulations:,} scenarios over {st.session_state.mc_years} years "
-                success_message += f"in {'today\'s dollars' if st.session_state.mc_normalize_to_today_dollars else 'future dollars'}."
+                dollar_type = "today's dollars" if st.session_state.mc_normalize_to_today_dollars else "future dollars"
+                success_message += f"in {dollar_type}."
                 st.success(success_message)
 
     # Display results if available
@@ -4306,11 +4335,13 @@ def save_load_tab():
         scenario_name = st.text_input("Scenario Name", key="save_scenario_name",
                                       placeholder="e.g., 'Base Case', 'Optimistic', 'Conservative'")
 
-        if st.button("💾 Save Scenario Internally", key="save_internal_scenario"):
+        if st.button("💾 Save Scenario", key="save_internal_scenario"):
             if scenario_name and scenario_name.strip():
                 scenario_data = save_data()
                 if scenario_data:
                     st.session_state.saved_scenarios[scenario_name.strip()] = scenario_data
+                    if st.session_state.get('authenticated') and st.session_state.get('household_id'):
+                        save_household_scenarios(st.session_state.household_id, st.session_state.saved_scenarios)
                     st.success(f"Saved scenario: {scenario_name}")
                     st.rerun()
             else:
@@ -4340,6 +4371,8 @@ def save_load_tab():
                 if st.button("🗑️ Delete Scenario", key="delete_internal_scenario"):
                     if scenario_to_load != "Select...":
                         del st.session_state.saved_scenarios[scenario_to_load]
+                        if st.session_state.get('authenticated') and st.session_state.get('household_id'):
+                            save_household_scenarios(st.session_state.household_id, st.session_state.saved_scenarios)
                         st.success(f"Deleted scenario: {scenario_to_load}")
                         st.rerun()
         else:
@@ -4419,6 +4452,8 @@ def save_load_tab():
         if st.session_state.saved_scenarios:
             if st.button("🗑️ Clear All Scenarios", key="clear_all_scenarios"):
                 st.session_state.saved_scenarios = {}
+                if st.session_state.get('authenticated') and st.session_state.get('household_id'):
+                    save_household_scenarios(st.session_state.household_id, st.session_state.saved_scenarios)
                 st.success("Cleared all saved scenarios!")
                 st.rerun()
 

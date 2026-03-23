@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
+    gcc curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
@@ -13,7 +13,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application
-COPY FinancialApp_V14.py .
+COPY FinancialPlanner_v0_8.py .
 
 # Create data directory
 RUN mkdir -p /app/data/households
@@ -31,7 +31,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 
 # Run the application
 ENV DATA_DIR=/app/data
-CMD ["streamlit", "run", "FinancialApp_V14.py", \
+CMD ["streamlit", "run", "FinancialPlanner_v0_8.py", \
      "--server.port=8501", \
      "--server.address=0.0.0.0", \
      "--server.headless=true", \

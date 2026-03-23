@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Filipp Design</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 3rem 1.5rem;
+            background: #0a0a0a;
+            color: #e5e5e5;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 4rem;
+            max-width: 600px;
+        }
+
+        header h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            margin-bottom: 0.5rem;
+            color: #fff;
+        }
+
+        header p {
+            font-size: 1rem;
+            color: #888;
+            line-height: 1.6;
+        }
+
+        .sections {
+            width: 100%;
+            max-width: 700px;
+        }
+
+        .section-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #666;
+            margin-bottom: 1rem;
+            padding-left: 4px;
+        }
+
+        .projects {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-bottom: 3rem;
+        }
+
+        .project-card {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            padding: 1.25rem 1.5rem;
+            background: #141414;
+            border: 1px solid #222;
+            border-radius: 12px;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.2s ease;
+        }
+
+        .project-card:hover {
+            border-color: #4A90D9;
+            background: #181820;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(74, 144, 217, 0.1);
+        }
+
+        .project-icon {
+            font-size: 1.8rem;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1a1a2e;
+            border-radius: 10px;
+            flex-shrink: 0;
+        }
+
+        .project-info h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 0.25rem;
+        }
+
+        .project-info p {
+            font-size: 0.85rem;
+            color: #777;
+            line-height: 1.4;
+        }
+
+        .project-arrow {
+            margin-left: auto;
+            color: #444;
+            font-size: 1.2rem;
+            transition: color 0.2s ease;
+        }
+
+        .project-card:hover .project-arrow { color: #4A90D9; }
+
+        .badge {
+            display: inline-block;
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        .badge-live { background: #0d3320; color: #34d399; }
+        .badge-soon { background: #332b0d; color: #d9a834; }
+
+        footer {
+            margin-top: auto;
+            padding-top: 3rem;
+            text-align: center;
+            color: #444;
+            font-size: 0.8rem;
+        }
+
+        @media (prefers-color-scheme: light) {
+            body { background: #fafafa; color: #333; }
+            header h1 { color: #111; }
+            .project-card { background: #fff; border-color: #e5e5e5; }
+            .project-card:hover { background: #f8f9ff; }
+            .project-icon { background: #f0f4ff; }
+            .project-info h3 { color: #111; }
+            .project-arrow { color: #ccc; }
+            footer { color: #aaa; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Filipp Design</h1>
+        <p>Personal projects in hardware and software engineering.</p>
+    </header>
+
+    <div class="sections">
+        <div class="section-title">Software</div>
+        <div class="projects">
+            <a href="https://finance.filippdesign.com" class="project-card">
+                <div class="project-icon">💰</div>
+                <div class="project-info">
+                    <h3>Financial Planning Suite <span class="badge badge-live">Live</span></h3>
+                    <p>Lifetime financial planner with Monte Carlo simulation, tax modeling, and household sharing.</p>
+                </div>
+                <span class="project-arrow">&rarr;</span>
+            </a>
+        </div>
+
+        <div class="section-title">Hardware</div>
+        <div class="projects">
+            <div class="project-card" style="cursor: default; opacity: 0.6;">
+                <div class="project-icon">🔧</div>
+                <div class="project-info">
+                    <h3>Coming Soon <span class="badge badge-soon">Planned</span></h3>
+                    <p>Hardware projects will be listed here.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        &copy; 2026 Filipp Design
+    </footer>
+</body>
+</html>
