@@ -4096,6 +4096,7 @@ def setup_wizard():
 
         if household_type == "Me and my partner":
             st.subheader("Partner Details")
+            st.caption("Don't worry about getting your partner's details perfect — they can update their own info later in the app.")
             p2_col1, p2_col2, p2_col3 = st.columns([2, 1, 1])
             with p2_col1:
                 p2_name = st.text_input("Partner's name", value=st.session_state.wizard_data.get('p2_name', ''), key="wiz_p2_name")
@@ -4187,8 +4188,10 @@ def setup_wizard():
             st.session_state.wizard_data['p1_career_phases'] = career_phases
 
         if is_couple:
+            st.markdown("---")
             partner_label = st.session_state.wizard_data.get('p2_name', 'Partner') or 'Partner'
             st.subheader(f"{partner_label}'s Income")
+            st.caption(f"Enter your best estimate — {partner_label} can refine these details later.")
             p2_income = st.number_input("Current annual income ($)", min_value=0, max_value=10_000_000,
                                          value=st.session_state.wizard_data.get('p2_income', 75000),
                                          step=5000, key="wiz_p2_income")
@@ -6767,9 +6770,194 @@ def parent_settings_tab():
     """)
 
 
+def _guided_mode_toggle(tab_key):
+    """Show a toggle to switch between form and guided mode for a tab."""
+    guided_key = f"guided_{tab_key}"
+    guided_step_key = f"guided_step_{tab_key}"
+    if guided_key not in st.session_state:
+        st.session_state[guided_key] = False
+    if guided_step_key not in st.session_state:
+        st.session_state[guided_step_key] = 0
+
+    if st.session_state[guided_key]:
+        if st.button("Switch to full form view", key=f"toggle_form_{tab_key}"):
+            st.session_state[guided_key] = False
+            st.rerun()
+    else:
+        if st.button("\U0001f9d9 Guided setup \u2014 answer questions one at a time", key=f"toggle_guided_{tab_key}"):
+            st.session_state[guided_key] = True
+            st.session_state[guided_step_key] = 0
+            st.rerun()
+
+    return st.session_state[guided_key]
+
+
+def _guided_nav(tab_key, current_step, total_steps):
+    """Navigation for guided mode within a tab."""
+    step_key = f"guided_step_{tab_key}"
+    st.progress((current_step + 1) / total_steps)
+    st.caption(f"Question {current_step + 1} of {total_steps}")
+    col1, col2 = st.columns(2)
+    with col1:
+        if current_step > 0:
+            if st.button("\u2190 Back", key=f"guided_back_{tab_key}_{current_step}"):
+                st.session_state[step_key] = current_step - 1
+                st.rerun()
+    with col2:
+        if current_step < total_steps - 1:
+            if st.button("Next \u2192", key=f"guided_next_{tab_key}_{current_step}", type="primary"):
+                st.session_state[step_key] = current_step + 1
+                st.rerun()
+        else:
+            if st.button("\u2705 Done", key=f"guided_done_{tab_key}", type="primary"):
+                st.session_state[f"guided_{tab_key}"] = False
+                st.rerun()
+
+
+def _parent_guided_mode(parent_prefix):
+    """Guided Q&A mode for a parent's financial details."""
+    p = parent_prefix  # "X" or "Y"
+    tab_key = f"parent_{p.lower()}"
+    step = st.session_state.get(f"guided_step_{tab_key}", 0)
+    total_steps = 6
+
+    name = st.session_state.parent1_name if p == "X" else st.session_state.parent2_name
+
+    if step == 0:
+        st.subheader(f"How old is {name}?")
+        st.session_state[f"parent{p}_age"] = st.number_input(
+            "Current age", min_value=18, max_value=100,
+            value=int(st.session_state[f"parent{p}_age"]),
+            key=f"guided_{p}_age")
+
+    elif step == 1:
+        st.subheader(f"What is {name}'s current annual income?")
+        st.caption("Include base salary before taxes. We'll add bonuses and equity in the career section.")
+        st.session_state[f"parent{p}_income"] = st.number_input(
+            "Annual income ($)", min_value=0, max_value=10_000_000,
+            value=int(st.session_state[f"parent{p}_income"]),
+            step=5000, key=f"guided_{p}_income")
+
+    elif step == 2:
+        st.subheader(f"What is {name}'s current net worth?")
+        st.caption("Total savings, investments, and assets minus any debts.")
+        st.session_state[f"parent{p}_net_worth"] = st.number_input(
+            "Net worth ($)", min_value=-10_000_000, max_value=100_000_000,
+            value=int(st.session_state[f"parent{p}_net_worth"]),
+            step=5000, key=f"guided_{p}_nw")
+
+    elif step == 3:
+        st.subheader(f"What annual raise does {name} typically get?")
+        st.caption("A typical annual raise is 3-5%. High performers or growing careers might see 5-10%.")
+        st.session_state[f"parent{p}_raise"] = st.number_input(
+            "Annual raise (%)", min_value=0.0, max_value=30.0,
+            value=float(st.session_state[f"parent{p}_raise"]),
+            step=0.5, key=f"guided_{p}_raise")
+
+    elif step == 4:
+        st.subheader(f"When does {name} plan to retire?")
+        st.session_state[f"parent{p}_retirement_age"] = st.number_input(
+            "Retirement age", min_value=30, max_value=85,
+            value=int(st.session_state[f"parent{p}_retirement_age"]),
+            key=f"guided_{p}_retire")
+        st.caption("Early retirement? No problem \u2014 the simulation will model the income gap.")
+
+    elif step == 5:
+        st.subheader(f"What Social Security benefit does {name} expect?")
+        st.caption("Check ssa.gov for your estimated benefit. Average is ~$1,900/month.")
+        st.session_state[f"parent{p}_ss_benefit"] = st.number_input(
+            "Monthly SS benefit ($)", min_value=0.0, max_value=10000.0,
+            value=float(st.session_state[f"parent{p}_ss_benefit"]),
+            step=100.0, key=f"guided_{p}_ss")
+
+    _guided_nav(tab_key, step, total_steps)
+
+
+def _children_guided_mode():
+    """Guided Q&A mode for children planning."""
+    tab_key = "children"
+    step = st.session_state.get(f"guided_step_{tab_key}", 0)
+    total_steps = 3
+
+    if step == 0:
+        st.subheader("Do you have or plan to have children?")
+        has_kids = st.radio("", ["Yes", "No"], index=0 if st.session_state.children_list else 1,
+                           key="guided_has_kids", label_visibility="collapsed")
+        if has_kids == "No":
+            st.session_state.children_list = []
+
+    elif step == 1:
+        st.subheader("Tell us about your children")
+        st.caption("Include both existing children and ones you're planning.")
+        num_kids = st.number_input("How many children (current + planned)?",
+                                    min_value=0, max_value=10,
+                                    value=max(len(st.session_state.children_list), 1),
+                                    key="guided_num_kids")
+
+        while len(st.session_state.children_list) < num_kids:
+            st.session_state.children_list.append({
+                'name': f'Child {len(st.session_state.children_list)+1}',
+                'birth_year': datetime.now().year + len(st.session_state.children_list),
+                'use_template': True,
+                'template_state': 'Seattle',
+                'template_strategy': 'Average'
+            })
+        st.session_state.children_list = st.session_state.children_list[:num_kids]
+
+        for i, child in enumerate(st.session_state.children_list):
+            col1, col2 = st.columns(2)
+            with col1:
+                child['name'] = st.text_input(f"Child {i+1} name", value=child['name'], key=f"guided_kid_name_{i}")
+            with col2:
+                child['birth_year'] = st.number_input(f"Birth year", min_value=1990, max_value=2060,
+                                                       value=child['birth_year'], key=f"guided_kid_year_{i}")
+
+    elif step == 2:
+        st.subheader("Where will your children grow up?")
+        st.caption("This determines cost estimates for childcare, education, and activities.")
+        location = st.selectbox("Location", AVAILABLE_LOCATIONS_CHILDREN, key="guided_kid_location")
+        for child in st.session_state.children_list:
+            child['template_state'] = location
+
+    _guided_nav(tab_key, step, total_steps)
+
+
+def _family_expenses_guided_mode():
+    """Guided Q&A mode for family expenses."""
+    tab_key = "family_expenses"
+    step = st.session_state.get(f"guided_step_{tab_key}", 0)
+    expenses = st.session_state.family_shared_expenses
+
+    # Group expenses into categories for step-by-step
+    groups = [
+        ("Housing", ["Mortgage/Rent", "Home Improvement", "Property Tax", "Home Insurance"]),
+        ("Utilities", ["Gas & Electric", "Water", "Garbage", "Internet & Cable"]),
+        ("Lifestyle", ["Shared Subscriptions", "Family Vacations", "Pet Care", "Other Family Expenses"]),
+    ]
+    total_steps = len(groups)
+
+    group_name, group_keys = groups[step]
+    st.subheader(f"How much does your household spend on {group_name.lower()}?")
+    st.caption("Enter annual amounts. Don't worry about being exact \u2014 you can fine-tune later.")
+
+    for key in group_keys:
+        if key in expenses:
+            expenses[key] = st.number_input(
+                key, min_value=0.0, max_value=1_000_000.0,
+                value=float(expenses[key]), step=500.0,
+                key=f"guided_exp_{key}")
+
+    st.session_state.family_shared_expenses = expenses
+    _guided_nav(tab_key, step, total_steps)
+
+
 def parent_x_tab():
     """Parent X financial details tab"""
     st.header(f"{st.session_state.parent1_emoji} {st.session_state.parent1_name}'s Financial Details")
+
+    if _guided_mode_toggle("parent_x"):
+        _parent_guided_mode("X")
+        return
 
     col1, col2 = st.columns(2)
 
@@ -7008,6 +7196,10 @@ def parent_y_tab():
     """Parent Y financial details tab"""
     st.header(f"{st.session_state.parent2_emoji} {st.session_state.parent2_name}'s Financial Details")
 
+    if _guided_mode_toggle("parent_y"):
+        _parent_guided_mode("Y")
+        return
+
     col1, col2 = st.columns(2)
 
     with col1:
@@ -7243,7 +7435,11 @@ def parent_y_tab():
 
 def family_expenses_tab():
     """Family expenses tab with template browsing, modification, and custom city creation"""
-    st.header("💸 Family Expenses")
+    st.header("\U0001f4b8 Family Expenses")
+
+    if _guided_mode_toggle("family_expenses"):
+        _family_expenses_guided_mode()
+        return
 
     # Show inflation adjustment info
     st.info(f"ℹ️ All expense templates are inflation-adjusted to **{EXPENSE_TEMPLATE_BASE_YEAR}** dollars")
@@ -7900,7 +8096,11 @@ def recurring_one_time_expenses_tab():
 
 def children_tab():
     """Children tab"""
-    st.header("👶 Children")
+    st.header("\U0001f476 Children")
+
+    if _guided_mode_toggle("children"):
+        _children_guided_mode()
+        return
 
     st.info("💡 **About Children Expenses**: All child-related expenses shown in the templates are calculated in today's dollars and will be automatically inflation-adjusted going forward based on your selected economic scenario.")
 
