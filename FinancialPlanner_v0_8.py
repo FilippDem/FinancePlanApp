@@ -3848,6 +3848,22 @@ class EconomicParameters:
 
 
 @dataclass
+class CareerPhase:
+    start_age: int
+    end_age: int
+    philosophy: str  # "Stable", "Climbing the Ladder", "Startup", "Part-time", "Coasting"
+    base_salary: float
+    annual_raise_pct: float = 3.0
+    annual_bonus_pct: float = 0.0
+    rsu_annual_grant: float = 0.0
+    rsu_vesting_years: int = 4
+    stock_options_grant: float = 0.0
+    stock_options_growth_pct: float = 0.0
+    stock_options_liquidity_year: int = 0
+    label: str = ""
+
+
+@dataclass
 class HouseTimelineEntry:
     year: int
     status: str
@@ -4144,6 +4160,32 @@ def setup_wizard():
                                                            value=jc_list[i]['income'], step=5000, key=f"wiz_p1_jc_i{i}")
             st.session_state.wizard_data['p1_job_changes'] = jc_list
 
+        st.markdown("---")
+        has_career_changes = st.checkbox("I expect distinct career phases (job switches, startup, etc.)", value=False, key="wiz_p1_career_changes")
+
+        if has_career_changes:
+            num_phases = st.number_input("How many career phases?", min_value=2, max_value=5, value=2, key="wiz_p1_num_phases")
+            career_phases = []
+            for i in range(int(num_phases)):
+                st.markdown(f"**Phase {i+1}**")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    cp_start = st.number_input("Start Age", value=st.session_state.wizard_data.get('p1_age', 30) + i*10, key=f"wiz_p1_cp_start_{i}")
+                with col2:
+                    cp_end = st.number_input("End Age", value=min(st.session_state.wizard_data.get('p1_age', 30) + (i+1)*10, st.session_state.wizard_data.get('p1_retire', 65)), key=f"wiz_p1_cp_end_{i}")
+                with col3:
+                    cp_phil = st.selectbox("Style", ["Stable", "Climbing the Ladder", "Startup", "Part-time", "Coasting"], key=f"wiz_p1_cp_phil_{i}")
+                col1, col2 = st.columns(2)
+                with col1:
+                    cp_salary = st.number_input("Base Salary ($)", value=75000, step=5000, key=f"wiz_p1_cp_sal_{i}")
+                with col2:
+                    cp_raise = st.number_input("Annual Raise %", value=3.0, step=0.5, key=f"wiz_p1_cp_raise_{i}")
+                career_phases.append({
+                    'start_age': int(cp_start), 'end_age': int(cp_end), 'philosophy': cp_phil,
+                    'base_salary': float(cp_salary), 'annual_raise_pct': float(cp_raise), 'label': f"Phase {i+1}"
+                })
+            st.session_state.wizard_data['p1_career_phases'] = career_phases
+
         if is_couple:
             partner_label = st.session_state.wizard_data.get('p2_name', 'Partner') or 'Partner'
             st.subheader(f"{partner_label}'s Income")
@@ -4180,6 +4222,32 @@ def setup_wizard():
                         jc_list2[i]['income'] = st.number_input(f"New income ($)", min_value=0, max_value=10_000_000,
                                                                  value=jc_list2[i]['income'], step=5000, key=f"wiz_p2_jc_i{i}")
                 st.session_state.wizard_data['p2_job_changes'] = jc_list2
+
+            st.markdown("---")
+            has_career_changes_p2 = st.checkbox("Partner expects distinct career phases (job switches, startup, etc.)", value=False, key="wiz_p2_career_changes")
+
+            if has_career_changes_p2:
+                num_phases_p2 = st.number_input("How many career phases?", min_value=2, max_value=5, value=2, key="wiz_p2_num_phases")
+                career_phases_p2 = []
+                for i in range(int(num_phases_p2)):
+                    st.markdown(f"**Phase {i+1}**")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        cp_start = st.number_input("Start Age", value=st.session_state.wizard_data.get('p2_age', 30) + i*10, key=f"wiz_p2_cp_start_{i}")
+                    with col2:
+                        cp_end = st.number_input("End Age", value=min(st.session_state.wizard_data.get('p2_age', 30) + (i+1)*10, st.session_state.wizard_data.get('p2_retire', 65)), key=f"wiz_p2_cp_end_{i}")
+                    with col3:
+                        cp_phil = st.selectbox("Style", ["Stable", "Climbing the Ladder", "Startup", "Part-time", "Coasting"], key=f"wiz_p2_cp_phil_{i}")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        cp_salary = st.number_input("Base Salary ($)", value=75000, step=5000, key=f"wiz_p2_cp_sal_{i}")
+                    with col2:
+                        cp_raise = st.number_input("Annual Raise %", value=3.0, step=0.5, key=f"wiz_p2_cp_raise_{i}")
+                    career_phases_p2.append({
+                        'start_age': int(cp_start), 'end_age': int(cp_end), 'philosophy': cp_phil,
+                        'base_salary': float(cp_salary), 'annual_raise_pct': float(cp_raise), 'label': f"Phase {i+1}"
+                    })
+                st.session_state.wizard_data['p2_career_phases'] = career_phases_p2
 
         _wizard_nav(step)
 
@@ -4429,6 +4497,25 @@ def _wizard_create_plan():
         incomes = [float(jc['income']) for jc in wd['p1_job_changes']]
         st.session_state.parentX_job_changes = pd.DataFrame({'Year': years, 'New Income': incomes})
 
+    # Career phases
+    if wd.get('p1_career_phases'):
+        st.session_state.parentX_career_phases = [
+            CareerPhase(**cp) for cp in wd['p1_career_phases']
+        ]
+    else:
+        st.session_state.parentX_career_phases = [
+            CareerPhase(
+                start_age=int(wd.get('p1_age', 30)),
+                end_age=int(wd.get('p1_retire', 65)),
+                philosophy="Stable",
+                base_salary=float(wd.get('p1_income', 75000)),
+                annual_raise_pct=float(wd.get('p1_raise', 3.0)),
+                label="Current Job"
+            )
+        ]
+    st.session_state.parentX_income = st.session_state.parentX_career_phases[0].base_salary
+    st.session_state.parentX_raise = st.session_state.parentX_career_phases[0].annual_raise_pct
+
     # Parent 2
     if is_couple:
         st.session_state.parent2_name = wd.get('p2_name', 'Parent 2') or 'Parent 2'
@@ -4445,6 +4532,25 @@ def _wizard_create_plan():
             years2 = [jc['year'] for jc in wd['p2_job_changes']]
             incomes2 = [float(jc['income']) for jc in wd['p2_job_changes']]
             st.session_state.parentY_job_changes = pd.DataFrame({'Year': years2, 'New Income': incomes2})
+
+        # Career phases for parent 2
+        if wd.get('p2_career_phases'):
+            st.session_state.parentY_career_phases = [
+                CareerPhase(**cp) for cp in wd['p2_career_phases']
+            ]
+        else:
+            st.session_state.parentY_career_phases = [
+                CareerPhase(
+                    start_age=int(wd.get('p2_age', 30)),
+                    end_age=int(wd.get('p2_retire', 65)),
+                    philosophy="Stable",
+                    base_salary=float(wd.get('p2_income', 75000)),
+                    annual_raise_pct=float(wd.get('p2_raise', 3.0)),
+                    label="Current Job"
+                )
+            ]
+        st.session_state.parentY_income = st.session_state.parentY_career_phases[0].base_salary
+        st.session_state.parentY_raise = st.session_state.parentY_career_phases[0].annual_raise_pct
     else:
         st.session_state.parent2_name = "N/A"
         st.session_state.parent2_emoji = "👤"
@@ -4541,6 +4647,16 @@ def initialize_session_state():
             'Year': pd.Series(dtype='int'),
             'New Income': pd.Series(dtype='float')
         })
+        st.session_state.parentX_career_phases = [
+            CareerPhase(
+                start_age=st.session_state.parentX_age,
+                end_age=st.session_state.parentX_retirement_age,
+                philosophy="Stable",
+                base_salary=st.session_state.parentX_income,
+                annual_raise_pct=st.session_state.parentX_raise,
+                label="Current Job"
+            )
+        ]
 
         # Parent Y data
         st.session_state.parentY_age = 30
@@ -4554,6 +4670,16 @@ def initialize_session_state():
             'Year': pd.Series(dtype='int'),
             'New Income': pd.Series(dtype='float')
         })
+        st.session_state.parentY_career_phases = [
+            CareerPhase(
+                start_age=st.session_state.parentY_age,
+                end_age=st.session_state.parentY_retirement_age,
+                philosophy="Stable",
+                base_salary=st.session_state.parentY_income,
+                annual_raise_pct=st.session_state.parentY_raise,
+                label="Current Job"
+            )
+        ]
 
         # Parent X expense settings
         st.session_state.parentX_expense_location = "Seattle"
@@ -6214,6 +6340,49 @@ def get_income_for_year(base_income: float, raise_rate: float, job_changes_df: p
     return income
 
 
+def get_career_income_for_year(career_phases, parent_age_current, current_year, target_year):
+    """Calculate total compensation for a specific year from career phases.
+    Returns dict with base_salary, bonus, rsu_income, options_income, total_employment_income."""
+    target_age = parent_age_current + (target_year - current_year)
+
+    # Find active phase
+    active_phase = None
+    for phase in career_phases:
+        if phase.start_age <= target_age < phase.end_age:
+            active_phase = phase
+            break
+
+    if active_phase is None:
+        return {'base_salary': 0, 'bonus': 0, 'rsu_income': 0, 'options_income': 0, 'total_employment_income': 0}
+
+    years_in_phase = target_age - active_phase.start_age
+
+    # Base salary with raises
+    base = active_phase.base_salary * (1 + active_phase.annual_raise_pct / 100) ** years_in_phase
+
+    # Bonus
+    bonus = base * (active_phase.annual_bonus_pct / 100)
+
+    # RSU income (steady state after year 1 in phase)
+    rsu = active_phase.rsu_annual_grant if years_in_phase >= 1 else 0
+
+    # Stock options (one-time liquidity event)
+    options = 0
+    if active_phase.stock_options_grant > 0 and active_phase.stock_options_liquidity_year == target_year:
+        phase_start_year = current_year + (active_phase.start_age - parent_age_current)
+        years_held = target_year - phase_start_year
+        if years_held > 0:
+            options = active_phase.stock_options_grant * (1 + active_phase.stock_options_growth_pct / 100) ** years_held
+
+    return {
+        'base_salary': base,
+        'bonus': bonus,
+        'rsu_income': rsu,
+        'options_income': options,
+        'total_employment_income': base + bonus + rsu + options
+    }
+
+
 def get_historical_return_stats():
     """Calculate statistics from historical returns"""
     returns = np.array(HISTORICAL_STOCK_RETURNS)
@@ -6678,38 +6847,89 @@ def parent_x_tab():
             key="parentX_death_age_input"
         )
 
-    st.subheader("Job Changes / Income Adjustments")
-    st.markdown("Plan for promotions, career changes, or income adjustments")
-    st.caption("💡 Tip: Click '+' to add rows, enter Year and New Income, changes save automatically")
+    st.subheader("Career Phases")
+    st.caption("Model your career trajectory — each phase represents a job or career stage. Default: single stable career until retirement.")
 
-    # Use data_editor and capture its output properly
-    edited_job_changes = st.data_editor(
-        st.session_state.parentX_job_changes,
-        num_rows="dynamic",
-        use_container_width=True,
-        column_config={
-            "Year": st.column_config.NumberColumn(
-                "Year",
-                help="Year when income changes",
-                min_value=st.session_state.current_year,
-                max_value=2100,
-                step=1,
-                format="%d"
-            ),
-            "New Income": st.column_config.NumberColumn(
-                "New Income ($)",
-                help="New annual income starting this year",
-                min_value=0,
-                max_value=10000000,
-                step=1000,
-                format="$%d"
-            )
-        },
-        key="parentX_job_changes_editor"
-    )
+    phases = st.session_state.parentX_career_phases
 
-    # Update session state with the edited data
-    st.session_state.parentX_job_changes = edited_job_changes
+    # Philosophy defaults helper
+    PHILOSOPHY_DEFAULTS_PX = {
+        "Stable": {"raise": 3.0, "bonus": 5.0, "rsu": 0},
+        "Climbing the Ladder": {"raise": 5.0, "bonus": 15.0, "rsu": 0},
+        "Startup": {"raise": 2.0, "bonus": 10.0, "rsu": 0},
+        "Part-time": {"raise": 1.0, "bonus": 0.0, "rsu": 0},
+        "Coasting": {"raise": 2.0, "bonus": 5.0, "rsu": 0},
+    }
+
+    for idx, phase in enumerate(phases):
+        with st.expander(f"Phase {idx+1}: {phase.label or phase.philosophy} — Age {phase.start_age} to {phase.end_age}", expanded=(idx == 0)):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                phases[idx].start_age = st.number_input("Start Age", value=int(phase.start_age), min_value=16, max_value=100, key=f"px_cp_start_{idx}")
+            with col2:
+                phases[idx].end_age = st.number_input("End Age", value=int(phase.end_age), min_value=17, max_value=100, key=f"px_cp_end_{idx}")
+            with col3:
+                phil_options = ["Stable", "Climbing the Ladder", "Startup", "Part-time", "Coasting"]
+                phil_idx = phil_options.index(phase.philosophy) if phase.philosophy in phil_options else 0
+                new_phil = st.selectbox("Career Style", phil_options, index=phil_idx, key=f"px_cp_phil_{idx}")
+                if new_phil != phase.philosophy:
+                    phases[idx].philosophy = new_phil
+                    defaults = PHILOSOPHY_DEFAULTS_PX[new_phil]
+                    phases[idx].annual_raise_pct = defaults["raise"]
+                    phases[idx].annual_bonus_pct = defaults["bonus"]
+
+            phases[idx].label = st.text_input("Label", value=phase.label, placeholder="e.g., Senior Engineer at BigCo", key=f"px_cp_label_{idx}")
+
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                phases[idx].base_salary = st.number_input("Base Salary ($)", value=float(phase.base_salary), min_value=0.0, step=5000.0, key=f"px_cp_salary_{idx}")
+            with col2:
+                phases[idx].annual_raise_pct = st.number_input("Annual Raise %", value=float(phase.annual_raise_pct), min_value=0.0, max_value=50.0, step=0.5, key=f"px_cp_raise_{idx}")
+            with col3:
+                phases[idx].annual_bonus_pct = st.number_input("Annual Bonus %", value=float(phase.annual_bonus_pct), min_value=0.0, max_value=100.0, step=1.0, key=f"px_cp_bonus_{idx}")
+
+            has_equity = st.checkbox("I receive equity compensation", value=(phase.rsu_annual_grant > 0 or phase.stock_options_grant > 0), key=f"px_cp_equity_{idx}")
+            if has_equity:
+                col1, col2 = st.columns(2)
+                with col1:
+                    phases[idx].rsu_annual_grant = st.number_input("RSU Annual Grant ($)", value=float(phase.rsu_annual_grant), min_value=0.0, step=5000.0, key=f"px_cp_rsu_{idx}")
+                with col2:
+                    phases[idx].rsu_vesting_years = st.number_input("Vesting Period (years)", value=int(phase.rsu_vesting_years), min_value=1, max_value=6, key=f"px_cp_vest_{idx}")
+
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    phases[idx].stock_options_grant = st.number_input("Stock Options Grant ($)", value=float(phase.stock_options_grant), min_value=0.0, step=10000.0, key=f"px_cp_opts_{idx}", help="Expected value above strike price")
+                with col2:
+                    phases[idx].stock_options_growth_pct = st.number_input("Options Growth %/yr", value=float(phase.stock_options_growth_pct), min_value=0.0, max_value=100.0, step=5.0, key=f"px_cp_optgrow_{idx}")
+                with col3:
+                    phases[idx].stock_options_liquidity_year = st.number_input("Liquidity Year", value=int(phase.stock_options_liquidity_year), min_value=0, max_value=2080, key=f"px_cp_optliq_{idx}", help="Year of IPO/acquisition. 0 = never")
+            else:
+                phases[idx].rsu_annual_grant = 0.0
+                phases[idx].stock_options_grant = 0.0
+
+            if len(phases) > 1:
+                if st.button("Remove this phase", key=f"px_cp_del_{idx}"):
+                    phases.pop(idx)
+                    st.rerun()
+
+    if st.button("+ Add Career Phase", key="px_add_phase"):
+        last = phases[-1] if phases else None
+        new_start = last.end_age if last else st.session_state.parentX_age
+        phases.append(CareerPhase(
+            start_age=new_start,
+            end_age=st.session_state.parentX_retirement_age,
+            philosophy="Stable",
+            base_salary=last.base_salary if last else 75000,
+            annual_raise_pct=3.0,
+            label=""
+        ))
+        st.rerun()
+
+    st.session_state.parentX_career_phases = phases
+    # Sync legacy fields
+    if phases:
+        st.session_state.parentX_income = phases[0].base_salary
+        st.session_state.parentX_raise = phases[0].annual_raise_pct
 
     # Annual Expenses Section
     st.markdown("---")
@@ -6864,38 +7084,89 @@ def parent_y_tab():
             key="parentY_death_age_input"
         )
 
-    st.subheader("Job Changes / Income Adjustments")
-    st.markdown("Plan for promotions, career changes, or income adjustments")
-    st.caption("💡 Tip: Click '+' to add rows, enter Year and New Income, changes save automatically")
+    st.subheader("Career Phases")
+    st.caption("Model your career trajectory — each phase represents a job or career stage. Default: single stable career until retirement.")
 
-    # Use data_editor and capture its output properly
-    edited_job_changes = st.data_editor(
-        st.session_state.parentY_job_changes,
-        num_rows="dynamic",
-        use_container_width=True,
-        column_config={
-            "Year": st.column_config.NumberColumn(
-                "Year",
-                help="Year when income changes",
-                min_value=st.session_state.current_year,
-                max_value=2100,
-                step=1,
-                format="%d"
-            ),
-            "New Income": st.column_config.NumberColumn(
-                "New Income ($)",
-                help="New annual income starting this year",
-                min_value=0,
-                max_value=10000000,
-                step=1000,
-                format="$%d"
-            )
-        },
-        key="parentY_job_changes_editor"
-    )
+    phases_y = st.session_state.parentY_career_phases
 
-    # Update session state with the edited data
-    st.session_state.parentY_job_changes = edited_job_changes
+    # Philosophy defaults helper
+    PHILOSOPHY_DEFAULTS_PY = {
+        "Stable": {"raise": 3.0, "bonus": 5.0, "rsu": 0},
+        "Climbing the Ladder": {"raise": 5.0, "bonus": 15.0, "rsu": 0},
+        "Startup": {"raise": 2.0, "bonus": 10.0, "rsu": 0},
+        "Part-time": {"raise": 1.0, "bonus": 0.0, "rsu": 0},
+        "Coasting": {"raise": 2.0, "bonus": 5.0, "rsu": 0},
+    }
+
+    for idx, phase in enumerate(phases_y):
+        with st.expander(f"Phase {idx+1}: {phase.label or phase.philosophy} — Age {phase.start_age} to {phase.end_age}", expanded=(idx == 0)):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                phases_y[idx].start_age = st.number_input("Start Age", value=int(phase.start_age), min_value=16, max_value=100, key=f"py_cp_start_{idx}")
+            with col2:
+                phases_y[idx].end_age = st.number_input("End Age", value=int(phase.end_age), min_value=17, max_value=100, key=f"py_cp_end_{idx}")
+            with col3:
+                phil_options = ["Stable", "Climbing the Ladder", "Startup", "Part-time", "Coasting"]
+                phil_idx = phil_options.index(phase.philosophy) if phase.philosophy in phil_options else 0
+                new_phil = st.selectbox("Career Style", phil_options, index=phil_idx, key=f"py_cp_phil_{idx}")
+                if new_phil != phase.philosophy:
+                    phases_y[idx].philosophy = new_phil
+                    defaults = PHILOSOPHY_DEFAULTS_PY[new_phil]
+                    phases_y[idx].annual_raise_pct = defaults["raise"]
+                    phases_y[idx].annual_bonus_pct = defaults["bonus"]
+
+            phases_y[idx].label = st.text_input("Label", value=phase.label, placeholder="e.g., Senior Engineer at BigCo", key=f"py_cp_label_{idx}")
+
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                phases_y[idx].base_salary = st.number_input("Base Salary ($)", value=float(phase.base_salary), min_value=0.0, step=5000.0, key=f"py_cp_salary_{idx}")
+            with col2:
+                phases_y[idx].annual_raise_pct = st.number_input("Annual Raise %", value=float(phase.annual_raise_pct), min_value=0.0, max_value=50.0, step=0.5, key=f"py_cp_raise_{idx}")
+            with col3:
+                phases_y[idx].annual_bonus_pct = st.number_input("Annual Bonus %", value=float(phase.annual_bonus_pct), min_value=0.0, max_value=100.0, step=1.0, key=f"py_cp_bonus_{idx}")
+
+            has_equity = st.checkbox("I receive equity compensation", value=(phase.rsu_annual_grant > 0 or phase.stock_options_grant > 0), key=f"py_cp_equity_{idx}")
+            if has_equity:
+                col1, col2 = st.columns(2)
+                with col1:
+                    phases_y[idx].rsu_annual_grant = st.number_input("RSU Annual Grant ($)", value=float(phase.rsu_annual_grant), min_value=0.0, step=5000.0, key=f"py_cp_rsu_{idx}")
+                with col2:
+                    phases_y[idx].rsu_vesting_years = st.number_input("Vesting Period (years)", value=int(phase.rsu_vesting_years), min_value=1, max_value=6, key=f"py_cp_vest_{idx}")
+
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    phases_y[idx].stock_options_grant = st.number_input("Stock Options Grant ($)", value=float(phase.stock_options_grant), min_value=0.0, step=10000.0, key=f"py_cp_opts_{idx}", help="Expected value above strike price")
+                with col2:
+                    phases_y[idx].stock_options_growth_pct = st.number_input("Options Growth %/yr", value=float(phase.stock_options_growth_pct), min_value=0.0, max_value=100.0, step=5.0, key=f"py_cp_optgrow_{idx}")
+                with col3:
+                    phases_y[idx].stock_options_liquidity_year = st.number_input("Liquidity Year", value=int(phase.stock_options_liquidity_year), min_value=0, max_value=2080, key=f"py_cp_optliq_{idx}", help="Year of IPO/acquisition. 0 = never")
+            else:
+                phases_y[idx].rsu_annual_grant = 0.0
+                phases_y[idx].stock_options_grant = 0.0
+
+            if len(phases_y) > 1:
+                if st.button("Remove this phase", key=f"py_cp_del_{idx}"):
+                    phases_y.pop(idx)
+                    st.rerun()
+
+    if st.button("+ Add Career Phase", key="py_add_phase"):
+        last = phases_y[-1] if phases_y else None
+        new_start = last.end_age if last else st.session_state.parentY_age
+        phases_y.append(CareerPhase(
+            start_age=new_start,
+            end_age=st.session_state.parentY_retirement_age,
+            philosophy="Stable",
+            base_salary=last.base_salary if last else 75000,
+            annual_raise_pct=3.0,
+            label=""
+        ))
+        st.rerun()
+
+    st.session_state.parentY_career_phases = phases_y
+    # Sync legacy fields
+    if phases_y:
+        st.session_state.parentY_income = phases_y[0].base_salary
+        st.session_state.parentY_raise = phases_y[0].annual_raise_pct
 
     # Annual Expenses Section
     st.markdown("---")
@@ -8939,13 +9210,22 @@ def calculate_lifetime_cashflow():
         ss_income = 0
 
         if parent1_working:
-            parent1_income = get_income_for_year(
-                st.session_state.parentX_income,
-                st.session_state.parentX_raise,
-                st.session_state.parentX_job_changes,
-                st.session_state.current_year,
-                year
-            )
+            if st.session_state.get('parentX_career_phases'):
+                comp = get_career_income_for_year(
+                    st.session_state.parentX_career_phases,
+                    st.session_state.parentX_age,
+                    st.session_state.current_year,
+                    year
+                )
+                parent1_income = comp['total_employment_income']
+            else:
+                parent1_income = get_income_for_year(
+                    st.session_state.parentX_income,
+                    st.session_state.parentX_raise,
+                    st.session_state.parentX_job_changes,
+                    st.session_state.current_year,
+                    year
+                )
         else:
             parent1_ss = st.session_state.parentX_ss_benefit * 12
             if st.session_state.ss_insolvency_enabled and year >= 2034:
@@ -8953,13 +9233,22 @@ def calculate_lifetime_cashflow():
             ss_income += parent1_ss
 
         if parent2_working:
-            parent2_income = get_income_for_year(
-                st.session_state.parentY_income,
-                st.session_state.parentY_raise,
-                st.session_state.parentY_job_changes,
-                st.session_state.current_year,
-                year
-            )
+            if st.session_state.get('parentY_career_phases'):
+                comp = get_career_income_for_year(
+                    st.session_state.parentY_career_phases,
+                    st.session_state.parentY_age,
+                    st.session_state.current_year,
+                    year
+                )
+                parent2_income = comp['total_employment_income']
+            else:
+                parent2_income = get_income_for_year(
+                    st.session_state.parentY_income,
+                    st.session_state.parentY_raise,
+                    st.session_state.parentY_job_changes,
+                    st.session_state.current_year,
+                    year
+                )
         else:
             parent2_ss = st.session_state.parentY_ss_benefit * 12
             if st.session_state.ss_insolvency_enabled and year >= 2034:
@@ -10013,7 +10302,16 @@ def monte_carlo_simulation_tab():
 
                     income = 0
                     if parentX_working:
-                        parentX_year_income = get_income_for_year(st.session_state.parentX_income, st.session_state.parentX_raise, st.session_state.parentX_job_changes, st.session_state.current_year, year)
+                        if st.session_state.get('parentX_career_phases'):
+                            comp = get_career_income_for_year(
+                                st.session_state.parentX_career_phases,
+                                st.session_state.parentX_age,
+                                st.session_state.current_year,
+                                year
+                            )
+                            parentX_year_income = comp['total_employment_income']
+                        else:
+                            parentX_year_income = get_income_for_year(st.session_state.parentX_income, st.session_state.parentX_raise, st.session_state.parentX_job_changes, st.session_state.current_year, year)
                         income += parentX_year_income
                     else:
                         ss_benefit = st.session_state.parentX_ss_benefit * 12
@@ -10022,7 +10320,16 @@ def monte_carlo_simulation_tab():
                         income += ss_benefit
 
                     if parentY_working:
-                        parentY_year_income = get_income_for_year(st.session_state.parentY_income, st.session_state.parentY_raise, st.session_state.parentY_job_changes, st.session_state.current_year, year)
+                        if st.session_state.get('parentY_career_phases'):
+                            comp = get_career_income_for_year(
+                                st.session_state.parentY_career_phases,
+                                st.session_state.parentY_age,
+                                st.session_state.current_year,
+                                year
+                            )
+                            parentY_year_income = comp['total_employment_income']
+                        else:
+                            parentY_year_income = get_income_for_year(st.session_state.parentY_income, st.session_state.parentY_raise, st.session_state.parentY_job_changes, st.session_state.current_year, year)
                         income += parentY_year_income
                     else:
                         ss_benefit = st.session_state.parentY_ss_benefit * 12
@@ -10950,6 +11257,7 @@ def save_data():
             'parentX_ss_benefit': st.session_state.parentX_ss_benefit,
             'parentX_death_age': st.session_state.get('parentX_death_age', 100),
             'parentX_job_changes': st.session_state.parentX_job_changes.to_dict('records') if hasattr(st.session_state.get('parentX_job_changes', None), 'to_dict') else [],
+            'parentX_career_phases': [asdict(cp) for cp in st.session_state.get('parentX_career_phases', [])],
             'parentX_expenses': st.session_state.get('parentX_expenses', {}),
             'parentX_expense_location': st.session_state.get('parentX_expense_location', 'Seattle'),
             'parentX_expense_strategy': st.session_state.get('parentX_expense_strategy', 'Moderate'),
@@ -10962,6 +11270,7 @@ def save_data():
             'parentY_ss_benefit': st.session_state.parentY_ss_benefit,
             'parentY_death_age': st.session_state.get('parentY_death_age', 100),
             'parentY_job_changes': st.session_state.parentY_job_changes.to_dict('records') if hasattr(st.session_state.get('parentY_job_changes', None), 'to_dict') else [],
+            'parentY_career_phases': [asdict(cp) for cp in st.session_state.get('parentY_career_phases', [])],
             'parentY_expenses': st.session_state.get('parentY_expenses', {}),
             'parentY_expense_location': st.session_state.get('parentY_expense_location', 'Seattle'),
             'parentY_expense_strategy': st.session_state.get('parentY_expense_strategy', 'Moderate'),
@@ -11021,6 +11330,8 @@ def load_data(json_data):
                 st.session_state.health_expenses = [HealthExpense(**he) for he in value]
             elif key in ('parentX_job_changes', 'parentY_job_changes'):
                 st.session_state[key] = pd.DataFrame(value) if value else pd.DataFrame({'Year': [], 'New Income': [], 'New Raise %': []})
+            elif key in ('parentX_career_phases', 'parentY_career_phases'):
+                st.session_state[key] = [CareerPhase(**cp) for cp in value]
             else:
                 st.session_state[key] = value
         return True
