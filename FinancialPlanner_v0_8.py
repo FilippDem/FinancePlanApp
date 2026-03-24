@@ -12,6 +12,7 @@ from typing import List, Dict, Optional, Any
 import hashlib
 import secrets
 import os
+import shutil
 from pathlib import Path
 import uuid
 
@@ -36,7 +37,7 @@ except ImportError:
 
 # Set page configuration
 st.set_page_config(
-    page_title="Financial Planning Application v0.8",
+    page_title="Financial Planning Suite",
     page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -111,8 +112,237 @@ st.markdown("""
 
     /* Login page centering */
     .login-container { max-width: 500px; margin: 0 auto; padding-top: 2rem; }
+
+    /* ── Wizard & onboarding polish ─────────────────────────────────── */
+
+    /* Step indicator pill */
+    .wizard-step-pill {
+        display: inline-block;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #fff;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 4px 14px;
+        border-radius: 20px;
+        letter-spacing: 0.03em;
+        margin-bottom: 4px;
+    }
+    .wizard-step-pill.phase2 {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+
+    /* Card container for form sections */
+    .wizard-card {
+        background: rgba(128, 128, 128, 0.04);
+        border: 1px solid rgba(128, 128, 128, 0.1);
+        border-radius: 12px;
+        padding: 1.25rem 1.5rem 1rem;
+        margin-bottom: 1rem;
+    }
+    .wizard-card h4 {
+        margin-top: 0 !important;
+        font-size: 1rem !important;
+        font-weight: 600 !important;
+        color: rgba(128, 128, 128, 0.85);
+    }
+
+    /* Review summary cards */
+    .review-card {
+        background: rgba(128, 128, 128, 0.04);
+        border: 1px solid rgba(128, 128, 128, 0.1);
+        border-radius: 10px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 0.75rem;
+    }
+    .review-card-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: rgba(128, 128, 128, 0.6);
+        margin-bottom: 4px;
+    }
+    .review-card-value {
+        font-size: 1.05rem;
+        font-weight: 500;
+        line-height: 1.5;
+    }
+
+    /* Hero branding for login / wizard welcome */
+    .brand-hero {
+        text-align: center;
+        padding: 1.5rem 0 0.5rem;
+    }
+    .brand-hero .brand-icon { font-size: 2.8rem; margin-bottom: 0.25rem; }
+    .brand-hero h1 { text-align: center; margin-bottom: 0.1rem !important; }
+    .brand-hero .brand-tagline {
+        font-size: 0.9rem;
+        color: rgba(128, 128, 128, 0.6);
+        margin-top: 0;
+    }
+
+    /* Stepper progress bar (dots) */
+    .wizard-dots {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin: 0.75rem 0 1.25rem;
+    }
+    .wizard-dots .dot {
+        width: 10px; height: 10px;
+        border-radius: 50%;
+        background: rgba(128, 128, 128, 0.18);
+        transition: all 0.2s ease;
+    }
+    .wizard-dots .dot.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        transform: scale(1.2);
+    }
+    .wizard-dots .dot.done {
+        background: #667eea;
+    }
+    .wizard-dots .dot.phase2-active {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        transform: scale(1.2);
+    }
+    .wizard-dots .dot.phase2-done {
+        background: #f093fb;
+    }
+
+    /* Sidebar user badge */
+    .sidebar-user-badge {
+        background: rgba(128, 128, 128, 0.06);
+        border-radius: 10px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.5rem;
+    }
+    .sidebar-user-badge .user-name {
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+    .sidebar-user-badge .household-name {
+        font-size: 0.8rem;
+        color: rgba(128, 128, 128, 0.6);
+    }
+
+    /* ── Section nav bar (horizontal radio as category selector) ── */
+    div[data-testid="stHorizontalBlock"]:has(> div[data-testid="stRadio"]) {
+        background: rgba(128, 128, 128, 0.04);
+        border: 1px solid rgba(128, 128, 128, 0.08);
+        border-radius: 10px;
+        padding: 2px 6px;
+        margin-bottom: 0.75rem;
+    }
+
+    /* ── Mobile-responsive layout ──────────────────────────────── */
+    @media (max-width: 768px) {
+        .block-container { padding-left: 1rem !important; padding-right: 1rem !important; }
+        h1 { font-size: 1.4rem !important; }
+        h2 { font-size: 1.15rem !important; }
+        h3 { font-size: 1rem !important; }
+        [data-testid="stMetricValue"] { font-size: 1.1rem !important; }
+        [data-testid="stMetricLabel"] { font-size: 0.7rem !important; }
+        .stTabs [data-baseweb="tab"] { padding: 6px 10px; font-size: 0.75rem; }
+        .stTabs [data-baseweb="tab-list"] { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+        .review-card { padding: 0.75rem 1rem; }
+        .review-card-value { font-size: 0.9rem; }
+        .login-container { padding-left: 1rem; padding-right: 1rem; }
+        .brand-hero .brand-icon { font-size: 2rem; }
+        .wizard-dots { gap: 5px; }
+        .wizard-dots .dot { width: 8px; height: 8px; }
+        .sidebar-user-badge { padding: 0.5rem 0.75rem; }
+    }
+    @media (max-width: 480px) {
+        .block-container { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+        .stTabs [data-baseweb="tab"] { padding: 5px 8px; font-size: 0.7rem; }
+        [data-testid="stMetric"] { padding: 8px 10px; }
+    }
+
+    /* Test mode banner */
+    .test-mode-banner {
+        background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
+        color: #fff;
+        text-align: center;
+        padding: 6px 16px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHART THEME — single source of truth for all Plotly charts
+# ══════════════════════════════════════════════════════════════════════════════
+COLORS = {
+    'primary':    '#667eea',
+    'secondary':  '#764ba2',
+    'success':    '#2ecc71',
+    'danger':     '#e74c3c',
+    'warning':    '#f39c12',
+    'info':       '#3498db',
+    'purple':     '#9b59b6',
+    'orange':     '#f5576c',
+    'muted':      '#95a5a6',
+    'dark_green': '#27ae60',
+}
+# Ordered palette for pie charts and categorical series
+COLOR_SEQUENCE = [
+    '#667eea', '#764ba2', '#2ecc71', '#e74c3c', '#f39c12',
+    '#3498db', '#9b59b6', '#f5576c', '#95a5a6', '#27ae60',
+]
+
+CHART_LAYOUT = dict(
+    height=380,
+    margin=dict(l=40, r=20, t=50, b=40),
+    hovermode='x unified',
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    yaxis=dict(tickformat="$,.0f"),
+    font=dict(family="Inter, -apple-system, sans-serif"),
+)
+
+CHART_LAYOUT_COMPACT = dict(
+    height=320,
+    margin=dict(l=20, r=20, t=50, b=20),
+    showlegend=False,
+    font=dict(family="Inter, -apple-system, sans-serif"),
+)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DATA PRESERVATION POLICY
+# ══════════════════════════════════════════════════════════════════════════════
+# Real users store financial plans in data/households/<id>.json files.
+# These files contain irreplaceable user-entered data. ANY code change that
+# touches persistence must follow these rules:
+#
+#   1. NEVER delete or overwrite a household file without creating a backup
+#      first. Backups go to data/backups/<id>_<timestamp>.json.
+#   2. ALWAYS load the existing file before writing — merge, don't replace.
+#      This preserves metadata, scenarios, and fields added by other versions.
+#   3. NEVER change the JSON schema in a breaking way. New fields are fine;
+#      removing or renaming existing keys will corrupt older data. If a schema
+#      migration is needed, write a migration function that runs on load.
+#   4. The households_index.json maps household IDs to member lists. Losing
+#      an entry here orphans the data file. Backup before every write.
+#   5. Test households (prefixed _test_) are ephemeral and exempt from backups.
+#   6. The auto-save on every interaction (in main()) is silent. It must NEVER
+#      throw an exception that interrupts the user.
+#
+# When making changes to save_data() / load_data() / any household_* function,
+# verify that existing household files still load correctly after the change.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ADMIN / TEST MODE
+# ══════════════════════════════════════════════════════════════════════════════
+# When these emails sign in, they get an extra "Test as New User" option on
+# the household picker. This creates an isolated, ephemeral test household
+# so the admin can experience the full new-user flow without affecting real data.
+ADMIN_EMAILS = {"filippdem@gmail.com"}
+TEST_HOUSEHOLD_PREFIX = "_test_"  # test households are prefixed for easy cleanup
 
 # Data persistence directories
 DATA_DIR = Path(os.environ.get('DATA_DIR', './data'))
@@ -140,8 +370,26 @@ def load_households_index() -> dict:
 
 
 def save_households_index(index: dict):
-    """Save the households index"""
+    """Save the households index.
+
+    ⚠️  DATA PRESERVATION: This file maps household IDs → member lists.
+    Losing entries here orphans household data files. Always load-then-merge,
+    never overwrite with a partial dict. A backup is created before each write.
+    """
     ensure_data_dirs()
+    # Backup before overwrite
+    if HOUSEHOLDS_INDEX.exists():
+        backup_dir = DATA_DIR / 'backups'
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        try:
+            shutil.copy2(HOUSEHOLDS_INDEX, backup_dir / f"households_index_{timestamp}.json")
+            # Keep only last 10 index backups
+            existing = sorted(backup_dir.glob("households_index_*.json"))
+            for old in existing[:-10]:
+                old.unlink()
+        except Exception:
+            pass
     with open(HOUSEHOLDS_INDEX, 'w') as f:
         json.dump(index, f, indent=2)
 
@@ -175,6 +423,44 @@ def join_household(household_id: str, email: str) -> tuple:
     return True, index[household_id]['name']
 
 
+def create_test_household(email: str) -> str:
+    """Create an ephemeral test household for admin testing.
+    Test households are prefixed so they can be identified and cleaned up."""
+    index = load_households_index()
+    test_id = TEST_HOUSEHOLD_PREFIX + str(uuid.uuid4())[:6]
+    index[test_id] = {
+        'name': f'Test Household ({datetime.now().strftime("%b %d %H:%M")})',
+        'members': [email],
+        'created_at': datetime.now().isoformat(),
+        'created_by': email,
+        'is_test': True,
+    }
+    save_households_index(index)
+    household_file = HOUSEHOLDS_DIR / f"{test_id}.json"
+    with open(household_file, 'w') as f:
+        json.dump({'household_name': index[test_id]['name'], 'is_test': True}, f)
+    return test_id
+
+
+def cleanup_test_households(email: str):
+    """Remove all test households created by this email."""
+    index = load_households_index()
+    to_delete = [
+        hid for hid, info in index.items()
+        if hid.startswith(TEST_HOUSEHOLD_PREFIX) and info.get('created_by') == email
+    ]
+    for hid in to_delete:
+        del index[hid]
+        household_file = HOUSEHOLDS_DIR / f"{hid}.json"
+        scenarios_file = HOUSEHOLDS_DIR / f"{hid}_scenarios.json"
+        for f in [household_file, scenarios_file]:
+            if f.exists():
+                f.unlink()
+    if to_delete:
+        save_households_index(index)
+    return len(to_delete)
+
+
 def get_households_for_email(email: str) -> list:
     """Get all households this email belongs to."""
     index = load_households_index()
@@ -204,18 +490,43 @@ def get_household_members(household_id: str) -> list:
 
 
 def save_household_plan(household_id: str, plan_data: str):
-    """Save financial plan data to household file"""
+    """Save financial plan data to household file.
+
+    ╔══════════════════════════════════════════════════════════════════════╗
+    ║  DATA PRESERVATION: This function writes to real user data files.  ║
+    ║  • Always load existing file first to preserve metadata/scenarios. ║
+    ║  • A timestamped backup is created before every write.             ║
+    ║  • Never delete or overwrite household files without backup.       ║
+    ║  • Test households (prefixed _test_) are exempt from backups.      ║
+    ╚══════════════════════════════════════════════════════════════════════╝
+    """
     ensure_data_dirs()
     household_file = HOUSEHOLDS_DIR / f"{household_id}.json"
 
-    # Load existing household metadata
+    # Load existing household metadata — NEVER discard existing fields
     try:
         with open(household_file, 'r') as f:
             household = json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
         household = {}
 
-    # Preserve metadata, update plan
+    # Create backup of existing data before overwriting (skip for test households)
+    if household and not household_id.startswith(TEST_HOUSEHOLD_PREFIX):
+        backup_dir = DATA_DIR / 'backups'
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_file = backup_dir / f"{household_id}_{timestamp}.json"
+        try:
+            with open(backup_file, 'w') as f:
+                json.dump(household, f, indent=2)
+            # Keep only the last 10 backups per household to avoid disk bloat
+            existing_backups = sorted(backup_dir.glob(f"{household_id}_*.json"))
+            for old_backup in existing_backups[:-10]:
+                old_backup.unlink()
+        except Exception:
+            pass  # Backup failure should never block a save
+
+    # Preserve all existing metadata, only update plan_data and timestamps
     household['plan_data'] = json.loads(plan_data) if isinstance(plan_data, str) else plan_data
     household['last_saved'] = datetime.now().isoformat()
     household['saved_by'] = st.session_state.get('current_user', 'unknown')
@@ -253,7 +564,10 @@ def get_household_info(household_id: str) -> dict:
 
 
 def save_household_scenarios(household_id: str, scenarios: dict):
-    """Save named scenarios to household file"""
+    """Save named scenarios to household file.
+    ⚠️  DATA PRESERVATION: Loads existing file first, only updates 'scenarios' key.
+    All other household data (plan_data, metadata) is preserved.
+    """
     ensure_data_dirs()
     household_file = HOUSEHOLDS_DIR / f"{household_id}.json"
     try:
@@ -280,14 +594,22 @@ def load_household_scenarios(household_id: str) -> dict:
 def household_picker_page(email: str):
     """Display household selection/creation page"""
     st.markdown("<div class='login-container'>", unsafe_allow_html=True)
-    st.title("💰 Financial Planning Suite")
+    st.markdown(
+        '<div class="brand-hero">'
+        '<div class="brand-icon">💰</div>'
+        '<h1>Financial Planning Suite</h1>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
     st.caption(f"Signed in as **{email}**")
 
     my_households = get_households_for_email(email)
 
-    if my_households:
+    # Filter out test households from the normal list (unless none left)
+    real_households = [h for h in my_households if not h['id'].startswith(TEST_HOUSEHOLD_PREFIX)]
+    if real_households:
         st.subheader("Your Households")
-        for h in my_households:
+        for h in real_households:
             member_count = len(h['members'])
             member_label = f"{member_count} member{'s' if member_count > 1 else ''}"
             if st.button(f"📂  {h['name']}  —  {member_label}", key=f"select_{h['id']}", use_container_width=True):
@@ -295,6 +617,7 @@ def household_picker_page(email: str):
                 st.session_state.current_user = email
                 st.session_state.user_data = {'display_name': email.split('@')[0], 'household_id': h['id']}
                 st.session_state.household_id = h['id']
+                st.session_state.pop('test_mode', None)
                 plan_data = load_household_plan(h['id'])
                 if plan_data:
                     load_data(plan_data)
@@ -339,6 +662,112 @@ def household_picker_page(email: str):
                         st.rerun()
                     else:
                         st.error(result)
+
+    # ── Admin test mode ──────────────────────────────────────────────────────
+    if email in ADMIN_EMAILS:
+        st.markdown("---")
+        with st.expander("🧪 Admin: Test Mode"):
+            st.markdown(
+                "Start a **fresh session** as a brand-new user. "
+                "This creates an isolated test household that won't affect real data."
+            )
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🚀 Test as New User", use_container_width=True, type="primary", key="test_new_user"):
+                    cleanup_test_households(email)
+                    test_hid = create_test_household(email)
+                    keys_to_keep = {'cf_email'}
+                    for key in list(st.session_state.keys()):
+                        if key not in keys_to_keep:
+                            del st.session_state[key]
+                    st.session_state.authenticated = True
+                    st.session_state.current_user = email
+                    st.session_state.user_data = {'display_name': 'Test User', 'household_id': test_hid}
+                    st.session_state.household_id = test_hid
+                    st.session_state.test_mode = True
+                    st.rerun()
+            with col2:
+                test_households = [h for h in my_households if h['id'].startswith(TEST_HOUSEHOLD_PREFIX)]
+                if test_households:
+                    if st.button(f"🗑️ Clean up {len(test_households)} test household(s)", use_container_width=True, key="cleanup_tests"):
+                        cleanup_test_households(email)
+                        st.rerun()
+
+            st.markdown("---")
+            st.markdown("**Pre-built Example Families**")
+            st.caption("Load a pre-configured scenario to test the app without filling in the wizard.")
+
+            def _load_test_scenario(name, data_overrides):
+                """Create a test household and populate with example data."""
+                cleanup_test_households(email)
+                test_hid = create_test_household(email)
+                keys_to_keep = {'cf_email'}
+                for key in list(st.session_state.keys()):
+                    if key not in keys_to_keep:
+                        del st.session_state[key]
+                st.session_state.authenticated = True
+                st.session_state.current_user = email
+                st.session_state.user_data = {'display_name': 'Test User', 'household_id': test_hid}
+                st.session_state.household_id = test_hid
+                st.session_state.test_mode = True
+                st.session_state.wizard_complete = True
+                st.session_state.wizard_skipped = True
+                initialize_session_state()
+                for k, v in data_overrides.items():
+                    st.session_state[k] = v
+                try:
+                    json_data = save_data()
+                    if json_data:
+                        save_household_plan(test_hid, json_data)
+                except Exception:
+                    pass
+
+            scenarios = {
+                "All Defaults": {},
+                "Young Couple, Seattle": {
+                    'parent1_name': 'Alex', 'parent2_name': 'Sam', 'parentX_age': 28, 'parentY_age': 27,
+                    'parentX_income': 95000.0, 'parentY_income': 80000.0, 'parentX_net_worth': 45000.0,
+                    'parentY_net_worth': 30000.0, 'marriage_year': 2024,
+                },
+                "Mid-Career, 2 Kids, CA": {
+                    'parent1_name': 'Maria', 'parent2_name': 'David', 'parentX_age': 38, 'parentY_age': 40,
+                    'parentX_income': 150000.0, 'parentY_income': 120000.0, 'parentX_net_worth': 350000.0,
+                    'parentY_net_worth': 280000.0, 'marriage_year': 2015,
+                    'children_list': [
+                        {'name': 'Sofia', 'birth_year': 2019, 'use_template': True, 'template_state': 'Sacramento',
+                         'template_strategy': 'Average', 'school_type': 'Public', 'college_location': 'Sacramento'},
+                        {'name': 'Lucas', 'birth_year': 2022, 'use_template': True, 'template_state': 'Sacramento',
+                         'template_strategy': 'Average', 'school_type': 'Public', 'college_location': 'Sacramento'},
+                    ],
+                },
+                "High Earner, Single": {
+                    'parent1_name': 'Jordan', 'parent2_name': 'N/A', 'parentX_age': 35, 'parentY_age': 0,
+                    'parentX_income': 250000.0, 'parentY_income': 0.0, 'parentX_net_worth': 600000.0,
+                    'parentY_net_worth': 0.0, 'parentX_retirement_age': 55, 'marriage_year': 'N/A',
+                },
+                "Near Retirement": {
+                    'parent1_name': 'Robert', 'parent2_name': 'Linda', 'parentX_age': 58, 'parentY_age': 56,
+                    'parentX_income': 130000.0, 'parentY_income': 85000.0, 'parentX_net_worth': 1200000.0,
+                    'parentY_net_worth': 800000.0, 'parentX_retirement_age': 62, 'parentY_retirement_age': 63,
+                    'parentX_ss_benefit': 3200.0, 'parentY_ss_benefit': 2400.0, 'marriage_year': 1992,
+                },
+                "Tight Budget, TX": {
+                    'parent1_name': 'Chris', 'parent2_name': 'Pat', 'parentX_age': 32, 'parentY_age': 30,
+                    'parentX_income': 55000.0, 'parentY_income': 45000.0, 'parentX_net_worth': 15000.0,
+                    'parentY_net_worth': 8000.0, 'marriage_year': 2023,
+                    'children_list': [
+                        {'name': 'Emma', 'birth_year': 2024, 'use_template': True, 'template_state': 'Houston',
+                         'template_strategy': 'Average', 'school_type': 'Public', 'college_location': 'Houston'},
+                    ],
+                },
+            }
+
+            cols = st.columns(3)
+            for idx, (name, overrides) in enumerate(scenarios.items()):
+                with cols[idx % 3]:
+                    if st.button(f"📋 {name}", use_container_width=True, key=f"test_scenario_{idx}"):
+                        _load_test_scenario(name, overrides)
+                        st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -4039,23 +4468,25 @@ def setup_wizard():
     step = st.session_state.wizard_step
 
     st.markdown("<div class='login-container' style='max-width:700px'>", unsafe_allow_html=True)
-    st.title("💰 Financial Planning Suite")
-
-    # Progress bar (steps 0-6)
-    if step > 0:
-        st.progress(step / 6)
-        st.caption(f"Step {step} of 6")
 
     # ── Step 0: Welcome ─────────────────────────────────────────────────────────
     if step == 0:
-        st.header("Let's set up your financial plan")
         st.markdown(
-            "This guided questionnaire will walk you through the key details "
+            '<div class="brand-hero">'
+            '<div class="brand-icon">💰</div>'
+            '<h1>Financial Planning Suite</h1>'
+            '<p class="brand-tagline">Build a lifetime financial plan in minutes</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown("")
+        st.markdown(
+            "This guided questionnaire walks you through the key details "
             "of your financial life — income, savings, children, housing, and more. "
-            "It takes about **3-5 minutes** and will create a starting plan you can "
+            "It takes about **3-5 minutes** and creates a starting plan you can "
             "fine-tune later."
         )
-        st.info("✨ **Recommended:** The wizard helps you build an accurate starting plan. You can always adjust every detail afterward.")
+        st.info("The wizard helps you build an accurate starting plan. You can always adjust every detail afterward.")
         if st.button("🚀 Get Started", use_container_width=True, type="primary"):
             st.session_state.wizard_step = 1
             st.rerun()
@@ -4068,7 +4499,7 @@ def setup_wizard():
 
     # ── Step 1: Family Structure ─────────────────────────────────────────────────
     elif step == 1:
-        st.header("👨‍👩‍👧‍👦 Family Structure")
+        _wizard_step_header(1, 6, "👨‍👩‍👧‍👦 Family Structure", "Tell us about your household.")
         emoji_options = ["👨", "👩", "👨‍🦱", "👩‍🦱", "👨‍🦰", "👩‍🦰", "👱‍♂️", "👱‍♀️", "🧑", "👴", "👵"]
 
         household_type = st.radio(
@@ -4122,7 +4553,7 @@ def setup_wizard():
 
     # ── Step 2: Income & Career ──────────────────────────────────────────────────
     elif step == 2:
-        st.header("💼 Income & Career")
+        _wizard_step_header(2, 6, "💼 Income & Career", "Your earnings, raises, and career trajectory.")
         is_couple = st.session_state.wizard_data.get('household_type') == "Me and my partner"
         parent_label = st.session_state.wizard_data.get('p1_name', 'You') or 'You'
 
@@ -4141,51 +4572,70 @@ def setup_wizard():
                                      value=st.session_state.wizard_data.get('p1_retire', 65), key="wiz_p1_retire")
         st.session_state.wizard_data['p1_retire'] = p1_retire
 
-        p1_job_changes = st.checkbox("I expect major job changes",
-                                      value=st.session_state.wizard_data.get('p1_has_job_changes', False),
-                                      key="wiz_p1_has_jc")
-        st.session_state.wizard_data['p1_has_job_changes'] = p1_job_changes
-        if p1_job_changes:
-            num_jc = st.number_input("How many job changes?", min_value=1, max_value=3, value=1, key="wiz_p1_njc")
-            jc_list = st.session_state.wizard_data.get('p1_job_changes', [])
-            while len(jc_list) < num_jc:
-                jc_list.append({'year': datetime.now().year + 2, 'income': 100000})
-            jc_list = jc_list[:num_jc]
-            for i in range(num_jc):
-                jc_c1, jc_c2 = st.columns(2)
-                with jc_c1:
-                    jc_list[i]['year'] = st.number_input(f"Job change {i+1} year", min_value=datetime.now().year,
-                                                         max_value=2080, value=jc_list[i]['year'], key=f"wiz_p1_jc_y{i}")
-                with jc_c2:
-                    jc_list[i]['income'] = st.number_input(f"New income ($)", min_value=0, max_value=10_000_000,
-                                                           value=jc_list[i]['income'], step=5000, key=f"wiz_p1_jc_i{i}")
-            st.session_state.wizard_data['p1_job_changes'] = jc_list
-
         st.markdown("---")
-        has_career_changes = st.checkbox("I expect distinct career phases (job switches, startup, etc.)", value=False, key="wiz_p1_career_changes")
+        st.markdown("**Career Phases**")
+        st.caption("Add each phase of your career — current job, future promotion, switching fields, going part-time, etc.")
 
-        if has_career_changes:
-            num_phases = st.number_input("How many career phases?", min_value=2, max_value=5, value=2, key="wiz_p1_num_phases")
-            career_phases = []
-            for i in range(int(num_phases)):
-                st.markdown(f"**Phase {i+1}**")
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    cp_start = st.number_input("Start Age", value=st.session_state.wizard_data.get('p1_age', 30) + i*10, key=f"wiz_p1_cp_start_{i}")
-                with col2:
-                    cp_end = st.number_input("End Age", value=min(st.session_state.wizard_data.get('p1_age', 30) + (i+1)*10, st.session_state.wizard_data.get('p1_retire', 65)), key=f"wiz_p1_cp_end_{i}")
-                with col3:
-                    cp_phil = st.selectbox("Style", ["Stable", "Climbing the Ladder", "Startup", "Part-time", "Coasting"], key=f"wiz_p1_cp_phil_{i}")
-                col1, col2 = st.columns(2)
-                with col1:
-                    cp_salary = st.number_input("Base Salary ($)", value=75000, step=5000, key=f"wiz_p1_cp_sal_{i}")
-                with col2:
-                    cp_raise = st.number_input("Annual Raise %", value=3.0, step=0.5, key=f"wiz_p1_cp_raise_{i}")
-                career_phases.append({
-                    'start_age': int(cp_start), 'end_age': int(cp_end), 'philosophy': cp_phil,
-                    'base_salary': float(cp_salary), 'annual_raise_pct': float(cp_raise), 'label': f"Phase {i+1}"
-                })
+        career_phases = st.session_state.wizard_data.get('p1_career_phases', [])
+        p1_age = st.session_state.wizard_data.get('p1_age', 30)
+        p1_retire = st.session_state.wizard_data.get('p1_retire', 65)
+
+        # Start with at least one phase
+        if not career_phases:
+            career_phases = [{
+                'start_age': p1_age, 'end_age': p1_retire, 'philosophy': 'Stable',
+                'base_salary': float(st.session_state.wizard_data.get('p1_income', 75000)),
+                'annual_raise_pct': float(st.session_state.wizard_data.get('p1_raise', 3.0)),
+                'label': 'Current Job',
+            }]
+
+        # Render each phase
+        phases_to_keep = []
+        for i, phase in enumerate(career_phases):
+            col_name, col_ages, col_sal, col_raise, col_del = st.columns([2, 2, 2, 1, 0.5])
+            with col_name:
+                phase['label'] = st.text_input("Name", value=phase.get('label', f'Phase {i+1}'),
+                    placeholder="e.g. Current Job, Senior Role, Part-time", key=f"wiz_p1_cp_name_{i}")
+            with col_ages:
+                c1, c2 = st.columns(2)
+                with c1:
+                    phase['start_age'] = st.number_input("From age", min_value=18, max_value=100,
+                        value=phase['start_age'], key=f"wiz_p1_cp_start_{i}")
+                with c2:
+                    phase['end_age'] = st.number_input("To age", min_value=18, max_value=100,
+                        value=phase['end_age'], key=f"wiz_p1_cp_end_{i}")
+            with col_sal:
+                phase['base_salary'] = float(st.number_input("Salary ($)", min_value=0, max_value=10_000_000,
+                    value=int(phase['base_salary']), step=5000, key=f"wiz_p1_cp_sal_{i}"))
+            with col_raise:
+                phase['annual_raise_pct'] = float(st.number_input("Raise %", min_value=0.0, max_value=30.0,
+                    value=phase['annual_raise_pct'], step=0.5, key=f"wiz_p1_cp_raise_{i}"))
+            with col_del:
+                st.markdown("")
+                if len(career_phases) > 1 and st.button("✕", key=f"wiz_p1_cp_del_{i}", help="Remove this phase"):
+                    continue  # Skip this phase (don't add to phases_to_keep)
+            phase['philosophy'] = 'Stable'  # Keep for backward compat with CareerPhase dataclass
+            phases_to_keep.append(phase)
+
+        career_phases = phases_to_keep
+        # Warn if any phase extends past retirement
+        for i, phase in enumerate(career_phases):
+            if phase['end_age'] > p1_retire:
+                st.warning(f"**{phase.get('label', f'Phase {i+1}')}** ends at age {phase['end_age']} "
+                           f"but retirement is set to age {p1_retire}. Income after retirement comes from Social Security, not employment.")
+
+        if st.button("＋ Add career phase", key="wiz_p1_add_phase"):
+            prev_end = career_phases[-1]['end_age'] if career_phases else p1_age
+            career_phases.append({
+                'start_age': prev_end, 'end_age': min(prev_end + 10, p1_retire),
+                'philosophy': 'Stable',
+                'base_salary': float(st.session_state.wizard_data.get('p1_income', 75000)),
+                'annual_raise_pct': float(st.session_state.wizard_data.get('p1_raise', 3.0)),
+                'label': f'Phase {len(career_phases) + 1}',
+            })
             st.session_state.wizard_data['p1_career_phases'] = career_phases
+            st.rerun()
+        st.session_state.wizard_data['p1_career_phases'] = career_phases
 
         if is_couple:
             st.markdown("---")
@@ -4206,57 +4656,73 @@ def setup_wizard():
                                          value=st.session_state.wizard_data.get('p2_retire', 65), key="wiz_p2_retire")
             st.session_state.wizard_data['p2_retire'] = p2_retire
 
-            p2_job_changes = st.checkbox("Partner expects major job changes",
-                                          value=st.session_state.wizard_data.get('p2_has_job_changes', False),
-                                          key="wiz_p2_has_jc")
-            st.session_state.wizard_data['p2_has_job_changes'] = p2_job_changes
-            if p2_job_changes:
-                num_jc2 = st.number_input("How many job changes?", min_value=1, max_value=3, value=1, key="wiz_p2_njc")
-                jc_list2 = st.session_state.wizard_data.get('p2_job_changes', [])
-                while len(jc_list2) < num_jc2:
-                    jc_list2.append({'year': datetime.now().year + 2, 'income': 100000})
-                jc_list2 = jc_list2[:num_jc2]
-                for i in range(num_jc2):
-                    jc_c1, jc_c2 = st.columns(2)
-                    with jc_c1:
-                        jc_list2[i]['year'] = st.number_input(f"Job change {i+1} year", min_value=datetime.now().year,
-                                                               max_value=2080, value=jc_list2[i]['year'], key=f"wiz_p2_jc_y{i}")
-                    with jc_c2:
-                        jc_list2[i]['income'] = st.number_input(f"New income ($)", min_value=0, max_value=10_000_000,
-                                                                 value=jc_list2[i]['income'], step=5000, key=f"wiz_p2_jc_i{i}")
-                st.session_state.wizard_data['p2_job_changes'] = jc_list2
-
             st.markdown("---")
-            has_career_changes_p2 = st.checkbox("Partner expects distinct career phases (job switches, startup, etc.)", value=False, key="wiz_p2_career_changes")
+            st.markdown(f"**{partner_label}'s Career Phases**")
+            st.caption("Add each phase of your partner's career.")
 
-            if has_career_changes_p2:
-                num_phases_p2 = st.number_input("How many career phases?", min_value=2, max_value=5, value=2, key="wiz_p2_num_phases")
-                career_phases_p2 = []
-                for i in range(int(num_phases_p2)):
-                    st.markdown(f"**Phase {i+1}**")
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        cp_start = st.number_input("Start Age", value=st.session_state.wizard_data.get('p2_age', 30) + i*10, key=f"wiz_p2_cp_start_{i}")
-                    with col2:
-                        cp_end = st.number_input("End Age", value=min(st.session_state.wizard_data.get('p2_age', 30) + (i+1)*10, st.session_state.wizard_data.get('p2_retire', 65)), key=f"wiz_p2_cp_end_{i}")
-                    with col3:
-                        cp_phil = st.selectbox("Style", ["Stable", "Climbing the Ladder", "Startup", "Part-time", "Coasting"], key=f"wiz_p2_cp_phil_{i}")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        cp_salary = st.number_input("Base Salary ($)", value=75000, step=5000, key=f"wiz_p2_cp_sal_{i}")
-                    with col2:
-                        cp_raise = st.number_input("Annual Raise %", value=3.0, step=0.5, key=f"wiz_p2_cp_raise_{i}")
-                    career_phases_p2.append({
-                        'start_age': int(cp_start), 'end_age': int(cp_end), 'philosophy': cp_phil,
-                        'base_salary': float(cp_salary), 'annual_raise_pct': float(cp_raise), 'label': f"Phase {i+1}"
-                    })
+            career_phases_p2 = st.session_state.wizard_data.get('p2_career_phases', [])
+            p2_age = st.session_state.wizard_data.get('p2_age', 30)
+            p2_retire = st.session_state.wizard_data.get('p2_retire', 65)
+
+            if not career_phases_p2:
+                career_phases_p2 = [{
+                    'start_age': p2_age, 'end_age': p2_retire, 'philosophy': 'Stable',
+                    'base_salary': float(st.session_state.wizard_data.get('p2_income', 75000)),
+                    'annual_raise_pct': float(st.session_state.wizard_data.get('p2_raise', 3.0)),
+                    'label': 'Current Job',
+                }]
+
+            phases_to_keep_p2 = []
+            for i, phase in enumerate(career_phases_p2):
+                col_name, col_ages, col_sal, col_raise, col_del = st.columns([2, 2, 2, 1, 0.5])
+                with col_name:
+                    phase['label'] = st.text_input("Name", value=phase.get('label', f'Phase {i+1}'),
+                        placeholder="e.g. Current Job, Senior Role", key=f"wiz_p2_cp_name_{i}")
+                with col_ages:
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        phase['start_age'] = st.number_input("From age", min_value=18, max_value=100,
+                            value=phase['start_age'], key=f"wiz_p2_cp_start_{i}")
+                    with c2:
+                        phase['end_age'] = st.number_input("To age", min_value=18, max_value=100,
+                            value=phase['end_age'], key=f"wiz_p2_cp_end_{i}")
+                with col_sal:
+                    phase['base_salary'] = float(st.number_input("Salary ($)", min_value=0, max_value=10_000_000,
+                        value=int(phase['base_salary']), step=5000, key=f"wiz_p2_cp_sal_{i}"))
+                with col_raise:
+                    phase['annual_raise_pct'] = float(st.number_input("Raise %", min_value=0.0, max_value=30.0,
+                        value=phase['annual_raise_pct'], step=0.5, key=f"wiz_p2_cp_raise_{i}"))
+                with col_del:
+                    st.markdown("")
+                    if len(career_phases_p2) > 1 and st.button("✕", key=f"wiz_p2_cp_del_{i}", help="Remove this phase"):
+                        continue
+                phase['philosophy'] = 'Stable'
+                phases_to_keep_p2.append(phase)
+
+            career_phases_p2 = phases_to_keep_p2
+            for i, phase in enumerate(career_phases_p2):
+                if phase['end_age'] > p2_retire:
+                    st.warning(f"**{phase.get('label', f'Phase {i+1}')}** ends at age {phase['end_age']} "
+                               f"but retirement is set to age {p2_retire}.")
+
+            if st.button(f"＋ Add career phase for {partner_label}", key="wiz_p2_add_phase"):
+                prev_end = career_phases_p2[-1]['end_age'] if career_phases_p2 else p2_age
+                career_phases_p2.append({
+                    'start_age': prev_end, 'end_age': min(prev_end + 10, p2_retire),
+                    'philosophy': 'Stable',
+                    'base_salary': float(st.session_state.wizard_data.get('p2_income', 75000)),
+                    'annual_raise_pct': float(st.session_state.wizard_data.get('p2_raise', 3.0)),
+                    'label': f'Phase {len(career_phases_p2) + 1}',
+                })
                 st.session_state.wizard_data['p2_career_phases'] = career_phases_p2
+                st.rerun()
+            st.session_state.wizard_data['p2_career_phases'] = career_phases_p2
 
         _wizard_nav(step)
 
     # ── Step 3: Assets & Savings ─────────────────────────────────────────────────
     elif step == 3:
-        st.header("🏦 Assets & Savings")
+        _wizard_step_header(3, 6, "🏦 Assets & Savings", "Current net worth and Social Security estimates.")
         is_couple = st.session_state.wizard_data.get('household_type') == "Me and my partner"
         parent_label = st.session_state.wizard_data.get('p1_name', 'You') or 'You'
 
@@ -4292,7 +4758,7 @@ def setup_wizard():
 
     # ── Step 4: Children ─────────────────────────────────────────────────────────
     elif step == 4:
-        st.header("👶 Children")
+        _wizard_step_header(4, 6, "👶 Children", "Current and planned children.")
         has_children = st.radio("Do you have or plan to have children?",
                                  ["No", "Yes"],
                                  index=1 if st.session_state.wizard_data.get('has_children', False) else 0,
@@ -4323,47 +4789,97 @@ def setup_wizard():
                                                                  key=f"wiz_child_by_{i}")
             st.session_state.wizard_data['children'] = children
 
-            child_location = st.selectbox("Children expense template location",
-                                           AVAILABLE_LOCATIONS_CHILDREN,
-                                           index=AVAILABLE_LOCATIONS_CHILDREN.index(
-                                               st.session_state.wizard_data.get('child_location', 'Seattle')
-                                           ) if st.session_state.wizard_data.get('child_location', 'Seattle') in AVAILABLE_LOCATIONS_CHILDREN else 0,
-                                           key="wiz_child_loc")
-            st.session_state.wizard_data['child_location'] = child_location
+            st.caption("Children's expense templates will use the location you set in the next step.")
 
         _wizard_nav(step)
 
     # ── Step 5: Location & Housing ───────────────────────────────────────────────
     elif step == 5:
-        st.header("📍 Location & Housing")
-        current_loc = st.selectbox("Where do you currently live?",
-                                    AVAILABLE_LOCATIONS_ADULTS,
-                                    index=AVAILABLE_LOCATIONS_ADULTS.index(
-                                        st.session_state.wizard_data.get('current_location', 'Seattle')
-                                    ) if st.session_state.wizard_data.get('current_location', 'Seattle') in AVAILABLE_LOCATIONS_ADULTS else 0,
-                                    key="wiz_current_loc")
-        st.session_state.wizard_data['current_location'] = current_loc
+        _wizard_step_header(5, 6, "📍 Location & Spending", "Where you live and your spending style.")
 
+        # Location picker with "Other" option
+        location_options = AVAILABLE_LOCATIONS_ADULTS + ["Other"]
+        current_saved = st.session_state.wizard_data.get('current_location', 'Seattle')
+        if current_saved in location_options:
+            loc_idx = location_options.index(current_saved)
+        elif st.session_state.wizard_data.get('current_location_custom'):
+            loc_idx = location_options.index("Other")
+        else:
+            loc_idx = 0
+
+        current_loc = st.selectbox("Where do you currently live?", location_options,
+                                    index=loc_idx, key="wiz_current_loc")
+
+        if current_loc == "Other":
+            custom_name = st.text_input("City / location name",
+                value=st.session_state.wizard_data.get('current_location_custom', ''),
+                placeholder="e.g., Austin, Denver, London", key="wiz_custom_loc")
+            st.session_state.wizard_data['current_location_custom'] = custom_name
+
+            US_STATES = ["Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
+                "Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas",
+                "Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota",
+                "Mississippi","Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey",
+                "New Mexico","New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon",
+                "Pennsylvania","Rhode Island","South Carolina","South Dakota","Tennessee","Texas",
+                "Utah","Vermont","Virginia","Washington","West Virginia","Wisconsin","Wyoming"]
+            state_options = ["I'll fill this in later"] + US_STATES + ["Outside the US"]
+            saved_state = st.session_state.wizard_data.get('current_location_state', "I'll fill this in later")
+            state_choice = st.selectbox("What state is this in?", state_options,
+                index=state_options.index(saved_state) if saved_state in state_options else 0,
+                key="wiz_custom_state")
+            st.session_state.wizard_data['current_location_state'] = state_choice
+
+            if state_choice == "Outside the US":
+                st.info("You'll need to manually configure expense templates for this location after the wizard.")
+            elif state_choice == "I'll fill this in later":
+                st.caption("No problem — you can set this up in the app later.")
+            else:
+                st.caption(f"Tax and expense data will be based on {state_choice} averages.")
+
+            # Use custom name as location, fall back to nearest template
+            st.session_state.wizard_data['current_location'] = custom_name or 'Seattle'
+        else:
+            st.session_state.wizard_data['current_location'] = current_loc
+            st.session_state.wizard_data.pop('current_location_custom', None)
+            st.session_state.wizard_data.pop('current_location_state', None)
+
+        # Also set child location to match
+        st.session_state.wizard_data['child_location'] = st.session_state.wizard_data['current_location']
+
+        # Moves
         plan_moves = st.checkbox("I plan to move in the future",
                                   value=st.session_state.wizard_data.get('plan_moves', False),
                                   key="wiz_plan_moves")
         st.session_state.wizard_data['plan_moves'] = plan_moves
 
         if plan_moves:
-            num_moves = st.number_input("How many moves?", min_value=1, max_value=3, value=1, key="wiz_num_moves")
             moves = st.session_state.wizard_data.get('moves', [])
-            while len(moves) < num_moves:
-                moves.append({'year': datetime.now().year + 5, 'location': 'Seattle'})
-            moves = moves[:num_moves]
-            for i in range(num_moves):
-                m1, m2 = st.columns(2)
+            if not moves:
+                moves = [{'year': datetime.now().year + 5, 'location': 'Seattle'}]
+
+            moves_to_keep = []
+            for i, mv in enumerate(moves):
+                m1, m2, m3 = st.columns([1, 2, 0.5])
                 with m1:
-                    moves[i]['year'] = st.number_input(f"Move {i+1} year", min_value=datetime.now().year,
-                                                        max_value=2080, value=moves[i]['year'], key=f"wiz_move_y{i}")
+                    mv['year'] = st.number_input(f"Move {i+1} year", min_value=datetime.now().year,
+                                                  max_value=2080, value=mv['year'], key=f"wiz_move_y{i}")
                 with m2:
-                    loc_idx = AVAILABLE_LOCATIONS_ADULTS.index(moves[i]['location']) if moves[i]['location'] in AVAILABLE_LOCATIONS_ADULTS else 0
-                    moves[i]['location'] = st.selectbox(f"Move to", AVAILABLE_LOCATIONS_ADULTS,
-                                                         index=loc_idx, key=f"wiz_move_loc{i}")
+                    loc_idx = AVAILABLE_LOCATIONS_ADULTS.index(mv['location']) if mv['location'] in AVAILABLE_LOCATIONS_ADULTS else 0
+                    mv['location'] = st.selectbox(f"Move to", AVAILABLE_LOCATIONS_ADULTS,
+                                                    index=loc_idx, key=f"wiz_move_loc{i}")
+                with m3:
+                    st.markdown("")
+                    if len(moves) > 1 and st.button("✕", key=f"wiz_move_del_{i}"):
+                        continue
+                moves_to_keep.append(mv)
+            moves = moves_to_keep
+
+            if st.button("＋ Add another move", key="wiz_add_move"):
+                last_year = moves[-1]['year'] if moves else datetime.now().year
+                moves.append({'year': last_year + 5, 'location': 'Seattle'})
+                st.session_state.wizard_data['moves'] = moves
+                st.rerun()
             st.session_state.wizard_data['moves'] = moves
 
         st.subheader("Spending Style")
@@ -4385,66 +4901,414 @@ def setup_wizard():
 
     # ── Step 6: Review & Create ──────────────────────────────────────────────────
     elif step == 6:
-        st.header("📋 Review Your Plan")
+        _wizard_step_header(6, 6, "📋 Review Your Plan", "Here's what we'll use to build your simulation.")
         wd = st.session_state.wizard_data
         is_couple = wd.get('household_type') == "Me and my partner"
 
-        # Family
-        st.subheader("Family")
+        # Family card
+        def _review_card(label, body):
+            st.markdown(
+                f'<div class="review-card">'
+                f'<div class="review-card-label">{label}</div>'
+                f'<div class="review-card-value">{body}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
         if is_couple:
-            st.write(f"**{wd.get('p1_emoji','')} {wd.get('p1_name','Parent 1')}** (age {wd.get('p1_age',30)}) "
-                     f"& **{wd.get('p2_emoji','')} {wd.get('p2_name','Parent 2')}** (age {wd.get('p2_age',30)})")
-            st.write(f"Marriage year: {wd.get('marriage_year', 'N/A')}")
+            family_body = (
+                f"{wd.get('p1_emoji','')} <b>{wd.get('p1_name','Parent 1')}</b> (age {wd.get('p1_age',30)}) "
+                f"&amp; {wd.get('p2_emoji','')} <b>{wd.get('p2_name','Parent 2')}</b> (age {wd.get('p2_age',30)})"
+                f"<br>Married {wd.get('marriage_year', 'N/A')}"
+            )
         else:
-            st.write(f"**{wd.get('p1_emoji','')} {wd.get('p1_name','Parent 1')}** (age {wd.get('p1_age',30)})")
+            family_body = f"{wd.get('p1_emoji','')} <b>{wd.get('p1_name','Parent 1')}</b> (age {wd.get('p1_age',30)})"
+        _review_card("FAMILY", family_body)
 
-        # Income
-        st.subheader("Income")
-        st.write(f"{wd.get('p1_name','You')}: **${wd.get('p1_income',0):,.0f}**/yr, "
-                 f"{wd.get('p1_raise',3.0):.1f}% raises, retire at {wd.get('p1_retire',65)}")
-        if is_couple:
-            st.write(f"{wd.get('p2_name','Partner')}: **${wd.get('p2_income',0):,.0f}**/yr, "
-                     f"{wd.get('p2_raise',3.0):.1f}% raises, retire at {wd.get('p2_retire',65)}")
+        # Income card
+        col1, col2 = st.columns(2)
+        with col1:
+            _review_card("INCOME — " + (wd.get('p1_name','You') or 'You'),
+                f"<b>${wd.get('p1_income',0):,.0f}</b>/yr &middot; {wd.get('p1_raise',3.0):.1f}% raises &middot; retire at {wd.get('p1_retire',65)}")
+        with col2:
+            if is_couple:
+                _review_card("INCOME — " + (wd.get('p2_name','Partner') or 'Partner'),
+                    f"<b>${wd.get('p2_income',0):,.0f}</b>/yr &middot; {wd.get('p2_raise',3.0):.1f}% raises &middot; retire at {wd.get('p2_retire',65)}")
 
-        # Assets
-        st.subheader("Assets")
-        st.write(f"{wd.get('p1_name','You')}: **${wd.get('p1_net_worth',0):,.0f}** net worth, "
-                 f"**${wd.get('p1_ss',2000):,.0f}**/mo Social Security")
-        if is_couple:
-            st.write(f"{wd.get('p2_name','Partner')}: **${wd.get('p2_net_worth',0):,.0f}** net worth, "
-                     f"**${wd.get('p2_ss',2000):,.0f}**/mo Social Security")
+        # Assets card
+        col1, col2 = st.columns(2)
+        with col1:
+            _review_card("NET WORTH — " + (wd.get('p1_name','You') or 'You'),
+                f"<b>${wd.get('p1_net_worth',0):,.0f}</b> &middot; SS ${wd.get('p1_ss',2000):,.0f}/mo")
+        with col2:
+            if is_couple:
+                _review_card("NET WORTH — " + (wd.get('p2_name','Partner') or 'Partner'),
+                    f"<b>${wd.get('p2_net_worth',0):,.0f}</b> &middot; SS ${wd.get('p2_ss',2000):,.0f}/mo")
 
-        # Children
-        st.subheader("Children")
+        # Children card
         if wd.get('has_children') and wd.get('children'):
-            for ch in wd['children']:
-                st.write(f"- {ch['name']} (born {ch['birth_year']})")
-            st.write(f"Expense template: {wd.get('child_location', 'Seattle')}")
+            kids = ", ".join(f"{ch['name']} ({ch['birth_year']})" for ch in wd['children'])
+            _review_card("CHILDREN", f"{kids}<br>Template: {wd.get('child_location', 'Seattle')}")
         else:
-            st.write("None")
+            _review_card("CHILDREN", "None")
 
-        # Location
-        st.subheader("Location & Spending")
-        st.write(f"Current: **{wd.get('current_location', 'Seattle')}**")
+        # Location card
+        spending_map = {"Frugal": "Conservative", "Average": "Average", "Comfortable": "High-end"}
+        loc_body = f"<b>{wd.get('current_location', 'Seattle')}</b> &middot; {spending_map.get(wd.get('spending_style', 'Average'), 'Average')} spending"
         if wd.get('plan_moves') and wd.get('moves'):
-            for mv in wd['moves']:
-                st.write(f"- Move to {mv['location']} in {mv['year']}")
-        spending_map = {"Frugal": "Conservative (statistical)", "Average": "Average (statistical)", "Comfortable": "High-end (statistical)"}
-        st.write(f"Spending style: **{wd.get('spending_style', 'Average')}** → {spending_map[wd.get('spending_style', 'Average')]}")
+            moves_str = " &rarr; ".join(f"{mv['location']} ({mv['year']})" for mv in wd['moves'])
+            loc_body += f"<br>Moves: {moves_str}"
+        _review_card("LOCATION & SPENDING", loc_body)
 
-        st.markdown("---")
-
+        st.markdown("")
         col1, col2 = st.columns(2)
         with col1:
             if st.button("⬅️ Back", use_container_width=True):
                 st.session_state.wizard_step = 5
                 st.rerun()
         with col2:
-            if st.button("✅ Create My Plan", use_container_width=True, type="primary"):
+            if st.button("✅ Create Quick Plan", use_container_width=True, type="primary"):
                 _wizard_create_plan()
                 st.rerun()
 
+        st.markdown("---")
+        st.markdown(
+            '<div class="wizard-card">'
+            '<h4>Want a more accurate simulation?</h4>'
+            '<p style="font-size:0.9rem; margin-bottom:0;">Answer 5 more questions about housing, expenses, taxes, and healthcare to fine-tune your plan.</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        if st.button("📋 Continue to detailed refinement →", use_container_width=True):
+            _wizard_create_plan()  # Create the base plan first
+            st.session_state.wizard_complete = False
+            st.session_state.wizard_step = 7
+            st.session_state.wizard_phase2 = True
+            st.rerun()
+
+    # ══════════════════════════════════════════════════════════════════════════════
+    # PHASE 2: Secondary wizard — detailed refinements
+    # ══════════════════════════════════════════════════════════════════════════════
+
+    elif step == 7:
+        _wizard_step_header(1, 6, "🏠 Housing", "Tell us about your housing situation.", phase2=True)
+
+        wd = st.session_state.wizard_data
+
+        housing_type = st.radio("Do you own or rent?", ["Own", "Rent", "Other"],
+                                index=["Own", "Rent", "Other"].index(wd.get('housing_type', 'Rent')),
+                                key="wiz2_housing_type", horizontal=True)
+        wd['housing_type'] = housing_type
+
+        if housing_type == "Own":
+            col1, col2 = st.columns(2)
+            with col1:
+                wd['home_value'] = st.number_input("Current home value ($)", min_value=0, max_value=10_000_000,
+                    value=wd.get('home_value', 500000), step=25000, key="wiz2_home_value")
+                wd['mortgage_balance'] = st.number_input("Remaining mortgage ($)", min_value=0, max_value=10_000_000,
+                    value=wd.get('mortgage_balance', 350000), step=10000, key="wiz2_mortgage_bal")
+            with col2:
+                wd['mortgage_rate'] = st.number_input("Mortgage rate (%)", min_value=0.0, max_value=15.0,
+                    value=wd.get('mortgage_rate', 6.5), step=0.25, key="wiz2_mortgage_rate")
+                wd['mortgage_years_left'] = st.number_input("Years left on mortgage", min_value=0, max_value=30,
+                    value=wd.get('mortgage_years_left', 28), key="wiz2_mortgage_years")
+            wd['property_tax'] = st.number_input("Annual property tax ($)", min_value=0, max_value=100000,
+                value=wd.get('property_tax', 6000), step=500, key="wiz2_prop_tax")
+        elif housing_type == "Rent":
+            # Location-based rent estimates
+            rent_estimates = {
+                'Seattle': 2200, 'San Francisco': 3500, 'New York': 3200, 'Los Angeles': 2800,
+                'Portland': 1800, 'Sacramento': 1900, 'Houston': 1500, 'Toronto': 2400,
+                'Vancouver': 2600, 'Paris': 2000, 'Berlin': 1400, 'Munich': 1800,
+                'Sydney': 2800, 'Melbourne': 2200, 'Auckland': 1800, 'Wellington': 1600,
+            }
+            loc = wd.get('current_location', 'Seattle')
+            default_rent = rent_estimates.get(loc, 2000)
+            wd['monthly_rent'] = st.number_input(f"Monthly rent ($) — estimated for {loc}", min_value=0, max_value=20000,
+                value=wd.get('monthly_rent', default_rent), step=100, key="wiz2_rent")
+
+        st.markdown("")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("⬅️ Back to Summary", use_container_width=True):
+                st.session_state.wizard_step = 6
+                st.session_state.wizard_phase2 = False
+                st.rerun()
+        with col2:
+            if st.button("Next ➡️", use_container_width=True, type="primary", key="wiz2_next_7"):
+                st.session_state.wizard_step = 8
+                st.rerun()
+
+    elif step == 8:
+        _wizard_step_header(2, 6, "💸 Monthly Expenses", "Estimate your household's major monthly expenses.", phase2=True)
+
+        wd = st.session_state.wizard_data
+        expenses = st.session_state.family_shared_expenses
+
+        st.markdown("**Housing & Utilities**")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            monthly_mortgage = st.number_input("Mortgage/Rent ($/mo)", min_value=0, max_value=50000,
+                value=int(expenses.get('Mortgage/Rent', 30000) / 12), step=100, key="wiz2_mortgage_mo")
+            expenses['Mortgage/Rent'] = monthly_mortgage * 12
+        with col2:
+            monthly_utilities = st.number_input("Utilities ($/mo)", min_value=0, max_value=5000,
+                value=int((expenses.get('Gas & Electric', 2400) + expenses.get('Water', 900) + expenses.get('Garbage', 600)) / 12), step=50, key="wiz2_util_mo")
+            # Split proportionally
+            expenses['Gas & Electric'] = monthly_utilities * 12 * 0.6
+            expenses['Water'] = monthly_utilities * 12 * 0.225
+            expenses['Garbage'] = monthly_utilities * 12 * 0.175
+        with col3:
+            monthly_internet = st.number_input("Internet & Cable ($/mo)", min_value=0, max_value=1000,
+                value=int(expenses.get('Internet & Cable', 1800) / 12), step=10, key="wiz2_internet_mo")
+            expenses['Internet & Cable'] = monthly_internet * 12
+
+        st.markdown("**Lifestyle**")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            annual_vacation = st.number_input("Annual vacation budget ($)", min_value=0, max_value=100000,
+                value=int(expenses.get('Family Vacations', 8000)), step=1000, key="wiz2_vacation")
+            expenses['Family Vacations'] = annual_vacation
+        with col2:
+            monthly_subs = st.number_input("Subscriptions ($/mo)", min_value=0, max_value=1000,
+                value=int(expenses.get('Shared Subscriptions', 600) / 12), step=10, key="wiz2_subs_mo")
+            expenses['Shared Subscriptions'] = monthly_subs * 12
+        with col3:
+            monthly_pet = st.number_input("Pet care ($/mo)", min_value=0, max_value=2000,
+                value=int(expenses.get('Pet Care', 0) / 12), step=25, key="wiz2_pet_mo")
+            expenses['Pet Care'] = monthly_pet * 12
+
+        st.session_state.family_shared_expenses = expenses
+
+        st.markdown("")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("⬅️ Back", use_container_width=True, key="wiz2_back_8"):
+                st.session_state.wizard_step = 7
+                st.rerun()
+        with col2:
+            if st.button("Next ➡️", use_container_width=True, type="primary", key="wiz2_next_8"):
+                st.session_state.wizard_step = 9
+                st.rerun()
+
+    elif step == 9:
+        _wizard_step_header(3, 6, "🏛️ Tax & Retirement Savings", "These have a big impact on your projections.", phase2=True)
+
+        wd = st.session_state.wizard_data
+
+        # Auto-derive state tax from location
+        state_tax_lookup = {
+            'Seattle': 0.0, 'Portland': 0.0, 'Houston': 0.0,  # WA, OR (no income), TX
+            'Sacramento': 9.3, 'San Francisco': 9.3, 'Los Angeles': 9.3,  # CA
+            'New York': 8.82,  # NY
+            'Toronto': 0.0, 'Vancouver': 0.0,  # Canada (handled separately)
+            'Paris': 0.0, 'Toulouse': 0.0, 'Berlin': 0.0, 'Munich': 0.0,  # International
+            'Sydney': 0.0, 'Melbourne': 0.0, 'Brisbane': 0.0,
+            'Auckland': 0.0, 'Wellington': 0.0,
+        }
+        loc = wd.get('current_location', 'Seattle')
+        derived_tax = state_tax_lookup.get(loc, 5.0)  # Default 5% for unknown US locations
+        wd['state_tax_rate'] = derived_tax
+        st.info(f"State tax rate auto-set to **{derived_tax}%** based on your location ({loc}). You can override this in the app later.")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            wd['pretax_401k'] = st.number_input("Annual 401k contribution ($)", min_value=0, max_value=50000,
+                value=wd.get('pretax_401k', int(st.session_state.get('pretax_401k', 23500))),
+                step=1000, key="wiz2_401k",
+                help="2026 max: $23,500 ($31,000 if 50+)")
+        with col2:
+            wd['filing_status'] = st.selectbox("Tax filing status",
+                ["married", "single"], index=0 if st.session_state.wizard_data.get('household_type') == "Me and my partner" else 1,
+                key="wiz2_filing")
+
+        st.markdown("**Social Security**")
+        wd['ss_insolvency'] = st.checkbox("Model Social Security insolvency risk",
+            value=wd.get('ss_insolvency', True), key="wiz2_ss_insolvency",
+            help="The SS trust fund may face shortfalls around 2035. This models a ~23% benefit reduction.")
+
+        st.markdown("")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("⬅️ Back", use_container_width=True, key="wiz2_back_9"):
+                st.session_state.wizard_step = 8
+                st.rerun()
+        with col2:
+            if st.button("Next ➡️", use_container_width=True, type="primary", key="wiz2_next_9"):
+                st.session_state.wizard_step = 10
+                st.rerun()
+
+    elif step == 10:
+        _wizard_step_header(4, 6, "🏥 Healthcare", "Healthcare costs are one of the biggest retirement expenses.", phase2=True)
+
+        wd = st.session_state.wizard_data
+
+        healthcare_approach = st.radio("How do you want to estimate healthcare costs?",
+            ["Use national averages (recommended)", "Enter my own estimates"],
+            index=0, key="wiz2_healthcare_approach", horizontal=True)
+        wd['healthcare_approach'] = healthcare_approach
+
+        if healthcare_approach == "Enter my own estimates":
+            col1, col2 = st.columns(2)
+            with col1:
+                wd['monthly_health_premium'] = st.number_input("Monthly health insurance premium ($)",
+                    min_value=0, max_value=5000,
+                    value=wd.get('monthly_health_premium', 500), step=50, key="wiz2_health_premium")
+                wd['annual_out_of_pocket'] = st.number_input("Annual out-of-pocket medical ($)",
+                    min_value=0, max_value=50000,
+                    value=wd.get('annual_out_of_pocket', 2000), step=500, key="wiz2_oop")
+            with col2:
+                wd['hsa_contribution'] = st.number_input("Annual HSA contribution ($)",
+                    min_value=0, max_value=10000,
+                    value=wd.get('hsa_contribution', 0), step=500, key="wiz2_hsa",
+                    help="2026 family max: $8,550")
+                wd['hsa_balance'] = st.number_input("Current HSA balance ($)",
+                    min_value=0, max_value=500000,
+                    value=wd.get('hsa_balance', 0), step=1000, key="wiz2_hsa_bal")
+
+        st.markdown("")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("⬅️ Back", use_container_width=True, key="wiz2_back_10"):
+                st.session_state.wizard_step = 9
+                st.rerun()
+        with col2:
+            if st.button("Next ➡️", use_container_width=True, type="primary", key="wiz2_next_10"):
+                st.session_state.wizard_step = 11
+                st.rerun()
+
+    # ── Step 11: Purchases & Recurring ──────────────────────────────────────
+    elif step == 11:
+        _wizard_step_header(5, 6, "🛒 Purchases & Recurring Costs", "Major one-time and recurring expenses.", phase2=True)
+
+        wd = st.session_state.wizard_data
+
+        st.markdown("**One-Time Major Purchases**")
+        st.caption("Big expenses you're planning — car, renovation, wedding, etc.")
+        purchases = wd.get('purchases', [])
+        if not purchases:
+            purchases = []
+
+        purchases_to_keep = []
+        for i, p in enumerate(purchases):
+            col1, col2, col3, col4 = st.columns([2, 1.5, 1, 0.5])
+            with col1:
+                p['name'] = st.text_input("What?", value=p.get('name', ''),
+                    placeholder="e.g., New car", key=f"wiz2_purch_name_{i}")
+            with col2:
+                p['amount'] = st.number_input("Cost ($)", min_value=0, max_value=10_000_000,
+                    value=p.get('amount', 20000), step=5000, key=f"wiz2_purch_amt_{i}")
+            with col3:
+                p['year'] = st.number_input("Year", min_value=datetime.now().year, max_value=2080,
+                    value=p.get('year', datetime.now().year + 1), key=f"wiz2_purch_yr_{i}")
+            with col4:
+                st.markdown("")
+                if st.button("✕", key=f"wiz2_purch_del_{i}"):
+                    continue
+            purchases_to_keep.append(p)
+        purchases = purchases_to_keep
+
+        if st.button("＋ Add one-time purchase", key="wiz2_add_purchase"):
+            purchases.append({'name': '', 'amount': 20000, 'year': datetime.now().year + 1})
+            wd['purchases'] = purchases
+            st.rerun()
+        wd['purchases'] = purchases
+        wd['has_purchases'] = len(purchases) > 0
+
+        st.markdown("---")
+        st.markdown("**Recurring Purchases**")
+        st.caption("Expenses that repeat on a schedule — new car every 5 years, home renovation every 10, etc.")
+        recurring = wd.get('recurring_purchases', [])
+
+        recurring_to_keep = []
+        for i, r in enumerate(recurring):
+            col1, col2, col3, col4 = st.columns([2, 1.5, 1, 0.5])
+            with col1:
+                r['name'] = st.text_input("What?", value=r.get('name', ''),
+                    placeholder="e.g., New car", key=f"wiz2_recur_name_{i}")
+            with col2:
+                r['amount'] = st.number_input("Cost ($)", min_value=0, max_value=10_000_000,
+                    value=r.get('amount', 30000), step=5000, key=f"wiz2_recur_amt_{i}")
+            with col3:
+                r['every_years'] = st.number_input("Every N years", min_value=1, max_value=30,
+                    value=r.get('every_years', 5), key=f"wiz2_recur_freq_{i}")
+            with col4:
+                st.markdown("")
+                if st.button("✕", key=f"wiz2_recur_del_{i}"):
+                    continue
+            recurring_to_keep.append(r)
+        recurring = recurring_to_keep
+
+        if st.button("＋ Add recurring purchase", key="wiz2_add_recurring"):
+            recurring.append({'name': '', 'amount': 30000, 'every_years': 5})
+            wd['recurring_purchases'] = recurring
+            st.rerun()
+        wd['recurring_purchases'] = recurring
+
+        st.markdown("")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("⬅️ Back", use_container_width=True, key="wiz2_back_11"):
+                st.session_state.wizard_step = 10
+                st.rerun()
+        with col2:
+            if st.button("Next ➡️", use_container_width=True, type="primary", key="wiz2_next_11"):
+                st.session_state.wizard_step = 12
+                st.rerun()
+
+    # ── Step 12: Final Details ───────────────────────────────────────────────
+    elif step == 12:
+        _wizard_step_header(6, 6, "📋 Final Details", "Last step — then your refined plan is ready.", phase2=True)
+
+        wd = st.session_state.wizard_data
+        is_couple = wd.get('household_type') == "Me and my partner"
+
+        st.markdown("**Life Expectancy**")
+        st.caption("Planning to a later age is more conservative — ensures you don't outlive your money.")
+        col1, col2 = st.columns(2)
+        with col1:
+            p1_name = wd.get('p1_name', 'Parent 1')
+            wd['p1_death_age'] = st.number_input(f"{p1_name}'s planning horizon (age)",
+                min_value=65, max_value=120, value=wd.get('p1_death_age', 95), key="wiz2_p1_death")
+        with col2:
+            if is_couple:
+                p2_name = wd.get('p2_name', 'Parent 2')
+                wd['p2_death_age'] = st.number_input(f"{p2_name}'s planning horizon (age)",
+                    min_value=65, max_value=120, value=wd.get('p2_death_age', 95), key="wiz2_p2_death")
+
+        st.markdown("")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("⬅️ Back", use_container_width=True, key="wiz2_back_12"):
+                st.session_state.wizard_step = 11
+                st.rerun()
+        with col2:
+            if st.button("✅ Create Refined Plan", use_container_width=True, type="primary"):
+                _wizard_apply_phase2()
+                st.rerun()
+
     st.markdown("</div>", unsafe_allow_html=True)
+
+
+def _wizard_step_header(step: int, total: int, title: str, subtitle: str, phase2: bool = False):
+    """Render a polished wizard step header with pill badge and dot progress."""
+    pill_class = "wizard-step-pill phase2" if phase2 else "wizard-step-pill"
+    phase_label = "REFINEMENT" if phase2 else "STEP"
+    st.markdown(
+        f'<span class="{pill_class}">{phase_label} {step} OF {total}</span>',
+        unsafe_allow_html=True,
+    )
+    st.header(title)
+    st.caption(subtitle)
+    # Dot progress
+    dots = []
+    for i in range(1, total + 1):
+        if phase2:
+            cls = "phase2-active" if i == step else ("phase2-done" if i < step else "")
+        else:
+            cls = "active" if i == step else ("done" if i < step else "")
+        dots.append(f'<span class="dot {cls}"></span>')
+    st.markdown(f'<div class="wizard-dots">{"".join(dots)}</div>', unsafe_allow_html=True)
 
 
 def _wizard_nav(step):
@@ -4463,6 +5327,93 @@ def _wizard_nav(step):
         if st.button("Next ➡️", use_container_width=True, type="primary", key=f"wiz_next_{step}"):
             st.session_state.wizard_step = step + 1
             st.rerun()
+
+
+def _wizard_apply_phase2():
+    """Apply secondary wizard refinements to the existing plan."""
+    wd = st.session_state.wizard_data
+
+    # Housing
+    if wd.get('housing_type') == 'Own' and wd.get('home_value'):
+        location = st.session_state.state_timeline[0].state if st.session_state.state_timeline else "Seattle"
+        st.session_state.houses = [House(
+            name="Primary Home",
+            purchase_year=datetime.now().year - 2,
+            purchase_price=wd.get('home_value', 500000),
+            current_value=wd.get('home_value', 500000),
+            mortgage_balance=wd.get('mortgage_balance', 350000),
+            mortgage_rate=wd.get('mortgage_rate', 6.5) / 100,
+            mortgage_years_left=wd.get('mortgage_years_left', 28),
+            property_tax_rate=wd.get('property_tax', 6000) / max(wd.get('home_value', 500000), 1),
+            home_insurance=2000,
+            maintenance_rate=1.0,
+            upkeep_costs=0,
+            owner="Shared",
+            timeline=[HouseTimelineEntry(datetime.now().year, "Own_Live", 0.0)]
+        )]
+    elif wd.get('housing_type') == 'Rent' and wd.get('monthly_rent'):
+        st.session_state.family_shared_expenses['Mortgage/Rent'] = wd['monthly_rent'] * 12
+
+    # Tax & retirement savings
+    if 'state_tax_rate' in wd:
+        st.session_state.state_tax_rate = wd['state_tax_rate']
+    if 'pretax_401k' in wd:
+        st.session_state.pretax_401k = wd['pretax_401k']
+    if wd.get('ss_insolvency'):
+        st.session_state.ss_insolvency_enabled = True
+        st.session_state.ss_shortfall_percentage = 77.0
+
+    # Healthcare
+    if wd.get('healthcare_approach') == "Enter my own estimates":
+        st.session_state.hsa_contribution = float(wd.get('hsa_contribution', 0))
+        st.session_state.hsa_balance = float(wd.get('hsa_balance', 0))
+
+    # Life expectancy
+    if 'p1_death_age' in wd:
+        st.session_state.parentX_death_age = wd['p1_death_age']
+    if 'p2_death_age' in wd:
+        st.session_state.parentY_death_age = wd['p2_death_age']
+
+    # Major purchases
+    if wd.get('purchases'):
+        st.session_state.major_purchases = [
+            MajorPurchase(name=p['name'] or f"Purchase {i+1}", amount=float(p['amount']), year=p['year'])
+            for i, p in enumerate(wd['purchases']) if p.get('amount', 0) > 0
+        ]
+
+    # Recurring purchases from wizard
+    if wd.get('recurring_purchases'):
+        from_year = datetime.now().year
+        for rp in wd['recurring_purchases']:
+            if rp.get('amount', 0) > 0 and rp.get('every_years', 0) > 0:
+                st.session_state.recurring_expenses.append(
+                    RecurringExpense(
+                        name=rp['name'] or 'Recurring Purchase',
+                        category='Major Purchase',
+                        amount=float(rp['amount']),
+                        frequency_years=rp['every_years'],
+                        start_year=from_year,
+                        inflation_adjust=True,
+                    )
+                )
+
+    # Save the refined plan
+    try:
+        json_data = save_data()
+        if json_data and st.session_state.get('household_id'):
+            save_household_plan(st.session_state.household_id, json_data)
+            scenarios = st.session_state.get('saved_scenarios', {})
+            scenarios["Refined Plan"] = json_data
+            st.session_state.saved_scenarios = scenarios
+            save_household_scenarios(st.session_state.household_id, scenarios)
+    except Exception:
+        pass
+
+    st.session_state.wizard_complete = True
+    st.session_state.wizard_manual = False
+    st.session_state.wizard_phase2 = False
+    st.session_state.pop('wizard_step', None)
+    st.session_state.pop('wizard_data', None)
 
 
 def _wizard_create_plan():
@@ -4494,12 +5445,6 @@ def _wizard_create_plan():
     st.session_state.parentX_net_worth = float(wd.get('p1_net_worth', 0))
     st.session_state.parentX_ss_benefit = float(wd.get('p1_ss', 2000))
 
-    # Parent 1 job changes
-    if wd.get('p1_has_job_changes') and wd.get('p1_job_changes'):
-        years = [jc['year'] for jc in wd['p1_job_changes']]
-        incomes = [float(jc['income']) for jc in wd['p1_job_changes']]
-        st.session_state.parentX_job_changes = pd.DataFrame({'Year': years, 'New Income': incomes})
-
     # Career phases
     if wd.get('p1_career_phases'):
         st.session_state.parentX_career_phases = [
@@ -4530,11 +5475,6 @@ def _wizard_create_plan():
         st.session_state.parentY_net_worth = float(wd.get('p2_net_worth', 0))
         st.session_state.parentY_ss_benefit = float(wd.get('p2_ss', 2000))
         st.session_state.marriage_year = wd.get('marriage_year', datetime.now().year)
-
-        if wd.get('p2_has_job_changes') and wd.get('p2_job_changes'):
-            years2 = [jc['year'] for jc in wd['p2_job_changes']]
-            incomes2 = [float(jc['income']) for jc in wd['p2_job_changes']]
-            st.session_state.parentY_job_changes = pd.DataFrame({'Year': years2, 'New Income': incomes2})
 
         # Career phases for parent 2
         if wd.get('p2_career_phases'):
@@ -4633,6 +5573,10 @@ def initialize_session_state():
         st.session_state.parent2_emoji = "👩"
 
         st.session_state.marriage_year = "N/A"
+
+        # Finance mode: "Pooled" (single family pot) or "Separate" (per-parent tracking)
+        st.session_state.finance_mode = "Pooled"
+        st.session_state.shared_expense_split_pct = 50  # Parent X pays this %, Y pays rest
 
         st.session_state.state_timeline = [
             StateTimelineEntry(datetime.now().year, "Seattle", "Average")
@@ -4871,7 +5815,7 @@ def initialize_session_state():
 
         # Tax settings
         st.session_state.state_tax_rate = 0.0
-        st.session_state.pretax_401k = 0.0
+        st.session_state.pretax_401k = 23500.0
 
         # Social Security insolvency settings
         st.session_state.ss_insolvency_enabled = True
@@ -6541,11 +7485,19 @@ def main():
         if not email:
             # Local development fallback — show simple email input
             st.markdown("<div class='login-container'>", unsafe_allow_html=True)
-            st.title("💰 Financial Planning Suite")
-            st.caption("Enter your email to continue (Cloudflare Access not detected)")
+            st.markdown(
+                '<div class="brand-hero">'
+                '<div class="brand-icon">💰</div>'
+                '<h1>Financial Planning Suite</h1>'
+                '<p class="brand-tagline">Lifetime financial simulation for your household</p>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown("")
+            st.caption("Enter your email to continue")
             with st.form("dev_login"):
-                email_input = st.text_input("Email")
-                if st.form_submit_button("Continue", type="primary") and email_input:
+                email_input = st.text_input("Email", placeholder="you@example.com")
+                if st.form_submit_button("Continue", type="primary", use_container_width=True) and email_input:
                     st.session_state.cf_email = email_input.strip().lower()
                     st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
@@ -6559,8 +7511,8 @@ def main():
         household_picker_page(email)
         return
 
-    # Check if wizard was manually triggered or this is a new household
-    if st.session_state.get('wizard_manual'):
+    # Check if wizard was manually triggered, phase 2 is active, or this is a new household
+    if st.session_state.get('wizard_manual') or st.session_state.get('wizard_phase2'):
         setup_wizard()
         return
     if not st.session_state.get('wizard_complete') and not st.session_state.get('wizard_skipped'):
@@ -6582,50 +7534,708 @@ def main():
             pass  # Silent auto-save - don't interrupt the user
 
     user_display = st.session_state.user_data.get('display_name', st.session_state.current_user)
-    st.title("💰 Financial Planning Suite v0.8")
+    if st.session_state.get('test_mode'):
+        st.markdown(
+            '<div class="test-mode-banner">🧪 TEST MODE — This is an isolated test session. No real data will be affected.</div>',
+            unsafe_allow_html=True,
+        )
+    st.title("💰 Financial Planning Suite")
 
-    # Build tab list dynamically based on visibility settings
-    tab_configs = [
-        ("⚙️ Settings", parent_settings_tab, True),  # Always shown
-        (f"{st.session_state.parent1_emoji} {st.session_state.parent1_name}", parent_x_tab, True),
-        (f"{st.session_state.parent2_emoji} {st.session_state.parent2_name}", parent_y_tab, True),
-        ("💸 Family Expenses", family_expenses_tab, st.session_state.get('show_family_expenses', False)),
-        ("🔄 Recurring & One-Time Expenses", recurring_one_time_expenses_tab, st.session_state.get('show_recurring_expenses', True)),
-        ("👶 Children", children_tab, True),
-        ("🏠 House Portfolio", house_tab, True),
-        ("🗓️ Timeline", timeline_tab, True),
-        ("📈 Economy", economy_tab, True),
-        ("🖼️ Retirement", retirement_tab, True),
-        ("🏥 Healthcare & Insurance", healthcare_insurance_tab, st.session_state.get('show_healthcare', False)),
-        ("💰 Deterministic Cashflow", deterministic_cashflow_tab, True),
-        ("🎲 Monte Carlo Simulation", monte_carlo_simulation_tab, True),
-        ("🧪 Stress Test", stress_test_tab, True),
-        ("📄 Export Reports", report_export_tab, st.session_state.get('show_export', True)),
-        ("💾 Save/Load", save_load_tab, True),
-        ("👤 Users", user_management_tab, True),
-    ]
+    # ── Grouped navigation ──────────────────────────────────────────────
+    # Categories keep tabs visible without horizontal scrolling.
+    p1_label = f"{st.session_state.parent1_emoji} {st.session_state.parent1_name}"
+    p2_label = f"{st.session_state.parent2_emoji} {st.session_state.parent2_name}"
 
-    # Filter to only enabled tabs
-    enabled_tabs = [(name, func) for name, func, enabled in tab_configs if enabled]
-    tab_names = [name for name, func in enabled_tabs]
-    tab_functions = [func for name, func in enabled_tabs]
+    nav_groups = {
+        "Overview": [
+            ("📊 Dashboard", dashboard_tab, True),
+            ("⚙️ Settings", parent_settings_tab, True),
+            ("👤 Users", user_management_tab, True),
+        ],
+        "People": [
+            (p1_label, parent_x_tab, True),
+            (p2_label, parent_y_tab, True),
+            ("👶 Children", children_tab, True),
+        ],
+        "Expenses": [
+            ("💸 Family", family_expenses_tab, st.session_state.get('show_family_expenses', False)),
+            ("🔄 Recurring", recurring_one_time_expenses_tab, st.session_state.get('show_recurring_expenses', True)),
+            ("🏠 Housing", house_tab, True),
+            ("🏥 Healthcare", healthcare_insurance_tab, st.session_state.get('show_healthcare', False)),
+        ],
+        "Planning": [
+            ("🗓️ Timeline", timeline_tab, True),
+            ("📈 Economy", economy_tab, True),
+            ("🏖️ Retirement", retirement_tab, True),
+        ],
+        "Analysis": [
+            ("💰 Cashflow", deterministic_cashflow_tab, True),
+            ("🎲 Monte Carlo", monte_carlo_simulation_tab, True),
+            ("🧪 Stress Test", stress_test_tab, True),
+        ],
+        "Data": [
+            ("💾 Save / Load", save_load_tab, True),
+            ("📄 Export", report_export_tab, st.session_state.get('show_export', True)),
+        ],
+    }
 
-    # Create tabs
-    tabs = st.tabs(tab_names)
+    # Category selector (horizontal radio, always visible)
+    group_names = list(nav_groups.keys())
+    if 'nav_group' not in st.session_state:
+        st.session_state.nav_group = "Overview"
+    selected_group = st.radio(
+        "Section", group_names, horizontal=True,
+        index=group_names.index(st.session_state.get('nav_group', 'Overview'))
+              if st.session_state.get('nav_group', 'Overview') in group_names else 0,
+        key="nav_group_radio", label_visibility="collapsed",
+    )
+    st.session_state.nav_group = selected_group
 
-    # Render each enabled tab
-    for idx, (tab, func) in enumerate(zip(tabs, tab_functions)):
-        with tab:
-            func()
+    # Category guide
+    CATEGORY_GUIDES = {
+        "Overview": "**Start here.** The Dashboard shows your overall financial health at a glance — key metrics, "
+                     "trajectory chart, and alerts. Use Settings to configure names and toggle optional tabs. "
+                     "Users manages your household and account.",
+        "People": "**Set up each person.** Enter income, career phases, net worth, retirement age, and Social Security "
+                   "for each parent. Add children with age-based expense templates. This data drives all projections.",
+        "Expenses": "**Where does the money go?** Family expenses are shared costs (groceries, utilities). "
+                     "Recurring covers repeating purchases. Housing tracks your properties, mortgages, and property tax. "
+                     "Healthcare models insurance and Medicare.",
+        "Planning": "**Set the timeline.** Timeline tracks relocations and spending strategy changes. Economy sets your "
+                     "assumptions for returns, inflation, and growth. Retirement configures Social Security and benefits.",
+        "Analysis": "**Run the numbers.** Cashflow shows a deterministic year-by-year projection. Monte Carlo runs "
+                     "thousands of randomized simulations for a range of outcomes. Stress Test pushes your plan to its limits.",
+        "Data": "**Save and share.** Save named scenarios, compare plans side-by-side, create what-if variants, "
+                 "restore from backups, and export to JSON/PDF.",
+    }
+    guide = CATEGORY_GUIDES.get(selected_group)
+    if guide:
+        with st.expander(f"📖 Guide: {selected_group}", expanded=False):
+            st.markdown(guide)
+
+    # Tabs within the selected group
+    group_tabs = nav_groups[selected_group]
+    enabled = [(name, func) for name, func, vis in group_tabs if vis]
+
+    if enabled:
+        tab_names = [n for n, f in enabled]
+        tab_functions = [f for n, f in enabled]
+        tabs = st.tabs(tab_names)
+        for tab, func in zip(tabs, tab_functions):
+            with tab:
+                func()
+    else:
+        st.info("No tabs enabled in this section. Toggle visibility in Settings.")
 
     # Display sidebar
     display_sidebar()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ALERTS ENGINE
+# ══════════════════════════════════════════════════════════════════════════════
+
+def generate_alerts(cashflow_data: list) -> list:
+    """Analyze cashflow data and return a list of alert dicts.
+    Each alert: {severity: 'critical'|'warning'|'info', title: str, detail: str}
+    """
+    if not cashflow_data:
+        return []
+
+    alerts = []
+    current_year = st.session_state.current_year
+    is_separate = cashflow_data[0].get('finance_mode') == 'Separate' if cashflow_data else False
+
+    # 1. Find the year net worth goes negative (if ever)
+    broke_year = None
+
+    # Per-person solvency checks (Separate mode)
+    if is_separate:
+        for parent_key, parent_name in [('nw_parent1', st.session_state.parent1_name),
+                                         ('nw_parent2', st.session_state.parent2_name)]:
+            for row in cashflow_data:
+                if row.get(parent_key, 0) < 0:
+                    alerts.append({
+                        'severity': 'critical',
+                        'title': f"{parent_name}'s net worth goes negative in {row['year']}",
+                        'detail': f"At age {row['parent1_age'] if 'parent1' in parent_key else row['parent2_age']}. "
+                                  f"Consider rebalancing the expense split or increasing savings."
+                    })
+                    break
+
+    for row in cashflow_data:
+        if row['net_worth'] < 0:
+            broke_year = row['year']
+            p1_age = row['parent1_age']
+            alerts.append({
+                'severity': 'critical',
+                'title': f'Combined net worth goes negative in {broke_year}',
+                'detail': f'{st.session_state.parent1_name} will be {p1_age}. '
+                          f'Consider increasing savings or delaying retirement.'
+            })
+            break
+
+    # 2. Peak net worth and when it starts declining
+    peak_nw = max(cashflow_data, key=lambda r: r['net_worth'])
+    if peak_nw['net_worth'] > 0:
+        decline_start = None
+        for i in range(1, len(cashflow_data)):
+            if cashflow_data[i]['net_worth'] < cashflow_data[i-1]['net_worth']:
+                decline_start = cashflow_data[i]['year']
+                break
+        if decline_start and decline_start < peak_nw['year'] + 5:
+            alerts.append({
+                'severity': 'warning',
+                'title': f'Net worth peaks at {format_currency(peak_nw["net_worth"])} in {peak_nw["year"]}',
+                'detail': f'Drawdown begins in {decline_start}. Plan for declining assets after this point.'
+            })
+
+    # 3. Negative cashflow years while still working
+    for row in cashflow_data:
+        p1_working = row['parent1_age'] < st.session_state.parentX_retirement_age
+        p2_working = row['parent2_age'] < st.session_state.parentY_retirement_age
+        if (p1_working or p2_working) and row['cashflow'] < 0 and row['year'] > current_year:
+            alerts.append({
+                'severity': 'warning',
+                'title': f'Spending exceeds income in {row["year"]} (while still working)',
+                'detail': f'Cashflow is {format_currency(row["cashflow"])}. Expenses may need adjustment.'
+            })
+            break  # Only flag the first occurrence
+
+    # 4. Healthcare costs exceeding a threshold
+    for row in cashflow_data:
+        if row['healthcare_expenses'] > 0 and row['total_income'] > 0:
+            hc_pct = row['healthcare_expenses'] / row['total_income']
+            if hc_pct > 0.25 and row['year'] > current_year:
+                alerts.append({
+                    'severity': 'warning',
+                    'title': f'Healthcare exceeds 25% of income in {row["year"]}',
+                    'detail': f'Healthcare: {format_currency(row["healthcare_expenses"])}, '
+                              f'Income: {format_currency(row["total_income"])} ({hc_pct:.0%}).'
+                })
+                break
+
+    # 5. Retirement readiness — savings at retirement age
+    for row in cashflow_data:
+        if row['parent1_age'] == st.session_state.parentX_retirement_age:
+            retirement_nw = row['net_worth']
+            annual_expenses = row['total_expenses']
+            if annual_expenses > 0:
+                years_covered = retirement_nw / annual_expenses
+                if years_covered < 15:
+                    alerts.append({
+                        'severity': 'critical',
+                        'title': f'Retirement savings cover only {years_covered:.0f} years of expenses',
+                        'detail': f'At retirement ({row["year"]}): {format_currency(retirement_nw)} saved, '
+                                  f'{format_currency(annual_expenses)}/yr expenses.'
+                    })
+                elif years_covered < 25:
+                    alerts.append({
+                        'severity': 'warning',
+                        'title': f'Retirement savings cover ~{years_covered:.0f} years of expenses',
+                        'detail': f'At retirement: {format_currency(retirement_nw)} saved. Consider boosting savings.'
+                    })
+                else:
+                    alerts.append({
+                        'severity': 'info',
+                        'title': f'Retirement savings look healthy ({years_covered:.0f}+ years covered)',
+                        'detail': f'At retirement: {format_currency(retirement_nw)} saved against '
+                                  f'{format_currency(annual_expenses)}/yr expenses.'
+                    })
+            break
+
+    # 6. Social Security insolvency warning
+    if st.session_state.get('ss_insolvency_enabled'):
+        alerts.append({
+            'severity': 'info',
+            'title': 'Social Security insolvency modeling is enabled',
+            'detail': f'Benefits reduced by {st.session_state.get("ss_shortfall_percentage", 23):.0f}% after projected trust fund depletion.'
+        })
+
+    # 7. No children expense coverage after age 18 check — just informational
+    if not broke_year:
+        final_row = cashflow_data[-1]
+        if final_row['net_worth'] > 0:
+            alerts.append({
+                'severity': 'info',
+                'title': f'Plan ends with {format_currency(final_row["net_worth"])} remaining',
+                'detail': f'At age {final_row["parent1_age"]}, projected net worth is positive.'
+            })
+
+    return alerts
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DASHBOARD TAB
+# ══════════════════════════════════════════════════════════════════════════════
+
+def dashboard_tab():
+    """Dashboard — at-a-glance summary of your financial plan."""
+    st.header("📊 Dashboard")
+
+    # Calculate cashflow data
+    try:
+        cashflow_data = calculate_lifetime_cashflow()
+    except Exception:
+        st.info("Complete the Settings and Income tabs to see your dashboard.")
+        return
+
+    if not cashflow_data:
+        st.info("No data yet. Fill in your details in the tabs to the right.")
+        return
+
+    current_year = st.session_state.current_year
+    current_row = cashflow_data[0] if cashflow_data else {}
+
+    # ── Key metrics row ──────────────────────────────────────────────────────
+    total_income = st.session_state.parentX_income + st.session_state.parentY_income
+    total_nw = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
+
+    # Find key milestones from cashflow
+    peak_nw_row = max(cashflow_data, key=lambda r: r['net_worth'])
+    broke_year = None
+    for row in cashflow_data:
+        if row['net_worth'] < 0:
+            broke_year = row['year']
+            break
+
+    p1_retire_year = current_year + (st.session_state.parentX_retirement_age - st.session_state.parentX_age)
+    years_to_retire = max(0, p1_retire_year - current_year)
+
+    is_separate = st.session_state.get('finance_mode', 'Pooled') == 'Separate'
+    p1_name = st.session_state.parent1_name
+    p2_name = st.session_state.parent2_name
+
+    if is_separate:
+        col1, col2, col3, col4, col5 = st.columns(5)
+        with col1:
+            st.metric(f"{p1_name} Net Worth", format_currency(st.session_state.parentX_net_worth))
+        with col2:
+            st.metric(f"{p2_name} Net Worth", format_currency(st.session_state.parentY_net_worth))
+        with col3:
+            st.metric("Combined", format_currency(total_nw))
+        with col4:
+            st.metric("Years to Retirement", f"{years_to_retire}" if years_to_retire > 0 else "Retired")
+        with col5:
+            if broke_year:
+                years_solvent = broke_year - current_year
+                st.metric("Solvent For", f"{years_solvent} yrs", delta=f"runs out {broke_year}", delta_color="inverse")
+            else:
+                st.metric("Solvent For", "Lifetime")
+    else:
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Combined Net Worth", format_currency(total_nw))
+        with col2:
+            st.metric("Combined Income", format_currency(total_income))
+        with col3:
+            st.metric("Years to Retirement", f"{years_to_retire}" if years_to_retire > 0 else "Retired")
+        with col4:
+            if broke_year:
+                years_solvent = broke_year - current_year
+                st.metric("Solvent For", f"{years_solvent} years", delta=f"runs out {broke_year}", delta_color="inverse")
+            else:
+                st.metric("Solvent For", "Lifetime", delta="never runs out")
+
+    st.markdown("")
+
+    # ── Net worth trajectory chart ───────────────────────────────────────────
+    years = [r['year'] for r in cashflow_data]
+    net_worths = [r['net_worth'] for r in cashflow_data]
+    incomes = [r['total_income'] for r in cashflow_data]
+    expenses = [r['total_expenses'] for r in cashflow_data]
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=years, y=net_worths, name='Net Worth',
+        fill='tozeroy', line=dict(color=COLORS['primary'], width=2),
+        fillcolor='rgba(102,126,234,0.15)'
+    ))
+    fig.add_trace(go.Scatter(
+        x=years, y=incomes, name='Income',
+        line=dict(color=COLORS['success'], width=1.5, dash='dot')
+    ))
+    fig.add_trace(go.Scatter(
+        x=years, y=expenses, name='Expenses',
+        line=dict(color=COLORS['danger'], width=1.5, dash='dot')
+    ))
+
+    # Per-person net worth traces (Separate mode only)
+    if is_separate and cashflow_data[0].get('nw_parent1') is not None:
+        fig.add_trace(go.Scatter(
+            x=years, y=[r.get('nw_parent1', 0) for r in cashflow_data],
+            name=f'{p1_name}', line=dict(color=COLORS['purple'], width=1.5, dash='dash')
+        ))
+        fig.add_trace(go.Scatter(
+            x=years, y=[r.get('nw_parent2', 0) for r in cashflow_data],
+            name=f'{p2_name}', line=dict(color=COLORS['warning'], width=1.5, dash='dash')
+        ))
+
+    # Add retirement marker
+    if years_to_retire > 0:
+        fig.add_vline(x=p1_retire_year, line_dash="dash", line_color="gray", opacity=0.5,
+                      annotation_text="Retirement", annotation_position="top left")
+
+    fig.update_layout(title="Lifetime Financial Trajectory",
+                      xaxis_title="Year", yaxis_title="Amount ($)", **CHART_LAYOUT)
+    st.plotly_chart(fig, use_container_width=True)
+
+    # ── Alerts section ───────────────────────────────────────────────────────
+    alerts = generate_alerts(cashflow_data)
+    if alerts:
+        st.markdown("### Alerts & Insights")
+        for alert in alerts:
+            if alert['severity'] == 'critical':
+                st.error(f"**{alert['title']}** — {alert['detail']}")
+            elif alert['severity'] == 'warning':
+                st.warning(f"**{alert['title']}** — {alert['detail']}")
+            else:
+                st.info(f"**{alert['title']}** — {alert['detail']}")
+
+    # ── Key milestones ───────────────────────────────────────────────────────
+    st.markdown("### Key Milestones")
+    milestone_cols = st.columns(3)
+
+    with milestone_cols[0]:
+        st.markdown(
+            f'<div class="review-card">'
+            f'<div class="review-card-label">PEAK NET WORTH</div>'
+            f'<div class="review-card-value"><b>{format_currency(peak_nw_row["net_worth"])}</b><br>'
+            f'Year {peak_nw_row["year"]} (age {peak_nw_row["parent1_age"]})</div></div>',
+            unsafe_allow_html=True,
+        )
+
+    with milestone_cols[1]:
+        # Find retirement net worth
+        retire_nw = "N/A"
+        for row in cashflow_data:
+            if row['parent1_age'] == st.session_state.parentX_retirement_age:
+                retire_nw = format_currency(row['net_worth'])
+                break
+        st.markdown(
+            f'<div class="review-card">'
+            f'<div class="review-card-label">NET WORTH AT RETIREMENT</div>'
+            f'<div class="review-card-value"><b>{retire_nw}</b><br>'
+            f'Age {st.session_state.parentX_retirement_age} ({p1_retire_year})</div></div>',
+            unsafe_allow_html=True,
+        )
+
+    with milestone_cols[2]:
+        final_row = cashflow_data[-1]
+        st.markdown(
+            f'<div class="review-card">'
+            f'<div class="review-card-label">END OF PLAN</div>'
+            f'<div class="review-card-value"><b>{format_currency(final_row["net_worth"])}</b><br>'
+            f'Age {final_row["parent1_age"]} ({final_row["year"]})</div></div>',
+            unsafe_allow_html=True,
+        )
+
+    # ── Monthly cashflow snapshot ────────────────────────────────────────────
+    st.markdown("### Current Year Snapshot")
+    if current_row:
+        monthly_income = current_row.get('total_income', 0) / 12
+        monthly_expenses = current_row.get('total_expenses', 0) / 12
+        monthly_taxes = current_row.get('taxes', 0) / 12
+        monthly_savings = monthly_income - monthly_expenses - monthly_taxes
+
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Monthly Income", format_currency(monthly_income))
+        with col2:
+            st.metric("Monthly Expenses", format_currency(monthly_expenses))
+        with col3:
+            st.metric("Monthly Taxes", format_currency(monthly_taxes))
+        with col4:
+            st.metric("Monthly Savings", format_currency(monthly_savings),
+                      delta=f"{(monthly_savings/max(monthly_income,1))*100:.0f}% savings rate" if monthly_income > 0 else None)
+
+    # ── Expense breakdown pie ────────────────────────────────────────────────
+    if current_row:
+        exp_labels = []
+        exp_values = []
+        for label, key in [("Living Expenses", "base_expenses"), ("Children", "children_expenses"),
+                           ("Healthcare", "healthcare_expenses"), ("Housing", "house_expenses"),
+                           ("Recurring", "recurring_expenses"), ("Major Purchases", "major_purchases")]:
+            val = current_row.get(key, 0)
+            if val > 0:
+                exp_labels.append(label)
+                exp_values.append(val)
+
+        if exp_values:
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                pie_fig = go.Figure(data=[go.Pie(
+                    labels=exp_labels, values=exp_values,
+                    hole=0.45, textinfo='label+percent',
+                    marker=dict(colors=COLOR_SEQUENCE[:len(exp_values)])
+                )])
+                pie_fig.update_layout(title=f"Expense Breakdown ({current_year})",
+                                      **CHART_LAYOUT_COMPACT)
+                st.plotly_chart(pie_fig, use_container_width=True)
+            with col2:
+                # Income sources breakdown
+                inc_labels = []
+                inc_values = []
+                for label, key in [(st.session_state.parent1_name, "parent1_income"),
+                                   (st.session_state.parent2_name, "parent2_income"),
+                                   ("Social Security", "ss_income"),
+                                   ("Investment Returns", "investment_income")]:
+                    val = current_row.get(key, 0)
+                    if val > 0:
+                        inc_labels.append(label)
+                        inc_values.append(val)
+                if inc_values:
+                    inc_fig = go.Figure(data=[go.Pie(
+                        labels=inc_labels, values=inc_values,
+                        hole=0.45, textinfo='label+percent',
+                        marker=dict(colors=COLOR_SEQUENCE[2:2+len(inc_values)])
+                    )])
+                    inc_fig.update_layout(title=f"Income Sources ({current_year})",
+                                          **CHART_LAYOUT_COMPACT)
+                    st.plotly_chart(inc_fig, use_container_width=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SCENARIO TEMPLATES (What-If)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def scenario_templates_section():
+    """Show one-click what-if scenario buttons inside Save/Load tab."""
+    st.markdown("### 🔮 Quick What-If Scenarios")
+    st.caption("Clone your current plan with one change applied. The original plan is preserved.")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🕐 Retire 2 Years Earlier", use_container_width=True, key="whatif_retire_early"):
+            _apply_whatif("Early Retirement (-2yr)", {
+                'parentX_retirement_age': st.session_state.parentX_retirement_age - 2,
+                'parentY_retirement_age': st.session_state.parentY_retirement_age - 2,
+            })
+        if st.button("👶 Add One More Child", use_container_width=True, key="whatif_add_child"):
+            _apply_whatif_add_child()
+        if st.button("📈 Aggressive Returns (8%)", use_container_width=True, key="whatif_bull"):
+            _apply_whatif("Aggressive Returns", {}, economy={'investment_return': 0.08})
+    with col2:
+        if st.button("🕐 Retire 2 Years Later", use_container_width=True, key="whatif_retire_late"):
+            _apply_whatif("Late Retirement (+2yr)", {
+                'parentX_retirement_age': st.session_state.parentX_retirement_age + 2,
+                'parentY_retirement_age': st.session_state.parentY_retirement_age + 2,
+            })
+        if st.button("📉 Bear Market (4% returns)", use_container_width=True, key="whatif_bear"):
+            _apply_whatif("Bear Market Returns", {}, economy={'investment_return': 0.04})
+        if st.button("💰 Boost Savings +$500/mo", use_container_width=True, key="whatif_save_more"):
+            new_nw = st.session_state.parentX_net_worth + 6000
+            _apply_whatif("Extra Savings (+$6k/yr)", {
+                'parentX_net_worth': new_nw,
+            })
+
+
+def _apply_whatif(name: str, overrides: dict, economy: dict = None):
+    """Save current plan as a scenario, then apply overrides to create a what-if variant."""
+    try:
+        # Save current plan first
+        base_json = save_data()
+        if base_json:
+            scenarios = st.session_state.get('saved_scenarios', {})
+            if "Current Plan (before what-if)" not in scenarios:
+                scenarios["Current Plan (before what-if)"] = base_json
+            # Apply overrides
+            for key, val in overrides.items():
+                st.session_state[key] = val
+            if economy:
+                for key, val in economy.items():
+                    setattr(st.session_state.economic_params, key, val)
+            # Save the what-if scenario
+            whatif_json = save_data()
+            if whatif_json:
+                scenarios[name] = whatif_json
+                st.session_state.saved_scenarios = scenarios
+                if st.session_state.get('household_id'):
+                    save_household_scenarios(st.session_state.household_id, scenarios)
+            st.success(f"Created scenario: **{name}**. Compare in Plan Comparison below.")
+            st.rerun()
+    except Exception as e:
+        st.error(f"Could not create scenario: {e}")
+
+
+def _apply_whatif_add_child():
+    """What-if: add one more child."""
+    try:
+        base_json = save_data()
+        if base_json:
+            scenarios = st.session_state.get('saved_scenarios', {})
+            if "Current Plan (before what-if)" not in scenarios:
+                scenarios["Current Plan (before what-if)"] = base_json
+
+            child_num = len(st.session_state.children_list) + 1
+            new_child = {
+                'name': f'Child {child_num}',
+                'birth_year': st.session_state.current_year + 1,
+                'use_template': True,
+                'template_state': 'Seattle',
+                'template_strategy': 'Average',
+                'school_type': 'Public',
+                'college_location': 'Seattle'
+            }
+            st.session_state.children_list.append(new_child)
+            whatif_json = save_data()
+            if whatif_json:
+                scenarios["Add One More Child"] = whatif_json
+                st.session_state.saved_scenarios = scenarios
+                if st.session_state.get('household_id'):
+                    save_household_scenarios(st.session_state.household_id, scenarios)
+            st.success("Created scenario: **Add One More Child**.")
+            st.rerun()
+    except Exception as e:
+        st.error(f"Could not create scenario: {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB HELP / WALKTHROUGH TEXT
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _version_history_section():
+    """Show backup history with restore capability in Save/Load tab."""
+    if not st.session_state.get('household_id'):
+        return
+    hid = st.session_state.household_id
+    backup_dir = DATA_DIR / 'backups'
+    if not backup_dir.exists():
+        return
+
+    backups = sorted(backup_dir.glob(f"{hid}_*.json"), reverse=True)
+    if not backups:
+        return
+
+    st.subheader("🕐 Version History")
+    st.caption("Automatic snapshots are created every time your plan is saved. Restore any previous version.")
+
+    for backup_file in backups[:10]:  # Show last 10
+        # Parse timestamp from filename: {hid}_{YYYYMMDD_HHMMSS}.json
+        ts_part = backup_file.stem.replace(f"{hid}_", "")
+        try:
+            ts = datetime.strptime(ts_part, "%Y%m%d_%H%M%S")
+            display_time = ts.strftime("%b %d, %Y %I:%M %p")
+        except ValueError:
+            display_time = ts_part
+
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            file_size = backup_file.stat().st_size / 1024
+            st.text(f"📄 {display_time}  ({file_size:.0f} KB)")
+        with col2:
+            if st.button("Restore", key=f"restore_{backup_file.name}", use_container_width=True):
+                try:
+                    with open(backup_file, 'r') as f:
+                        backup_data = json.load(f)
+                    if 'plan_data' in backup_data:
+                        plan_json = json.dumps(backup_data['plan_data'])
+                        if load_data(plan_json):
+                            # Also save the restored version as the current plan
+                            save_household_plan(hid, plan_json)
+                            st.success(f"Restored plan from {display_time}")
+                            st.rerun()
+                    else:
+                        st.error("Backup file doesn't contain plan data.")
+                except Exception as e:
+                    st.error(f"Could not restore: {e}")
+
+
+TAB_HELP = {
+    "dashboard": (
+        "**What this tab shows:** A bird's-eye view of your financial plan — key metrics, "
+        "net worth trajectory, alerts about potential issues, and a current-year income/expense breakdown.\n\n"
+        "**What to look for:** Check the Alerts section for any red or yellow flags. "
+        "The trajectory chart shows your projected net worth over your lifetime."
+    ),
+    "settings": (
+        "**What this tab does:** Configure basic plan parameters — the current year, parent names, "
+        "and which optional tabs (Family Expenses, Healthcare, etc.) to show.\n\n"
+        "**Tip:** You can toggle tab visibility here to simplify the interface."
+    ),
+    "parent": (
+        "**What this tab does:** Set income, age, expected raises, retirement age, net worth, and "
+        "Social Security benefits for this person. You can also model career phases (startup → big tech, etc.) "
+        "and planned job changes.\n\n"
+        "**What matters most:** Current income, retirement age, and net worth have the biggest impact "
+        "on your projections."
+    ),
+    "family_expenses": (
+        "**What this tab does:** Define shared household expenses that don't belong to either parent "
+        "individually — groceries, utilities, vacations, subscriptions.\n\n"
+        "**Tip:** Use state templates (CA, WA, TX) to auto-fill typical costs, then customize."
+    ),
+    "recurring": (
+        "**What this tab does:** Model recurring expenses (e.g., car payments every 5 years) and "
+        "one-time major purchases (renovation, wedding, boat).\n\n"
+        "**Tip:** These flow into both the deterministic cashflow and Monte Carlo simulations."
+    ),
+    "children": (
+        "**What this tab does:** Add children with age-based expense templates covering childcare, "
+        "school, activities, healthcare, and college (ages 0-30).\n\n"
+        "**Tip:** Choose Public vs Private school and set a college location — costs vary dramatically."
+    ),
+    "house": (
+        "**What this tab does:** Model your real estate portfolio — purchase price, mortgage details, "
+        "property tax, insurance, maintenance. Use the timeline to plan when you live in, rent out, or sell each property.\n\n"
+        "**What matters most:** Property tax rate and maintenance rate — these compound with home appreciation."
+    ),
+    "timeline": (
+        "**What this tab does:** Plan geographic relocations and spending strategy changes over time. "
+        "Moving from a high-cost to low-cost area can dramatically change your projections.\n\n"
+        "**Tip:** Add entries for each planned move with the year and new location."
+    ),
+    "economy": (
+        "**What this tab does:** Set your assumptions for investment returns, inflation, expense growth, "
+        "and healthcare inflation. These drive all simulation models.\n\n"
+        "**Tip:** The default 7% return / 3% inflation is a common baseline. Adjust based on your risk tolerance."
+    ),
+    "retirement": (
+        "**What this tab does:** Configure Social Security benefits, claiming age, and optional "
+        "insolvency modeling (benefit reductions after ~2035).\n\n"
+        "**Tip:** Delaying SS from 62 to 70 can increase benefits by ~77%."
+    ),
+    "healthcare": (
+        "**What this tab does:** Model health insurance plans, HSA accounts, Medicare costs (Part B/D, Medigap), "
+        "and long-term care insurance.\n\n"
+        "**What matters most:** Healthcare is often the #1 retirement expense. Make sure to model Medicare transition."
+    ),
+    "deterministic": (
+        "**What this tab does:** Shows a year-by-year projection using your exact inputs — no randomness. "
+        "Click any year to see detailed income and expense breakdowns.\n\n"
+        "**When to use:** To understand the baseline trajectory before running Monte Carlo."
+    ),
+    "monte_carlo": (
+        "**What this tab does:** Runs thousands of simulations with randomized returns and expense variations "
+        "to show a range of possible outcomes (10th to 90th percentile).\n\n"
+        "**What to look for:** The 25th percentile line — if it stays positive, your plan is fairly robust."
+    ),
+    "stress_test": (
+        "**What this tab does:** Tests your plan against extreme scenarios — market crash, hyperinflation, "
+        "disability, unemployment — to find your plan's breaking points.\n\n"
+        "**Tip:** Run the compound stress test to see how multiple bad events stack."
+    ),
+    "save_load": (
+        "**What this tab does:** Save named scenarios, compare them side-by-side, export/import plan data, "
+        "and create what-if variants with one click.\n\n"
+        "**Tip:** Use 'Quick What-If Scenarios' to instantly test common changes."
+    ),
+}
+
+
+def tab_walkthrough(tab_key: str):
+    """Render a collapsible help section for a tab."""
+    help_text = TAB_HELP.get(tab_key)
+    if help_text:
+        with st.expander("💡 How this tab works", expanded=False):
+            st.markdown(help_text)
 
 
 # Tab implementations
 def parent_settings_tab():
     """Settings and Instructions tab"""
     st.header("⚙️ Settings and Instructions")
+    tab_walkthrough("settings")
 
     st.subheader("📅 Current Year Setting")
     st.session_state.current_year = st.number_input(
@@ -6654,6 +8264,36 @@ def parent_settings_tab():
     )
 
     st.session_state.marriage_year = selected_marriage
+
+    # Finance mode
+    st.subheader("💰 Finance Mode")
+    finance_mode = st.radio(
+        "How do you manage household finances?",
+        ["Pooled", "Separate"],
+        index=0 if st.session_state.get('finance_mode', 'Pooled') == 'Pooled' else 1,
+        horizontal=True,
+        key="settings_finance_mode",
+        help="Pooled = one family pot. Separate = each person tracks their own net worth."
+    )
+    st.session_state.finance_mode = finance_mode
+
+    if finance_mode == "Separate":
+        st.caption(
+            "Each parent keeps their own income and investments. "
+            "Shared expenses (family, children, housing) are split by the ratio below."
+        )
+        split_pct = st.slider(
+            f"Shared expense split — {st.session_state.parent1_name} pays",
+            min_value=0, max_value=100, value=st.session_state.get('shared_expense_split_pct', 50),
+            format="%d%%", key="settings_split_pct",
+            help="How much of shared expenses Parent 1 covers. Parent 2 covers the rest."
+        )
+        st.session_state.shared_expense_split_pct = split_pct
+        col_info1, col_info2 = st.columns(2)
+        with col_info1:
+            st.info(f"{st.session_state.parent1_name}: **{split_pct}%** of shared costs")
+        with col_info2:
+            st.info(f"{st.session_state.parent2_name}: **{100 - split_pct}%** of shared costs")
 
     col1, col2 = st.columns(2)
 
@@ -6877,7 +8517,7 @@ def _children_guided_mode():
     """Guided Q&A mode for children planning."""
     tab_key = "children"
     step = st.session_state.get(f"guided_step_{tab_key}", 0)
-    total_steps = 3
+    total_steps = 2
 
     if step == 0:
         st.subheader("Do you have or plan to have children?")
@@ -6888,7 +8528,7 @@ def _children_guided_mode():
 
     elif step == 1:
         st.subheader("Tell us about your children")
-        st.caption("Include both existing children and ones you're planning.")
+        st.caption("Include both existing children and ones you're planning. Location-based costs are set in the Timeline tab.")
         num_kids = st.number_input("How many children (current + planned)?",
                                     min_value=0, max_value=10,
                                     value=max(len(st.session_state.children_list), 1),
@@ -6911,13 +8551,6 @@ def _children_guided_mode():
             with col2:
                 child['birth_year'] = st.number_input(f"Birth year", min_value=1990, max_value=2060,
                                                        value=child['birth_year'], key=f"guided_kid_year_{i}")
-
-    elif step == 2:
-        st.subheader("Where will your children grow up?")
-        st.caption("This determines cost estimates for childcare, education, and activities.")
-        location = st.selectbox("Location", AVAILABLE_LOCATIONS_CHILDREN, key="guided_kid_location")
-        for child in st.session_state.children_list:
-            child['template_state'] = location
 
     _guided_nav(tab_key, step, total_steps)
 
@@ -6954,6 +8587,7 @@ def _family_expenses_guided_mode():
 def parent_x_tab():
     """Parent X financial details tab"""
     st.header(f"{st.session_state.parent1_emoji} {st.session_state.parent1_name}'s Financial Details")
+    tab_walkthrough("parent")
 
     if _guided_mode_toggle("parent_x"):
         _parent_guided_mode("X")
@@ -7195,6 +8829,7 @@ def parent_x_tab():
 def parent_y_tab():
     """Parent Y financial details tab"""
     st.header(f"{st.session_state.parent2_emoji} {st.session_state.parent2_name}'s Financial Details")
+    tab_walkthrough("parent")
 
     if _guided_mode_toggle("parent_y"):
         _parent_guided_mode("Y")
@@ -7436,6 +9071,7 @@ def parent_y_tab():
 def family_expenses_tab():
     """Family expenses tab with template browsing, modification, and custom city creation"""
     st.header("\U0001f4b8 Family Expenses")
+    tab_walkthrough("family_expenses")
 
     if _guided_mode_toggle("family_expenses"):
         _family_expenses_guided_mode()
@@ -7970,6 +9606,7 @@ def family_expenses_tab():
 def recurring_one_time_expenses_tab():
     """Recurring expenses and one-time major purchases tab"""
     st.header("🔄 Recurring & One-Time Expenses")
+    tab_walkthrough("recurring")
 
     st.markdown("""
     Manage recurring expenses (like vehicle purchases every N years) and one-time major purchases.
@@ -8097,6 +9734,7 @@ def recurring_one_time_expenses_tab():
 def children_tab():
     """Children tab"""
     st.header("\U0001f476 Children")
+    tab_walkthrough("children")
 
     if _guided_mode_toggle("children"):
         _children_guided_mode()
@@ -8335,6 +9973,7 @@ def children_tab():
 def house_tab():
     """House portfolio tab"""
     st.header("🏠 House Portfolio")
+    tab_walkthrough("house")
 
     if st.button("➕ Add House"):
         new_house = House(
@@ -8468,6 +10107,7 @@ def house_tab():
 def economy_tab():
     """Economy parameters configuration tab"""
     st.header("📈 Economy & Market Parameters")
+    tab_walkthrough("economy")
 
     st.markdown("""
     Configure the economic assumptions used in your financial projections.
@@ -8651,7 +10291,8 @@ def economy_tab():
 
 def retirement_tab():
     """Retirement planning tab"""
-    st.header("🖼️ Retirement Planning")
+    st.header("🏖️ Retirement Planning")
+    tab_walkthrough("retirement")
 
     # Calculate retirement years
     parentX_birth_year = st.session_state.current_year - st.session_state.parentX_age
@@ -8716,6 +10357,7 @@ def retirement_tab():
 def timeline_tab():
     """Timeline and state relocation tab"""
     st.header("🗓️ Timeline & State Planning")
+    tab_walkthrough("timeline")
 
     st.markdown("""
     Plan your relocations and spending strategy changes over time.
@@ -9394,7 +11036,17 @@ def calculate_lifetime_cashflow():
     timeline_end = max(parent1_death_year, parent2_death_year)
 
     results = []
-    cumulative_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
+    finance_mode = st.session_state.get('finance_mode', 'Pooled')
+    split_pct = st.session_state.get('shared_expense_split_pct', 50) / 100.0
+
+    if finance_mode == "Separate":
+        nw_parent1 = st.session_state.parentX_net_worth
+        nw_parent2 = st.session_state.parentY_net_worth
+        cumulative_net_worth = nw_parent1 + nw_parent2
+    else:
+        nw_parent1 = None
+        nw_parent2 = None
+        cumulative_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
 
     for year in range(st.session_state.current_year, timeline_end + 1):
         # Calculate ages
@@ -9407,7 +11059,8 @@ def calculate_lifetime_cashflow():
 
         parent1_income = 0
         parent2_income = 0
-        ss_income = 0
+        parent1_ss = 0
+        parent2_ss = 0
 
         if parent1_working:
             if st.session_state.get('parentX_career_phases'):
@@ -9430,7 +11083,6 @@ def calculate_lifetime_cashflow():
             parent1_ss = st.session_state.parentX_ss_benefit * 12
             if st.session_state.ss_insolvency_enabled and year >= 2034:
                 parent1_ss *= (1 - st.session_state.ss_shortfall_percentage / 100)
-            ss_income += parent1_ss
 
         if parent2_working:
             if st.session_state.get('parentY_career_phases'):
@@ -9453,8 +11105,8 @@ def calculate_lifetime_cashflow():
             parent2_ss = st.session_state.parentY_ss_benefit * 12
             if st.session_state.ss_insolvency_enabled and year >= 2034:
                 parent2_ss *= (1 - st.session_state.ss_shortfall_percentage / 100)
-            ss_income += parent2_ss
 
+        ss_income = parent1_ss + parent2_ss
         total_income = parent1_income + parent2_income + ss_income
 
         # Calculate taxes based on location for this year
@@ -9664,12 +11316,75 @@ def calculate_lifetime_cashflow():
 
         total_expenses = base_expenses + children_expenses + recurring_expenses_total + major_purchase_expenses + healthcare_expenses + house_expenses
 
-        # Calculate cashflow (Income - Taxes - Expenses)
-        cashflow = total_income - total_taxes - total_expenses
+        # ── Net worth update ──────────────────────────────────────────────
+        inv_rate = st.session_state.economic_params.investment_return
 
-        # Update net worth (cashflow + investment return based on user's expected return rate)
-        investment_return = cumulative_net_worth * st.session_state.economic_params.investment_return
-        cumulative_net_worth += cashflow + investment_return
+        if finance_mode == "Separate":
+            # Allocate shared expenses by split ratio
+            shared_costs = (family_total + children_expenses + recurring_expenses_total
+                            + major_purchase_expenses)
+
+            # Allocate house expenses by owner
+            p1_house_exp = 0
+            p2_house_exp = 0
+            p1_name = st.session_state.parent1_name
+            p2_name = st.session_state.parent2_name
+            if 'houses' in st.session_state:
+                for detail in house_expense_details:
+                    # Find matching house to check owner
+                    owner = "Shared"
+                    for house in st.session_state.houses:
+                        if house.name == detail['name']:
+                            owner = house.owner
+                            break
+                    h_total = detail['property_tax'] + detail['home_insurance'] + detail['maintenance'] + detail['upkeep']
+                    if owner == p1_name:
+                        p1_house_exp += h_total
+                    elif owner == p2_name:
+                        p2_house_exp += h_total
+                    else:  # Shared
+                        p1_house_exp += h_total * split_pct
+                        p2_house_exp += h_total * (1 - split_pct)
+
+            # Allocate healthcare by covered person
+            p1_healthcare = 0
+            p2_healthcare = 0
+            for key, val in healthcare_expense_details.items():
+                if p1_name in key or "Parent 1" in key:
+                    p1_healthcare += val
+                elif p2_name in key or "Parent 2" in key:
+                    p2_healthcare += val
+                else:
+                    p1_healthcare += val * split_pct
+                    p2_healthcare += val * (1 - split_pct)
+
+            p1_expenses = parentX_total + shared_costs * split_pct + p1_house_exp + p1_healthcare
+            p2_expenses = parentY_total + shared_costs * (1 - split_pct) + p2_house_exp + p2_healthcare
+
+            p1_total_income = parent1_income + parent1_ss
+            p2_total_income = parent2_income + parent2_ss
+
+            # Simplified per-person taxes (half of joint for now — keeps backward compat)
+            p1_taxes = total_taxes * (p1_total_income / max(total_income, 1)) if total_income > 0 else 0
+            p2_taxes = total_taxes - p1_taxes
+
+            p1_cashflow = p1_total_income - p1_taxes - p1_expenses
+            p2_cashflow = p2_total_income - p2_taxes - p2_expenses
+
+            p1_return = nw_parent1 * inv_rate
+            p2_return = nw_parent2 * inv_rate
+
+            nw_parent1 += p1_cashflow + p1_return
+            nw_parent2 += p2_cashflow + p2_return
+            cumulative_net_worth = nw_parent1 + nw_parent2
+
+            investment_return = p1_return + p2_return
+            cashflow = p1_cashflow + p2_cashflow
+        else:
+            # Pooled mode — original logic
+            cashflow = total_income - total_taxes - total_expenses
+            investment_return = cumulative_net_worth * inv_rate
+            cumulative_net_worth += cashflow + investment_return
 
         # Track events
         events = []
@@ -9692,17 +11407,17 @@ def calculate_lifetime_cashflow():
         if parent2_age == st.session_state.parentY_retirement_age:
             events.append(('retirement', st.session_state.parent2_name))
 
-        results.append({
+        row_data = {
             'year': year,
             'parent1_age': parent1_age,
             'parent2_age': parent2_age,
             'parent1_income': parent1_income,
             'parent2_income': parent2_income,
             'ss_income': ss_income,
-            'investment_income': investment_return,  # Add investment returns
+            'investment_income': investment_return,
             'total_income': total_income,
-            'taxes': total_taxes,  # Total taxes
-            'tax_breakdown': tax_breakdown,  # Detailed tax breakdown
+            'taxes': total_taxes,
+            'tax_breakdown': tax_breakdown,
             'base_expenses': base_expenses,
             'base_expenses_breakdown': base_expenses_dict_inflated,
             'children_expenses': children_expenses,
@@ -9719,8 +11434,20 @@ def calculate_lifetime_cashflow():
             'cashflow': cashflow,
             'net_worth': cumulative_net_worth,
             'children_in_college': children_in_college,
-            'events': events
-        })
+            'events': events,
+            'finance_mode': finance_mode,
+        }
+
+        # Per-parent fields (only in Separate mode)
+        if finance_mode == "Separate":
+            row_data['nw_parent1'] = nw_parent1
+            row_data['nw_parent2'] = nw_parent2
+            row_data['p1_cashflow'] = p1_cashflow
+            row_data['p2_cashflow'] = p2_cashflow
+            row_data['p1_expenses'] = p1_expenses
+            row_data['p2_expenses'] = p2_expenses
+
+        results.append(row_data)
 
     return results
 
@@ -9728,6 +11455,7 @@ def calculate_lifetime_cashflow():
 def deterministic_cashflow_tab():
     """Deterministic Lifetime Cashflow Analysis"""
     st.header("💰 Deterministic Lifetime Cashflow")
+    tab_walkthrough("deterministic")
 
     st.markdown("""
     See exactly how money flows through your entire life from now until age 100.
@@ -10422,6 +12150,7 @@ def deterministic_cashflow_tab():
 def monte_carlo_simulation_tab():
     """Monte Carlo Simulation Analysis"""
     st.header("🎲 Monte Carlo Simulation")
+    tab_walkthrough("monte_carlo")
 
     st.markdown("""
     Add uncertainty to your plan and see the range of possible outcomes.
@@ -10486,12 +12215,17 @@ def monte_carlo_simulation_tab():
             all_sim_results = []
 
             initial_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
+            mc_finance_mode = st.session_state.get('finance_mode', 'Pooled')
+            mc_split = st.session_state.get('shared_expense_split_pct', 50) / 100.0
 
             progress_bar = st.progress(0)
 
             for sim in range(num_sims):
                 sim_net_worth = []
                 net_worth = initial_net_worth
+                if mc_finance_mode == "Separate":
+                    mc_nw_p1 = st.session_state.parentX_net_worth
+                    mc_nw_p2 = st.session_state.parentY_net_worth
 
                 for year_offset in range(st.session_state.mc_years):
                     year = st.session_state.mc_start_year + year_offset
@@ -10500,7 +12234,8 @@ def monte_carlo_simulation_tab():
                     parentX_working = (year - (st.session_state.current_year - st.session_state.parentX_age)) < st.session_state.parentX_retirement_age
                     parentY_working = (year - (st.session_state.current_year - st.session_state.parentY_age)) < st.session_state.parentY_retirement_age
 
-                    income = 0
+                    mc_p1_income = 0
+                    mc_p2_income = 0
                     if parentX_working:
                         if st.session_state.get('parentX_career_phases'):
                             comp = get_career_income_for_year(
@@ -10509,15 +12244,14 @@ def monte_carlo_simulation_tab():
                                 st.session_state.current_year,
                                 year
                             )
-                            parentX_year_income = comp['total_employment_income']
+                            mc_p1_income = comp['total_employment_income']
                         else:
-                            parentX_year_income = get_income_for_year(st.session_state.parentX_income, st.session_state.parentX_raise, st.session_state.parentX_job_changes, st.session_state.current_year, year)
-                        income += parentX_year_income
+                            mc_p1_income = get_income_for_year(st.session_state.parentX_income, st.session_state.parentX_raise, st.session_state.parentX_job_changes, st.session_state.current_year, year)
                     else:
                         ss_benefit = st.session_state.parentX_ss_benefit * 12
                         if st.session_state.ss_insolvency_enabled and year >= 2034:
                             ss_benefit *= (1 - st.session_state.ss_shortfall_percentage / 100)
-                        income += ss_benefit
+                        mc_p1_income += ss_benefit
 
                     if parentY_working:
                         if st.session_state.get('parentY_career_phases'):
@@ -10527,15 +12261,16 @@ def monte_carlo_simulation_tab():
                                 st.session_state.current_year,
                                 year
                             )
-                            parentY_year_income = comp['total_employment_income']
+                            mc_p2_income = comp['total_employment_income']
                         else:
-                            parentY_year_income = get_income_for_year(st.session_state.parentY_income, st.session_state.parentY_raise, st.session_state.parentY_job_changes, st.session_state.current_year, year)
-                        income += parentY_year_income
+                            mc_p2_income = get_income_for_year(st.session_state.parentY_income, st.session_state.parentY_raise, st.session_state.parentY_job_changes, st.session_state.current_year, year)
                     else:
                         ss_benefit = st.session_state.parentY_ss_benefit * 12
                         if st.session_state.ss_insolvency_enabled and year >= 2034:
                             ss_benefit *= (1 - st.session_state.ss_shortfall_percentage / 100)
-                        income += ss_benefit
+                        mc_p2_income += ss_benefit
+
+                    income = mc_p1_income + mc_p2_income
 
                     # Add variability to income
                     if use_asymmetric:
@@ -10616,7 +12351,19 @@ def monte_carlo_simulation_tab():
                             elif ltc.covered_person == "Parent 2" and parent2_age >= ltc.start_age:
                                 healthcare_expenses += ltc.monthly_premium * 12
 
-                    total_expenses = base_expenses + children_expenses + recurring_expenses_total + major_purchase_expenses + healthcare_expenses
+                    # Housing expenses (property tax, insurance, maintenance, upkeep)
+                    house_expenses = 0
+                    if 'houses' in st.session_state:
+                        for house in st.session_state.houses:
+                            status, _rental = house.get_status_for_year(year)
+                            if status in ("Own_Live", "Own_Rent"):
+                                current_house_value = house.current_value * (1.03 ** years_from_now)
+                                house_expenses += current_house_value * house.property_tax_rate
+                                house_expenses += house.home_insurance * (1.03 ** years_from_now)
+                                house_expenses += current_house_value * house.maintenance_rate
+                                house_expenses += house.upkeep_costs * (1.03 ** years_from_now)
+
+                    total_expenses = base_expenses + children_expenses + recurring_expenses_total + major_purchase_expenses + healthcare_expenses + house_expenses
 
                     # Add variability to expenses
                     if use_asymmetric:
@@ -10637,8 +12384,21 @@ def monte_carlo_simulation_tab():
                         investment_return = scenario.investment_return * (1 + np.random.uniform(-st.session_state.mc_return_variability / 100, st.session_state.mc_return_variability / 100))
 
                     # Update net worth
-                    cashflow = income - total_expenses
-                    net_worth = net_worth + cashflow + (net_worth * investment_return)
+                    if mc_finance_mode == "Separate":
+                        # Split shared costs (everything except per-parent base expenses)
+                        shared_mc = (family_total + children_expenses + recurring_expenses_total
+                                     + major_purchase_expenses + healthcare_expenses + house_expenses)
+                        # Apply expense variability equally to both
+                        variability_factor = total_expenses / max(base_expenses + children_expenses + recurring_expenses_total + major_purchase_expenses + healthcare_expenses + house_expenses, 1) if (base_expenses + children_expenses + recurring_expenses_total + major_purchase_expenses + healthcare_expenses + house_expenses) > 0 else 1
+                        p1_mc_exp = (parentX_total + shared_mc * mc_split) * variability_factor
+                        p2_mc_exp = (parentY_total + shared_mc * (1 - mc_split)) * variability_factor
+
+                        mc_nw_p1 = mc_nw_p1 + (mc_p1_income - p1_mc_exp) + (mc_nw_p1 * investment_return)
+                        mc_nw_p2 = mc_nw_p2 + (mc_p2_income - p2_mc_exp) + (mc_nw_p2 * investment_return)
+                        net_worth = mc_nw_p1 + mc_nw_p2
+                    else:
+                        cashflow = income - total_expenses
+                        net_worth = net_worth + cashflow + (net_worth * investment_return)
 
                     # Normalize if requested
                     if st.session_state.mc_normalize_to_today_dollars:
@@ -11037,6 +12797,7 @@ def test_hyperinflation_scenario(percentiles_data, config):
 def stress_test_tab():
     """Stress testing tab for catastrophic scenarios"""
     st.header("🧪 Stress Test Analysis")
+    tab_walkthrough("stress_test")
     st.markdown("""
     Stress-test your financial plan against rare catastrophic events.
     This analysis shows whether your plan can withstand worst-case scenarios across different Monte Carlo percentiles.
@@ -11449,6 +13210,8 @@ def save_data():
             'parent2_name': st.session_state.parent2_name,
             'parent2_emoji': st.session_state.parent2_emoji,
             'marriage_year': st.session_state.marriage_year,
+            'finance_mode': st.session_state.get('finance_mode', 'Pooled'),
+            'shared_expense_split_pct': st.session_state.get('shared_expense_split_pct', 50),
             'parentX_age': st.session_state.parentX_age,
             'parentX_net_worth': st.session_state.parentX_net_worth,
             'parentX_income': st.session_state.parentX_income,
@@ -11543,6 +13306,7 @@ def load_data(json_data):
 def save_load_tab():
     """Save and load scenarios tab"""
     st.header("💾 Save & Load Scenarios")
+    tab_walkthrough("save_load")
 
     st.markdown("Save and load complete financial planning scenarios")
 
@@ -11574,6 +13338,16 @@ def save_load_tab():
             st.caption(f"Last saved: {household_info['last_saved'][:19]} by {household_info.get('saved_by', 'unknown')}")
 
         st.divider()
+
+    # Quick what-if scenario templates
+    scenario_templates_section()
+
+    st.divider()
+
+    # Version history / restore from backup
+    _version_history_section()
+
+    st.divider()
 
     # Internal scenario library
     st.subheader("📚 Internal Scenario Library")
@@ -11793,6 +13567,7 @@ def save_load_tab():
 def healthcare_insurance_tab():
     """Healthcare and Insurance Planning Tab"""
     st.header("🏥 Healthcare & Insurance Planning")
+    tab_walkthrough("healthcare")
 
     st.markdown("""
     Plan for healthcare costs throughout retirement, including Medicare, insurance premiums,
@@ -12884,15 +14659,33 @@ def user_management_tab():
 def display_sidebar():
     """Display sidebar with summary information"""
     with st.sidebar:
-        st.title("📊 Quick Summary")
-
         if st.session_state.get('authenticated'):
             email = st.session_state.current_user
             household_info = get_household_info(st.session_state.household_id)
             household_name = household_info.get('household_name', 'My Household')
-            st.write(f"👤 **{email.split('@')[0]}**")
-            st.caption(f"🏠 {household_name}")
-            st.divider()
+            display_name = email.split('@')[0].title()
+            if st.session_state.get('test_mode'):
+                st.markdown(
+                    '<div class="test-mode-banner">🧪 TEST MODE</div>',
+                    unsafe_allow_html=True,
+                )
+            st.markdown(
+                f'<div class="sidebar-user-badge">'
+                f'<div class="user-name">👤 {display_name}</div>'
+                f'<div class="household-name">🏠 {household_name}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+            if st.session_state.get('test_mode'):
+                if st.button("🚪 Exit Test Mode", use_container_width=True, key="exit_test_mode"):
+                    cleanup_test_households(email)
+                    for key in list(st.session_state.keys()):
+                        if key != 'cf_email':
+                            del st.session_state[key]
+                    st.session_state.authenticated = False
+                    st.rerun()
+
+        st.markdown("### Quick Summary")
 
         # Net Worth
         total_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
@@ -12918,6 +14711,34 @@ def display_sidebar():
         current_state, current_strategy = get_state_for_year(st.session_state.current_year)
         st.subheader("Current Location")
         st.info(f"{current_state}\n{current_strategy}")
+
+        # Quick alerts summary
+        try:
+            cashflow = calculate_lifetime_cashflow()
+            alerts = generate_alerts(cashflow)
+            critical = sum(1 for a in alerts if a['severity'] == 'critical')
+            warnings = sum(1 for a in alerts if a['severity'] == 'warning')
+            if critical > 0:
+                st.error(f"{critical} critical alert{'s' if critical > 1 else ''}")
+            if warnings > 0:
+                st.warning(f"{warnings} warning{'s' if warnings > 1 else ''}")
+            if critical == 0 and warnings == 0:
+                st.success("No issues detected")
+        except Exception:
+            pass
+
+        # About
+        st.divider()
+        with st.expander("About", expanded=False):
+            st.markdown(
+                "**Financial Planning Suite** v0.8\n\n"
+                "A lifetime financial simulation tool designed to help individuals and families "
+                "plan the financial aspects of their lives — from income and expenses to retirement, "
+                "housing, healthcare, and beyond.\n\n"
+                "Built with Monte Carlo simulation, deterministic cashflow modeling, and scenario "
+                "comparison to give you a clear picture of your financial future.\n\n"
+                "Created by **Filipp Demenschonok**"
+            )
 
 
 if __name__ == "__main__":

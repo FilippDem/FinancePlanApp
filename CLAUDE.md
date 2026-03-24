@@ -51,6 +51,18 @@ docker-compose -f docker-compose-local.yml up -d
 ### Step 3: Verify
 Open `http://192.168.68.102:8501` in a browser.
 
+## Data Preservation Policy (CRITICAL)
+
+Real users store financial plans in `data/households/<id>.json`. These files contain irreplaceable user-entered data. **ANY code change that touches persistence must follow these rules:**
+
+1. **NEVER delete or overwrite** a household file without creating a backup first. Backups go to `data/backups/<id>_<timestamp>.json`.
+2. **ALWAYS load the existing file before writing** — merge, don't replace. This preserves metadata, scenarios, and fields added by other versions.
+3. **NEVER change the JSON schema in a breaking way.** New fields are fine; removing or renaming existing keys will corrupt older data. If a schema migration is needed, write a migration function that runs on load.
+4. **The `households_index.json`** maps household IDs → member lists. Losing an entry here orphans the data file. Backup before every write.
+5. **Test households** (prefixed `_test_`) are ephemeral and exempt from backups.
+6. **Auto-save** on every interaction (in `main()`) is silent — it must NEVER throw an exception that interrupts the user.
+7. When changing `save_data()` / `load_data()` / any `household_*` function, **verify that existing household files still load correctly** after the change.
+
 ## Critical Rules for Code Changes
 
 ### NEVER regress features. V14 has ALL of these — verify they survive any edit:
