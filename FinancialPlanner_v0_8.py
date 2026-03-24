@@ -859,46 +859,154 @@ HISTORICAL_STOCK_RETURNS = [
     0.18, 0.29, -0.18, 0.26
 ]
 
-# Available locations for expense templates
-# Note: CHILDREN_EXPENSE_TEMPLATES currently only includes US locations and original 3 states
-# FAMILY_EXPENSE_TEMPLATES includes all locations below
-AVAILABLE_LOCATIONS_CHILDREN = [
-    # Major US Cities (with detailed children templates)
-    "Seattle", "Sacramento", "Houston",
-    "New York", "San Francisco", "Los Angeles", "Portland",
-    # New Zealand Cities
-    "Auckland", "Wellington"
-]
+# ============================================================================
+# LOCATION HIERARCHY: Country → State/Province → City
+# ============================================================================
+# Cities with expense templates get the most specific data.
+# States/Provinces have their own templates (US: all 50, Canada: provinces).
+# Countries without state data grey out the state picker.
 
+LOCATION_HIERARCHY = {
+    "United States": {
+        "has_states": True,
+        "states": {
+            "Washington": {"cities": ["Seattle"]},
+            "California": {"cities": ["Sacramento", "San Francisco", "Los Angeles"]},
+            "Texas": {"cities": ["Houston"]},
+            "New York": {"cities": ["New York"]},
+            "Oregon": {"cities": ["Portland"]},
+            "Alabama": {}, "Alaska": {}, "Arizona": {}, "Arkansas": {},
+            "Colorado": {}, "Connecticut": {}, "Delaware": {}, "Florida": {},
+            "Georgia": {}, "Hawaii": {}, "Idaho": {}, "Illinois": {},
+            "Indiana": {}, "Iowa": {}, "Kansas": {}, "Kentucky": {},
+            "Louisiana": {}, "Maine": {}, "Maryland": {}, "Massachusetts": {},
+            "Michigan": {}, "Minnesota": {}, "Mississippi": {}, "Missouri": {},
+            "Montana": {}, "Nebraska": {}, "Nevada": {}, "New Hampshire": {},
+            "New Jersey": {}, "New Mexico": {}, "North Carolina": {},
+            "North Dakota": {}, "Ohio": {}, "Oklahoma": {}, "Pennsylvania": {},
+            "Rhode Island": {}, "South Carolina": {}, "South Dakota": {},
+            "Tennessee": {}, "Utah": {}, "Vermont": {}, "Virginia": {},
+            "West Virginia": {}, "Wisconsin": {}, "Wyoming": {},
+        },
+    },
+    "Canada": {
+        "has_states": True,
+        "state_label": "Province",
+        "states": {
+            "Ontario": {"cities": ["Toronto"]},
+            "British Columbia": {"cities": ["Vancouver"]},
+            "Quebec": {}, "Alberta": {}, "Manitoba": {},
+            "Saskatchewan": {}, "Nova Scotia": {}, "New Brunswick": {},
+            "Newfoundland and Labrador": {}, "Prince Edward Island": {},
+        },
+    },
+    "France": {
+        "has_states": False,
+        "cities": ["Paris", "Toulouse"],
+    },
+    "Germany": {
+        "has_states": False,
+        "cities": ["Berlin", "Munich"],
+    },
+    "Australia": {
+        "has_states": False,
+        "cities": ["Sydney", "Melbourne", "Brisbane"],
+    },
+    "New Zealand": {
+        "has_states": False,
+        "cities": ["Auckland", "Wellington"],
+    },
+}
+
+# Flat lists (backward compatibility — used by non-wizard tabs)
 AVAILABLE_LOCATIONS_ADULTS = [
-    # Major US Cities
-    "Seattle", "Sacramento", "Houston",
-    "New York", "San Francisco", "Los Angeles", "Portland",
-    # Canada
-    "Toronto", "Vancouver",
-    # France
-    "Paris", "Toulouse",
-    # Germany
-    "Berlin", "Munich",
-    # Australia
-    "Sydney", "Melbourne", "Brisbane",
-    # New Zealand
+    "Seattle", "Sacramento", "Houston", "New York", "San Francisco", "Los Angeles", "Portland",
+    "Toronto", "Vancouver", "Paris", "Toulouse", "Berlin", "Munich",
+    "Sydney", "Melbourne", "Brisbane", "Auckland", "Wellington"
+]
+AVAILABLE_LOCATIONS_CHILDREN = [
+    "Seattle", "Sacramento", "Houston", "New York", "San Francisco", "Los Angeles", "Portland",
     "Auckland", "Wellington"
 ]
-
 AVAILABLE_LOCATIONS_FAMILY = [
-    # Major US Cities
-    "Seattle", "Sacramento", "Houston",
-    "New York", "San Francisco", "Los Angeles", "Portland",
-    # Canada
-    "Toronto", "Vancouver",
-    # France
-    "Paris", "Toulouse",
-    # Germany
-    "Berlin", "Munich",
-    # Australia
+    "Seattle", "Sacramento", "Houston", "New York", "San Francisco", "Los Angeles", "Portland",
+    "Toronto", "Vancouver", "Paris", "Toulouse", "Berlin", "Munich",
     "Sydney", "Melbourne", "Brisbane"
 ]
+
+
+def location_picker(prefix: str, wd: dict, label: str = "Where do you currently live?"):
+    """Hierarchical location picker: Country → State/Province → City.
+    Stores result in wd[f'{prefix}_country'], wd[f'{prefix}_state'], wd[f'{prefix}_city'],
+    and wd[f'{prefix}_location'] (the most specific location name for template lookup).
+    Returns the resolved location string.
+    """
+    countries = list(LOCATION_HIERARCHY.keys())
+    saved_country = wd.get(f'{prefix}_country', 'United States')
+    country = st.selectbox(label, countries,
+        index=countries.index(saved_country) if saved_country in countries else 0,
+        key=f"{prefix}_country_sel")
+    wd[f'{prefix}_country'] = country
+
+    country_data = LOCATION_HIERARCHY[country]
+    resolved_location = None
+
+    if country_data.get('has_states'):
+        state_label = country_data.get('state_label', 'State')
+        states = sorted(country_data['states'].keys())
+        saved_state = wd.get(f'{prefix}_state', states[0] if states else '')
+        state = st.selectbox(state_label, states,
+            index=states.index(saved_state) if saved_state in states else 0,
+            key=f"{prefix}_state_sel")
+        wd[f'{prefix}_state'] = state
+        resolved_location = state  # State-level default
+
+        # Cities within this state
+        state_data = country_data['states'].get(state, {})
+        cities = state_data.get('cities', [])
+        if cities:
+            city_options = [f"State average ({state})"] + cities
+            saved_city = wd.get(f'{prefix}_city', '')
+            if saved_city in cities:
+                city_idx = city_options.index(saved_city)
+            else:
+                city_idx = 0
+            city = st.selectbox("City (optional — more specific data)", city_options,
+                index=city_idx, key=f"{prefix}_city_sel")
+            wd[f'{prefix}_city'] = city if city != city_options[0] else ''
+            if city != city_options[0]:
+                resolved_location = city  # City overrides state
+        else:
+            wd[f'{prefix}_city'] = ''
+            st.caption(f"Using {state} state-level expense data.")
+    else:
+        # No state/province — grey it out
+        st.selectbox("State / Province", ["Not available for this country"],
+            disabled=True, key=f"{prefix}_state_disabled")
+        wd[f'{prefix}_state'] = ''
+        st.caption(f"State/province-level data is only available for the US and Canada for now.")
+
+        # Cities
+        cities = country_data.get('cities', [])
+        if cities:
+            city_options = [f"Country average ({country})"] + cities
+            saved_city = wd.get(f'{prefix}_city', '')
+            if saved_city in cities:
+                city_idx = city_options.index(saved_city)
+            else:
+                city_idx = 0
+            city = st.selectbox("City", city_options,
+                index=city_idx, key=f"{prefix}_city_sel")
+            wd[f'{prefix}_city'] = city if city != city_options[0] else ''
+            if city != city_options[0]:
+                resolved_location = city
+            else:
+                resolved_location = cities[0]  # Fallback to first city in country
+        else:
+            resolved_location = 'Seattle'  # Ultimate fallback
+
+    wd[f'{prefix}_location'] = resolved_location or 'Seattle'
+    return resolved_location or 'Seattle'
 
 # Display names for locations (includes country and state for USA cities)
 LOCATION_DISPLAY_NAMES = {
@@ -3857,10 +3965,161 @@ STATE_EXPENSE_TEMPLATES = {
 }
 
 
+# ============================================================================
+# CANADIAN PROVINCE EXPENSE TEMPLATES
+# ============================================================================
+# Annual amounts per adult in USD (CAD × 0.74). Derived from StatCan Survey of
+# Household Spending 2022, provincial auto insurance data, regional grocery indices.
+# Medical/dental/vision are lower than US due to universal healthcare.
+
+PROVINCE_EXPENSE_TEMPLATES = {
+    "Ontario": {
+        "Conservative (statistical)": {
+            "Groceries": 4440, "Dining Out": 2520, "Coffee Shops": 530, "Auto Payment": 4070, "Gas & Fuel": 1850, "Auto Maintenance": 670, "Auto Insurance": 1180, "Parking & Tolls": 300, "Public Transit": 370, "Ride Shares": 220,
+            "Clothing": 1000, "Personal Care": 500, "Grooming": 330, "Medical": 590, "Dental": 330, "Vision": 150, "Fitness": 370, "Mental Health": 260, "Entertainment": 1000, "Hobbies": 520, "Subscriptions": 410, "Phone": 740, "Other Personal": 480
+        },
+        "Average (statistical)": {
+            "Groceries": 6340, "Dining Out": 3600, "Coffee Shops": 760, "Auto Payment": 5810, "Gas & Fuel": 2640, "Auto Maintenance": 960, "Auto Insurance": 1680, "Parking & Tolls": 430, "Public Transit": 530, "Ride Shares": 310,
+            "Clothing": 1430, "Personal Care": 710, "Grooming": 470, "Medical": 850, "Dental": 470, "Vision": 220, "Fitness": 530, "Mental Health": 370, "Entertainment": 1430, "Hobbies": 740, "Subscriptions": 590, "Phone": 1060, "Other Personal": 680
+        },
+        "High-end (statistical)": {
+            "Groceries": 9510, "Dining Out": 5400, "Coffee Shops": 1140, "Auto Payment": 8720, "Gas & Fuel": 3960, "Auto Maintenance": 1440, "Auto Insurance": 2520, "Parking & Tolls": 640, "Public Transit": 790, "Ride Shares": 470,
+            "Clothing": 2140, "Personal Care": 1070, "Grooming": 710, "Medical": 1270, "Dental": 710, "Vision": 330, "Fitness": 790, "Mental Health": 560, "Entertainment": 2140, "Hobbies": 1110, "Subscriptions": 880, "Phone": 1590, "Other Personal": 1020
+        }
+    },
+    "British Columbia": {
+        "Conservative (statistical)": {
+            "Groceries": 4810, "Dining Out": 2740, "Coffee Shops": 590, "Auto Payment": 4180, "Gas & Fuel": 2000, "Auto Maintenance": 700, "Auto Insurance": 1330, "Parking & Tolls": 330, "Public Transit": 410, "Ride Shares": 260,
+            "Clothing": 1070, "Personal Care": 530, "Grooming": 350, "Medical": 560, "Dental": 330, "Vision": 150, "Fitness": 410, "Mental Health": 300, "Entertainment": 1070, "Hobbies": 560, "Subscriptions": 430, "Phone": 740, "Other Personal": 520
+        },
+        "Average (statistical)": {
+            "Groceries": 6860, "Dining Out": 3920, "Coffee Shops": 850, "Auto Payment": 5960, "Gas & Fuel": 2860, "Auto Maintenance": 1000, "Auto Insurance": 1900, "Parking & Tolls": 470, "Public Transit": 590, "Ride Shares": 370,
+            "Clothing": 1530, "Personal Care": 760, "Grooming": 500, "Medical": 800, "Dental": 470, "Vision": 220, "Fitness": 590, "Mental Health": 430, "Entertainment": 1530, "Hobbies": 800, "Subscriptions": 610, "Phone": 1060, "Other Personal": 740
+        },
+        "High-end (statistical)": {
+            "Groceries": 10290, "Dining Out": 5880, "Coffee Shops": 1270, "Auto Payment": 8940, "Gas & Fuel": 4290, "Auto Maintenance": 1500, "Auto Insurance": 2850, "Parking & Tolls": 710, "Public Transit": 880, "Ride Shares": 560,
+            "Clothing": 2290, "Personal Care": 1140, "Grooming": 750, "Medical": 1200, "Dental": 710, "Vision": 330, "Fitness": 880, "Mental Health": 640, "Entertainment": 2290, "Hobbies": 1200, "Subscriptions": 920, "Phone": 1590, "Other Personal": 1110
+        }
+    },
+    "Quebec": {
+        "Conservative (statistical)": {
+            "Groceries": 4070, "Dining Out": 2220, "Coffee Shops": 480, "Auto Payment": 3700, "Gas & Fuel": 1700, "Auto Maintenance": 630, "Auto Insurance": 520, "Parking & Tolls": 260, "Public Transit": 410, "Ride Shares": 190,
+            "Clothing": 890, "Personal Care": 450, "Grooming": 300, "Medical": 480, "Dental": 300, "Vision": 130, "Fitness": 330, "Mental Health": 230, "Entertainment": 890, "Hobbies": 480, "Subscriptions": 370, "Phone": 670, "Other Personal": 440
+        },
+        "Average (statistical)": {
+            "Groceries": 5810, "Dining Out": 3170, "Coffee Shops": 680, "Auto Payment": 5290, "Gas & Fuel": 2420, "Auto Maintenance": 900, "Auto Insurance": 740, "Parking & Tolls": 370, "Public Transit": 590, "Ride Shares": 260,
+            "Clothing": 1280, "Personal Care": 640, "Grooming": 430, "Medical": 680, "Dental": 430, "Vision": 190, "Fitness": 470, "Mental Health": 330, "Entertainment": 1280, "Hobbies": 680, "Subscriptions": 530, "Phone": 960, "Other Personal": 630
+        },
+        "High-end (statistical)": {
+            "Groceries": 8720, "Dining Out": 4760, "Coffee Shops": 1020, "Auto Payment": 7930, "Gas & Fuel": 3630, "Auto Maintenance": 1350, "Auto Insurance": 1110, "Parking & Tolls": 560, "Public Transit": 880, "Ride Shares": 400,
+            "Clothing": 1920, "Personal Care": 960, "Grooming": 640, "Medical": 1020, "Dental": 640, "Vision": 280, "Fitness": 710, "Mental Health": 500, "Entertainment": 1920, "Hobbies": 1020, "Subscriptions": 790, "Phone": 1440, "Other Personal": 940
+        }
+    },
+    "Alberta": {
+        "Conservative (statistical)": {
+            "Groceries": 4330, "Dining Out": 2480, "Coffee Shops": 530, "Auto Payment": 4260, "Gas & Fuel": 1920, "Auto Maintenance": 670, "Auto Insurance": 890, "Parking & Tolls": 280, "Public Transit": 260, "Ride Shares": 190,
+            "Clothing": 960, "Personal Care": 480, "Grooming": 320, "Medical": 560, "Dental": 330, "Vision": 150, "Fitness": 370, "Mental Health": 260, "Entertainment": 1000, "Hobbies": 520, "Subscriptions": 410, "Phone": 700, "Other Personal": 480
+        },
+        "Average (statistical)": {
+            "Groceries": 6190, "Dining Out": 3540, "Coffee Shops": 760, "Auto Payment": 6080, "Gas & Fuel": 2750, "Auto Maintenance": 960, "Auto Insurance": 1270, "Parking & Tolls": 400, "Public Transit": 370, "Ride Shares": 260,
+            "Clothing": 1380, "Personal Care": 680, "Grooming": 460, "Medical": 800, "Dental": 470, "Vision": 220, "Fitness": 530, "Mental Health": 370, "Entertainment": 1430, "Hobbies": 740, "Subscriptions": 590, "Phone": 1000, "Other Personal": 680
+        },
+        "High-end (statistical)": {
+            "Groceries": 9280, "Dining Out": 5310, "Coffee Shops": 1140, "Auto Payment": 9120, "Gas & Fuel": 4120, "Auto Maintenance": 1440, "Auto Insurance": 1900, "Parking & Tolls": 600, "Public Transit": 560, "Ride Shares": 400,
+            "Clothing": 2070, "Personal Care": 1020, "Grooming": 680, "Medical": 1200, "Dental": 710, "Vision": 330, "Fitness": 790, "Mental Health": 560, "Entertainment": 2140, "Hobbies": 1110, "Subscriptions": 880, "Phone": 1500, "Other Personal": 1020
+        }
+    },
+    "Manitoba": {
+        "Conservative (statistical)": {
+            "Groceries": 3920, "Dining Out": 2110, "Coffee Shops": 440, "Auto Payment": 3700, "Gas & Fuel": 1700, "Auto Maintenance": 630, "Auto Insurance": 850, "Parking & Tolls": 220, "Public Transit": 260, "Ride Shares": 150,
+            "Clothing": 850, "Personal Care": 430, "Grooming": 280, "Medical": 520, "Dental": 300, "Vision": 130, "Fitness": 300, "Mental Health": 220, "Entertainment": 850, "Hobbies": 440, "Subscriptions": 370, "Phone": 670, "Other Personal": 410
+        },
+        "Average (statistical)": {
+            "Groceries": 5590, "Dining Out": 3020, "Coffee Shops": 630, "Auto Payment": 5290, "Gas & Fuel": 2420, "Auto Maintenance": 900, "Auto Insurance": 1220, "Parking & Tolls": 310, "Public Transit": 370, "Ride Shares": 220,
+            "Clothing": 1220, "Personal Care": 610, "Grooming": 400, "Medical": 740, "Dental": 430, "Vision": 190, "Fitness": 430, "Mental Health": 310, "Entertainment": 1220, "Hobbies": 630, "Subscriptions": 530, "Phone": 960, "Other Personal": 590
+        },
+        "High-end (statistical)": {
+            "Groceries": 8390, "Dining Out": 4520, "Coffee Shops": 940, "Auto Payment": 7930, "Gas & Fuel": 3630, "Auto Maintenance": 1350, "Auto Insurance": 1830, "Parking & Tolls": 470, "Public Transit": 560, "Ride Shares": 330,
+            "Clothing": 1830, "Personal Care": 920, "Grooming": 600, "Medical": 1110, "Dental": 640, "Vision": 280, "Fitness": 640, "Mental Health": 470, "Entertainment": 1830, "Hobbies": 940, "Subscriptions": 790, "Phone": 1440, "Other Personal": 880
+        }
+    },
+    "Saskatchewan": {
+        "Conservative (statistical)": {
+            "Groceries": 3850, "Dining Out": 2040, "Coffee Shops": 430, "Auto Payment": 3700, "Gas & Fuel": 1770, "Auto Maintenance": 630, "Auto Insurance": 780, "Parking & Tolls": 190, "Public Transit": 190, "Ride Shares": 130,
+            "Clothing": 850, "Personal Care": 430, "Grooming": 280, "Medical": 520, "Dental": 300, "Vision": 130, "Fitness": 300, "Mental Health": 220, "Entertainment": 850, "Hobbies": 440, "Subscriptions": 370, "Phone": 670, "Other Personal": 410
+        },
+        "Average (statistical)": {
+            "Groceries": 5510, "Dining Out": 2910, "Coffee Shops": 610, "Auto Payment": 5290, "Gas & Fuel": 2530, "Auto Maintenance": 900, "Auto Insurance": 1110, "Parking & Tolls": 280, "Public Transit": 260, "Ride Shares": 190,
+            "Clothing": 1220, "Personal Care": 610, "Grooming": 400, "Medical": 740, "Dental": 430, "Vision": 190, "Fitness": 430, "Mental Health": 310, "Entertainment": 1220, "Hobbies": 630, "Subscriptions": 530, "Phone": 960, "Other Personal": 590
+        },
+        "High-end (statistical)": {
+            "Groceries": 8260, "Dining Out": 4370, "Coffee Shops": 920, "Auto Payment": 7930, "Gas & Fuel": 3790, "Auto Maintenance": 1350, "Auto Insurance": 1660, "Parking & Tolls": 420, "Public Transit": 400, "Ride Shares": 280,
+            "Clothing": 1830, "Personal Care": 920, "Grooming": 600, "Medical": 1110, "Dental": 640, "Vision": 280, "Fitness": 640, "Mental Health": 470, "Entertainment": 1830, "Hobbies": 940, "Subscriptions": 790, "Phone": 1440, "Other Personal": 880
+        }
+    },
+    "Nova Scotia": {
+        "Conservative (statistical)": {
+            "Groceries": 3770, "Dining Out": 1960, "Coffee Shops": 410, "Auto Payment": 3550, "Gas & Fuel": 1700, "Auto Maintenance": 600, "Auto Insurance": 670, "Parking & Tolls": 170, "Public Transit": 220, "Ride Shares": 110,
+            "Clothing": 780, "Personal Care": 390, "Grooming": 260, "Medical": 480, "Dental": 280, "Vision": 130, "Fitness": 280, "Mental Health": 190, "Entertainment": 780, "Hobbies": 410, "Subscriptions": 350, "Phone": 670, "Other Personal": 370
+        },
+        "Average (statistical)": {
+            "Groceries": 5390, "Dining Out": 2790, "Coffee Shops": 590, "Auto Payment": 5070, "Gas & Fuel": 2420, "Auto Maintenance": 860, "Auto Insurance": 960, "Parking & Tolls": 240, "Public Transit": 310, "Ride Shares": 150,
+            "Clothing": 1110, "Personal Care": 560, "Grooming": 370, "Medical": 680, "Dental": 400, "Vision": 190, "Fitness": 400, "Mental Health": 280, "Entertainment": 1110, "Hobbies": 590, "Subscriptions": 500, "Phone": 960, "Other Personal": 530
+        },
+        "High-end (statistical)": {
+            "Groceries": 8080, "Dining Out": 4190, "Coffee Shops": 880, "Auto Payment": 7600, "Gas & Fuel": 3630, "Auto Maintenance": 1280, "Auto Insurance": 1440, "Parking & Tolls": 370, "Public Transit": 470, "Ride Shares": 230,
+            "Clothing": 1660, "Personal Care": 840, "Grooming": 560, "Medical": 1020, "Dental": 600, "Vision": 280, "Fitness": 600, "Mental Health": 420, "Entertainment": 1660, "Hobbies": 880, "Subscriptions": 750, "Phone": 1440, "Other Personal": 800
+        }
+    },
+    "New Brunswick": {
+        "Conservative (statistical)": {
+            "Groceries": 3630, "Dining Out": 1850, "Coffee Shops": 390, "Auto Payment": 3480, "Gas & Fuel": 1630, "Auto Maintenance": 590, "Auto Insurance": 630, "Parking & Tolls": 150, "Public Transit": 150, "Ride Shares": 100,
+            "Clothing": 740, "Personal Care": 370, "Grooming": 250, "Medical": 460, "Dental": 260, "Vision": 120, "Fitness": 260, "Mental Health": 180, "Entertainment": 740, "Hobbies": 390, "Subscriptions": 340, "Phone": 650, "Other Personal": 350
+        },
+        "Average (statistical)": {
+            "Groceries": 5180, "Dining Out": 2640, "Coffee Shops": 560, "Auto Payment": 4960, "Gas & Fuel": 2340, "Auto Maintenance": 840, "Auto Insurance": 900, "Parking & Tolls": 220, "Public Transit": 220, "Ride Shares": 150,
+            "Clothing": 1060, "Personal Care": 530, "Grooming": 350, "Medical": 650, "Dental": 370, "Vision": 170, "Fitness": 370, "Mental Health": 260, "Entertainment": 1060, "Hobbies": 560, "Subscriptions": 480, "Phone": 930, "Other Personal": 500
+        },
+        "High-end (statistical)": {
+            "Groceries": 7770, "Dining Out": 3960, "Coffee Shops": 840, "Auto Payment": 7440, "Gas & Fuel": 3510, "Auto Maintenance": 1260, "Auto Insurance": 1350, "Parking & Tolls": 330, "Public Transit": 330, "Ride Shares": 220,
+            "Clothing": 1590, "Personal Care": 800, "Grooming": 530, "Medical": 980, "Dental": 560, "Vision": 260, "Fitness": 560, "Mental Health": 390, "Entertainment": 1590, "Hobbies": 840, "Subscriptions": 720, "Phone": 1400, "Other Personal": 750
+        }
+    },
+    "Newfoundland and Labrador": {
+        "Conservative (statistical)": {
+            "Groceries": 3920, "Dining Out": 1810, "Coffee Shops": 380, "Auto Payment": 3480, "Gas & Fuel": 1740, "Auto Maintenance": 610, "Auto Insurance": 700, "Parking & Tolls": 150, "Public Transit": 150, "Ride Shares": 90,
+            "Clothing": 740, "Personal Care": 370, "Grooming": 240, "Medical": 460, "Dental": 260, "Vision": 120, "Fitness": 250, "Mental Health": 180, "Entertainment": 740, "Hobbies": 380, "Subscriptions": 340, "Phone": 670, "Other Personal": 350
+        },
+        "Average (statistical)": {
+            "Groceries": 5590, "Dining Out": 2590, "Coffee Shops": 540, "Auto Payment": 4960, "Gas & Fuel": 2490, "Auto Maintenance": 870, "Auto Insurance": 1000, "Parking & Tolls": 220, "Public Transit": 220, "Ride Shares": 130,
+            "Clothing": 1060, "Personal Care": 530, "Grooming": 340, "Medical": 650, "Dental": 370, "Vision": 170, "Fitness": 350, "Mental Health": 260, "Entertainment": 1060, "Hobbies": 540, "Subscriptions": 480, "Phone": 960, "Other Personal": 500
+        },
+        "High-end (statistical)": {
+            "Groceries": 8390, "Dining Out": 3890, "Coffee Shops": 810, "Auto Payment": 7440, "Gas & Fuel": 3730, "Auto Maintenance": 1310, "Auto Insurance": 1500, "Parking & Tolls": 330, "Public Transit": 330, "Ride Shares": 190,
+            "Clothing": 1590, "Personal Care": 800, "Grooming": 510, "Medical": 980, "Dental": 560, "Vision": 260, "Fitness": 530, "Mental Health": 390, "Entertainment": 1590, "Hobbies": 810, "Subscriptions": 720, "Phone": 1440, "Other Personal": 750
+        }
+    },
+    "Prince Edward Island": {
+        "Conservative (statistical)": {
+            "Groceries": 3590, "Dining Out": 1740, "Coffee Shops": 370, "Auto Payment": 3400, "Gas & Fuel": 1590, "Auto Maintenance": 570, "Auto Insurance": 600, "Parking & Tolls": 130, "Public Transit": 110, "Ride Shares": 80,
+            "Clothing": 710, "Personal Care": 350, "Grooming": 240, "Medical": 440, "Dental": 250, "Vision": 110, "Fitness": 240, "Mental Health": 170, "Entertainment": 710, "Hobbies": 370, "Subscriptions": 330, "Phone": 650, "Other Personal": 330
+        },
+        "Average (statistical)": {
+            "Groceries": 5130, "Dining Out": 2490, "Coffee Shops": 530, "Auto Payment": 4850, "Gas & Fuel": 2270, "Auto Maintenance": 810, "Auto Insurance": 850, "Parking & Tolls": 190, "Public Transit": 150, "Ride Shares": 110,
+            "Clothing": 1010, "Personal Care": 500, "Grooming": 340, "Medical": 630, "Dental": 350, "Vision": 160, "Fitness": 340, "Mental Health": 240, "Entertainment": 1010, "Hobbies": 530, "Subscriptions": 470, "Phone": 930, "Other Personal": 470
+        },
+        "High-end (statistical)": {
+            "Groceries": 7700, "Dining Out": 3730, "Coffee Shops": 790, "Auto Payment": 7280, "Gas & Fuel": 3410, "Auto Maintenance": 1220, "Auto Insurance": 1280, "Parking & Tolls": 280, "Public Transit": 230, "Ride Shares": 170,
+            "Clothing": 1520, "Personal Care": 750, "Grooming": 510, "Medical": 940, "Dental": 530, "Vision": 240, "Fitness": 510, "Mental Health": 370, "Entertainment": 1520, "Hobbies": 790, "Subscriptions": 710, "Phone": 1400, "Other Personal": 710
+        }
+    },
+}
+
+
 def get_adult_expense_template(location, strategy_name):
     """
     Get adult expense template for a specific location and strategy.
-    Checks city templates first, then state templates, then falls back to Seattle.
+    Priority: city → US state → Canadian province → wizard state setting → Seattle fallback.
     """
     # Try city-level templates first
     if location in ADULT_EXPENSE_TEMPLATES:
@@ -3870,7 +4129,7 @@ def get_adult_expense_template(location, strategy_name):
         if base_name in ADULT_EXPENSE_TEMPLATES[location]:
             return ADULT_EXPENSE_TEMPLATES[location][base_name].copy()
 
-    # Try state-level templates
+    # Try US state templates
     if location in STATE_EXPENSE_TEMPLATES:
         if strategy_name in STATE_EXPENSE_TEMPLATES[location]:
             return STATE_EXPENSE_TEMPLATES[location][strategy_name].copy()
@@ -3878,16 +4137,26 @@ def get_adult_expense_template(location, strategy_name):
         if base_name in STATE_EXPENSE_TEMPLATES[location]:
             return STATE_EXPENSE_TEMPLATES[location][base_name].copy()
 
-    # Check if wizard has a custom state set
+    # Try Canadian province templates
+    if location in PROVINCE_EXPENSE_TEMPLATES:
+        if strategy_name in PROVINCE_EXPENSE_TEMPLATES[location]:
+            return PROVINCE_EXPENSE_TEMPLATES[location][strategy_name].copy()
+        base_name = get_strategy_base_name(strategy_name)
+        if base_name in PROVINCE_EXPENSE_TEMPLATES[location]:
+            return PROVINCE_EXPENSE_TEMPLATES[location][base_name].copy()
+
+    # Check if wizard has a state/province set
     state = None
     if hasattr(st, 'session_state') and hasattr(st.session_state, 'get'):
         wd = st.session_state.get('wizard_data', {})
-        state = wd.get('current_location_state')
-        if state in ("I'll fill this in later", "Outside the US", None):
+        state = wd.get('current_location_state') or wd.get('wiz_loc_state')
+        if state in ("I'll fill this in later", "Outside the US", None, ''):
             state = None
-    if state and state in STATE_EXPENSE_TEMPLATES:
-        if strategy_name in STATE_EXPENSE_TEMPLATES[state]:
-            return STATE_EXPENSE_TEMPLATES[state][strategy_name].copy()
+    if state:
+        for template_dict in [STATE_EXPENSE_TEMPLATES, PROVINCE_EXPENSE_TEMPLATES]:
+            if state in template_dict:
+                if strategy_name in template_dict[state]:
+                    return template_dict[state][strategy_name].copy()
 
     # Return default (Seattle Average) if not found
     if "Average (statistical)" in ADULT_EXPENSE_TEMPLATES.get("Seattle", {}):
@@ -6178,55 +6447,14 @@ def setup_wizard():
     elif step == 5:
         _wizard_step_header(5, 6, "📍 Location & Spending", "Where you live and your spending style.")
 
-        # Location picker with "Other" option
-        location_options = AVAILABLE_LOCATIONS_ADULTS + ["Other"]
-        current_saved = st.session_state.wizard_data.get('current_location', 'Seattle')
-        if current_saved in location_options:
-            loc_idx = location_options.index(current_saved)
-        elif st.session_state.wizard_data.get('current_location_custom'):
-            loc_idx = location_options.index("Other")
-        else:
-            loc_idx = 0
-
-        current_loc = st.selectbox("Where do you currently live?", location_options,
-                                    index=loc_idx, key="wiz_current_loc")
-
-        if current_loc == "Other":
-            custom_name = st.text_input("City / location name",
-                value=st.session_state.wizard_data.get('current_location_custom', ''),
-                placeholder="e.g., Austin, Denver, London", key="wiz_custom_loc")
-            st.session_state.wizard_data['current_location_custom'] = custom_name
-
-            US_STATES = ["Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
-                "Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas",
-                "Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota",
-                "Mississippi","Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey",
-                "New Mexico","New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon",
-                "Pennsylvania","Rhode Island","South Carolina","South Dakota","Tennessee","Texas",
-                "Utah","Vermont","Virginia","Washington","West Virginia","Wisconsin","Wyoming"]
-            state_options = ["I'll fill this in later"] + US_STATES + ["Outside the US"]
-            saved_state = st.session_state.wizard_data.get('current_location_state', "I'll fill this in later")
-            state_choice = st.selectbox("What state is this in?", state_options,
-                index=state_options.index(saved_state) if saved_state in state_options else 0,
-                key="wiz_custom_state")
-            st.session_state.wizard_data['current_location_state'] = state_choice
-
-            if state_choice == "Outside the US":
-                st.info("You'll need to manually configure expense templates for this location after the wizard.")
-            elif state_choice == "I'll fill this in later":
-                st.caption("No problem — you can set this up in the app later.")
-            else:
-                st.caption(f"Tax and expense data will be based on {state_choice} averages.")
-
-            # Use custom name as location, fall back to nearest template
-            st.session_state.wizard_data['current_location'] = custom_name or 'Seattle'
-        else:
-            st.session_state.wizard_data['current_location'] = current_loc
-            st.session_state.wizard_data.pop('current_location_custom', None)
-            st.session_state.wizard_data.pop('current_location_state', None)
-
+        # Hierarchical location picker: Country → State/Province → City
+        current_loc = location_picker("wiz_loc", st.session_state.wizard_data,
+                                       label="Where do you currently live?")
+        st.session_state.wizard_data['current_location'] = current_loc
         # Also set child location to match
-        st.session_state.wizard_data['child_location'] = st.session_state.wizard_data['current_location']
+        st.session_state.wizard_data['child_location'] = current_loc
+        # Store state for tax lookup
+        st.session_state.wizard_data['current_location_state'] = st.session_state.wizard_data.get('wiz_loc_state', '')
 
         # Moves
         plan_moves = st.checkbox("I plan to move in the future",
@@ -6241,18 +6469,18 @@ def setup_wizard():
 
             moves_to_keep = []
             for i, mv in enumerate(moves):
-                m1, m2, m3 = st.columns([1, 2, 0.5])
-                with m1:
-                    mv['year'] = st.number_input(f"Move {i+1} year", min_value=datetime.now().year,
+                st.markdown(f"**Move {i+1}**")
+                mc1, mc2 = st.columns([1, 3])
+                with mc1:
+                    mv['year'] = st.number_input(f"Year", min_value=datetime.now().year,
                                                   max_value=2080, value=mv['year'], key=f"wiz_move_y{i}")
-                with m2:
-                    loc_idx = AVAILABLE_LOCATIONS_ADULTS.index(mv['location']) if mv['location'] in AVAILABLE_LOCATIONS_ADULTS else 0
-                    mv['location'] = st.selectbox(f"Move to", AVAILABLE_LOCATIONS_ADULTS,
-                                                    index=loc_idx, key=f"wiz_move_loc{i}")
-                with m3:
-                    st.markdown("")
-                    if len(moves) > 1 and st.button("✕", key=f"wiz_move_del_{i}"):
-                        continue
+                with mc2:
+                    # Mini location picker for each move
+                    move_loc = location_picker(f"wiz_move_{i}", mv, label="Move to")
+                    mv['location'] = move_loc
+
+                if len(moves) > 1 and st.button("✕ Remove this move", key=f"wiz_move_del_{i}"):
+                    continue
                 moves_to_keep.append(mv)
             moves = moves_to_keep
 
