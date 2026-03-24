@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh:*)",
+      "Bash(ssh-keygen:*)",
+      "Skill(update-config)",
+      "Bash(echo \"exit code: $?\")",
+      "Bash(echo \"exit: $?\")",
+      "Bash(ls:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" --connect-timeout 5 http://192.168.68.102:8501)",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Read(//c/Users/filip/**)",
+      "Bash(cp \"C:/Users/filip/financial-planner/FinancialApp_V14.py\" \"//192.168.68.102/Gonzik/Transfer/\")",
+      "Bash(cp \"C:/Users/filip/financial-planner/streamlit_config.toml\" \"//192.168.68.102/Gonzik/Transfer/\")",
+      "Bash(cp \"C:/Users/filip/financial-planner/v14_verify.py\" \"//192.168.68.102/Gonzik/Transfer/\")",
+      "Bash(cp \"C:/Users/filip/financial-planner/stress_test.py\" \"//192.168.68.102/Gonzik/Transfer/\")",
+      "Bash(curl:*)",
+      "Bash(find /tmp -name *FinancialPlanner* -o -name *v0_8* -o -name *v0.8*)",
+      "Bash(find /c/Users/filip -maxdepth 3 -name *v0_8* -o -name *v0.8*)",
+      "Bash(cygpath:*)",
+      "Bash(for f:*)",
+      "Bash(do cp:*)",
+      "Bash(done)",
+      "Bash(cp:*)",
+      "Bash(gh auth:*)",
+      "Read(//c/Users/filip/financial-planner/**)",
+      "Bash(bash -c:*)",
+      "Bash(python3:*)",
+      "Bash(cat:*)"
+    ]
+  }
+}
