@@ -6072,6 +6072,8 @@ class House:
     maintenance_rate: float
     upkeep_costs: float
     owner: str = "Shared"
+    location: str = ""  # City or state where house is located
+    appreciation_rate: float = 3.0  # Annual appreciation % (default 3%)
     timeline: List[HouseTimelineEntry] = None
 
     def __post_init__(self):
@@ -9203,7 +9205,14 @@ def main():
             return
 
     # User is authenticated - proceed with app
+    was_fresh = 'initialized' not in st.session_state
     initialize_session_state()
+    if was_fresh and st.session_state.get('household_id'):
+        # Session was just restored from saved data
+        plan_data = load_household_plan(st.session_state.household_id)
+        if plan_data:
+            load_data(plan_data)
+            st.session_state._session_restored = True
 
     # Auto-save: persist to household storage on every interaction
     if st.session_state.get('authenticated') and st.session_state.get('household_id') and st.session_state.get('initialized'):
@@ -9221,6 +9230,15 @@ def main():
             unsafe_allow_html=True,
         )
     st.title("💰 Financial Planning Suite")
+
+    # What's New banner (dismissible)
+    if not st.session_state.get('_whats_new_dismissed'):
+        with st.expander(f"🆕 What's new in v{APP_VERSION}", expanded=False):
+            for item in WHATS_NEW:
+                st.markdown(f"- {item}")
+            if st.button("Dismiss", key="dismiss_whats_new"):
+                st.session_state._whats_new_dismissed = True
+                st.rerun()
 
     # ── Grouped navigation ──────────────────────────────────────────────
     # Categories keep tabs visible without horizontal scrolling.
@@ -9270,7 +9288,18 @@ def main():
               if st.session_state.get('nav_group', 'Overview') in group_names else 0,
         key="nav_group_radio", label_visibility="collapsed",
     )
+    # Auto-save when switching sections
+    prev_group = st.session_state.get('_prev_nav_group')
     st.session_state.nav_group = selected_group
+    if prev_group and prev_group != selected_group:
+        if st.session_state.get('authenticated') and st.session_state.get('household_id') and st.session_state.get('initialized'):
+            try:
+                json_data = save_data()
+                if json_data:
+                    save_household_plan(st.session_state.household_id, json_data)
+            except Exception:
+                pass
+    st.session_state._prev_nav_group = selected_group
 
     # Category guide
     CATEGORY_GUIDES = {
@@ -9447,6 +9476,70 @@ def generate_alerts(cashflow_data: list) -> list:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# UI HELPERS: empty states, validation, formatting, completion
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _plan_completion_pct() -> tuple:
+    """Calculate plan completion percentage and list of missing items."""
+    checks = [
+        (st.session_state.parent1_name != "Parent 1", "Set your name (Settings)"),
+        (st.session_state.parentX_income > 0, "Enter your income"),
+        (st.session_state.parentX_net_worth > 0, "Enter your net worth"),
+        (st.session_state.parentX_retirement_age != 65 or True, "Review retirement age"),  # Always passes
+        (len(st.session_state.get('children_list', [])) > 0 or True, "Add children (optional)"),
+        (len(st.session_state.get('houses', [])) > 0, "Add housing details"),
+        (sum(st.session_state.family_shared_expenses.values()) > 0, "Review family expenses"),
+        (st.session_state.get('state_timeline') and len(st.session_state.state_timeline) > 0, "Set your location"),
+    ]
+    completed = sum(1 for ok, _ in checks if ok)
+    missing = [msg for ok, msg in checks if not ok]
+    return completed / len(checks), missing
+
+
+def _empty_state(icon: str, title: str, description: str):
+    """Render a helpful empty state message."""
+    st.markdown(
+        f'<div style="text-align:center; padding:2rem 1rem; color:rgba(128,128,128,0.6);">'
+        f'<div style="font-size:2.5rem; margin-bottom:0.5rem;">{icon}</div>'
+        f'<div style="font-size:1.1rem; font-weight:600; margin-bottom:0.25rem;">{title}</div>'
+        f'<div style="font-size:0.85rem;">{description}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _validation_warnings():
+    """Check for common data issues and return list of warning strings."""
+    warnings = []
+    total_income = st.session_state.parentX_income + st.session_state.parentY_income
+    total_expenses = (sum(st.session_state.get('parentX_expenses', {}).values()) +
+                      sum(st.session_state.get('parentY_expenses', {}).values()) +
+                      sum(st.session_state.family_shared_expenses.values()))
+    if total_income > 0 and total_expenses > total_income * 0.95:
+        warnings.append(f"Your annual expenses (${total_expenses:,.0f}) are close to or exceed your gross income (${total_income:,.0f}). After taxes, you may be running a deficit.")
+    if st.session_state.parentX_income == 0 and st.session_state.parent1_name != "N/A":
+        warnings.append(f"{st.session_state.parent1_name}'s income is $0. Is this intentional?")
+    if st.session_state.parentX_retirement_age <= st.session_state.parentX_age:
+        warnings.append(f"{st.session_state.parent1_name}'s retirement age ({st.session_state.parentX_retirement_age}) is at or before current age ({st.session_state.parentX_age}).")
+    return warnings
+
+
+APP_VERSION = "0.8.1"
+WHATS_NEW = [
+    "Dashboard with financial trajectory chart and alerts",
+    "Grouped navigation (Overview, People, Expenses, Planning, Analysis, Data)",
+    "Hierarchical location picker: Country → State → City",
+    "50 US state + 10 Canadian province expense templates",
+    "Pooled vs Separate finance mode for couples",
+    "Career phases with add/delete and retirement age warnings",
+    "Housing ↔ location linking, configurable appreciation rates",
+    "Net worth breakdown: liquid assets vs home equity",
+    "Auto-save on section change, sidebar save button",
+    "One-click what-if scenario templates",
+]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # DASHBOARD TAB
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -9454,9 +9547,21 @@ def dashboard_tab():
     """Dashboard — at-a-glance summary of your financial plan."""
     st.header("📊 Dashboard")
 
+    # Plan completion indicator
+    completion, missing = _plan_completion_pct()
+    if completion < 1.0:
+        st.progress(completion)
+        st.caption(f"Plan is {completion:.0%} complete. Missing: {', '.join(missing[:3])}")
+
+    # Validation warnings
+    warnings = _validation_warnings()
+    for w in warnings:
+        st.warning(w)
+
     # Calculate cashflow data
     try:
-        cashflow_data = calculate_lifetime_cashflow()
+        with st.spinner("Calculating projections..."):
+            cashflow_data = calculate_lifetime_cashflow()
     except Exception:
         st.info("Complete the Settings and Income tabs to see your dashboard.")
         return
@@ -9610,6 +9715,54 @@ def dashboard_tab():
             f'Age {final_row["parent1_age"]} ({final_row["year"]})</div></div>',
             unsafe_allow_html=True,
         )
+
+    # ── Net worth breakdown ────────────────────────────────────────────────
+    if current_row and current_row.get('house_equity', 0) > 0:
+        st.markdown("### Net Worth Breakdown")
+        liquid = current_row.get('liquid_net_worth', current_row['net_worth'])
+        house_eq = current_row.get('house_equity', 0)
+        total = current_row['net_worth']
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Liquid Assets", format_currency(liquid),
+                      help="Cash, stocks, retirement accounts — accessible funds")
+        with col2:
+            st.metric("Home Equity", format_currency(house_eq),
+                      help="House value minus remaining mortgage")
+        with col3:
+            st.metric("Total Net Worth", format_currency(total))
+
+    # ── Benchmarks & Health Indicators ─────────────────────────────────────
+    if current_row:
+        st.markdown("### Financial Health")
+        total_inc = current_row.get('total_income', 0)
+        total_exp = current_row.get('total_expenses', 0)
+        total_tax = current_row.get('taxes', 0)
+        savings_rate = (total_inc - total_exp - total_tax) / max(total_inc, 1) * 100 if total_inc > 0 else 0
+        p1_age = st.session_state.parentX_age
+
+        # Age-based net worth benchmark (rough median from Federal Reserve SCF)
+        age_benchmarks = {25: 10000, 30: 50000, 35: 100000, 40: 180000, 45: 250000,
+                          50: 350000, 55: 500000, 60: 700000, 65: 900000, 70: 1000000}
+        benchmark_age = min(age_benchmarks.keys(), key=lambda a: abs(a - p1_age))
+        benchmark_nw = age_benchmarks[benchmark_age]
+        nw_pct = "above" if total_nw > benchmark_nw else "below"
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            color = "🟢" if savings_rate > 15 else "🟡" if savings_rate > 5 else "🔴"
+            st.metric(f"{color} Savings Rate", f"{savings_rate:.1f}%",
+                      help="Green >15%, Yellow 5-15%, Red <5%. Median US household: ~8%.")
+        with col2:
+            color = "🟢" if total_nw > benchmark_nw * 1.2 else "🟡" if total_nw > benchmark_nw * 0.5 else "🔴"
+            st.metric(f"{color} Net Worth vs Benchmark", f"{nw_pct.title()} median",
+                      delta=f"{format_currency(total_nw - benchmark_nw)} vs age {benchmark_age} median",
+                      help=f"Median net worth at age {benchmark_age}: {format_currency(benchmark_nw)} (Federal Reserve SCF)")
+        with col3:
+            debt_ratio = total_exp / max(total_inc, 1) * 100 if total_inc > 0 else 0
+            color = "🟢" if debt_ratio < 60 else "🟡" if debt_ratio < 80 else "🔴"
+            st.metric(f"{color} Expense-to-Income", f"{debt_ratio:.0f}%",
+                      help="Green <60%, Yellow 60-80%, Red >80%. Lower is better.")
 
     # ── Monthly cashflow snapshot ────────────────────────────────────────────
     st.markdown("### Current Year Snapshot")
@@ -11737,6 +11890,19 @@ def house_tab():
                 key=f"house_owner_{idx}"
             )
 
+            col_loc, col_appr = st.columns(2)
+            with col_loc:
+                house.location = st.text_input("Location (city/state)",
+                    value=getattr(house, 'location', ''),
+                    placeholder="e.g., Seattle, WA",
+                    key=f"house_location_{idx}")
+            with col_appr:
+                house.appreciation_rate = st.number_input("Annual appreciation (%)",
+                    min_value=-5.0, max_value=15.0,
+                    value=float(getattr(house, 'appreciation_rate', 3.0)),
+                    step=0.5, key=f"house_appr_{idx}",
+                    help="US historical avg: ~3-4%. Coastal cities may be higher.")
+
             # Timeline
             st.subheader("Property Timeline")
             st.markdown("Define how the property status changes over time")
@@ -12829,6 +12995,19 @@ def calculate_lifetime_cashflow():
         family_expenses_inflated = {}
         for category, amount in st.session_state.family_shared_expenses.items():
             family_expenses_inflated[category] = amount * (1.03 ** years_from_now)
+
+        # Housing ↔ Location linking: if user lives in an owned house this year,
+        # zero out the Mortgage/Rent family expense (house costs are in house_expenses)
+        lives_in_owned_house = False
+        if 'houses' in st.session_state:
+            for house in st.session_state.houses:
+                status, _ = house.get_status_for_year(year)
+                if status == "Own_Live":
+                    lives_in_owned_house = True
+                    break
+        if lives_in_owned_house:
+            family_expenses_inflated['Mortgage/Rent'] = 0.0
+
         family_total = sum(family_expenses_inflated.values())
 
         # Total base expenses = ParentX + ParentY + Family Shared
@@ -12966,15 +13145,15 @@ def calculate_lifetime_cashflow():
                             is_owned = False
 
                 if is_owned:
-                    # Calculate house value with appreciation (assume 3% annual appreciation)
-                    years_since_purchase = year - house.purchase_year
-                    current_house_value = house.current_value * (1.03 ** years_from_now)
+                    # Calculate house value with appreciation (per-house rate)
+                    appr_rate = 1 + getattr(house, 'appreciation_rate', 3.0) / 100
+                    current_house_value = house.current_value * (appr_rate ** years_from_now)
 
                     # Property tax (based on current house value)
                     property_tax = current_house_value * house.property_tax_rate
                     house_expenses += property_tax
 
-                    # Home insurance (with inflation)
+                    # Home insurance (with general inflation)
                     home_insurance = house.home_insurance * (1.03 ** years_from_now)
                     house_expenses += home_insurance
 
@@ -12982,7 +13161,7 @@ def calculate_lifetime_cashflow():
                     maintenance = current_house_value * house.maintenance_rate
                     house_expenses += maintenance
 
-                    # Upkeep costs (with inflation)
+                    # Upkeep costs (with general inflation)
                     upkeep = house.upkeep_costs * (1.03 ** years_from_now)
                     house_expenses += upkeep
 
@@ -12996,6 +13175,25 @@ def calculate_lifetime_cashflow():
                     })
 
         total_expenses = base_expenses + children_expenses + recurring_expenses_total + major_purchase_expenses + healthcare_expenses + house_expenses
+
+        # ── House equity calculation (non-liquid net worth) ──────────────
+        total_house_equity = 0
+        if 'houses' in st.session_state:
+            for house in st.session_state.houses:
+                status, _ = house.get_status_for_year(year)
+                if status in ("Own_Live", "Own_Rent"):
+                    appr = 1 + getattr(house, 'appreciation_rate', 3.0) / 100
+                    h_value = house.current_value * (appr ** years_from_now)
+                    # Remaining mortgage (simple: pay down linearly over mortgage_years_left)
+                    years_into_mortgage = years_from_now
+                    if house.mortgage_years_left > 0 and years_into_mortgage < house.mortgage_years_left:
+                        remaining_frac = 1 - (years_into_mortgage / house.mortgage_years_left)
+                        h_mortgage = house.mortgage_balance * remaining_frac
+                    elif house.mortgage_years_left > 0:
+                        h_mortgage = 0  # Paid off
+                    else:
+                        h_mortgage = 0
+                    total_house_equity += max(0, h_value - h_mortgage)
 
         # ── Net worth update ──────────────────────────────────────────────
         inv_rate = st.session_state.economic_params.investment_return
@@ -13114,6 +13312,8 @@ def calculate_lifetime_cashflow():
             'total_expenses': total_expenses,
             'cashflow': cashflow,
             'net_worth': cumulative_net_worth,
+            'house_equity': total_house_equity,
+            'liquid_net_worth': cumulative_net_worth - total_house_equity,
             'children_in_college': children_in_college,
             'events': events,
             'finance_mode': finance_mode,
@@ -13968,7 +14168,18 @@ def monte_carlo_simulation_tab():
                     # Parent X + Parent Y + Family expenses (with inflation)
                     parentX_total = sum(st.session_state.parentX_expenses.values()) * (1.03 ** years_from_now)
                     parentY_total = sum(st.session_state.parentY_expenses.values()) * (1.03 ** years_from_now)
-                    family_total = sum(st.session_state.family_shared_expenses.values()) * (1.03 ** years_from_now)
+                    # Check if living in owned house → skip rent
+                    mc_family = dict(st.session_state.family_shared_expenses)
+                    mc_lives_owned = False
+                    if 'houses' in st.session_state:
+                        for house in st.session_state.houses:
+                            status, _ = house.get_status_for_year(year)
+                            if status == "Own_Live":
+                                mc_lives_owned = True
+                                break
+                    if mc_lives_owned:
+                        mc_family['Mortgage/Rent'] = 0.0
+                    family_total = sum(mc_family.values()) * (1.03 ** years_from_now)
                     base_expenses = parentX_total + parentY_total + family_total
 
                     # Children expenses (same calculation as deterministic cashflow)
@@ -14038,7 +14249,8 @@ def monte_carlo_simulation_tab():
                         for house in st.session_state.houses:
                             status, _rental = house.get_status_for_year(year)
                             if status in ("Own_Live", "Own_Rent"):
-                                current_house_value = house.current_value * (1.03 ** years_from_now)
+                                mc_appr = 1 + getattr(house, 'appreciation_rate', 3.0) / 100
+                                current_house_value = house.current_value * (mc_appr ** years_from_now)
                                 house_expenses += current_house_value * house.property_tax_rate
                                 house_expenses += house.home_insurance * (1.03 ** years_from_now)
                                 house_expenses += current_house_value * house.maintenance_rate
@@ -16365,6 +16577,26 @@ def display_sidebar():
                             del st.session_state[key]
                     st.session_state.authenticated = False
                     st.rerun()
+
+        # Quick save button (always visible)
+        if st.session_state.get('authenticated') and st.session_state.get('household_id') and st.session_state.get('initialized'):
+            col_save, col_reset = st.columns(2)
+            with col_save:
+                if st.button("💾 Save", use_container_width=True, type="primary", key="sidebar_save"):
+                    try:
+                        json_data = save_data()
+                        if json_data:
+                            save_household_plan(st.session_state.household_id, json_data)
+                            st.success("Saved!", icon="✅")
+                    except Exception as e:
+                        st.error(f"Save failed: {e}")
+            with col_reset:
+                if st.button("↩ Reset", use_container_width=True, key="sidebar_reset",
+                             help="Reload last saved version"):
+                    plan_data = load_household_plan(st.session_state.household_id)
+                    if plan_data:
+                        load_data(plan_data)
+                        st.rerun()
 
         st.markdown("### Quick Summary")
 
