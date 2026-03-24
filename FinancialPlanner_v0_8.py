@@ -722,51 +722,87 @@ def household_picker_page(email: str):
                 except Exception:
                     pass
 
-            scenarios = {
+            # Quick test scenarios (override defaults)
+            st.markdown("**Quick Scenarios** (basic overrides, fast to load)")
+            quick_scenarios = {
                 "All Defaults": {},
                 "Young Couple, Seattle": {
                     'parent1_name': 'Alex', 'parent2_name': 'Sam', 'parentX_age': 28, 'parentY_age': 27,
                     'parentX_income': 95000.0, 'parentY_income': 80000.0, 'parentX_net_worth': 45000.0,
                     'parentY_net_worth': 30000.0, 'marriage_year': 2024,
                 },
-                "Mid-Career, 2 Kids, CA": {
-                    'parent1_name': 'Maria', 'parent2_name': 'David', 'parentX_age': 38, 'parentY_age': 40,
-                    'parentX_income': 150000.0, 'parentY_income': 120000.0, 'parentX_net_worth': 350000.0,
-                    'parentY_net_worth': 280000.0, 'marriage_year': 2015,
-                    'children_list': [
-                        {'name': 'Sofia', 'birth_year': 2019, 'use_template': True, 'template_state': 'Sacramento',
-                         'template_strategy': 'Average', 'school_type': 'Public', 'college_location': 'Sacramento'},
-                        {'name': 'Lucas', 'birth_year': 2022, 'use_template': True, 'template_state': 'Sacramento',
-                         'template_strategy': 'Average', 'school_type': 'Public', 'college_location': 'Sacramento'},
-                    ],
-                },
-                "High Earner, Single": {
-                    'parent1_name': 'Jordan', 'parent2_name': 'N/A', 'parentX_age': 35, 'parentY_age': 0,
-                    'parentX_income': 250000.0, 'parentY_income': 0.0, 'parentX_net_worth': 600000.0,
-                    'parentY_net_worth': 0.0, 'parentX_retirement_age': 55, 'marriage_year': 'N/A',
-                },
-                "Near Retirement": {
-                    'parent1_name': 'Robert', 'parent2_name': 'Linda', 'parentX_age': 58, 'parentY_age': 56,
-                    'parentX_income': 130000.0, 'parentY_income': 85000.0, 'parentX_net_worth': 1200000.0,
-                    'parentY_net_worth': 800000.0, 'parentX_retirement_age': 62, 'parentY_retirement_age': 63,
-                    'parentX_ss_benefit': 3200.0, 'parentY_ss_benefit': 2400.0, 'marriage_year': 1992,
-                },
                 "Tight Budget, TX": {
                     'parent1_name': 'Chris', 'parent2_name': 'Pat', 'parentX_age': 32, 'parentY_age': 30,
                     'parentX_income': 55000.0, 'parentY_income': 45000.0, 'parentX_net_worth': 15000.0,
                     'parentY_net_worth': 8000.0, 'marriage_year': 2023,
+                    'parentX_expenses': get_adult_expense_template("Houston", "Conservative (statistical)"),
+                    'parentY_expenses': get_adult_expense_template("Houston", "Conservative (statistical)"),
+                    'family_shared_expenses': {
+                        'Mortgage/Rent': 18000.0, 'Home Improvement': 500.0,
+                        'Property Tax': 0.0, 'Home Insurance': 0.0,
+                        'Gas & Electric': 1500.0, 'Water': 480.0, 'Garbage': 360.0,
+                        'Internet & Cable': 960.0, 'Shared Subscriptions': 360.0,
+                        'Family Vacations': 2000.0, 'Pet Care': 0.0, 'Other Family Expenses': 400.0,
+                    },
                     'children_list': [
                         {'name': 'Emma', 'birth_year': 2024, 'use_template': True, 'template_state': 'Houston',
                          'template_strategy': 'Average', 'school_type': 'Public', 'college_location': 'Houston'},
                     ],
                 },
             }
-
             cols = st.columns(3)
-            for idx, (name, overrides) in enumerate(scenarios.items()):
+            for idx, (name, overrides) in enumerate(quick_scenarios.items()):
                 with cols[idx % 3]:
                     if st.button(f"📋 {name}", use_container_width=True, key=f"test_scenario_{idx}"):
                         _load_test_scenario(name, overrides)
+                        st.rerun()
+
+            st.markdown("")
+            st.markdown("**Full Demo Scenarios** (detailed, with properties and career changes)")
+            st.caption("These load the same demos available in the scenario library. Edit them here and they persist for your test session.")
+
+            # Load demo scenario names from the init block
+            demo_names = [
+                ("Tech Couple SF→Austin", "[DEMO] Tech Couple: SF→Austin→Seattle, Early Retirement @50"),
+                ("3-Kid Family", "[DEMO] 3-Kid Family: Seattle→Portland→Denver"),
+                ("Executives NYC→Miami", "[DEMO] Executives: NYC→Miami→Portugal, Early Retire @55"),
+                ("Single Mom Teacher", "[DEMO] Single Mom: Sacramento→San Diego, Teacher→Principal"),
+                ("Empty Nesters @60", "[DEMO] Empty Nesters: Early Retire @60, Portland→Arizona→RV"),
+            ]
+
+            def _load_demo_scenario(demo_key):
+                """Load a demo scenario from saved_scenarios (populated by init)."""
+                cleanup_test_households(email)
+                test_hid = create_test_household(email)
+                keys_to_keep = {'cf_email'}
+                for key in list(st.session_state.keys()):
+                    if key not in keys_to_keep:
+                        del st.session_state[key]
+                st.session_state.authenticated = True
+                st.session_state.current_user = email
+                st.session_state.user_data = {'display_name': 'Test User', 'household_id': test_hid}
+                st.session_state.household_id = test_hid
+                st.session_state.test_mode = True
+                st.session_state.wizard_complete = True
+                st.session_state.wizard_skipped = True
+                initialize_session_state()
+                # Load the demo data
+                demo_data = st.session_state.saved_scenarios.get(demo_key)
+                if demo_data:
+                    data_str = json.dumps(demo_data) if isinstance(demo_data, dict) else demo_data
+                    load_data(data_str)
+                try:
+                    json_data = save_data()
+                    if json_data:
+                        save_household_plan(test_hid, json_data)
+                except Exception:
+                    pass
+
+            cols = st.columns(3)
+            for idx, (short_name, full_key) in enumerate(demo_names):
+                with cols[idx % 3]:
+                    if st.button(f"🎭 {short_name}", use_container_width=True, key=f"demo_scenario_{idx}"):
+                        _load_demo_scenario(full_key)
                         st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
@@ -5584,7 +5620,7 @@ def initialize_session_state():
 
         # Parent X data
         st.session_state.parentX_age = 30
-        st.session_state.parentX_net_worth = 0.0
+        st.session_state.parentX_net_worth = 50000.0
         st.session_state.parentX_income = 75000.0
         st.session_state.parentX_raise = 3.0
         st.session_state.parentX_retirement_age = 65
@@ -5607,7 +5643,7 @@ def initialize_session_state():
 
         # Parent Y data
         st.session_state.parentY_age = 30
-        st.session_state.parentY_net_worth = 0.0
+        st.session_state.parentY_net_worth = 40000.0
         st.session_state.parentY_income = 75000.0
         st.session_state.parentY_raise = 3.0
         st.session_state.parentY_retirement_age = 65
@@ -5649,20 +5685,20 @@ def initialize_session_state():
         # Family shared expenses (reduced to only truly shared items)
         st.session_state.family_shared_expenses = {
             # Housing
-            'Mortgage/Rent': 30000.0,  # $2,500/month
-            'Home Improvement': 3000.0,
-            'Property Tax': 6000.0,
-            'Home Insurance': 1500.0,
+            'Mortgage/Rent': 24000.0,  # $2,000/month
+            'Home Improvement': 1000.0,
+            'Property Tax': 0.0,  # Only applies if owning (set via House Portfolio)
+            'Home Insurance': 0.0,  # Only applies if owning (set via House Portfolio)
             # Utilities & Bills
-            'Gas & Electric': 2400.0,  # $200/month
-            'Water': 900.0,  # $75/month
-            'Garbage': 600.0,  # $50/month
-            'Internet & Cable': 1800.0,  # $150/month
+            'Gas & Electric': 1800.0,  # $150/month
+            'Water': 600.0,  # $50/month
+            'Garbage': 420.0,  # $35/month
+            'Internet & Cable': 1200.0,  # $100/month
             # Shared Lifestyle
-            'Shared Subscriptions': 600.0,  # Netflix, etc.
-            'Family Vacations': 8000.0,
+            'Shared Subscriptions': 480.0,  # Netflix, etc.
+            'Family Vacations': 4000.0,
             'Pet Care': 0.0,
-            'Other Family Expenses': 1200.0
+            'Other Family Expenses': 600.0
         }
 
         # Legacy expense categories (for backwards compatibility - DEPRECATED)
@@ -5743,44 +5779,7 @@ def initialize_session_state():
 
         # Major purchases and recurring expenses
         st.session_state.major_purchases = []
-        st.session_state.recurring_expenses = [
-            RecurringExpense(
-                name="Parent Retirement Help",
-                category="Family Support",
-                amount=20000.0,
-                frequency_years=1,
-                start_year=datetime.now().year,
-                end_year=None,
-                inflation_adjust=False,
-                parent="Both",
-                financing_years=0,
-                interest_rate=0.0
-            ),
-            RecurringExpense(
-                name="Parent X Vehicle",
-                category="Vehicle",
-                amount=35000.0,
-                frequency_years=10,
-                start_year=datetime.now().year,
-                end_year=None,
-                inflation_adjust=True,
-                parent="ParentX",
-                financing_years=5,
-                interest_rate=0.045
-            ),
-            RecurringExpense(
-                name="Parent Y Vehicle",
-                category="Vehicle",
-                amount=32000.0,
-                frequency_years=10,
-                start_year=datetime.now().year + 2,
-                end_year=None,
-                inflation_adjust=True,
-                parent="ParentY",
-                financing_years=5,
-                interest_rate=0.045
-            )
-        ]
+        st.session_state.recurring_expenses = []
 
         # Economic parameters — default to historical averages
         st.session_state.economic_params = EconomicParameters(
