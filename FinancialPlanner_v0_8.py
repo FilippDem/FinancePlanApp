@@ -871,19 +871,24 @@ LOCATION_HIERARCHY = {
         "has_states": True,
         "states": {
             "Washington": {"cities": ["Seattle"]},
-            "California": {"cities": ["Sacramento", "San Francisco", "Los Angeles"]},
+            "California": {"cities": ["Sacramento", "San Francisco", "Los Angeles", "San Diego"]},
             "Texas": {"cities": ["Houston"]},
             "New York": {"cities": ["New York"]},
             "Oregon": {"cities": ["Portland"]},
+            "Illinois": {"cities": ["Chicago"]},
+            "Florida": {"cities": ["Miami"]},
+            "District of Columbia": {"cities": ["Washington DC"]},
+            "Ohio": {"cities": ["Columbus"]},
+            "Hawaii": {"cities": ["Honolulu"]},
             "Alabama": {}, "Alaska": {}, "Arizona": {}, "Arkansas": {},
-            "Colorado": {}, "Connecticut": {}, "Delaware": {}, "Florida": {},
-            "Georgia": {}, "Hawaii": {}, "Idaho": {}, "Illinois": {},
+            "Colorado": {}, "Connecticut": {}, "Delaware": {},
+            "Georgia": {}, "Idaho": {},
             "Indiana": {}, "Iowa": {}, "Kansas": {}, "Kentucky": {},
             "Louisiana": {}, "Maine": {}, "Maryland": {}, "Massachusetts": {},
             "Michigan": {}, "Minnesota": {}, "Mississippi": {}, "Missouri": {},
             "Montana": {}, "Nebraska": {}, "Nevada": {}, "New Hampshire": {},
             "New Jersey": {}, "New Mexico": {}, "North Carolina": {},
-            "North Dakota": {}, "Ohio": {}, "Oklahoma": {}, "Pennsylvania": {},
+            "North Dakota": {}, "Oklahoma": {}, "Pennsylvania": {},
             "Rhode Island": {}, "South Carolina": {}, "South Dakota": {},
             "Tennessee": {}, "Utah": {}, "Vermont": {}, "Virginia": {},
             "West Virginia": {}, "Wisconsin": {}, "Wyoming": {},
@@ -921,6 +926,7 @@ LOCATION_HIERARCHY = {
 # Flat lists (backward compatibility — used by non-wizard tabs)
 AVAILABLE_LOCATIONS_ADULTS = [
     "Seattle", "Sacramento", "Houston", "New York", "San Francisco", "Los Angeles", "Portland",
+    "Chicago", "Miami", "Washington DC", "San Diego", "Columbus", "Honolulu",
     "Toronto", "Vancouver", "Paris", "Toulouse", "Berlin", "Munich",
     "Sydney", "Melbourne", "Brisbane", "Auckland", "Wellington"
 ]
@@ -930,6 +936,7 @@ AVAILABLE_LOCATIONS_CHILDREN = [
 ]
 AVAILABLE_LOCATIONS_FAMILY = [
     "Seattle", "Sacramento", "Houston", "New York", "San Francisco", "Los Angeles", "Portland",
+    "Chicago", "Miami", "Washington DC", "San Diego", "Columbus", "Honolulu",
     "Toronto", "Vancouver", "Paris", "Toulouse", "Berlin", "Munich",
     "Sydney", "Melbourne", "Brisbane"
 ]
@@ -1731,6 +1738,108 @@ ADULT_EXPENSE_TEMPLATES = {
             'Phone': 1140,
             'Other Personal': 2280
         }
+    },
+    "Chicago": {
+        "Conservative (statistical)": {
+            "Groceries": 3360, "Dining Out": 1680, "Coffee Shops": 420, "Auto Payment": 2520, "Gas & Fuel": 1260, "Auto Maintenance": 560, "Auto Insurance": 1540, "Parking & Tolls": 840,
+            "Public Transit": 840, "Ride Shares": 350, "Clothing": 700, "Personal Care": 350, "Grooming": 280, "Medical": 1120, "Dental": 280, "Vision": 140, "Fitness": 350,
+            "Mental Health": 420, "Entertainment": 840, "Hobbies": 420, "Subscriptions": 280, "Phone": 700, "Other Personal": 420
+        },
+        "Average (statistical)": {
+            "Groceries": 4800, "Dining Out": 2400, "Coffee Shops": 600, "Auto Payment": 3600, "Gas & Fuel": 1800, "Auto Maintenance": 800, "Auto Insurance": 2200, "Parking & Tolls": 1200,
+            "Public Transit": 1200, "Ride Shares": 500, "Clothing": 1000, "Personal Care": 500, "Grooming": 400, "Medical": 1600, "Dental": 400, "Vision": 200, "Fitness": 500,
+            "Mental Health": 600, "Entertainment": 1200, "Hobbies": 600, "Subscriptions": 400, "Phone": 1000, "Other Personal": 600
+        },
+        "High-end (statistical)": {
+            "Groceries": 7200, "Dining Out": 3600, "Coffee Shops": 900, "Auto Payment": 5400, "Gas & Fuel": 2700, "Auto Maintenance": 1200, "Auto Insurance": 3300, "Parking & Tolls": 1800,
+            "Public Transit": 1800, "Ride Shares": 750, "Clothing": 1500, "Personal Care": 750, "Grooming": 600, "Medical": 2400, "Dental": 600, "Vision": 300, "Fitness": 750,
+            "Mental Health": 900, "Entertainment": 1800, "Hobbies": 900, "Subscriptions": 600, "Phone": 1500, "Other Personal": 900
+        },
+    },
+    "Miami": {
+        "Conservative (statistical)": {
+            "Groceries": 3220, "Dining Out": 1960, "Coffee Shops": 490, "Auto Payment": 2660, "Gas & Fuel": 1330, "Auto Maintenance": 560, "Auto Insurance": 1680, "Parking & Tolls": 700,
+            "Public Transit": 420, "Ride Shares": 420, "Clothing": 770, "Personal Care": 385, "Grooming": 280, "Medical": 1050, "Dental": 280, "Vision": 140, "Fitness": 385,
+            "Mental Health": 350, "Entertainment": 1050, "Hobbies": 490, "Subscriptions": 280, "Phone": 700, "Other Personal": 420
+        },
+        "Average (statistical)": {
+            "Groceries": 4600, "Dining Out": 2800, "Coffee Shops": 700, "Auto Payment": 3800, "Gas & Fuel": 1900, "Auto Maintenance": 800, "Auto Insurance": 2400, "Parking & Tolls": 1000,
+            "Public Transit": 600, "Ride Shares": 600, "Clothing": 1100, "Personal Care": 550, "Grooming": 400, "Medical": 1500, "Dental": 400, "Vision": 200, "Fitness": 550,
+            "Mental Health": 500, "Entertainment": 1500, "Hobbies": 700, "Subscriptions": 400, "Phone": 1000, "Other Personal": 600
+        },
+        "High-end (statistical)": {
+            "Groceries": 6900, "Dining Out": 4200, "Coffee Shops": 1050, "Auto Payment": 5700, "Gas & Fuel": 2850, "Auto Maintenance": 1200, "Auto Insurance": 3600, "Parking & Tolls": 1500,
+            "Public Transit": 900, "Ride Shares": 900, "Clothing": 1650, "Personal Care": 825, "Grooming": 600, "Medical": 2250, "Dental": 600, "Vision": 300, "Fitness": 825,
+            "Mental Health": 750, "Entertainment": 2250, "Hobbies": 1050, "Subscriptions": 600, "Phone": 1500, "Other Personal": 900
+        },
+    },
+    "Washington DC": {
+        "Conservative (statistical)": {
+            "Groceries": 3640, "Dining Out": 2100, "Coffee Shops": 560, "Auto Payment": 2520, "Gas & Fuel": 1190, "Auto Maintenance": 560, "Auto Insurance": 1050, "Parking & Tolls": 1260,
+            "Public Transit": 1120, "Ride Shares": 490, "Clothing": 840, "Personal Care": 420, "Grooming": 350, "Medical": 1260, "Dental": 350, "Vision": 175, "Fitness": 490,
+            "Mental Health": 490, "Entertainment": 1050, "Hobbies": 560, "Subscriptions": 315, "Phone": 735, "Other Personal": 490
+        },
+        "Average (statistical)": {
+            "Groceries": 5200, "Dining Out": 3000, "Coffee Shops": 800, "Auto Payment": 3600, "Gas & Fuel": 1700, "Auto Maintenance": 800, "Auto Insurance": 1500, "Parking & Tolls": 1800,
+            "Public Transit": 1600, "Ride Shares": 700, "Clothing": 1200, "Personal Care": 600, "Grooming": 500, "Medical": 1800, "Dental": 500, "Vision": 250, "Fitness": 700,
+            "Mental Health": 700, "Entertainment": 1500, "Hobbies": 800, "Subscriptions": 450, "Phone": 1050, "Other Personal": 700
+        },
+        "High-end (statistical)": {
+            "Groceries": 7800, "Dining Out": 4500, "Coffee Shops": 1200, "Auto Payment": 5400, "Gas & Fuel": 2550, "Auto Maintenance": 1200, "Auto Insurance": 2250, "Parking & Tolls": 2700,
+            "Public Transit": 2400, "Ride Shares": 1050, "Clothing": 1800, "Personal Care": 900, "Grooming": 750, "Medical": 2700, "Dental": 750, "Vision": 375, "Fitness": 1050,
+            "Mental Health": 1050, "Entertainment": 2250, "Hobbies": 1200, "Subscriptions": 675, "Phone": 1575, "Other Personal": 1050
+        },
+    },
+    "San Diego": {
+        "Conservative (statistical)": {
+            "Groceries": 3500, "Dining Out": 1820, "Coffee Shops": 490, "Auto Payment": 2660, "Gas & Fuel": 1400, "Auto Maintenance": 560, "Auto Insurance": 1120, "Parking & Tolls": 700,
+            "Public Transit": 560, "Ride Shares": 385, "Clothing": 700, "Personal Care": 385, "Grooming": 315, "Medical": 1120, "Dental": 315, "Vision": 154, "Fitness": 420,
+            "Mental Health": 420, "Entertainment": 910, "Hobbies": 490, "Subscriptions": 280, "Phone": 735, "Other Personal": 420
+        },
+        "Average (statistical)": {
+            "Groceries": 5000, "Dining Out": 2600, "Coffee Shops": 700, "Auto Payment": 3800, "Gas & Fuel": 2000, "Auto Maintenance": 800, "Auto Insurance": 1600, "Parking & Tolls": 1000,
+            "Public Transit": 800, "Ride Shares": 550, "Clothing": 1000, "Personal Care": 550, "Grooming": 450, "Medical": 1600, "Dental": 450, "Vision": 220, "Fitness": 600,
+            "Mental Health": 600, "Entertainment": 1300, "Hobbies": 700, "Subscriptions": 400, "Phone": 1050, "Other Personal": 600
+        },
+        "High-end (statistical)": {
+            "Groceries": 7500, "Dining Out": 3900, "Coffee Shops": 1050, "Auto Payment": 5700, "Gas & Fuel": 3000, "Auto Maintenance": 1200, "Auto Insurance": 2400, "Parking & Tolls": 1500,
+            "Public Transit": 1200, "Ride Shares": 825, "Clothing": 1500, "Personal Care": 825, "Grooming": 675, "Medical": 2400, "Dental": 675, "Vision": 330, "Fitness": 900,
+            "Mental Health": 900, "Entertainment": 1950, "Hobbies": 1050, "Subscriptions": 600, "Phone": 1575, "Other Personal": 900
+        },
+    },
+    "Columbus": {
+        "Conservative (statistical)": {
+            "Groceries": 2800, "Dining Out": 1260, "Coffee Shops": 315, "Auto Payment": 2240, "Gas & Fuel": 1050, "Auto Maintenance": 490, "Auto Insurance": 770, "Parking & Tolls": 350,
+            "Public Transit": 280, "Ride Shares": 245, "Clothing": 560, "Personal Care": 280, "Grooming": 210, "Medical": 840, "Dental": 245, "Vision": 119, "Fitness": 280,
+            "Mental Health": 315, "Entertainment": 630, "Hobbies": 350, "Subscriptions": 245, "Phone": 630, "Other Personal": 350
+        },
+        "Average (statistical)": {
+            "Groceries": 4000, "Dining Out": 1800, "Coffee Shops": 450, "Auto Payment": 3200, "Gas & Fuel": 1500, "Auto Maintenance": 700, "Auto Insurance": 1100, "Parking & Tolls": 500,
+            "Public Transit": 400, "Ride Shares": 350, "Clothing": 800, "Personal Care": 400, "Grooming": 300, "Medical": 1200, "Dental": 350, "Vision": 170, "Fitness": 400,
+            "Mental Health": 450, "Entertainment": 900, "Hobbies": 500, "Subscriptions": 350, "Phone": 900, "Other Personal": 500
+        },
+        "High-end (statistical)": {
+            "Groceries": 6000, "Dining Out": 2700, "Coffee Shops": 675, "Auto Payment": 4800, "Gas & Fuel": 2250, "Auto Maintenance": 1050, "Auto Insurance": 1650, "Parking & Tolls": 750,
+            "Public Transit": 600, "Ride Shares": 525, "Clothing": 1200, "Personal Care": 600, "Grooming": 450, "Medical": 1800, "Dental": 525, "Vision": 255, "Fitness": 600,
+            "Mental Health": 675, "Entertainment": 1350, "Hobbies": 750, "Subscriptions": 525, "Phone": 1350, "Other Personal": 750
+        },
+    },
+    "Honolulu": {
+        "Conservative (statistical)": {
+            "Groceries": 4900, "Dining Out": 2100, "Coffee Shops": 560, "Auto Payment": 2660, "Gas & Fuel": 1750, "Auto Maintenance": 630, "Auto Insurance": 980, "Parking & Tolls": 840,
+            "Public Transit": 420, "Ride Shares": 420, "Clothing": 700, "Personal Care": 385, "Grooming": 315, "Medical": 1190, "Dental": 315, "Vision": 154, "Fitness": 455,
+            "Mental Health": 420, "Entertainment": 980, "Hobbies": 560, "Subscriptions": 280, "Phone": 770, "Other Personal": 490
+        },
+        "Average (statistical)": {
+            "Groceries": 7000, "Dining Out": 3000, "Coffee Shops": 800, "Auto Payment": 3800, "Gas & Fuel": 2500, "Auto Maintenance": 900, "Auto Insurance": 1400, "Parking & Tolls": 1200,
+            "Public Transit": 600, "Ride Shares": 600, "Clothing": 1000, "Personal Care": 550, "Grooming": 450, "Medical": 1700, "Dental": 450, "Vision": 220, "Fitness": 650,
+            "Mental Health": 600, "Entertainment": 1400, "Hobbies": 800, "Subscriptions": 400, "Phone": 1100, "Other Personal": 700
+        },
+        "High-end (statistical)": {
+            "Groceries": 10500, "Dining Out": 4500, "Coffee Shops": 1200, "Auto Payment": 5700, "Gas & Fuel": 3750, "Auto Maintenance": 1350, "Auto Insurance": 2100, "Parking & Tolls": 1800,
+            "Public Transit": 900, "Ride Shares": 900, "Clothing": 1500, "Personal Care": 825, "Grooming": 675, "Medical": 2550, "Dental": 675, "Vision": 330, "Fitness": 975,
+            "Mental Health": 900, "Entertainment": 2100, "Hobbies": 1200, "Subscriptions": 600, "Phone": 1650, "Other Personal": 1050
+        },
     },
     "Toronto": {
         "Conservative (statistical)": {
