@@ -756,6 +756,7 @@ def household_picker_page(email: str):
 
     if real_households:
         st.subheader("Your Households")
+        st.caption("You can create multiple plans — e.g., one shared with your partner and one just for you.")
         for h in real_households:
             member_count = len(h['members'])
             member_label = f"{member_count} member{'s' if member_count > 1 else ''}"
@@ -782,51 +783,50 @@ def household_picker_page(email: str):
     create_tab, join_tab = st.tabs(["Create New Household", "Join Existing Household"])
 
     with create_tab:
-        with st.form("create_household_form"):
-            household_name = st.text_input("Household Name", placeholder="e.g., The Smith Family")
+        household_name = st.text_input("Household Name", placeholder="e.g., The Smith Family", key="create_hh_name")
 
-            st.markdown("**Data Security**")
-            security_choice = st.radio(
-                "Choose how your data is stored:",
-                ["Standard", "Encrypted"],
-                index=0,
-                horizontal=True,
-                help="You can't change this after creation.",
-            )
-            if security_choice == "Standard":
-                st.caption("Same as Google Docs — your data is stored on the server, protected by your login. "
-                           "Seamless access with no extra steps. The server admin has theoretical access to stored data.")
+        st.markdown("**Data Security**")
+        security_choice = st.radio(
+            "Choose how your data is stored:",
+            ["Standard", "Encrypted"],
+            index=0,
+            horizontal=True,
+            key="create_hh_security",
+            help="You can't change this after creation.",
+        )
+        if security_choice == "Standard":
+            st.caption("Same as Google Docs — your data is stored on the server, protected by your login. "
+                       "Seamless access with no extra steps. The server admin has theoretical access to stored data.")
+        else:
+            st.caption("Files on the server are encrypted with your passphrase (AES-256). "
+                       "You'll enter it once per session. Protects data at rest, but not during active sessions. "
+                       "**If you forget it, your data is permanently unrecoverable.**")
+
+        passphrase_field = ""
+        passphrase_confirm = ""
+        if security_choice == "Encrypted":
+            passphrase_field = st.text_input("Set a passphrase", type="password",
+                placeholder="Choose a strong passphrase", key="create_hh_pass")
+            passphrase_confirm = st.text_input("Confirm passphrase", type="password",
+                placeholder="Enter it again", key="create_hh_pass_confirm")
+
+        if st.button("Create Household", type="primary", use_container_width=True, key="create_hh_submit"):
+            if not household_name.strip():
+                st.error("Please enter a household name")
+            elif security_choice == "Encrypted" and not passphrase_field:
+                st.error("Please set a passphrase for your encrypted household.")
+            elif security_choice == "Encrypted" and passphrase_field != passphrase_confirm:
+                st.error("Passphrases don't match.")
             else:
-                st.caption("Files on the server are encrypted with your passphrase (AES-256). "
-                           "You'll enter it once per session. Protects data at rest, but not during active sessions. "
-                           "**If you forget it, your data is permanently unrecoverable.**")
-
-            passphrase_field = ""
-            passphrase_confirm = ""
-            if security_choice == "Encrypted":
-                passphrase_field = st.text_input("Set a passphrase", type="password",
-                    placeholder="Choose a strong passphrase")
-                passphrase_confirm = st.text_input("Confirm passphrase", type="password",
-                    placeholder="Enter it again")
-
-            submitted = st.form_submit_button("Create Household", type="primary")
-            if submitted:
-                if not household_name.strip():
-                    st.error("Please enter a household name")
-                elif security_choice == "Encrypted" and not passphrase_field:
-                    st.error("Please set a passphrase for your encrypted household.")
-                elif security_choice == "Encrypted" and passphrase_field != passphrase_confirm:
-                    st.error("Passphrases don't match.")
-                else:
-                    is_enc = security_choice == "Encrypted"
-                    hid = create_household(household_name.strip(), email, encrypted=is_enc)
-                    st.session_state.authenticated = True
-                    st.session_state.current_user = email
-                    st.session_state.user_data = {'display_name': email.split('@')[0], 'household_id': hid}
-                    st.session_state.household_id = hid
-                    if is_enc:
-                        st.session_state._household_passphrase = passphrase_field
-                    st.rerun()
+                is_enc = security_choice == "Encrypted"
+                hid = create_household(household_name.strip(), email, encrypted=is_enc)
+                st.session_state.authenticated = True
+                st.session_state.current_user = email
+                st.session_state.user_data = {'display_name': email.split('@')[0], 'household_id': hid}
+                st.session_state.household_id = hid
+                if is_enc:
+                    st.session_state._household_passphrase = passphrase_field
+                st.rerun()
 
     with join_tab:
         with st.form("join_household_form"):
@@ -923,6 +923,9 @@ def household_picker_page(email: str):
                     'parent1_name': 'Alex', 'parent2_name': 'Sam', 'parentX_age': 28, 'parentY_age': 27,
                     'parentX_income': 95000.0, 'parentY_income': 80000.0, 'parentX_net_worth': 45000.0,
                     'parentY_net_worth': 30000.0, 'marriage_year': 2024,
+                    'parentX_expenses': get_adult_expense_template("Seattle", "Conservative (statistical)"),
+                    'parentY_expenses': get_adult_expense_template("Seattle", "Conservative (statistical)"),
+                    'pretax_401k': 12000.0,  # Lower 401k for young couple
                 },
                 "Mid-Career + 2 Kids, Seattle": {
                     'parent1_name': 'Maria', 'parent2_name': 'David', 'parentX_age': 38, 'parentY_age': 40,
@@ -939,6 +942,7 @@ def household_picker_page(email: str):
                     'parent1_name': 'Jordan', 'parent2_name': 'N/A', 'parentX_age': 35, 'parentY_age': 0,
                     'parentX_income': 250000.0, 'parentY_income': 0.0, 'parentX_net_worth': 600000.0,
                     'parentY_net_worth': 0.0, 'parentX_retirement_age': 55, 'marriage_year': 'N/A',
+                    'parentY_expenses': {cat: 0 for cat in get_adult_expense_template("Seattle", "Average (statistical)").keys()},
                 },
                 "Near Retirement, Seattle": {
                     'parent1_name': 'Robert', 'parent2_name': 'Linda', 'parentX_age': 58, 'parentY_age': 56,
@@ -16790,6 +16794,28 @@ def display_sidebar():
                     if plan_data:
                         load_data(plan_data)
                         st.rerun()
+
+            if st.button("🏠 Switch Household", use_container_width=True, key="sidebar_switch_household"):
+                # Auto-save before switching
+                try:
+                    json_data = save_data()
+                    if json_data:
+                        save_household_plan(st.session_state.household_id, json_data)
+                except Exception:
+                    pass
+                # Clear session but keep auth
+                keep = {'cf_email', 'current_user'}
+                cf_email = st.session_state.get('cf_email')
+                current_user = st.session_state.get('current_user')
+                for key in list(st.session_state.keys()):
+                    if key not in keep:
+                        del st.session_state[key]
+                if cf_email:
+                    st.session_state.cf_email = cf_email
+                if current_user:
+                    st.session_state.current_user = current_user
+                st.session_state.authenticated = False
+                st.rerun()
 
         st.markdown("### Quick Summary")
 
