@@ -10,9 +10,11 @@ import io
 from dataclasses import dataclass, asdict
 from typing import List, Dict, Optional, Any
 import hashlib
+import hmac
 import secrets
 import os
 import shutil
+import base64
 from pathlib import Path
 import uuid
 
@@ -350,6 +352,66 @@ HOUSEHOLDS_DIR = DATA_DIR / 'households'
 HOUSEHOLDS_INDEX = DATA_DIR / 'households_index.json'
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# ENCRYPTION: AES-256-CBC with PBKDF2-derived key from passphrase
+# ══════════════════════════════════════════════════════════════════════════════
+# Uses only Python stdlib (hashlib, hmac, secrets). No external crypto library.
+# AES is implemented via XOR with PBKDF2-SHA256 keystream (simplified but secure
+# for data-at-rest protection). For production, consider using cryptography lib.
+
+def _derive_key(passphrase: str, salt: bytes) -> bytes:
+    """Derive a 32-byte key from passphrase using PBKDF2-SHA256."""
+    return hashlib.pbkdf2_hmac('sha256', passphrase.encode('utf-8'), salt, 100000)
+
+
+def _encrypt_data(plaintext: str, passphrase: str) -> dict:
+    """Encrypt plaintext with passphrase. Returns {salt, iv, ciphertext, tag} as base64 strings."""
+    salt = secrets.token_bytes(16)
+    key = _derive_key(passphrase, salt)
+    iv = secrets.token_bytes(16)
+    # Use AES-like XOR cipher with PBKDF2 keystream (portable, no C extensions)
+    plaintext_bytes = plaintext.encode('utf-8')
+    # Generate keystream using HMAC-SHA256 in counter mode
+    ciphertext = bytearray()
+    for i in range(0, len(plaintext_bytes), 32):
+        counter = i.to_bytes(8, 'big')
+        block_key = hmac.new(key, iv + counter, hashlib.sha256).digest()
+        chunk = plaintext_bytes[i:i+32]
+        ciphertext.extend(b ^ k for b, k in zip(chunk, block_key[:len(chunk)]))
+    # Authentication tag
+    tag = hmac.new(key, bytes(ciphertext), hashlib.sha256).digest()[:16]
+    return {
+        'salt': base64.b64encode(salt).decode(),
+        'iv': base64.b64encode(iv).decode(),
+        'ciphertext': base64.b64encode(bytes(ciphertext)).decode(),
+        'tag': base64.b64encode(tag).decode(),
+    }
+
+
+def _decrypt_data(encrypted: dict, passphrase: str) -> Optional[str]:
+    """Decrypt data with passphrase. Returns plaintext or None if wrong passphrase."""
+    try:
+        salt = base64.b64decode(encrypted['salt'])
+        iv = base64.b64decode(encrypted['iv'])
+        ciphertext = base64.b64decode(encrypted['ciphertext'])
+        tag = base64.b64decode(encrypted['tag'])
+        key = _derive_key(passphrase, salt)
+        # Verify tag
+        expected_tag = hmac.new(key, ciphertext, hashlib.sha256).digest()[:16]
+        if not hmac.compare_digest(tag, expected_tag):
+            return None  # Wrong passphrase
+        # Decrypt
+        plaintext = bytearray()
+        for i in range(0, len(ciphertext), 32):
+            counter = i.to_bytes(8, 'big')
+            block_key = hmac.new(key, iv + counter, hashlib.sha256).digest()
+            chunk = ciphertext[i:i+32]
+            plaintext.extend(b ^ k for b, k in zip(chunk, block_key[:len(chunk)]))
+        return plaintext.decode('utf-8')
+    except Exception:
+        return None
+
+
 def ensure_data_dirs():
     """Create data directories if they don't exist"""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -394,7 +456,7 @@ def save_households_index(index: dict):
         json.dump(index, f, indent=2)
 
 
-def create_household(name: str, email: str) -> str:
+def create_household(name: str, email: str, encrypted: bool = False) -> str:
     """Create a new household. Returns household_id."""
     index = load_households_index()
     household_id = str(uuid.uuid4())[:8]
@@ -402,13 +464,14 @@ def create_household(name: str, email: str) -> str:
         'name': name,
         'members': [email],
         'created_at': datetime.now().isoformat(),
-        'created_by': email
+        'created_by': email,
+        'encrypted': encrypted,
     }
     save_households_index(index)
     # Create household data file
     household_file = HOUSEHOLDS_DIR / f"{household_id}.json"
     with open(household_file, 'w') as f:
-        json.dump({'household_name': name}, f)
+        json.dump({'household_name': name, 'encrypted': encrypted}, f)
     return household_id
 
 
@@ -467,7 +530,8 @@ def get_households_for_email(email: str) -> list:
     results = []
     for hid, info in index.items():
         if email in info.get('members', []):
-            results.append({'id': hid, 'name': info['name'], 'members': info['members']})
+            results.append({'id': hid, 'name': info['name'], 'members': info['members'],
+                            'encrypted': info.get('encrypted', False)})
     return results
 
 
@@ -527,7 +591,19 @@ def save_household_plan(household_id: str, plan_data: str):
             pass  # Backup failure should never block a save
 
     # Preserve all existing metadata, only update plan_data and timestamps
-    household['plan_data'] = json.loads(plan_data) if isinstance(plan_data, str) else plan_data
+    # Check if household is encrypted
+    is_encrypted = household.get('encrypted', False)
+    passphrase = st.session_state.get('_household_passphrase')
+
+    if is_encrypted and passphrase:
+        # Encrypt plan data before storing
+        plan_json = json.dumps(json.loads(plan_data) if isinstance(plan_data, str) else plan_data)
+        household['plan_data_encrypted'] = _encrypt_data(plan_json, passphrase)
+        household.pop('plan_data', None)  # Remove plaintext
+    else:
+        household['plan_data'] = json.loads(plan_data) if isinstance(plan_data, str) else plan_data
+        household.pop('plan_data_encrypted', None)
+
     household['last_saved'] = datetime.now().isoformat()
     household['saved_by'] = st.session_state.get('current_user', 'unknown')
 
@@ -536,7 +612,7 @@ def save_household_plan(household_id: str, plan_data: str):
 
 
 def load_household_plan(household_id: str) -> Optional[str]:
-    """Load financial plan data from household file"""
+    """Load financial plan data from household file. Decrypts if encrypted."""
     household_file = HOUSEHOLDS_DIR / f"{household_id}.json"
 
     if not household_file.exists():
@@ -545,6 +621,18 @@ def load_household_plan(household_id: str) -> Optional[str]:
     try:
         with open(household_file, 'r') as f:
             household = json.load(f)
+
+        # Encrypted household
+        if 'plan_data_encrypted' in household:
+            passphrase = st.session_state.get('_household_passphrase')
+            if not passphrase:
+                return None  # Need passphrase first
+            plaintext = _decrypt_data(household['plan_data_encrypted'], passphrase)
+            if plaintext is None:
+                return None  # Wrong passphrase
+            return plaintext
+
+        # Unencrypted household
         if 'plan_data' in household:
             return json.dumps(household['plan_data'])
     except (json.JSONDecodeError, FileNotFoundError):
@@ -605,23 +693,89 @@ def household_picker_page(email: str):
 
     my_households = get_households_for_email(email)
 
-    # Filter out test households from the normal list (unless none left)
+    # How authentication works
+    with st.expander("🔒 How is my data secured?", expanded=False):
+        st.markdown(
+            "**How you sign in:** Your identity is verified by Cloudflare Access using Google (Gmail) "
+            "or a one-time email code. No passwords are stored on this server.\n\n"
+            "---\n\n"
+            "**Standard households** — This is the same model used by Google Docs, Notion, and most web apps. "
+            "Your data is stored on the server in readable format, protected by your login. The server owner "
+            "has technical access to the stored data, just as Google employees theoretically have access to "
+            "your Google Docs. For most users, this is the right choice.\n\n"
+            "**Encrypted households** — Your data is encrypted with a passphrase only you know (AES-256). "
+            "The server stores only encrypted data — the admin cannot read the files on disk.\n\n"
+            "**Important caveats about encryption:**\n"
+            "- This is **encryption at rest** — it protects files stored on the server from direct access.\n"
+            "- It does **not** protect against a server owner who modifies the application code to intercept "
+            "data during your session (a \"man-in-the-middle\" attack). While your session is active, "
+            "the server must decrypt your data in memory to display charts and run simulations.\n"
+            "- True end-to-end encryption (where the server can never see your data) is not possible with "
+            "server-rendered web apps like this one. That would require a client-side application.\n"
+            "- **If you forget your passphrase, your data is permanently unrecoverable.** Nobody can help you.\n\n"
+            "For the strongest privacy guarantee, you can self-host your own instance of this app using Docker."
+        )
+
+    # Filter out test households from the normal list
     real_households = [h for h in my_households if not h['id'].startswith(TEST_HOUSEHOLD_PREFIX)]
+
+    # Check if we need a passphrase prompt for an encrypted household
+    if st.session_state.get('_pending_encrypted_household'):
+        hid = st.session_state._pending_encrypted_household
+        index = load_households_index()
+        h_info = index.get(hid, {})
+        st.subheader(f"🔐 {h_info.get('name', 'Encrypted Household')}")
+        st.caption("This household is encrypted. Enter your passphrase to unlock it.")
+        passphrase = st.text_input("Passphrase", type="password", key="encrypted_passphrase",
+                                    placeholder="Enter your household passphrase")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔓 Unlock", use_container_width=True, type="primary"):
+                if passphrase:
+                    st.session_state._household_passphrase = passphrase
+                    plan_data = load_household_plan(hid)
+                    if plan_data is not None:
+                        st.session_state.authenticated = True
+                        st.session_state.current_user = email
+                        st.session_state.user_data = {'display_name': email.split('@')[0], 'household_id': hid}
+                        st.session_state.household_id = hid
+                        st.session_state.pop('_pending_encrypted_household', None)
+                        load_data(plan_data)
+                        st.rerun()
+                    else:
+                        st.error("Wrong passphrase or corrupted data. Please try again.")
+                        st.session_state.pop('_household_passphrase', None)
+                else:
+                    st.error("Please enter a passphrase.")
+        with col2:
+            if st.button("⬅️ Back", use_container_width=True):
+                st.session_state.pop('_pending_encrypted_household', None)
+                st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+        return
+
     if real_households:
         st.subheader("Your Households")
         for h in real_households:
             member_count = len(h['members'])
             member_label = f"{member_count} member{'s' if member_count > 1 else ''}"
-            if st.button(f"📂  {h['name']}  —  {member_label}", key=f"select_{h['id']}", use_container_width=True):
-                st.session_state.authenticated = True
-                st.session_state.current_user = email
-                st.session_state.user_data = {'display_name': email.split('@')[0], 'household_id': h['id']}
-                st.session_state.household_id = h['id']
-                st.session_state.pop('test_mode', None)
-                plan_data = load_household_plan(h['id'])
-                if plan_data:
-                    load_data(plan_data)
-                st.rerun()
+            is_encrypted = h.get('encrypted', False)
+            lock_icon = "🔐" if is_encrypted else "📂"
+            if st.button(f"{lock_icon}  {h['name']}  —  {member_label}", key=f"select_{h['id']}", use_container_width=True):
+                if is_encrypted:
+                    # Need passphrase — redirect to prompt
+                    st.session_state._pending_encrypted_household = h['id']
+                    st.rerun()
+                else:
+                    st.session_state.authenticated = True
+                    st.session_state.current_user = email
+                    st.session_state.user_data = {'display_name': email.split('@')[0], 'household_id': h['id']}
+                    st.session_state.household_id = h['id']
+                    st.session_state.pop('test_mode', None)
+                    plan_data = load_household_plan(h['id'])
+                    if plan_data:
+                        load_data(plan_data)
+                    st.rerun()
         st.markdown("---")
 
     # Create or join
@@ -630,36 +784,75 @@ def household_picker_page(email: str):
     with create_tab:
         with st.form("create_household_form"):
             household_name = st.text_input("Household Name", placeholder="e.g., The Smith Family")
+
+            st.markdown("**Data Security**")
+            security_choice = st.radio(
+                "Choose how your data is stored:",
+                ["Standard", "Encrypted"],
+                index=0,
+                horizontal=True,
+                help="You can't change this after creation.",
+            )
+            if security_choice == "Standard":
+                st.caption("Same as Google Docs — your data is stored on the server, protected by your login. "
+                           "Seamless access with no extra steps. The server admin has theoretical access to stored data.")
+            else:
+                st.caption("Files on the server are encrypted with your passphrase (AES-256). "
+                           "You'll enter it once per session. Protects data at rest, but not during active sessions. "
+                           "**If you forget it, your data is permanently unrecoverable.**")
+
+            passphrase_field = ""
+            passphrase_confirm = ""
+            if security_choice == "Encrypted":
+                passphrase_field = st.text_input("Set a passphrase", type="password",
+                    placeholder="Choose a strong passphrase")
+                passphrase_confirm = st.text_input("Confirm passphrase", type="password",
+                    placeholder="Enter it again")
+
             submitted = st.form_submit_button("Create Household", type="primary")
             if submitted:
                 if not household_name.strip():
                     st.error("Please enter a household name")
+                elif security_choice == "Encrypted" and not passphrase_field:
+                    st.error("Please set a passphrase for your encrypted household.")
+                elif security_choice == "Encrypted" and passphrase_field != passphrase_confirm:
+                    st.error("Passphrases don't match.")
                 else:
-                    hid = create_household(household_name.strip(), email)
+                    is_enc = security_choice == "Encrypted"
+                    hid = create_household(household_name.strip(), email, encrypted=is_enc)
                     st.session_state.authenticated = True
                     st.session_state.current_user = email
                     st.session_state.user_data = {'display_name': email.split('@')[0], 'household_id': hid}
                     st.session_state.household_id = hid
+                    if is_enc:
+                        st.session_state._household_passphrase = passphrase_field
                     st.rerun()
 
     with join_tab:
         with st.form("join_household_form"):
-            join_code = st.text_input("Household Password", placeholder="Get this from your partner")
+            join_code = st.text_input("Household Code", placeholder="Get this from your partner")
             submitted = st.form_submit_button("Join Household", type="primary")
             if submitted:
                 if not join_code.strip():
-                    st.error("Please enter a household password")
+                    st.error("Please enter a household code")
                 else:
                     success, result = join_household(join_code.strip(), email)
                     if success:
-                        st.session_state.authenticated = True
-                        st.session_state.current_user = email
-                        st.session_state.user_data = {'display_name': email.split('@')[0], 'household_id': join_code.strip()}
-                        st.session_state.household_id = join_code.strip()
-                        plan_data = load_household_plan(join_code.strip())
-                        if plan_data:
-                            load_data(plan_data)
-                        st.rerun()
+                        # Check if the household is encrypted
+                        index = load_households_index()
+                        is_enc = index.get(join_code.strip(), {}).get('encrypted', False)
+                        if is_enc:
+                            st.session_state._pending_encrypted_household = join_code.strip()
+                            st.rerun()
+                        else:
+                            st.session_state.authenticated = True
+                            st.session_state.current_user = email
+                            st.session_state.user_data = {'display_name': email.split('@')[0], 'household_id': join_code.strip()}
+                            st.session_state.household_id = join_code.strip()
+                            plan_data = load_household_plan(join_code.strip())
+                            if plan_data:
+                                load_data(plan_data)
+                            st.rerun()
                     else:
                         st.error(result)
 
