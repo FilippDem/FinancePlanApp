@@ -7718,26 +7718,8 @@ def initialize_session_state():
         })
 
         # Children instances
-        st.session_state.children_list = [
-            {
-                'name': 'Child 1',
-                'birth_year': 2028,
-                'use_template': True,
-                'template_state': 'Seattle',
-                'template_strategy': 'Average',
-                'school_type': 'Public',
-                'college_location': 'Seattle'
-            },
-            {
-                'name': 'Child 2',
-                'birth_year': 2030,
-                'use_template': True,
-                'template_state': 'Seattle',
-                'template_strategy': 'Average',
-                'school_type': 'Public',
-                'college_location': 'Seattle'
-            }
-        ]
+        # No default children — added via wizard or Children tab
+        st.session_state.children_list = []
         st.session_state.children_today_dollars = True
 
         # Major purchases and recurring expenses
