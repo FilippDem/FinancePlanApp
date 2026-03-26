@@ -7263,8 +7263,8 @@ def _wizard_apply_phase2():
             mortgage_years_left=wd.get('mortgage_years_left', 28),
             property_tax_rate=wd.get('property_tax', 6000) / max(wd.get('home_value', 500000), 1),
             home_insurance=2000,
-            maintenance_rate=1.0,
-            upkeep_costs=0,
+            maintenance_rate=0.01,
+            upkeep_costs=2000,
             owner="Shared",
             timeline=[HouseTimelineEntry(datetime.now().year, "Own_Live", 0.0)]
         )]
@@ -7674,24 +7674,8 @@ def initialize_session_state():
             use_historical_healthcare_inflation=True
         )
 
-        # Houses
-        st.session_state.houses = [
-            House(
-                name="Primary Home",
-                purchase_year=2020,
-                purchase_price=600000.0,
-                current_value=650000.0,
-                mortgage_balance=500000.0,
-                mortgage_rate=0.067,
-                mortgage_years_left=28,
-                property_tax_rate=0.0092,
-                home_insurance=1800.0,
-                maintenance_rate=0.015,
-                upkeep_costs=3000.0,
-                owner="Shared",
-                timeline=[HouseTimelineEntry(2020, "Own_Live", 0.0)]
-            )
-        ]
+        # Houses — empty by default; added via wizard or House tab
+        st.session_state.houses = []
 
         # Tax settings
         st.session_state.state_tax_rate = 0.0
@@ -15387,6 +15371,25 @@ def load_data(json_data):
                 st.session_state[key] = [CareerPhase(**cp) for cp in value]
             else:
                 st.session_state[key] = value
+
+        # ── Post-load migration / sanity fixes ──────────────────────────
+        # Zero out Parent Y expenses if single parent
+        p2_name = st.session_state.get('parent2_name', '')
+        p2_income = st.session_state.get('parentY_income', 0)
+        is_single = p2_name in ('N/A', '', 'Parent 2') and p2_income == 0
+        if (is_single and hasattr(st.session_state, 'parentY_expenses')
+                and sum(st.session_state.parentY_expenses.values()) > 0):
+            st.session_state.parentY_expenses = {k: 0 for k in st.session_state.parentY_expenses}
+
+        # For single-income households under $100k, use Conservative expenses if still at Average defaults
+        p1_income = st.session_state.get('parentX_income', 0)
+        if is_single and p1_income < 100000 and hasattr(st.session_state, 'parentX_expenses'):
+            avg_template = get_adult_expense_template("Seattle", "Average (statistical)")
+            current_total = sum(st.session_state.parentX_expenses.values())
+            avg_total = sum(avg_template.values())
+            if abs(current_total - avg_total) < 1000:  # Still at defaults
+                st.session_state.parentX_expenses = get_adult_expense_template("Seattle", "Conservative (statistical)")
+
         return True
     except Exception as e:
         st.error(f"Error loading data: {str(e)}")
