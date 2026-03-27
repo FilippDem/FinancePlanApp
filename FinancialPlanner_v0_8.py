@@ -679,6 +679,54 @@ def load_household_scenarios(household_id: str) -> dict:
         return {}
 
 
+def save_household_actuals(household_id: str, actuals: dict):
+    """Save actuals tracking data to household file.
+    ⚠️  DATA PRESERVATION: Loads existing file first, only updates 'actuals' key.
+    Encrypts if household is encrypted.
+    """
+    ensure_data_dirs()
+    household_file = HOUSEHOLDS_DIR / f"{household_id}.json"
+    try:
+        with open(household_file, 'r') as f:
+            household = json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        household = {}
+
+    is_encrypted = household.get('encrypted', False)
+    passphrase = st.session_state.get('_household_passphrase')
+
+    if is_encrypted and passphrase:
+        actuals_json = json.dumps(actuals)
+        household['actuals_encrypted'] = _encrypt_data(actuals_json, passphrase)
+        household.pop('actuals', None)
+    else:
+        household['actuals'] = actuals
+        household.pop('actuals_encrypted', None)
+
+    with open(household_file, 'w') as f:
+        json.dump(household, f, indent=2)
+
+
+def load_household_actuals(household_id: str) -> dict:
+    """Load actuals tracking data from household file. Decrypts if needed."""
+    household_file = HOUSEHOLDS_DIR / f"{household_id}.json"
+    try:
+        with open(household_file, 'r') as f:
+            household = json.load(f)
+
+        if 'actuals_encrypted' in household:
+            passphrase = st.session_state.get('_household_passphrase')
+            if passphrase:
+                plaintext = _decrypt_data(household['actuals_encrypted'], passphrase)
+                if plaintext:
+                    return json.loads(plaintext)
+            return {}
+
+        return household.get('actuals', {})
+    except (json.JSONDecodeError, FileNotFoundError):
+        return {}
+
+
 def household_picker_page(email: str):
     """Display household selection/creation page"""
     st.markdown("<div class='login-container'>", unsafe_allow_html=True)
@@ -9458,6 +9506,10 @@ def main():
         if plan_data:
             load_data(plan_data)
             st.session_state._session_restored = True
+        # Load actuals data
+        st.session_state.actuals_data = load_household_actuals(st.session_state.household_id)
+    if 'actuals_data' not in st.session_state:
+        st.session_state.actuals_data = {}
 
     # Auto-save: persist to household storage on every interaction
     if st.session_state.get('authenticated') and st.session_state.get('household_id') and st.session_state.get('initialized'):
@@ -9517,6 +9569,11 @@ def main():
             ("🎲 Monte Carlo", monte_carlo_simulation_tab, True),
             ("🧪 Stress Test", stress_test_tab, True),
         ],
+        "Tracking": [
+            ("📝 Enter Actuals", actuals_input_tab, True),
+            ("📊 Plan vs Actual", plan_vs_actual_tab, True),
+            ("📥 Excel Tracking", excel_tracking_tab, True),
+        ],
         "Data": [
             ("💾 Save / Load", save_load_tab, True),
             ("📄 Export", report_export_tab, st.session_state.get('show_export', True)),
@@ -9560,6 +9617,9 @@ def main():
                      "assumptions for returns, inflation, and growth. Retirement configures Social Security and benefits.",
         "Analysis": "**Run the numbers.** Cashflow shows a deterministic year-by-year projection. Monte Carlo runs "
                      "thousands of randomized simulations for a range of outcomes. Stress Test pushes your plan to its limits.",
+        "Tracking": "**Compare plan to reality.** Enter your actual expenses at year-end, "
+                     "or export your plan to Excel with blank columns to fill in monthly. "
+                     "View charts showing where you're on track and where you've drifted.",
         "Data": "**Save and share.** Save named scenarios, compare plans side-by-side, create what-if variants, "
                  "restore from backups, and export to JSON/PDF.",
     }
@@ -10308,6 +10368,711 @@ def tab_walkthrough(tab_key: str):
     if help_text:
         with st.expander("💡 How this tab works", expanded=False):
             st.markdown(help_text)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TRACKING TABS: Enter Actuals, Plan vs Actual, Excel Tracking
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _get_planned_for_year(year: int) -> dict:
+    """Get planned values for a specific year from cashflow calculation."""
+    try:
+        cashflow = calculate_lifetime_cashflow()
+        for row in cashflow:
+            if row['year'] == year:
+                return row
+    except Exception:
+        pass
+    return {}
+
+
+def actuals_input_tab():
+    """Tab for entering actual year-end financial data."""
+    st.header("📝 Enter Actuals")
+    tab_walkthrough("tracking_input")
+
+    current_year = st.session_state.current_year
+    year_options = list(range(current_year - 5, current_year + 1))
+    selected_year = st.selectbox("Select year to enter actuals for",
+                                  year_options, index=len(year_options) - 1,
+                                  key="actuals_year_select")
+
+    # Load existing actuals for this year
+    actuals = st.session_state.actuals_data.get(str(selected_year), {})
+
+    # Get planned values for comparison
+    planned = _get_planned_for_year(selected_year)
+    if not planned:
+        st.warning("No plan projections available for this year. Fill in your plan details in the other tabs first.")
+
+    # Year-end net worth
+    st.subheader("Year-End Summary")
+    col1, col2 = st.columns(2)
+    with col1:
+        actual_nw = st.number_input("Actual year-end net worth ($)",
+            value=float(actuals.get('net_worth', 0)),
+            step=1000.0, key="actual_nw",
+            help="Total assets minus total debts at Dec 31")
+        if planned:
+            st.caption(f"Planned: {format_currency(planned.get('net_worth', 0))}")
+    with col2:
+        actual_taxes = st.number_input("Total taxes paid ($)",
+            value=float(actuals.get('taxes_paid', 0)),
+            step=1000.0, key="actual_taxes")
+        if planned:
+            st.caption(f"Planned: {format_currency(planned.get('taxes', 0))}")
+
+    notes = st.text_area("Notes (optional)",
+        value=actuals.get('notes', ''),
+        placeholder="How was this year financially? Any big surprises?",
+        key="actual_notes")
+
+    # Income
+    st.subheader("Income")
+    p1_name = st.session_state.parent1_name
+    p2_name = st.session_state.parent2_name
+    income_data = actuals.get('income', {})
+
+    inc_cols = st.columns(4)
+    with inc_cols[0]:
+        inc_p1 = st.number_input(f"{p1_name} employment ($)",
+            value=float(income_data.get('parent1_employment', 0)), step=1000.0, key="act_inc_p1")
+        if planned:
+            st.caption(f"Plan: {format_currency(planned.get('parent1_income', 0))}")
+    with inc_cols[1]:
+        inc_p2 = st.number_input(f"{p2_name} employment ($)",
+            value=float(income_data.get('parent2_employment', 0)), step=1000.0, key="act_inc_p2")
+        if planned:
+            st.caption(f"Plan: {format_currency(planned.get('parent2_income', 0))}")
+    with inc_cols[2]:
+        inc_ss = st.number_input("Social Security ($)",
+            value=float(income_data.get('ss_income', 0)), step=500.0, key="act_inc_ss")
+    with inc_cols[3]:
+        inc_inv = st.number_input("Investment income ($)",
+            value=float(income_data.get('investment_income', 0)), step=1000.0, key="act_inc_inv")
+
+    # Expense categories as data editors
+    st.subheader("Expenses")
+    expense_tabs = st.tabs([f"{p1_name}", f"{p2_name}", "Family", "Children", "Housing", "Healthcare", "Other"])
+
+    # Helper to build a comparison dataframe
+    def _expense_editor(categories: dict, actual_expenses: dict, planned_breakdown: dict, key_prefix: str):
+        """Show a data editor for expense categories with plan vs actual."""
+        rows = []
+        for cat in categories:
+            plan_val = planned_breakdown.get(cat, 0) if planned_breakdown else 0
+            act_val = actual_expenses.get(cat, 0)
+            rows.append({"Category": cat, "Planned": plan_val, "Actual": act_val})
+
+        df = pd.DataFrame(rows)
+        edited = st.data_editor(
+            df, key=f"actuals_editor_{key_prefix}",
+            column_config={
+                "Category": st.column_config.TextColumn(disabled=True),
+                "Planned": st.column_config.NumberColumn(format="$%.0f", disabled=True),
+                "Actual": st.column_config.NumberColumn(format="$%.0f"),
+            },
+            hide_index=True, use_container_width=True,
+        )
+        return {row['Category']: row['Actual'] for _, row in edited.iterrows()}
+
+    # Get planned expense breakdowns
+    planned_breakdown = planned.get('base_expenses_breakdown', {}) if planned else {}
+
+    # Parent X expenses
+    with expense_tabs[0]:
+        px_planned = {k.replace(f"{p1_name}_", ""): v for k, v in planned_breakdown.items() if k.startswith(f"{p1_name}_")} if planned_breakdown else {}
+        if not px_planned:
+            px_planned = dict(st.session_state.get('parentX_expenses', {}))
+        px_actuals = actuals.get('expenses', {}).get('parentX', {})
+        cats = list(st.session_state.get('parentX_expenses', {}).keys())
+        px_result = _expense_editor(cats, px_actuals, px_planned, "px")
+
+    # Parent Y expenses
+    with expense_tabs[1]:
+        py_planned = {k.replace(f"{p2_name}_", ""): v for k, v in planned_breakdown.items() if k.startswith(f"{p2_name}_")} if planned_breakdown else {}
+        if not py_planned:
+            py_planned = dict(st.session_state.get('parentY_expenses', {}))
+        py_actuals = actuals.get('expenses', {}).get('parentY', {})
+        cats_y = list(st.session_state.get('parentY_expenses', {}).keys())
+        py_result = _expense_editor(cats_y, py_actuals, py_planned, "py")
+
+    # Family shared expenses
+    with expense_tabs[2]:
+        fam_planned = {k.replace("Family_", ""): v for k, v in planned_breakdown.items() if k.startswith("Family_")} if planned_breakdown else {}
+        if not fam_planned:
+            fam_planned = dict(st.session_state.family_shared_expenses)
+        fam_actuals = actuals.get('expenses', {}).get('family', {})
+        fam_cats = list(st.session_state.family_shared_expenses.keys())
+        fam_result = _expense_editor(fam_cats, fam_actuals, fam_planned, "fam")
+
+    # Children expenses
+    with expense_tabs[3]:
+        children_actuals = actuals.get('expenses', {}).get('children', {})
+        children_result = {}
+        if st.session_state.get('children_list'):
+            for child in st.session_state.children_list:
+                st.markdown(f"**{child['name']}**")
+                child_act = children_actuals.get(child['name'], {})
+                child_cats = ['Food', 'Clothing', 'Healthcare', 'Activities/Sports', 'Entertainment',
+                              'Transportation', 'School Supplies', 'Gifts/Celebrations', 'Daycare', 'Education']
+                child_planned_detail = {}
+                if planned:
+                    for cd in planned.get('children_expense_details', []):
+                        if cd.get('child_name') == child['name']:
+                            child_planned_detail = cd.get('expenses', {})
+                child_res = _expense_editor(child_cats, child_act, child_planned_detail, f"child_{child['name']}")
+                children_result[child['name']] = child_res
+        else:
+            _empty_state("👶", "No children", "Add children in the People section to track their expenses.")
+
+    # Housing expenses
+    with expense_tabs[4]:
+        housing_actuals = actuals.get('expenses', {}).get('housing', {})
+        housing_result = {}
+        if st.session_state.get('houses'):
+            for house in st.session_state.houses:
+                st.markdown(f"**{house.name}**")
+                h_act = housing_actuals.get(house.name, {})
+                h_cats = ['property_tax', 'home_insurance', 'maintenance', 'upkeep']
+                h_planned = {}
+                if planned:
+                    for hd in planned.get('house_expense_details', []):
+                        if hd.get('name') == house.name:
+                            h_planned = hd
+                h_res = _expense_editor(h_cats, h_act, h_planned, f"house_{house.name}")
+                housing_result[house.name] = h_res
+        else:
+            _empty_state("🏠", "No properties", "Add a house in the Expenses > Housing tab to track costs.")
+
+    # Healthcare
+    with expense_tabs[5]:
+        hc_actuals = actuals.get('expenses', {}).get('healthcare', {})
+        hc_cats = ['insurance_premiums', 'medicare', 'ltc_premiums', 'out_of_pocket']
+        hc_planned = {'insurance_premiums': 0, 'medicare': 0, 'ltc_premiums': 0, 'out_of_pocket': 0}
+        if planned:
+            hc_planned['insurance_premiums'] = planned.get('healthcare_expenses', 0) * 0.7
+            hc_planned['out_of_pocket'] = planned.get('healthcare_expenses', 0) * 0.3
+        hc_result = _expense_editor(hc_cats, hc_actuals, hc_planned, "hc")
+
+    # Recurring & Major purchases
+    with expense_tabs[6]:
+        rec_actuals = actuals.get('expenses', {}).get('recurring', {})
+        mp_actuals = actuals.get('expenses', {}).get('major_purchases', {})
+        rec_result = {}
+        mp_result = {}
+
+        if st.session_state.get('recurring_expenses'):
+            st.markdown("**Recurring Expenses**")
+            for re_item in st.session_state.recurring_expenses:
+                act_val = rec_actuals.get(re_item.name, 0)
+                plan_val = re_item.amount if (selected_year - re_item.start_year) % max(re_item.frequency_years, 1) == 0 else 0
+                val = st.number_input(f"{re_item.name} (planned: {format_currency(plan_val)})",
+                    value=float(act_val), step=500.0, key=f"act_rec_{re_item.name}")
+                rec_result[re_item.name] = val
+
+        st.markdown("**Major Purchases**")
+        mp_names = st.text_input("Add purchases (comma-separated names)",
+            value=", ".join(mp_actuals.keys()) if mp_actuals else "",
+            placeholder="e.g., New car, Kitchen renovation", key="act_mp_names")
+        if mp_names.strip():
+            for name in [n.strip() for n in mp_names.split(",") if n.strip()]:
+                val = st.number_input(f"{name} ($)",
+                    value=float(mp_actuals.get(name, 0)), step=1000.0, key=f"act_mp_{name}")
+                mp_result[name] = val
+
+    # Save button
+    st.markdown("---")
+    if st.button("💾 Save Actuals", type="primary", use_container_width=True, key="save_actuals"):
+        actuals_to_save = {
+            'net_worth': actual_nw,
+            'taxes_paid': actual_taxes,
+            'notes': notes,
+            'entered_at': datetime.now().isoformat(),
+            'entered_by': st.session_state.get('current_user', 'unknown'),
+            'income': {
+                'parent1_employment': inc_p1,
+                'parent2_employment': inc_p2,
+                'ss_income': inc_ss,
+                'investment_income': inc_inv,
+            },
+            'expenses': {
+                'parentX': px_result,
+                'parentY': py_result,
+                'family': fam_result,
+                'children': children_result,
+                'healthcare': hc_result,
+                'housing': housing_result,
+                'recurring': rec_result,
+                'major_purchases': mp_result,
+            }
+        }
+        st.session_state.actuals_data[str(selected_year)] = actuals_to_save
+        if st.session_state.get('household_id'):
+            save_household_actuals(st.session_state.household_id, st.session_state.actuals_data)
+        st.success(f"Actuals for {selected_year} saved!")
+
+
+def plan_vs_actual_tab():
+    """Dashboard comparing planned projections to actual results."""
+    st.header("📊 Plan vs Actual")
+    tab_walkthrough("tracking_compare")
+
+    actuals = st.session_state.get('actuals_data', {})
+    years_with_actuals = sorted(actuals.keys())
+
+    if not years_with_actuals:
+        _empty_state("📊", "No actuals entered yet",
+                     "Go to 'Enter Actuals' to input your year-end financial data, "
+                     "or import from an Excel tracking workbook.")
+        return
+
+    selected_year = st.selectbox("Year", years_with_actuals, index=len(years_with_actuals) - 1,
+                                  key="pva_year")
+    year_actuals = actuals[selected_year]
+    planned = _get_planned_for_year(int(selected_year))
+
+    if not planned:
+        st.warning("No plan projections available for this year.")
+        return
+
+    # KPI Cards
+    plan_income = planned.get('total_income', 0)
+    act_income = sum(year_actuals.get('income', {}).values())
+    plan_expenses = planned.get('total_expenses', 0)
+    act_expenses_dict = year_actuals.get('expenses', {})
+    act_expenses = (sum(act_expenses_dict.get('parentX', {}).values()) +
+                    sum(act_expenses_dict.get('parentY', {}).values()) +
+                    sum(act_expenses_dict.get('family', {}).values()) +
+                    sum(sum(c.values()) for c in act_expenses_dict.get('children', {}).values()) +
+                    sum(act_expenses_dict.get('healthcare', {}).values()) +
+                    sum(sum(h.values()) for h in act_expenses_dict.get('housing', {}).values()) +
+                    sum(act_expenses_dict.get('recurring', {}).values()) +
+                    sum(act_expenses_dict.get('major_purchases', {}).values()))
+    plan_nw = planned.get('net_worth', 0)
+    act_nw = year_actuals.get('net_worth', 0)
+
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        delta = act_income - plan_income
+        st.metric("Total Income", format_currency(act_income),
+                  delta=f"{'+' if delta >= 0 else ''}{format_currency(delta)} vs plan")
+    with col2:
+        delta = act_expenses - plan_expenses
+        st.metric("Total Expenses", format_currency(act_expenses),
+                  delta=f"{'+' if delta >= 0 else ''}{format_currency(delta)} vs plan",
+                  delta_color="inverse")
+    with col3:
+        delta = act_nw - plan_nw
+        st.metric("Net Worth", format_currency(act_nw),
+                  delta=f"{'+' if delta >= 0 else ''}{format_currency(delta)} vs plan")
+    with col4:
+        plan_sr = (plan_income - plan_expenses - planned.get('taxes', 0)) / max(plan_income, 1) * 100
+        act_sr = (act_income - act_expenses - year_actuals.get('taxes_paid', 0)) / max(act_income, 1) * 100
+        st.metric("Savings Rate", f"{act_sr:.1f}%",
+                  delta=f"{act_sr - plan_sr:+.1f}pp vs plan")
+
+    # Grouped bar chart
+    st.markdown("### Expense Categories: Plan vs Actual")
+    categories = []
+    plan_vals = []
+    actual_vals = []
+
+    for label, plan_key, act_key in [
+        (st.session_state.parent1_name, 'parentX', 'parentX'),
+        (st.session_state.parent2_name, 'parentY', 'parentY'),
+        ("Family Shared", 'family', 'family'),
+        ("Children", 'children', 'children'),
+        ("Healthcare", 'healthcare', 'healthcare'),
+        ("Housing", 'housing', 'housing'),
+        ("Recurring", 'recurring', 'recurring'),
+        ("Major Purchases", 'major_purchases', 'major_purchases'),
+    ]:
+        categories.append(label)
+        # Plan values from cashflow
+        if plan_key == 'parentX':
+            pv = sum(v for k, v in planned.get('base_expenses_breakdown', {}).items()
+                     if k.startswith(st.session_state.parent1_name))
+        elif plan_key == 'parentY':
+            pv = sum(v for k, v in planned.get('base_expenses_breakdown', {}).items()
+                     if k.startswith(st.session_state.parent2_name))
+        elif plan_key == 'family':
+            pv = sum(v for k, v in planned.get('base_expenses_breakdown', {}).items()
+                     if k.startswith("Family"))
+        elif plan_key == 'children':
+            pv = planned.get('children_expenses', 0)
+        elif plan_key == 'healthcare':
+            pv = planned.get('healthcare_expenses', 0)
+        elif plan_key == 'housing':
+            pv = planned.get('house_expenses', 0)
+        elif plan_key == 'recurring':
+            pv = planned.get('recurring_expenses', 0)
+        else:
+            pv = planned.get('major_purchases', 0)
+        plan_vals.append(pv)
+
+        # Actual values
+        act_dict = act_expenses_dict.get(act_key, {})
+        if isinstance(act_dict, dict):
+            if act_key in ('children', 'housing'):
+                av = sum(sum(v.values()) if isinstance(v, dict) else 0 for v in act_dict.values())
+            else:
+                av = sum(act_dict.values())
+        else:
+            av = 0
+        actual_vals.append(av)
+
+    fig = go.Figure(data=[
+        go.Bar(name='Planned', x=categories, y=plan_vals, marker_color=COLORS['primary']),
+        go.Bar(name='Actual', x=categories, y=actual_vals, marker_color=COLORS['warning']),
+    ])
+    fig.update_layout(barmode='group', title=f"Plan vs Actual — {selected_year}",
+                      yaxis=dict(tickformat="$,.0f"), height=400,
+                      font=dict(family="Inter, sans-serif"))
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Variance waterfall
+    st.markdown("### Variance Breakdown")
+    variances = [(cat, actual_vals[i] - plan_vals[i]) for i, cat in enumerate(categories) if plan_vals[i] > 0 or actual_vals[i] > 0]
+    variances.sort(key=lambda x: abs(x[1]), reverse=True)
+    if variances:
+        v_cats = [v[0] for v in variances]
+        v_vals = [v[1] for v in variances]
+        v_colors = [COLORS['danger'] if v > 0 else COLORS['success'] for v in v_vals]
+        fig_w = go.Figure(go.Bar(x=v_cats, y=v_vals, marker_color=v_colors))
+        fig_w.update_layout(title="Over/Under Budget by Category",
+                            yaxis=dict(tickformat="$,.0f"), height=350,
+                            font=dict(family="Inter, sans-serif"))
+        st.plotly_chart(fig_w, use_container_width=True)
+
+    # Auto-generated insights
+    st.markdown("### Insights")
+    over_budget = [(cat, actual_vals[i] - plan_vals[i], (actual_vals[i] - plan_vals[i]) / max(plan_vals[i], 1) * 100)
+                   for i, cat in enumerate(categories) if actual_vals[i] > plan_vals[i] and plan_vals[i] > 0]
+    under_budget = [(cat, plan_vals[i] - actual_vals[i], (plan_vals[i] - actual_vals[i]) / max(plan_vals[i], 1) * 100)
+                    for i, cat in enumerate(categories) if actual_vals[i] < plan_vals[i] and plan_vals[i] > 0]
+    over_budget.sort(key=lambda x: x[1], reverse=True)
+    under_budget.sort(key=lambda x: x[1], reverse=True)
+
+    for cat, amt, pct in over_budget[:3]:
+        st.warning(f"**{cat}**: Over budget by {format_currency(amt)} (+{pct:.0f}%)")
+    for cat, amt, pct in under_budget[:3]:
+        st.success(f"**{cat}**: Under budget by {format_currency(amt)} (-{pct:.0f}%)")
+
+    if act_nw > plan_nw:
+        st.info(f"Net worth is **{format_currency(act_nw - plan_nw)} ahead** of plan!")
+    elif act_nw < plan_nw:
+        st.error(f"Net worth is **{format_currency(plan_nw - act_nw)} behind** plan.")
+
+    # Multi-year trend (if 2+ years)
+    if len(years_with_actuals) >= 2:
+        st.markdown("### Multi-Year Trend")
+        trend_years = sorted(years_with_actuals)
+        plan_nws = []
+        act_nws = []
+        for yr in trend_years:
+            p = _get_planned_for_year(int(yr))
+            plan_nws.append(p.get('net_worth', 0) if p else 0)
+            act_nws.append(actuals[yr].get('net_worth', 0))
+        fig_trend = go.Figure()
+        fig_trend.add_trace(go.Scatter(x=trend_years, y=plan_nws, name='Planned',
+                                        line=dict(color=COLORS['primary'])))
+        fig_trend.add_trace(go.Scatter(x=trend_years, y=act_nws, name='Actual',
+                                        line=dict(color=COLORS['warning'], dash='dash')))
+        fig_trend.update_layout(title="Net Worth: Plan vs Actual Over Time",
+                                yaxis=dict(tickformat="$,.0f"), height=350,
+                                font=dict(family="Inter, sans-serif"))
+        st.plotly_chart(fig_trend, use_container_width=True)
+
+
+def excel_tracking_tab():
+    """Excel export of plan with blank actuals and import of filled actuals."""
+    st.header("📥 Excel Tracking Workbook")
+    tab_walkthrough("tracking_excel")
+
+    st.markdown("""
+    **Export** a multi-tab Excel workbook with your planned expenses and blank columns for actuals.
+    Fill in your actual spending month by month, then **import** the completed workbook to see how you're tracking.
+    """)
+
+    col1, col2 = st.columns(2)
+
+    # ── Export ────────────────────────────────────────────────────────────
+    with col1:
+        st.subheader("Export Plan Workbook")
+        export_years = st.slider("Years to include",
+            min_value=st.session_state.current_year,
+            max_value=st.session_state.current_year + 10,
+            value=(st.session_state.current_year, st.session_state.current_year + 2),
+            key="export_year_range")
+
+        if st.button("Generate Workbook", type="primary", use_container_width=True, key="gen_workbook"):
+            with st.spinner("Generating Excel workbook..."):
+                wb = _generate_tracking_workbook(export_years[0], export_years[1])
+                if wb:
+                    from io import BytesIO
+                    buffer = BytesIO()
+                    wb.save(buffer)
+                    buffer.seek(0)
+                    household_name = st.session_state.get('user_data', {}).get('household_id', 'plan')
+                    st.download_button(
+                        "📥 Download Workbook",
+                        data=buffer,
+                        file_name=f"financial_tracking_{export_years[0]}_{export_years[1]}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                    )
+
+    # ── Import ────────────────────────────────────────────────────────────
+    with col2:
+        st.subheader("Import Filled Workbook")
+        uploaded = st.file_uploader("Upload completed tracking workbook",
+                                     type=['xlsx'], key="import_workbook")
+        if uploaded:
+            try:
+                parsed = _parse_tracking_workbook(uploaded)
+                if parsed:
+                    st.success(f"Found actuals for {len(parsed)} year(s): {', '.join(sorted(parsed.keys()))}")
+                    for yr, data in sorted(parsed.items()):
+                        total = sum(data.get('expenses', {}).get('parentX', {}).values()) + \
+                                sum(data.get('expenses', {}).get('parentY', {}).values()) + \
+                                sum(data.get('expenses', {}).get('family', {}).values())
+                        st.caption(f"{yr}: {format_currency(total)} in expenses entered")
+
+                    if st.button("Import Actuals", type="primary", use_container_width=True, key="import_actuals"):
+                        for yr, data in parsed.items():
+                            st.session_state.actuals_data[yr] = data
+                        if st.session_state.get('household_id'):
+                            save_household_actuals(st.session_state.household_id, st.session_state.actuals_data)
+                        st.success("Imported!")
+                        st.rerun()
+            except Exception as e:
+                st.error(f"Could not parse workbook: {e}")
+
+
+def _generate_tracking_workbook(start_year: int, end_year: int):
+    """Generate an openpyxl workbook with planned values and blank actual columns."""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, numbers
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        st.error("openpyxl is required for Excel export.")
+        return None
+
+    wb = Workbook()
+    plan_fill = PatternFill(start_color="D6EAF8", end_color="D6EAF8", fill_type="solid")
+    actual_fill = PatternFill(start_color="FEF9E7", end_color="FEF9E7", fill_type="solid")
+    header_fill = PatternFill(start_color="2C3E50", end_color="2C3E50", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True, size=11)
+    currency_fmt = '$#,##0'
+    pct_fmt = '0.0%'
+    thin_border = Border(bottom=Side(style='thin'))
+    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+    # Instructions sheet
+    ws_inst = wb.active
+    ws_inst.title = "Instructions"
+    ws_inst['A1'] = "Financial Plan Tracking Workbook"
+    ws_inst['A1'].font = Font(bold=True, size=16)
+    instructions = [
+        "", "How to use this workbook:",
+        "1. Each year has expense sheets with your planned values (blue columns)",
+        "2. Fill in the yellow 'Actual' columns with your real spending each month",
+        "3. Annual totals and variance are calculated automatically",
+        "4. Upload the completed workbook back to the app to see charts and insights",
+        "", "Color legend:",
+        "  Blue cells = Planned (do not edit)",
+        "  Yellow cells = Actual (fill these in)",
+        "  Green variance = under budget, Red variance = over budget",
+    ]
+    for i, line in enumerate(instructions, 2):
+        ws_inst[f'A{i}'] = line
+
+    # Summary sheet
+    ws_sum = wb.create_sheet("Summary")
+    sum_headers = ['Year', 'Net Worth (Plan)', 'Net Worth (Actual)', 'Income (Plan)', 'Income (Actual)',
+                   'Expenses (Plan)', 'Expenses (Actual)', 'Cashflow (Plan)', 'Cashflow (Actual)']
+    for col, header in enumerate(sum_headers, 1):
+        cell = ws_sum.cell(row=1, column=col, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+
+    cashflow_data = []
+    try:
+        cashflow_data = calculate_lifetime_cashflow()
+    except Exception:
+        pass
+
+    for row_idx, year in enumerate(range(start_year, end_year + 1), 2):
+        planned = {}
+        for r in cashflow_data:
+            if r['year'] == year:
+                planned = r
+                break
+        ws_sum.cell(row=row_idx, column=1, value=year)
+        ws_sum.cell(row=row_idx, column=2, value=planned.get('net_worth', 0)).number_format = currency_fmt
+        ws_sum.cell(row=row_idx, column=2).fill = plan_fill
+        ws_sum.cell(row=row_idx, column=3).fill = actual_fill  # Blank for user
+        ws_sum.cell(row=row_idx, column=3).number_format = currency_fmt
+        ws_sum.cell(row=row_idx, column=4, value=planned.get('total_income', 0)).number_format = currency_fmt
+        ws_sum.cell(row=row_idx, column=4).fill = plan_fill
+        ws_sum.cell(row=row_idx, column=5).fill = actual_fill
+        ws_sum.cell(row=row_idx, column=5).number_format = currency_fmt
+        ws_sum.cell(row=row_idx, column=6, value=planned.get('total_expenses', 0)).number_format = currency_fmt
+        ws_sum.cell(row=row_idx, column=6).fill = plan_fill
+        ws_sum.cell(row=row_idx, column=7).fill = actual_fill
+        ws_sum.cell(row=row_idx, column=7).number_format = currency_fmt
+        cf = planned.get('cashflow', 0)
+        ws_sum.cell(row=row_idx, column=8, value=cf).number_format = currency_fmt
+        ws_sum.cell(row=row_idx, column=8).fill = plan_fill
+        ws_sum.cell(row=row_idx, column=9).fill = actual_fill
+        ws_sum.cell(row=row_idx, column=9).number_format = currency_fmt
+
+    # Per-year expense sheets
+    for year in range(start_year, end_year + 1):
+        planned = {}
+        for r in cashflow_data:
+            if r['year'] == year:
+                planned = r
+                break
+
+        ws = wb.create_sheet(f"Expenses_{year}")
+
+        # Headers: Category | Monthly Plan | Jan | Feb | ... | Dec | Annual Plan | Annual Actual | Variance | Variance %
+        headers = ['Category', 'Monthly Plan'] + months + ['Annual Plan', 'Annual Actual', 'Variance', 'Variance %']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            if col >= 3 and col <= 14:  # Month columns
+                cell.fill = PatternFill(start_color="F39C12", end_color="F39C12", fill_type="solid")
+
+        row = 2
+        def _add_section(title, categories, planned_vals):
+            nonlocal row
+            ws.cell(row=row, column=1, value=title).font = Font(bold=True, size=12)
+            row += 1
+            for cat in categories:
+                annual = planned_vals.get(cat, 0)
+                monthly = annual / 12
+                ws.cell(row=row, column=1, value=cat)
+                ws.cell(row=row, column=2, value=monthly).number_format = currency_fmt
+                ws.cell(row=row, column=2).fill = plan_fill
+                # Month columns (3-14) — blank yellow for user input
+                for m in range(3, 15):
+                    ws.cell(row=row, column=m).fill = actual_fill
+                    ws.cell(row=row, column=m).number_format = currency_fmt
+                # Annual Plan (col 15)
+                ws.cell(row=row, column=15, value=annual).number_format = currency_fmt
+                ws.cell(row=row, column=15).fill = plan_fill
+                # Annual Actual = SUM of months (col 16)
+                month_range = f"{get_column_letter(3)}{row}:{get_column_letter(14)}{row}"
+                ws.cell(row=row, column=16).value = f"=SUM({month_range})"
+                ws.cell(row=row, column=16).number_format = currency_fmt
+                ws.cell(row=row, column=16).fill = actual_fill
+                # Variance (col 17) = Actual - Plan
+                ws.cell(row=row, column=17).value = f"={get_column_letter(16)}{row}-{get_column_letter(15)}{row}"
+                ws.cell(row=row, column=17).number_format = currency_fmt
+                # Variance % (col 18)
+                ws.cell(row=row, column=18).value = f"=IF({get_column_letter(15)}{row}<>0,{get_column_letter(17)}{row}/{get_column_letter(15)}{row},\"\")"
+                ws.cell(row=row, column=18).number_format = pct_fmt
+                row += 1
+            row += 1  # Blank row between sections
+
+        # Parent X expenses
+        px_planned = dict(st.session_state.get('parentX_expenses', {}))
+        _add_section(f"{st.session_state.parent1_name} — Individual", list(px_planned.keys()), px_planned)
+
+        # Parent Y expenses
+        py_planned = dict(st.session_state.get('parentY_expenses', {}))
+        if sum(py_planned.values()) > 0:
+            _add_section(f"{st.session_state.parent2_name} — Individual", list(py_planned.keys()), py_planned)
+
+        # Family shared
+        fam_planned = dict(st.session_state.family_shared_expenses)
+        _add_section("Family Shared", list(fam_planned.keys()), fam_planned)
+
+        # Auto-fit column widths
+        ws.column_dimensions['A'].width = 25
+        ws.column_dimensions['B'].width = 14
+        for c in range(3, 19):
+            ws.column_dimensions[get_column_letter(c)].width = 13
+        ws.freeze_panes = 'C2'
+
+    return wb
+
+
+def _parse_tracking_workbook(uploaded_file) -> dict:
+    """Parse an uploaded tracking workbook and extract actuals."""
+    from openpyxl import load_workbook
+    wb = load_workbook(uploaded_file, data_only=True)
+
+    parsed = {}
+    for sheet_name in wb.sheetnames:
+        if sheet_name.startswith("Expenses_"):
+            year = sheet_name.replace("Expenses_", "")
+            ws = wb[sheet_name]
+            year_data = {'expenses': {'parentX': {}, 'parentY': {}, 'family': {}}}
+            current_section = None
+
+            for row in ws.iter_rows(min_row=2, max_col=18, values_only=False):
+                cat_cell = row[0]
+                annual_actual_cell = row[15]  # Column P (index 15)
+
+                if cat_cell.value and cat_cell.font and cat_cell.font.bold:
+                    # Section header
+                    header = str(cat_cell.value).lower()
+                    if 'individual' in header:
+                        if st.session_state.parent1_name.lower() in header:
+                            current_section = 'parentX'
+                        else:
+                            current_section = 'parentY'
+                    elif 'family' in header:
+                        current_section = 'family'
+                    continue
+
+                if cat_cell.value and current_section and annual_actual_cell.value:
+                    try:
+                        val = float(annual_actual_cell.value)
+                        year_data['expenses'][current_section][str(cat_cell.value)] = val
+                    except (ValueError, TypeError):
+                        pass
+
+            # Also try to get net worth from Summary sheet
+            if 'Summary' in wb.sheetnames:
+                ws_sum = wb['Summary']
+                for row in ws_sum.iter_rows(min_row=2, max_col=9, values_only=True):
+                    if row[0] and str(row[0]) == year:
+                        if row[2]:  # Net Worth (Actual) column
+                            year_data['net_worth'] = float(row[2])
+                        if row[4]:  # Income (Actual)
+                            year_data['income'] = {'total': float(row[4])}
+                        break
+
+            if any(year_data['expenses'][k] for k in year_data['expenses']):
+                parsed[year] = year_data
+
+    return parsed
+
+
+# Add tracking walkthrough entries
+TAB_HELP["tracking_input"] = (
+    "**What this tab does:** Enter your actual income, expenses, and net worth at year-end. "
+    "The form shows your planned values alongside blank fields for actuals.\n\n"
+    "**Tip:** Fill this in once a year (January is a good time for the previous year). "
+    "The more years you track, the more useful the trend analysis becomes."
+)
+TAB_HELP["tracking_compare"] = (
+    "**What this tab does:** Shows charts and metrics comparing your plan to reality. "
+    "See where you're over or under budget, and how your net worth is tracking.\n\n"
+    "**What to look for:** The variance waterfall shows which categories had the biggest gaps."
+)
+TAB_HELP["tracking_excel"] = (
+    "**What this tab does:** Export your financial plan as an Excel workbook with monthly columns "
+    "and blank 'Actual' fields you can fill in. Import the completed workbook to populate your actuals.\n\n"
+    "**Tip:** The workbook has formulas that auto-calculate annual totals and variance."
+)
 
 
 # Tab implementations
