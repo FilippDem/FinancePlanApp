@@ -1002,18 +1002,19 @@ def household_picker_page(email: str):
                     'parent1_name': 'Chris', 'parent2_name': 'Pat', 'parentX_age': 32, 'parentY_age': 30,
                     'parentX_income': 55000.0, 'parentY_income': 45000.0, 'parentX_net_worth': 15000.0,
                     'parentY_net_worth': 8000.0, 'marriage_year': 2023,
+                    'pretax_401k': 3000.0,  # Low 401k on tight budget
                     'parentX_expenses': get_adult_expense_template("Houston", "Conservative (statistical)"),
                     'parentY_expenses': get_adult_expense_template("Houston", "Conservative (statistical)"),
                     'family_shared_expenses': {
-                        'Mortgage/Rent': 18000.0, 'Home Improvement': 500.0,
+                        'Mortgage/Rent': 16800.0, 'Home Improvement': 300.0,
                         'Property Tax': 0.0, 'Home Insurance': 0.0,
-                        'Gas & Electric': 1500.0, 'Water': 480.0, 'Garbage': 360.0,
-                        'Internet & Cable': 960.0, 'Shared Subscriptions': 360.0,
-                        'Family Vacations': 2000.0, 'Pet Care': 0.0, 'Other Family Expenses': 400.0,
+                        'Gas & Electric': 1320.0, 'Water': 420.0, 'Garbage': 300.0,
+                        'Internet & Cable': 840.0, 'Shared Subscriptions': 240.0,
+                        'Family Vacations': 1200.0, 'Pet Care': 0.0, 'Other Family Expenses': 300.0,
                     },
                     'children_list': [
                         {'name': 'Emma', 'birth_year': 2024, 'use_template': True, 'template_state': 'Houston',
-                         'template_strategy': 'Average', 'school_type': 'Public', 'college_location': 'Houston'},
+                         'template_strategy': 'Conservative', 'school_type': 'Public', 'college_location': 'Houston'},
                     ],
                 },
             }
@@ -7791,7 +7792,7 @@ def initialize_session_state():
 
         # Tax settings
         st.session_state.state_tax_rate = 0.0
-        st.session_state.pretax_401k = 23500.0
+        st.session_state.pretax_401k = 6000.0  # Moderate default; users can increase in Tax tab
 
         # Social Security insolvency settings
         st.session_state.ss_insolvency_enabled = True
