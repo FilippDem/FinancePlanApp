@@ -9377,7 +9377,7 @@ def calculate_annual_taxes(gross_income, pretax_deductions=0, state_tax_rate=0.0
 
     state_tax = adjusted_gross_income * state_tax_rate
 
-    ss_wage_base = 160200
+    ss_wage_base = 168600  # 2024 SS wage base (IRS)
     medicare_threshold = 250000 if filing_status == "married_jointly" else 200000
 
     ss_tax = min(gross_income, ss_wage_base) * 0.062
@@ -13678,25 +13678,25 @@ def calculate_federal_income_tax(taxable_income, filing_status='married'):
         float: Federal income tax amount
     """
     if filing_status == 'married':
-        # 2024 Married Filing Jointly brackets
+        # 2024 Married Filing Jointly brackets (IRS Rev. Proc. 2023-34)
         brackets = [
-            (22000, 0.10),      # 10% on first $22,000
-            (89075, 0.12),      # 12% on $22,001 to $89,075
-            (190750, 0.22),     # 22% on $89,076 to $190,750
-            (364200, 0.24),     # 24% on $190,751 to $364,200
-            (462500, 0.32),     # 32% on $364,201 to $462,500
-            (693750, 0.35),     # 35% on $462,501 to $693,750
-            (float('inf'), 0.37)  # 37% on $693,751+
+            (23200, 0.10),      # 10% on first $23,200
+            (94300, 0.12),      # 12% on $23,201 to $94,300
+            (201050, 0.22),     # 22% on $94,301 to $201,050
+            (383900, 0.24),     # 24% on $201,051 to $383,900
+            (487450, 0.32),     # 32% on $383,901 to $487,450
+            (731200, 0.35),     # 35% on $487,451 to $731,200
+            (float('inf'), 0.37)  # 37% on $731,201+
         ]
     else:
-        # 2024 Single filer brackets
+        # 2024 Single filer brackets (IRS Rev. Proc. 2023-34)
         brackets = [
-            (11000, 0.10),
-            (44725, 0.12),
-            (95375, 0.22),
-            (182100, 0.24),
-            (231250, 0.32),
-            (578125, 0.35),
+            (11600, 0.10),
+            (47150, 0.12),
+            (100525, 0.22),
+            (191950, 0.24),
+            (243725, 0.32),
+            (609350, 0.35),
             (float('inf'), 0.37)
         ]
 
@@ -13713,7 +13713,7 @@ def calculate_federal_income_tax(taxable_income, filing_status='married'):
 
     return tax
 
-def calculate_fica_tax(wage_income):
+def calculate_fica_tax(wage_income, filing_status='married'):
     """
     Calculate FICA taxes (Social Security + Medicare).
 
@@ -13724,11 +13724,11 @@ def calculate_fica_tax(wage_income):
         float: Total FICA tax (employee portion)
     """
     # Social Security: 6.2% up to wage base ($160,200 in 2024)
-    ss_wage_base = 160200
+    ss_wage_base = 168600  # 2024 SS wage base (IRS)
     social_security_tax = min(wage_income, ss_wage_base) * 0.062
 
     # Medicare: 1.45% on all wages, plus 0.9% Additional Medicare Tax on high earners
-    medicare_wage_threshold = 250000  # For married filing jointly
+    medicare_wage_threshold = 250000 if filing_status == 'married' else 200000
 
     if wage_income <= medicare_wage_threshold:
         medicare_tax = wage_income * 0.0145
@@ -13906,6 +13906,9 @@ def calculate_lifetime_cashflow():
         nw_parent2 = None
         cumulative_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
 
+    # Use economic params inflation rate (not hardcoded 3%)
+    expense_inflation = 1 + st.session_state.economic_params.inflation_rate
+
     for year in range(st.session_state.current_year, timeline_end + 1):
         # Calculate ages
         parent1_age = st.session_state.parentX_age + (year - st.session_state.current_year)
@@ -13993,19 +13996,19 @@ def calculate_lifetime_cashflow():
         # Parent X individual expenses (with inflation)
         parentX_expenses_inflated = {}
         for category, amount in st.session_state.parentX_expenses.items():
-            parentX_expenses_inflated[category] = amount * (1.03 ** years_from_now)
+            parentX_expenses_inflated[category] = amount * (expense_inflation ** years_from_now)
         parentX_total = sum(parentX_expenses_inflated.values())
 
         # Parent Y individual expenses (with inflation)
         parentY_expenses_inflated = {}
         for category, amount in st.session_state.parentY_expenses.items():
-            parentY_expenses_inflated[category] = amount * (1.03 ** years_from_now)
+            parentY_expenses_inflated[category] = amount * (expense_inflation ** years_from_now)
         parentY_total = sum(parentY_expenses_inflated.values())
 
         # Family shared expenses (with inflation)
         family_expenses_inflated = {}
         for category, amount in st.session_state.family_shared_expenses.items():
-            family_expenses_inflated[category] = amount * (1.03 ** years_from_now)
+            family_expenses_inflated[category] = amount * (expense_inflation ** years_from_now)
 
         # Housing ↔ Location linking: if user lives in an owned house this year,
         # zero out the Mortgage/Rent family expense (house costs are in house_expenses)
@@ -14064,7 +14067,7 @@ def calculate_lifetime_cashflow():
                     if years_since_start % recurring.frequency_years == 0:
                         expense_amount = recurring.amount
                         if recurring.inflation_adjust:
-                            expense_amount *= (1.03 ** years_from_now)
+                            expense_amount *= (expense_inflation ** years_from_now)
                         recurring_expenses_total += expense_amount
 
                         # Store details
@@ -14165,7 +14168,7 @@ def calculate_lifetime_cashflow():
                     house_expenses += property_tax
 
                     # Home insurance (with general inflation)
-                    home_insurance = house.home_insurance * (1.03 ** years_from_now)
+                    home_insurance = house.home_insurance * (expense_inflation ** years_from_now)
                     house_expenses += home_insurance
 
                     # Maintenance (based on current house value)
@@ -14173,7 +14176,7 @@ def calculate_lifetime_cashflow():
                     house_expenses += maintenance
 
                     # Upkeep costs (with general inflation)
-                    upkeep = house.upkeep_costs * (1.03 ** years_from_now)
+                    upkeep = house.upkeep_costs * (expense_inflation ** years_from_now)
                     house_expenses += upkeep
 
                     # Store breakdown
@@ -15109,6 +15112,7 @@ def monte_carlo_simulation_tab():
             initial_net_worth = st.session_state.parentX_net_worth + st.session_state.parentY_net_worth
             mc_finance_mode = st.session_state.get('finance_mode', 'Pooled')
             mc_split = st.session_state.get('shared_expense_split_pct', 50) / 100.0
+            expense_inflation = 1 + st.session_state.economic_params.inflation_rate
 
             progress_bar = st.progress(0)
 
@@ -15162,23 +15166,35 @@ def monte_carlo_simulation_tab():
                             ss_benefit *= (1 - st.session_state.ss_shortfall_percentage / 100)
                         mc_p2_income += ss_benefit
 
-                    income = mc_p1_income + mc_p2_income
+                    # Separate employment income from SS (SS is fixed, not varied)
+                    employment_income = 0
+                    ss_total = 0
+                    if parentX_working:
+                        employment_income += mc_p1_income
+                    else:
+                        ss_total += mc_p1_income  # This is SS benefit
+                    if parentY_working:
+                        employment_income += mc_p2_income
+                    else:
+                        ss_total += mc_p2_income  # This is SS benefit
 
-                    # Add variability to income
+                    # Add variability to employment income ONLY (not Social Security)
                     if use_asymmetric:
                         if np.random.random() > 0.5:
-                            income *= (1 + np.random.uniform(0, st.session_state.mc_income_variability_positive / 100))
+                            employment_income *= (1 + np.random.uniform(0, st.session_state.mc_income_variability_positive / 100))
                         else:
-                            income *= (1 - np.random.uniform(0, st.session_state.mc_income_variability_negative / 100))
+                            employment_income *= (1 - np.random.uniform(0, st.session_state.mc_income_variability_negative / 100))
                     else:
-                        income *= (1 + np.random.uniform(-st.session_state.mc_income_variability / 100, st.session_state.mc_income_variability / 100))
+                        employment_income *= (1 + np.random.uniform(-st.session_state.mc_income_variability / 100, st.session_state.mc_income_variability / 100))
+
+                    income = employment_income + ss_total  # Combine after variability
 
                     # Calculate base expenses (Parent X + Parent Y + Family)
                     years_from_now = year - st.session_state.current_year
 
                     # Parent X + Parent Y + Family expenses (with inflation)
-                    parentX_total = sum(st.session_state.parentX_expenses.values()) * (1.03 ** years_from_now)
-                    parentY_total = sum(st.session_state.parentY_expenses.values()) * (1.03 ** years_from_now)
+                    parentX_total = sum(st.session_state.parentX_expenses.values()) * (expense_inflation ** years_from_now)
+                    parentY_total = sum(st.session_state.parentY_expenses.values()) * (expense_inflation ** years_from_now)
                     # Check if living in owned house → skip rent
                     mc_family = dict(st.session_state.family_shared_expenses)
                     mc_lives_owned = False
@@ -15190,7 +15206,7 @@ def monte_carlo_simulation_tab():
                                 break
                     if mc_lives_owned:
                         mc_family['Mortgage/Rent'] = 0.0
-                    family_total = sum(mc_family.values()) * (1.03 ** years_from_now)
+                    family_total = sum(mc_family.values()) * (expense_inflation ** years_from_now)
                     base_expenses = parentX_total + parentY_total + family_total
 
                     # Children expenses (same calculation as deterministic cashflow)
@@ -15209,7 +15225,7 @@ def monte_carlo_simulation_tab():
                                 if years_since_start % recurring.frequency_years == 0:
                                     expense_amount = recurring.amount
                                     if recurring.inflation_adjust:
-                                        expense_amount *= (1.03 ** years_from_now)
+                                        expense_amount *= (expense_inflation ** years_from_now)
                                     recurring_expenses_total += expense_amount
 
                     # One-time major purchases
@@ -15263,9 +15279,9 @@ def monte_carlo_simulation_tab():
                                 mc_appr = 1 + getattr(house, 'appreciation_rate', 3.0) / 100
                                 current_house_value = house.current_value * (mc_appr ** years_from_now)
                                 house_expenses += current_house_value * house.property_tax_rate
-                                house_expenses += house.home_insurance * (1.03 ** years_from_now)
+                                house_expenses += house.home_insurance * (expense_inflation ** years_from_now)
                                 house_expenses += current_house_value * house.maintenance_rate
-                                house_expenses += house.upkeep_costs * (1.03 ** years_from_now)
+                                house_expenses += house.upkeep_costs * (expense_inflation ** years_from_now)
 
                     total_expenses = base_expenses + children_expenses + recurring_expenses_total + major_purchase_expenses + healthcare_expenses + house_expenses
 
