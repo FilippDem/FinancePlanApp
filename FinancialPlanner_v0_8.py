@@ -226,14 +226,43 @@ st.markdown("""
         font-size: 0.8rem;
         color: rgba(128, 128, 128, 0.6);
     }
+    .sidebar-user-badge .family-members {
+        font-size: 0.82rem;
+        color: rgba(180, 180, 200, 0.8);
+        margin-top: 4px;
+        padding-top: 4px;
+        border-top: 1px solid rgba(128, 128, 128, 0.1);
+    }
 
-    /* ── Section nav bar (horizontal radio as category selector) ── */
-    div[data-testid="stHorizontalBlock"]:has(> div[data-testid="stRadio"]) {
-        background: rgba(128, 128, 128, 0.04);
-        border: 1px solid rgba(128, 128, 128, 0.08);
+    /* ── Section nav pills (styled as tab bar) ── */
+    div[data-testid="stPills"] {
+        background: rgba(128, 128, 128, 0.05);
         border-radius: 10px;
-        padding: 2px 6px;
-        margin-bottom: 0.75rem;
+        padding: 4px 6px;
+        margin-bottom: 0.5rem;
+    }
+    div[data-testid="stPills"] button {
+        font-size: 0.85rem !important;
+        font-weight: 500 !important;
+        border-radius: 8px !important;
+        padding: 8px 16px !important;
+        transition: all 0.15s ease !important;
+    }
+    div[data-testid="stPills"] button[aria-checked="false"] {
+        background: transparent !important;
+        border: none !important;
+        color: rgba(180, 180, 180, 0.7) !important;
+    }
+    div[data-testid="stPills"] button[aria-checked="false"]:hover {
+        background: rgba(128, 128, 128, 0.1) !important;
+        color: rgba(220, 220, 220, 0.9) !important;
+    }
+    div[data-testid="stPills"] button[aria-checked="true"] {
+        background: rgba(102, 126, 234, 0.18) !important;
+        border: none !important;
+        color: #667eea !important;
+        font-weight: 600 !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12) !important;
     }
 
     /* ── Mobile-responsive layout ──────────────────────────────── */
@@ -9529,15 +9558,6 @@ def main():
         )
     st.title("💰 Financial Planning Suite")
 
-    # What's New banner (dismissible)
-    if not st.session_state.get('_whats_new_dismissed'):
-        with st.expander(f"🆕 What's new in v{APP_VERSION}", expanded=False):
-            for item in WHATS_NEW:
-                st.markdown(f"- {item}")
-            if st.button("Dismiss", key="dismiss_whats_new"):
-                st.session_state._whats_new_dismissed = True
-                st.rerun()
-
     # ── Grouped navigation ──────────────────────────────────────────────
     # Categories keep tabs visible without horizontal scrolling.
     p1_label = f"{st.session_state.parent1_emoji} {st.session_state.parent1_name}"
@@ -9581,20 +9601,27 @@ def main():
         ],
     }
 
-    # Category selector (horizontal radio, always visible)
+    # Category selector — styled tab bar using buttons
     group_names = list(nav_groups.keys())
     if 'nav_group' not in st.session_state:
         st.session_state.nav_group = "Overview"
-    selected_group = st.radio(
-        "Section", group_names, horizontal=True,
-        index=group_names.index(st.session_state.get('nav_group', 'Overview'))
-              if st.session_state.get('nav_group', 'Overview') in group_names else 0,
-        key="nav_group_radio", label_visibility="collapsed",
+
+    current_group = st.session_state.get('nav_group', 'Overview')
+    if current_group not in group_names:
+        current_group = "Overview"
+
+    selected_group = st.pills(
+        "Section", group_names,
+        default=current_group,
+        key="nav_group_pills",
+        label_visibility="collapsed",
+        width="stretch",
     )
+    if selected_group is None:
+        selected_group = current_group
     # Auto-save when switching sections
-    prev_group = st.session_state.get('_prev_nav_group')
-    st.session_state.nav_group = selected_group
-    if prev_group and prev_group != selected_group:
+    if selected_group != current_group:
+        st.session_state.nav_group = selected_group
         if st.session_state.get('authenticated') and st.session_state.get('household_id') and st.session_state.get('initialized'):
             try:
                 json_data = save_data()
@@ -9602,32 +9629,21 @@ def main():
                     save_household_plan(st.session_state.household_id, json_data)
             except Exception:
                 pass
-    st.session_state._prev_nav_group = selected_group
+        st.rerun()
 
-    # Category guide
-    CATEGORY_GUIDES = {
-        "Overview": "**Start here.** The Dashboard shows your overall financial health at a glance — key metrics, "
-                     "trajectory chart, and alerts. Use Settings to configure names and toggle optional tabs. "
-                     "Users manages your household and account.",
-        "People": "**Set up each person.** Enter income, career phases, net worth, retirement age, and Social Security "
-                   "for each parent. Add children with age-based expense templates. This data drives all projections.",
-        "Expenses": "**Where does the money go?** Family expenses are shared costs (groceries, utilities). "
-                     "Recurring covers repeating purchases. Housing tracks your properties, mortgages, and property tax. "
-                     "Healthcare models insurance and Medicare.",
-        "Planning": "**Set the timeline.** Timeline tracks relocations and spending strategy changes. Economy sets your "
-                     "assumptions for returns, inflation, and growth. Retirement configures Social Security and benefits.",
-        "Analysis": "**Run the numbers.** Cashflow shows a deterministic year-by-year projection. Monte Carlo runs "
-                     "thousands of randomized simulations for a range of outcomes. Stress Test pushes your plan to its limits.",
-        "Tracking": "**Compare plan to reality.** Enter your actual expenses at year-end, "
-                     "or export your plan to Excel with blank columns to fill in monthly. "
-                     "View charts showing where you're on track and where you've drifted.",
-        "Data": "**Save and share.** Save named scenarios, compare plans side-by-side, create what-if variants, "
-                 "restore from backups, and export to JSON/PDF.",
+    # Brief section descriptions (one-liner captions)
+    SECTION_DESCRIPTIONS = {
+        "Overview": "Dashboard, settings, and account management.",
+        "People": "Income, career, net worth, and children for each person.",
+        "Expenses": "Family, recurring, housing, and healthcare costs.",
+        "Planning": "Timeline, economy assumptions, and retirement setup.",
+        "Analysis": "Cashflow projections, Monte Carlo simulations, and stress tests.",
+        "Tracking": "Enter actuals, compare plan vs reality, export to Excel.",
+        "Data": "Save scenarios, compare plans, and export/import data.",
     }
-    guide = CATEGORY_GUIDES.get(selected_group)
-    if guide:
-        with st.expander(f"📖 Guide: {selected_group}", expanded=False):
-            st.markdown(guide)
+    desc = SECTION_DESCRIPTIONS.get(selected_group)
+    if desc:
+        st.caption(desc)
 
     # Tabs within the selected group
     group_tabs = nav_groups[selected_group]
@@ -9851,7 +9867,14 @@ WHATS_NEW = [
 
 def dashboard_tab():
     """Dashboard — at-a-glance summary of your financial plan."""
-    st.header("📊 Dashboard")
+    # Show family identity in dashboard header
+    p1 = st.session_state.get('parent1_name', 'Parent 1')
+    p2 = st.session_state.get('parent2_name', '')
+    if p2 and p2 != 'N/A':
+        family_label = f"{p1} & {p2}"
+    else:
+        family_label = p1
+    st.header(f"📊 {family_label}'s Dashboard")
 
     # Plan completion indicator
     completion, missing = _plan_completion_pct()
@@ -10363,12 +10386,40 @@ TAB_HELP = {
 }
 
 
+TAB_SHORT_DESC = {
+    "dashboard": "Overview of your financial health — key metrics, trajectory, and alerts.",
+    "settings": "Configure names, emojis, and toggle optional tabs.",
+    "parent": "Income, career phases, retirement age, net worth, and Social Security.",
+    "family_expenses": "Shared household expenses — groceries, utilities, subscriptions.",
+    "recurring": "Recurring costs and one-time major purchases.",
+    "children": "Age-based expense templates for each child (ages 0-30).",
+    "house": "Properties, mortgages, property tax, and maintenance.",
+    "timeline": "Geographic relocations and spending strategy changes.",
+    "economy": "Investment return, inflation, and growth assumptions.",
+    "retirement": "Social Security benefits, claiming age, insolvency modeling.",
+    "healthcare": "Insurance plans, HSA, Medicare, and long-term care.",
+    "deterministic": "Year-by-year projection using your exact inputs.",
+    "monte_carlo": "Thousands of randomized simulations for a range of outcomes.",
+    "stress_test": "Test your plan against extreme scenarios.",
+    "save_load": "Save, compare, export/import scenarios.",
+    "tracking_input": "Enter actual year-end income and expenses.",
+    "tracking_compare": "Charts comparing your plan to reality.",
+    "tracking_excel": "Export plan to Excel with monthly tracking columns.",
+}
+
+
 def tab_walkthrough(tab_key: str):
-    """Render a collapsible help section for a tab."""
+    """Render a brief description with a popover for detailed help."""
+    short = TAB_SHORT_DESC.get(tab_key)
     help_text = TAB_HELP.get(tab_key)
-    if help_text:
-        with st.expander("💡 How this tab works", expanded=False):
-            st.markdown(help_text)
+    if short:
+        col_desc, col_info = st.columns([30, 1])
+        with col_desc:
+            st.caption(short)
+        if help_text:
+            with col_info:
+                with st.popover("ℹ️", use_container_width=False):
+                    st.markdown(help_text)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -11216,43 +11267,19 @@ def parent_settings_tab():
 
     st.info("💡 Changes take effect immediately. Disabled tabs are hidden from the navigation.")
 
-    # Instructions Section
+    # Instructions Section (collapsed by default)
     st.markdown("---")
-    st.header("📖 Application Instructions")
+    with st.expander("📖 Application Instructions", expanded=False):
+        st.markdown("""
+**Quick Start:** Settings → Parent Tabs → Expenses → Economy → Analysis → Save/Load
 
-    st.markdown("""
-    ### Welcome to Financial Planning Suite
-
-    This application helps you plan and project your family's financial future through comprehensive
-    modeling of income, expenses, investments, and major life events.
-
-    #### Quick Start Guide
-
-    1. **Settings**: Configure current year, parent names, and which tabs to show
-    2. **Parent Tabs**: Enter age, net worth, income, retirement plans, and Social Security
-    3. **Family Expenses**: Define annual expenses, taxes, major purchases
-    4. **Children**: Add children and configure their education expenses
-    5. **Houses**: Track property ownership, mortgages, and timelines
-    6. **Economy**: Configure market returns and inflation assumptions
-    7. **Timeline**: Review consolidated timeline and plan relocations
-    8. **Analysis**: Run Monte Carlo simulations to project future outcomes
-    9. **Save/Load**: Save scenarios for future reference
-
-    #### Optional Advanced Features
-
-    Enable in Settings → Tab Visibility to access:
-    - **Healthcare & Insurance**: Plan Medicare, HSA, and long-term care costs
-    - **Export Reports**: Generate Excel/CSV/JSON reports
-
-    #### Key Capabilities
-
-    - Location-based expense templates for major U.S. cities
-    - Monte Carlo simulation with detailed percentile analysis
-    - Historical market data (100+ years of S&P 500 returns)
-    - Social Security insolvency modeling
-    - Inflation adjustment and today's dollars view
-    - Multiple scenario comparison
-    """)
+1. **Settings**: Names, emojis, toggle optional tabs
+2. **Parent Tabs**: Age, net worth, income, retirement, Social Security
+3. **Expenses**: Family costs, recurring, housing, healthcare
+4. **Economy**: Returns, inflation assumptions
+5. **Analysis**: Cashflow projections, Monte Carlo simulations
+6. **Save/Load**: Save scenarios for comparison
+        """)
 
 
 def _guided_mode_toggle(tab_key):
@@ -17608,10 +17635,27 @@ def display_sidebar():
                     '<div class="test-mode-banner">🧪 TEST MODE</div>',
                     unsafe_allow_html=True,
                 )
+            # Build family display line
+            family_line = ""
+            if st.session_state.get('initialized'):
+                p1 = st.session_state.get('parent1_name', '')
+                p2 = st.session_state.get('parent2_name', '')
+                p1_emoji = st.session_state.get('parent1_emoji', '')
+                p2_emoji = st.session_state.get('parent2_emoji', '')
+                num_kids = len(st.session_state.get('children_list', []))
+                if p1 and p2 and p2 != 'N/A':
+                    family_line = f'{p1_emoji} {p1} & {p2_emoji} {p2}'
+                elif p1:
+                    family_line = f'{p1_emoji} {p1}'
+                if num_kids > 0:
+                    family_line += f' + {num_kids} {"child" if num_kids == 1 else "children"}'
+
+            family_html = f'<div class="family-members">{family_line}</div>' if family_line else ""
             st.markdown(
                 f'<div class="sidebar-user-badge">'
                 f'<div class="user-name">👤 {display_name}</div>'
                 f'<div class="household-name">🏠 {household_name}</div>'
+                f'{family_html}'
                 f'</div>',
                 unsafe_allow_html=True,
             )
@@ -17676,9 +17720,13 @@ def display_sidebar():
         total_income = st.session_state.parentX_income + st.session_state.parentY_income
         st.metric("Combined Annual Income", format_currency(total_income))
 
-        # Expenses
-        total_expenses = sum(st.session_state.expenses.values())
-        st.metric("Annual Family Expenses", format_currency(total_expenses))
+        # Expenses (all sources: individual parents + family shared)
+        family_exp = sum(st.session_state.get('family_shared_expenses', st.session_state.expenses).values())
+        p1_exp = sum(st.session_state.parentX_expenses.values())
+        p2_exp = sum(st.session_state.parentY_expenses.values())
+        total_expenses = family_exp + p1_exp + p2_exp
+        st.metric("Annual Base Expenses", format_currency(total_expenses))
+        st.caption("Excl. children, housing, recurring")
 
         # Children
         st.metric("Number of Children", len(st.session_state.children_list))
