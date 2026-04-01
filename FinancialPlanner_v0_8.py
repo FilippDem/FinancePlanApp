@@ -8362,10 +8362,10 @@ def initialize_session_state():
                     'mortgage_balance': 0.0,
                     'mortgage_rate': 0.0,
                     'mortgage_years_left': 0,
-                    'property_tax_rate': 0.025,
+                    'property_tax_rate': 0.018,
                     'home_insurance': 3200.0,
-                    'maintenance_rate': 0.01,
-                    'upkeep_costs': 15000.0,
+                    'maintenance_rate': 0.008,
+                    'upkeep_costs': 12000.0,
                     'owner': 'Shared',
                     'timeline': [
                         {'year': current_year - 5, 'status': 'Own_Live', 'rental_income': 0.0},
@@ -8476,7 +8476,7 @@ def initialize_session_state():
                 {
                     'name': 'International Luxury Travel',
                     'category': 'Travel',
-                    'amount': 45000.0,
+                    'amount': 30000.0,
                     'frequency_years': 1,
                     'start_year': current_year,
                     'end_year': None,
@@ -8488,7 +8488,7 @@ def initialize_session_state():
                 {
                     'name': 'Charitable Giving',
                     'category': 'Philanthropy',
-                    'amount': 50000.0,
+                    'amount': 30000.0,
                     'frequency_years': 1,
                     'start_year': current_year,
                     'end_year': None,
@@ -8566,8 +8566,8 @@ def initialize_session_state():
             'marriage_year': "N/A",
             'parentX_age': 35,
             'parentX_net_worth': 95000.0,
-            'parentX_income': 72000.0,  # Teacher salary, will increase to VP then Principal
-            'parentX_raise': 2.5,
+            'parentX_income': 92000.0,  # Experienced CA teacher salary (10+ years)
+            'parentX_raise': 3.0,
             'parentX_retirement_age': 62,  # Early retirement with good pension
             'parentX_ss_benefit': 2200.0,
             'parentY_age': 35,
@@ -8600,15 +8600,15 @@ def initialize_session_state():
                 {
                     'name': 'Sacramento Townhouse',
                     'purchase_year': current_year - 3,
-                    'purchase_price': 420000.0,
-                    'current_value': 450000.0,
-                    'mortgage_balance': 336000.0,
-                    'mortgage_rate': 0.068,
+                    'purchase_price': 350000.0,
+                    'current_value': 370000.0,
+                    'mortgage_balance': 270000.0,
+                    'mortgage_rate': 0.055,
                     'mortgage_years_left': 27,
                     'property_tax_rate': 0.011,
-                    'home_insurance': 1400.0,
-                    'maintenance_rate': 0.006,
-                    'upkeep_costs': 3000.0,
+                    'home_insurance': 1200.0,
+                    'maintenance_rate': 0.005,
+                    'upkeep_costs': 2500.0,
                     'owner': 'ParentX',
                     'timeline': [
                         {'year': current_year - 3, 'status': 'Own_Live', 'rental_income': 0.0},
