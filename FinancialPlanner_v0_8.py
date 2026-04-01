@@ -8566,7 +8566,7 @@ def initialize_session_state():
             'marriage_year': "N/A",
             'parentX_age': 35,
             'parentX_net_worth': 95000.0,
-            'parentX_income': 92000.0,  # Experienced CA teacher salary (10+ years)
+            'parentX_income': 95000.0,  # Senior CA teacher salary (Sacramento Unified, 10+ years)
             'parentX_raise': 3.0,
             'parentX_retirement_age': 62,  # Early retirement with good pension
             'parentX_ss_benefit': 2200.0,
@@ -8577,12 +8577,12 @@ def initialize_session_state():
             'parentY_retirement_age': 67,
             'parentY_ss_benefit': 0.0,
             'expenses': {
-                'Food & Groceries': 9600.0,
-                'Clothing': 2400.0,
-                'Transportation': 7200.0,
-                'Entertainment & Activities': 3600.0,
-                'Personal Care': 2400.0,
-                'Other Expenses': 4800.0
+                'Food & Groceries': 8400.0,
+                'Clothing': 1800.0,
+                'Transportation': 6000.0,
+                'Entertainment & Activities': 2400.0,
+                'Personal Care': 1800.0,
+                'Other Expenses': 3600.0
             },
             'children_list': [
                 {
@@ -8600,9 +8600,9 @@ def initialize_session_state():
                 {
                     'name': 'Sacramento Townhouse',
                     'purchase_year': current_year - 3,
-                    'purchase_price': 350000.0,
-                    'current_value': 370000.0,
-                    'mortgage_balance': 270000.0,
+                    'purchase_price': 410000.0,
+                    'current_value': 430000.0,
+                    'mortgage_balance': 330000.0,
                     'mortgage_rate': 0.055,
                     'mortgage_years_left': 27,
                     'property_tax_rate': 0.011,
