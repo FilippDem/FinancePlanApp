@@ -357,9 +357,10 @@ CHART_LAYOUT = dict(
 )
 
 CHART_LAYOUT_COMPACT = dict(
-    height=320,
-    margin=dict(l=20, r=20, t=50, b=20),
-    showlegend=False,
+    height=380,
+    margin=dict(l=10, r=10, t=50, b=10),
+    showlegend=True,
+    legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5, font=dict(size=11)),
     font=dict(family="Inter, -apple-system, sans-serif"),
 )
 
@@ -10155,7 +10156,8 @@ def dashboard_tab():
             with col1:
                 pie_fig = go.Figure(data=[go.Pie(
                     labels=exp_labels, values=exp_values,
-                    hole=0.45, textinfo='label+percent',
+                    hole=0.45, textinfo='percent',
+                    textposition='inside',
                     marker=dict(colors=COLOR_SEQUENCE[:len(exp_values)])
                 )])
                 pie_fig.update_layout(title=f"Expense Breakdown ({current_year})",
@@ -10176,7 +10178,8 @@ def dashboard_tab():
                 if inc_values:
                     inc_fig = go.Figure(data=[go.Pie(
                         labels=inc_labels, values=inc_values,
-                        hole=0.45, textinfo='label+percent',
+                        hole=0.45, textinfo='percent',
+                        textposition='inside',
                         marker=dict(colors=COLOR_SEQUENCE[2:2+len(inc_values)])
                     )])
                     inc_fig.update_layout(title=f"Income Sources ({current_year})",
