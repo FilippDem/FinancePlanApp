@@ -301,6 +301,28 @@ st.markdown("""
         border-radius: 6px;
         margin-bottom: 1rem;
     }
+
+    /* ── Replace Streamlit's sports running animation ── */
+    /* Hide the default running-man SVG icons */
+    [data-testid="stStatusWidget"] svg {
+        display: none !important;
+    }
+    /* Show a pulsing dot instead */
+    [data-testid="stStatusWidget"]::before {
+        content: "";
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #667eea;
+        animation: pulse-dot 1s ease-in-out infinite;
+        margin-right: 6px;
+        vertical-align: middle;
+    }
+    @keyframes pulse-dot {
+        0%, 100% { opacity: 0.3; transform: scale(0.8); }
+        50% { opacity: 1; transform: scale(1.2); }
+    }
 </style>
 """, unsafe_allow_html=True)
 
