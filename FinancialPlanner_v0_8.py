@@ -7817,15 +7817,15 @@ def initialize_session_state():
             'parentX_age': 28,
             'parentX_net_worth': 150000.0,
             'parentX_income': 180000.0,  # High initial, increases, sabbatical, then recovery
-            'parentX_raise': 8.0,
+            'parentX_raise': 5.0,  # Realistic tech raises with periodic promotions
             'parentX_retirement_age': 50,  # Early retirement!
-            'parentX_ss_benefit': 3500.0,
+            'parentX_ss_benefit': 2800.0,  # Reduced — only ~22 years of earnings
             'parentY_age': 27,
             'parentY_net_worth': 120000.0,
             'parentY_income': 165000.0,
-            'parentY_raise': 7.5,
+            'parentY_raise': 4.5,
             'parentY_retirement_age': 51,  # Early retirement!
-            'parentY_ss_benefit': 3200.0,
+            'parentY_ss_benefit': 2600.0,  # Reduced — only ~24 years of earnings
             'expenses': {
                 'Food & Groceries': 18000.0,
                 'Clothing': 6000.0,
@@ -7981,7 +7981,7 @@ def initialize_session_state():
                 {
                     'name': 'Boat Maintenance',
                     'category': 'Recreation',
-                    'amount': 8000.0,
+                    'amount': 13000.0,  # ~10% of boat value
                     'frequency_years': 1,
                     'start_year': current_year + 10,
                     'end_year': None,
@@ -8169,9 +8169,9 @@ def initialize_session_state():
                     'appreciation_rate': 0.0
                 },
                 {
-                    'name': "Career Change Education (Sarah MBA)",
+                    'name': "Career Change Education (Sarah MBA, public university)",
                     'year': current_year + 7,
-                    'amount': 65000.0,
+                    'amount': 95000.0,
                     'financing_years': 0,
                     'interest_rate': 0.0,
                     'asset_type': 'Expense',
@@ -8411,15 +8411,20 @@ def initialize_session_state():
                 {
                     'name': 'Aspen Ski Chalet',
                     'purchase_year': current_year + 3,
-                    'purchase_price': 1600000.0,
-                    'current_value': 1600000.0,
+                    'purchase_price': 3200000.0,
+                    'current_value': 3200000.0,
                     'mortgage_balance': 0.0,
                     'mortgage_rate': 0.0,
                     'mortgage_years_left': 0,
                     'property_tax_rate': 0.006,
-                    'home_insurance': 3800.0,
+                    'home_insurance': 5500.0,
                     'maintenance_rate': 0.012,
-                    'upkeep_costs': 18000.0
+                    'upkeep_costs': 22000.0,
+                    'appreciation_rate': 4.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 3, 'status': 'Own_Live', 'rental_income': 0.0}
+                    ]
                 }
             ],
             'major_purchases': [
@@ -8617,36 +8622,24 @@ def initialize_session_state():
                     ]
                 },
                 {
-                    'name': 'San Diego House',
+                    'name': 'San Diego Condo',
                     'purchase_year': current_year + 6,
-                    'purchase_price': 720000.0,
-                    'current_value': 720000.0,
-                    'mortgage_balance': 576000.0,
-                    'mortgage_rate': 0.058,
+                    'purchase_price': 520000.0,
+                    'current_value': 520000.0,
+                    'mortgage_balance': 416000.0,
+                    'mortgage_rate': 0.055,
                     'mortgage_years_left': 30,
                     'property_tax_rate': 0.0073,
-                    'home_insurance': 1800.0,
-                    'maintenance_rate': 0.007,
-                    'upkeep_costs': 5000.0,
+                    'home_insurance': 1500.0,
+                    'maintenance_rate': 0.006,
+                    'upkeep_costs': 3500.0,
                     'owner': 'ParentX',
                     'timeline': [
                         {'year': current_year + 6, 'status': 'Own_Live', 'rental_income': 0.0}
                     ]
-                },
-                {
-                    'name': 'Lake Tahoe Cabin',
-                    'purchase_year': current_year + 12,
-                    'purchase_price': 420000.0,
-                    'current_value': 420000.0,
-                    'mortgage_balance': 336000.0,
-                    'mortgage_rate': 0.062,
-                    'mortgage_years_left': 30,
-                    'property_tax_rate': 0.0085,
-                    'home_insurance': 1300.0,
-                    'maintenance_rate': 0.01,
-                    'asset_type': 'Expense',
-                    'appreciation_rate': 0.0
-                },
+                }
+            ],
+            'major_purchases': [
                 {
                     'name': 'Sabbatical Year (Educational Travel)',
                     'year': current_year + 10,
@@ -8730,7 +8723,7 @@ def initialize_session_state():
                 {
                     'year': current_year + 15,
                     'state': 'San Francisco',
-                    'spending_strategy': 'High-end'  # Principal salary, established career
+                    'spending_strategy': 'Average'  # Principal salary, comfortable but not lavish
                 }
             ],
             'economic_params': asdict(EconomicParameters(0.04, 0.03, 0.02, 0.05, False, False, False, False)),
@@ -8834,11 +8827,14 @@ def initialize_session_state():
                     'property_tax_rate': 0.0081,
                     'home_insurance': 1100.0,
                     'maintenance_rate': 0.011,
-                    'financing_years': 0,
-                    'interest_rate': 0.0,
-                    'asset_type': 'Expense',
-                    'appreciation_rate': 0.0
-                },
+                    'upkeep_costs': 3500.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 8, 'status': 'Own_Live', 'rental_income': 0.0}
+                    ]
+                }
+            ],
+            'major_purchases': [
                 {
                     'name': 'Luxury RV Purchase',
                     'year': current_year + 12,
@@ -9069,15 +9065,6 @@ def initialize_session_state():
                     'asset_type': 'Expense',
                     'appreciation_rate': 0.0
                 },
-                {
-                    'name': 'Emergency Fund Buffer',
-                    'year': current_year + 1,
-                    'amount': 5000.0,
-                    'financing_years': 0,
-                    'interest_rate': 0.0,
-                    'asset_type': 'Expense',
-                    'appreciation_rate': 0.0
-                }
             ],
             'recurring_expenses': [
                 {
