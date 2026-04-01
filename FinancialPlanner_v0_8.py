@@ -987,108 +987,8 @@ def household_picker_page(email: str):
                         st.rerun()
 
             st.markdown("---")
-            st.markdown("**Pre-built Example Families**")
-            st.caption("Load a pre-configured scenario to test the app without filling in the wizard.")
-
-            def _load_test_scenario(name, data_overrides):
-                """Create a test household and populate with example data."""
-                cleanup_test_households(email)
-                test_hid = create_test_household(email)
-                keys_to_keep = {'cf_email'}
-                for key in list(st.session_state.keys()):
-                    if key not in keys_to_keep:
-                        del st.session_state[key]
-                st.session_state.authenticated = True
-                st.session_state.current_user = email
-                st.session_state.user_data = {'display_name': 'Test User', 'household_id': test_hid}
-                st.session_state.household_id = test_hid
-                st.session_state.test_mode = True
-                st.session_state.wizard_complete = True
-                st.session_state.wizard_skipped = True
-                initialize_session_state()
-                for k, v in data_overrides.items():
-                    st.session_state[k] = v
-                try:
-                    json_data = save_data()
-                    if json_data:
-                        save_household_plan(test_hid, json_data)
-                except Exception:
-                    pass
-
-            # Quick test scenarios (override defaults)
-            st.markdown("**Quick Scenarios** (basic overrides, fast to load)")
-            quick_scenarios = {
-                "All Defaults (Seattle)": {},
-                "Young Couple, Seattle": {
-                    'parent1_name': 'Alex', 'parent2_name': 'Sam', 'parentX_age': 28, 'parentY_age': 27,
-                    'parentX_income': 95000.0, 'parentY_income': 80000.0, 'parentX_net_worth': 45000.0,
-                    'parentY_net_worth': 30000.0, 'marriage_year': 2024,
-                    'parentX_expenses': get_adult_expense_template("Seattle", "Conservative (statistical)"),
-                    'parentY_expenses': get_adult_expense_template("Seattle", "Conservative (statistical)"),
-                    'pretax_401k': 12000.0,  # Lower 401k for young couple
-                },
-                "Mid-Career + 2 Kids, Seattle": {
-                    'parent1_name': 'Maria', 'parent2_name': 'David', 'parentX_age': 38, 'parentY_age': 40,
-                    'parentX_income': 150000.0, 'parentY_income': 120000.0, 'parentX_net_worth': 350000.0,
-                    'parentY_net_worth': 280000.0, 'marriage_year': 2015,
-                    'children_list': [
-                        {'name': 'Sofia', 'birth_year': 2019, 'use_template': True, 'template_state': 'Seattle',
-                         'template_strategy': 'Average', 'school_type': 'Public', 'college_location': 'Seattle'},
-                        {'name': 'Lucas', 'birth_year': 2022, 'use_template': True, 'template_state': 'Seattle',
-                         'template_strategy': 'Average', 'school_type': 'Public', 'college_location': 'Seattle'},
-                    ],
-                },
-                "High Earner, Single, Seattle": {
-                    'parent1_name': 'Jordan', 'parent2_name': 'N/A', 'parentX_age': 35, 'parentY_age': 0,
-                    'parentX_income': 250000.0, 'parentY_income': 0.0, 'parentX_net_worth': 600000.0,
-                    'parentY_net_worth': 0.0, 'parentX_retirement_age': 55, 'marriage_year': 'N/A',
-                    'parentY_expenses': {cat: 0 for cat in get_adult_expense_template("Seattle", "Average (statistical)").keys()},
-                },
-                "Near Retirement, Seattle": {
-                    'parent1_name': 'Robert', 'parent2_name': 'Linda', 'parentX_age': 58, 'parentY_age': 56,
-                    'parentX_income': 130000.0, 'parentY_income': 85000.0, 'parentX_net_worth': 1200000.0,
-                    'parentY_net_worth': 800000.0, 'parentX_retirement_age': 62, 'parentY_retirement_age': 63,
-                    'parentX_ss_benefit': 3200.0, 'parentY_ss_benefit': 2400.0, 'marriage_year': 1992,
-                },
-                "Tight Budget, TX": {
-                    'parent1_name': 'Chris', 'parent2_name': 'Pat', 'parentX_age': 32, 'parentY_age': 30,
-                    'parentX_income': 55000.0, 'parentY_income': 45000.0, 'parentX_net_worth': 15000.0,
-                    'parentY_net_worth': 8000.0, 'marriage_year': 2023,
-                    'pretax_401k': 3000.0,  # Low 401k on tight budget
-                    'parentX_expenses': get_adult_expense_template("Houston", "Conservative (statistical)"),
-                    'parentY_expenses': get_adult_expense_template("Houston", "Conservative (statistical)"),
-                    'family_shared_expenses': {
-                        'Mortgage/Rent': 16800.0, 'Home Improvement': 300.0,
-                        'Property Tax': 0.0, 'Home Insurance': 0.0,
-                        'Gas & Electric': 1320.0, 'Water': 420.0, 'Garbage': 300.0,
-                        'Internet & Cable': 840.0, 'Shared Subscriptions': 240.0,
-                        'Family Vacations': 1200.0, 'Pet Care': 0.0, 'Other Family Expenses': 300.0,
-                    },
-                    'children_list': [
-                        {'name': 'Emma', 'birth_year': 2024, 'use_template': True, 'template_state': 'Houston',
-                         'template_strategy': 'Conservative', 'school_type': 'Public', 'college_location': 'Houston'},
-                    ],
-                },
-            }
-            cols = st.columns(3)
-            for idx, (name, overrides) in enumerate(quick_scenarios.items()):
-                with cols[idx % 3]:
-                    if st.button(f"📋 {name}", use_container_width=True, key=f"test_scenario_{idx}"):
-                        _load_test_scenario(name, overrides)
-                        st.rerun()
-
-            st.markdown("")
-            st.markdown("**Full Demo Scenarios** (detailed, with properties and career changes)")
-            st.caption("These load the same demos available in the scenario library. Edit them here and they persist for your test session.")
-
-            # Load demo scenario names from the init block
-            demo_names = [
-                ("Tech Couple SF→Austin", "[DEMO] Tech Couple: SF→Austin→Seattle, Early Retirement @50"),
-                ("3-Kid Family", "[DEMO] 3-Kid Family: Seattle→Portland→Denver"),
-                ("Executives NYC→Miami", "[DEMO] Executives: NYC→Miami→Portugal, Early Retire @55"),
-                ("Single Mom Teacher", "[DEMO] Single Mom: Sacramento→San Diego, Teacher→Principal"),
-                ("Empty Nesters @60", "[DEMO] Empty Nesters: Early Retire @60, Portland→Arizona→RV"),
-            ]
+            st.markdown("**Demo Scenarios**")
+            st.caption("Pre-built example families with properties, career changes, and full financial plans.")
 
             def _load_demo_scenario(demo_key):
                 """Load a demo scenario from saved_scenarios (populated by init)."""
@@ -1106,7 +1006,6 @@ def household_picker_page(email: str):
                 st.session_state.wizard_complete = True
                 st.session_state.wizard_skipped = True
                 initialize_session_state()
-                # Load the demo data
                 demo_data = st.session_state.saved_scenarios.get(demo_key)
                 if demo_data:
                     data_str = json.dumps(demo_data) if isinstance(demo_data, dict) else demo_data
@@ -1118,10 +1017,26 @@ def household_picker_page(email: str):
                 except Exception:
                     pass
 
+            demo_scenarios = [
+                ("Tech Couple, SF→Austin", "[DEMO] Tech Couple: SF→Austin→Seattle, Early Retirement @50",
+                 "Alex & Jordan, ages 28/27. $345k combined. 2 kids, 3 properties, early retire @50."),
+                ("3-Kid Family, Seattle", "[DEMO] 3-Kid Family: Seattle→Portland→Denver, Career Change, 4 Properties",
+                 "Mike & Sarah, ages 38/37. $210k combined. 3 kids, career change, 4 properties."),
+                ("Executives, NYC→Portugal", "[DEMO] Executives: NYC→Miami→Portugal, Early Retire @55, 5 Properties",
+                 "David & Jennifer, ages 45/43. $630k combined. $4.7M net worth, 5 properties, yacht."),
+                ("Single Mom, Sacramento", "[DEMO] Single Mom: Sacramento→San Diego, Teacher→Principal, 3 Properties",
+                 "Maria, age 35. $72k income. 1 kid, teacher→principal career, 3 properties."),
+                ("Empty Nesters, Portland", "[DEMO] Empty Nesters: Early Retire @60, Portland→Arizona→RV, 4 Properties",
+                 "Robert & Linda, ages 58/57. $223k combined. $2.15M net worth, RV retirement."),
+                ("Budget Family, Houston", "[DEMO] Budget Family: Houston→Austin, Careful Savers",
+                 "Chris & Pat, ages 32/30. $100k combined. $23k net worth, 2 kids, tight budget."),
+            ]
+
             cols = st.columns(3)
-            for idx, (short_name, full_key) in enumerate(demo_names):
+            for idx, (short_name, full_key, desc) in enumerate(demo_scenarios):
                 with cols[idx % 3]:
-                    if st.button(f"🎭 {short_name}", use_container_width=True, key=f"demo_scenario_{idx}"):
+                    if st.button(f"🎭 {short_name}", use_container_width=True, key=f"demo_scenario_{idx}",
+                                 help=desc):
                         _load_demo_scenario(full_key)
                         st.rerun()
 
@@ -9052,6 +8967,169 @@ def initialize_session_state():
                 }
             ],
             'economic_params': asdict(EconomicParameters(0.04, 0.03, 0.02, 0.05, False, False, False, False)),
+            'ss_insolvency_enabled': True,
+            'ss_shortfall_percentage': 30.0
+        }
+
+        # Scenario 6: Budget-Conscious Family in Texas
+        st.session_state.saved_scenarios["[DEMO] Budget Family: Houston→Austin, Careful Savers"] = {
+            'current_year': current_year,
+            'parent1_name': "Chris",
+            'parent1_emoji': "👨",
+            'parent2_name': "Pat",
+            'parent2_emoji': "👩",
+            'marriage_year': current_year - 3,
+            'parentX_age': 32,
+            'parentX_net_worth': 15000.0,
+            'parentX_income': 55000.0,
+            'parentX_raise': 3.0,
+            'parentX_retirement_age': 67,
+            'parentX_ss_benefit': 1800.0,
+            'parentY_age': 30,
+            'parentY_net_worth': 8000.0,
+            'parentY_income': 45000.0,
+            'parentY_raise': 2.5,
+            'parentY_retirement_age': 67,
+            'parentY_ss_benefit': 1500.0,
+            'pretax_401k': 3000.0,
+            'expenses': {
+                'Food & Groceries': 9600.0,
+                'Clothing': 2400.0,
+                'Transportation': 9600.0,
+                'Entertainment & Activities': 3000.0,
+                'Personal Care': 2400.0,
+                'Other Expenses': 3600.0
+            },
+            'children_list': [
+                {
+                    'name': 'Emma',
+                    'birth_year': current_year - 2,
+                    'use_template': True,
+                    'template_state': 'Houston',
+                    'template_strategy': 'Conservative',
+                    'school_type': 'Public',
+                    'college_type': 'Public',
+                    'college_location': 'Houston'
+                },
+                {
+                    'name': 'Liam',
+                    'birth_year': current_year + 2,
+                    'use_template': True,
+                    'template_state': 'Houston',
+                    'template_strategy': 'Conservative',
+                    'school_type': 'Public',
+                    'college_type': 'Public',
+                    'college_location': 'Houston'
+                }
+            ],
+            'houses': [
+                {
+                    'name': 'Houston Starter Home',
+                    'purchase_year': current_year - 1,
+                    'purchase_price': 280000.0,
+                    'current_value': 290000.0,
+                    'mortgage_balance': 252000.0,
+                    'mortgage_rate': 0.069,
+                    'mortgage_years_left': 29,
+                    'property_tax_rate': 0.022,
+                    'home_insurance': 1800.0,
+                    'maintenance_rate': 0.008,
+                    'upkeep_costs': 2500.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year - 1, 'status': 'Own_Live', 'rental_income': 0.0},
+                        {'year': current_year + 8, 'status': 'Sold', 'rental_income': 0.0}
+                    ]
+                },
+                {
+                    'name': 'Austin Family Home',
+                    'purchase_year': current_year + 8,
+                    'purchase_price': 380000.0,
+                    'current_value': 380000.0,
+                    'mortgage_balance': 342000.0,
+                    'mortgage_rate': 0.058,
+                    'mortgage_years_left': 30,
+                    'property_tax_rate': 0.020,
+                    'home_insurance': 2000.0,
+                    'maintenance_rate': 0.008,
+                    'upkeep_costs': 3000.0,
+                    'owner': 'Shared',
+                    'timeline': [
+                        {'year': current_year + 8, 'status': 'Own_Live', 'rental_income': 0.0}
+                    ]
+                }
+            ],
+            'major_purchases': [
+                {
+                    'name': "Pat's Career Certification",
+                    'year': current_year + 3,
+                    'amount': 8000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                },
+                {
+                    'name': 'Emergency Fund Buffer',
+                    'year': current_year + 1,
+                    'amount': 5000.0,
+                    'financing_years': 0,
+                    'interest_rate': 0.0,
+                    'asset_type': 'Expense',
+                    'appreciation_rate': 0.0
+                }
+            ],
+            'recurring_expenses': [
+                {
+                    'name': 'Used Family Car',
+                    'category': 'Vehicle',
+                    'amount': 22000.0,
+                    'frequency_years': 8,
+                    'start_year': current_year + 3,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 5,
+                    'interest_rate': 0.059
+                },
+                {
+                    'name': 'Budget Family Vacation',
+                    'category': 'Travel',
+                    'amount': 2500.0,
+                    'frequency_years': 1,
+                    'start_year': current_year + 2,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                },
+                {
+                    'name': 'Home Maintenance Fund',
+                    'category': 'Home',
+                    'amount': 1500.0,
+                    'frequency_years': 1,
+                    'start_year': current_year,
+                    'end_year': None,
+                    'inflation_adjust': True,
+                    'parent': 'Both',
+                    'financing_years': 0,
+                    'interest_rate': 0.0
+                }
+            ],
+            'state_timeline': [
+                {
+                    'year': current_year,
+                    'state': 'Houston',
+                    'spending_strategy': 'Conservative'
+                },
+                {
+                    'year': current_year + 8,
+                    'state': 'Houston',
+                    'spending_strategy': 'Average'
+                }
+            ],
+            'economic_params': asdict(EconomicParameters(0.06, 0.03, 0.025, 0.05, False, False, False, False)),
             'ss_insolvency_enabled': True,
             'ss_shortfall_percentage': 30.0
         }
