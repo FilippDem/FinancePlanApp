@@ -12,6 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Patch Streamlit's loading screen (replace sports icons with branded spinner)
+COPY patch_loading.py .
+RUN python patch_loading.py && rm patch_loading.py
+
 # Copy application
 COPY FinancialPlanner_v0_8.py .
 
