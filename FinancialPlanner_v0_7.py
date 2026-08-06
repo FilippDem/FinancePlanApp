@@ -1914,7 +1914,7 @@ def initialize_session_state():
 
         # Parent X data
         st.session_state.parentX_age = 35
-        st.session_state.parentX_net_worth = 85000.0
+        st.session_state.parentX_net_worth = 4900000.0
         st.session_state.parentX_income = 95000.0
         st.session_state.parentX_raise = 3.5
         st.session_state.parentX_retirement_age = 65
