@@ -15,6 +15,14 @@ This is a Streamlit-based lifetime financial planning application (V14) with:
 - **Data**: Each household gets an isolated JSON file in `data/households/`
 - **Deploy**: Docker + Nginx Proxy Manager for HTTPS
 
+## v2 (React + FastAPI rewrite) — branch `v2-react`, folder `v2/`
+
+- The Streamlit app (`FinancialPlanner_v0_8.py`) is frozen at tag `v0.8-streamlit` / branch `legacy/streamlit-v0.8` and still deploys from `main`.
+- v2 shares the same data directory format — the Data Preservation Policy above applies unchanged (server merges keys, backs up before each write).
+- Engine: `v2/engine/finplan` (pure numpy). Math changes vs v0.8 are listed in `v2/docs/ENGINE_CHANGES.md`; feature status in `v2/docs/PARITY.md` — keep it updated and never drop a ✅ item.
+- Tests: `cd v2/engine && python -m pytest -q` and `cd v2 && python -m pytest -q server/tests` must pass; `cd v2/web && npx tsc -b` must be clean.
+- Reference data (templates, tax tables, demos) is extracted from v0.8 by `v2/tools/extract_v08_data.py` — don't hand-edit the JSON.
+
 ## NAS Deployment Details
 
 - **NAS Model**: TerraMaster F4-223 (Intel Celeron N4505, 32GB RAM)

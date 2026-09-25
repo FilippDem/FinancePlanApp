@@ -1,0 +1,7 @@
+web/node_modules/
+web/dist/
+app-data-v2/
+__pycache__/
+.pytest_cache/
+*.pyc
+web/*.tsbuildinfo

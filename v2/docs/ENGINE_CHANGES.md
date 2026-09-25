@@ -1,0 +1,50 @@
+# v2 engine: what changed vs v0.8
+
+The v0.8 engine was spread across `calculate_lifetime_cashflow()` (deterministic),
+the Monte Carlo loop in `monte_carlo_simulation_tab()` and the stress-test tab,
+each reading `st.session_state` directly and each with slightly different math.
+v2 has **one** engine (`engine/finplan/engine.py`) used for both the
+deterministic projection and Monte Carlo. It is pure Python/numpy with no
+Streamlit dependency, and it runs 5,000 Monte Carlo paths in well under a second.
+
+Numbers from v2 **will differ** from v0.8. Most differences come from v0.8 bugs
+that made plans look far better than they are. Every change below is covered by
+a test in `engine/tests/test_engine.py`.
+
+## Bugs fixed (these change results)
+
+| # | v0.8 behaviour | v2 behaviour |
+|---|---|---|
+| 1 | **Mortgage payments were never charged.** House costs covered property tax, insurance, maintenance and upkeep only, and "Mortgage/Rent" was zeroed whenever you lived in an owned home. | Principal and interest are paid every year until payoff, using real amortization. |
+| 2 | Home equity was estimated with a linear payoff, never added to net worth, and "liquid = net worth − equity" subtracted equity that had never been added. | Net worth = savings + pre-tax accounts + home equity + other assets − consumer loans. Equity grows with appreciation and principal paydown. |
+| 3 | Future home purchases were free: no down payment. | A purchase after the current year pays (price − mortgage) from savings in the purchase year. |
+| 4 | Selling a home produced no proceeds. Timelines saved as `Sell` were never treated as sold, so the house kept costing money. | The sale year pays off the loan, deducts selling costs (default 6%) and adds the proceeds to savings. `Sell` and `Sold` both work. |
+| 5 | Rental income (`Own_Rent`) was ignored. | Rent is income, and net rental profit is taxed as ordinary income without FICA. |
+| 6 | Social Security started at the **retirement** age (even at 50), was flat forever (no COLA) and had no claiming adjustment. | Benefits start at the claim age (62–70, default max(retirement, 62)). The entered benefit is treated as the age-67 amount and adjusted by the SSA early/late factors (62 → 70%, 70 → 124%). Benefits grow with inflation, and a surviving spouse keeps the larger benefit. The insolvency cut and its start year remain configurable. |
+| 7 | Monte Carlo return "variability" multiplied the *rate*: 6% × (1 ± 15%) gives 5.1–6.9%, which is almost no market risk. | Volatility is in percentage points (6% ± 15 pp gives a realistic spread). The asymmetric upside/downside split is kept. |
+| 8 | Monte Carlo ignored taxes entirely. | Monte Carlo runs the same cash flow, tax and housing code as the projection. |
+| 9 | The "Historical average" economy toggle set the return to the S&P arithmetic mean (12.4%, 100% stocks, no fees). | The value is still available as a button, with a warning. Historical Monte Carlo adds a stock/bond allocation and an optional *sequential* (real historical sequences) sampling mode. |
+| 10 | Children, one-time purchases and healthcare premiums were never inflated. | Children and purchases inflate with CPI; healthcare with healthcare inflation. Child templates (2024 dollars) are also scaled to the current year. |
+| 11 | College cost = the template's own college "Education" amount **plus** tuition **plus** room & board (double counted). | College years use tuition + room & board for the college location, replacing the template amount. |
+| 12 | Financing on recurring expenses and one-time purchases was ignored: the full amount was charged at once. | Financed items are amortized over the loan term and the remaining loan balance counts as a liability. Purchases marked Vehicle/Real Estate/Investment/Depreciating are kept as assets that appreciate or depreciate. |
+| 13 | Tax brackets, the standard deduction and the FICA wage base were frozen at 2024 nominal values. | These are indexed to inflation. FICA applies per earner, not on combined wages. |
+| 14 | Health expenses (`health_expenses`) were collected but never used. | They are included, age-ranged and per person. |
+| 15 | A negative net worth kept "earning" investment returns (which shrinks the debt in down years). | A negative savings balance accrues interest at the borrowing rate (default 7%). |
+| 16 | Plans without `parentX_career_phases` (e.g. all six demos) silently used a default 75k phase starting at age 30, so the Tech Couple demo earned **$0** in year one. | Missing career phases means the simple income model is used: income, raise and job changes. |
+| 17 | 401(k) contributions were only a tax deduction and then disappeared. | Contributions (and HSA contributions) are deducted from taxable wages and accumulate in a pre-tax bucket. Shortfalls are withdrawn from it, grossed up for income tax. |
+
+## Behaviour kept from v0.8 (intentionally)
+- Expense categories, templates and all reference data are identical, extracted automatically by `tools/extract_v08_data.py`.
+- Family "Mortgage/Rent" is skipped in years you live in an owned home. "Property Tax" and "Home Insurance" family lines are also skipped while any home is owned, because they come from the Homes page.
+- Pooled vs Separate finances. The shared-cost split % and per-owner house costs are kept.
+- Income variability applies to wages only, not Social Security (V14 fix). Maintenance uses `maintenance_rate` (V14 fix). Children's health categories use healthcare inflation (V14 fix).
+- `expense_growth_rate` is stored but not used (v0.8 didn't use it either).
+
+## Money conventions
+- Recurring amounts you type (spending, rent, premiums, SS benefit, 401(k), one-time costs) are **today's dollars** and inflate every year.
+- Salaries are nominal and grow by the raise %.
+- House prices, values and mortgage balances are nominal as entered.
+- `parentX_net_worth` means **savings & investments excluding home equity**. That matches how v0.8's math used it. Homes are added from the Homes list.
+
+## Why the demo plans now look much worse
+The six demo households were tuned against the v0.8 engine, which never charged mortgage payments or down payments. With those included, most demos run out of money, because they buy several homes with little income headroom. They still load and are useful for exploring the UI, but they need re-tuning.

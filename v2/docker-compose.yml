@@ -1,0 +1,19 @@
+# v2 runs NEXT TO the Streamlit app (port 8501) on port 8502.
+#
+# By default it uses its own data folder (./app-data-v2) so you can try it
+# safely. To try it against real plans, copy them first:
+#     cp -r ../app-data ./app-data-v2        (backups are made on every save)
+# Once you are happy, point this volume at ../app-data instead.
+services:
+  financial-planner-v2:
+    build: .
+    container_name: financial-planner-v2
+    ports:
+      - "8502:8502"
+    volumes:
+      - ./app-data-v2:/app/data
+    environment:
+      - DATA_DIR=/app/data
+      # Set to 0 when behind Cloudflare Access so only the CF identity is trusted
+      - ALLOW_DEV_LOGIN=1
+    restart: unless-stopped
