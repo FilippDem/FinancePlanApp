@@ -7,6 +7,7 @@ import { SpendingSlider, useCurve } from '../components/SpendingSlider'
 import { Curve, rescale, strategyFor, describe } from '../lib/spending'
 import { money, pct } from '../lib/format'
 import { FlowShell, Question, ChoiceCards, Chips, BigField, Slider } from '../components/flow'
+import { LocationPicker } from './Locations'
 import { Money, NumberInput, Percent, TextInput, Select, Button, Card, Note } from '../components/ui'
 import { Sparkline } from '../components/charts'
 import { monthlyPayment } from '../lib/mortgage'
@@ -35,6 +36,14 @@ interface Answers {
   plans: string[]
   planAmounts: Record<string, number>
   lifeExp: number
+  life2?: number
+  marriage?: number
+  moves?: { year: number; location: string }[]
+  jobs?: { p1: { year: number; income: number }[]; p2: { year: number; income: number }[] }
+  monthly?: { utilities: number; water: number; internet: number; subs: number; pets: number; other: number }
+  custom?: { name: string; amount: number; kind: 'once' | 'recurring'; year: number; every: number }[]
+  hsa?: { balance: number; contrib: number }
+  oop?: number
   ssCut: boolean
   cadence: 'quarterly' | 'semiannual' | 'annual' | 'off'
 }
@@ -50,7 +59,10 @@ const DEFAULT: Answers = {
   kids: 'none', children: [], style: 'Average', health: 'employer', bridge: 1400, plans: ['vacation'],
   planAmounts: { car: 35000, vacation: 6000, wedding: 30000, renovation: 50000, boat: 40000, college_help: 0 },
   lifeExp: 95, ssCut: true, cadence: 'quarterly',
+  moves: [], jobs: { p1: [], p2: [] }, custom: [],
+  monthly: { utilities: 180, water: 60, internet: 120, subs: 40, pets: 0, other: 50 }, hsa: { balance: 0, contrib: 0 }, oop: 1500,
 }
+const EMOJIS = ['👨', '👩', '🧑', '👱', '👴', '👵', '🧔', '👩‍🦰', '👨‍🦱', '🧕', '🙂']
 
 const BIG_PLANS: { value: string; label: string; kind: 'recurring' | 'once'; every?: number; desc: string }[] = [
   { value: 'car', label: 'New car every 8 years', kind: 'recurring', every: 8, desc: 'Replacement vehicle' },
@@ -77,7 +89,7 @@ function buildPlan(A: Answers, base: any, curve: Curve) {
     p[`parent${idx}_name`] = a.name || (idx === 1 ? 'Me' : 'Partner')
     p[`parent${idx}_emoji`] = a.emoji
     p[`parent${who}_age`] = a.age
-    p[`parent${who}_death_age`] = A.lifeExp
+    p[`parent${who}_death_age`] = who === 'Y' && A.life2 ? A.life2 : A.lifeExp
     p[`parent${who}_income`] = a.work === 'working' ? a.income : 0
     p[`parent${who}_raise`] = a.raise
     p[`parent${who}_retirement_age`] = a.work === 'retired' ? a.age : a.retire
@@ -85,7 +97,7 @@ function buildPlan(A: Answers, base: any, curve: Curve) {
     p[`parent${who}_pretax_balance`] = a.retirement
     p[`parent${who}_ss_benefit`] = A.ss_mode === 'known' ? a.ss : estimateSS(a.work === 'home' ? 0 : a.income)
     p[`parent${who}_career_phases`] = []
-    p[`parent${who}_job_changes`] = []
+    p[`parent${who}_job_changes`] = ((A.jobs?.[idx === 1 ? 'p1' : 'p2']) || []).filter(j => j.year > CY).map(j => ({ Year: j.year, 'New Income': j.income }))
     p[`parent${who}_expense_location`] = A.location
     p[`parent${who}_expense_strategy`] = strat
     p[`parent${who}_expenses`] = rescale({}, curve, null, level)
@@ -104,10 +116,18 @@ function buildPlan(A: Answers, base: any, curve: Curve) {
     p.tax_filing_status = 'married'
   }
   p.pretax_401k = A.contrib
-  p.state_timeline = [{ year: CY, state: A.location, spending_strategy: strat.replace(' (statistical)', '') }]
+  p.state_timeline = [{ year: CY, state: A.location, spending_strategy: strat.replace(' (statistical)', '') },
+    ...(A.moves || []).filter(m => m.year > CY && m.location).sort((a, b) => a.year - b.year)
+      .map(m => ({ year: m.year, state: m.location, spending_strategy: strat.replace(' (statistical)', '') }))]
+  if (!single && A.marriage) p.marriage_year = A.marriage
   // housing
   const fam = { ...p.family_shared_expenses }
   fam['Mortgage/Rent'] = A.housing === 'rent' ? A.rent * 12 : 0
+  const mo = A.monthly
+  if (mo) {
+    fam['Gas & Electric'] = mo.utilities * 12; fam['Water'] = mo.water * 12; fam['Internet & Cable'] = mo.internet * 12
+    fam['Shared Subscriptions'] = mo.subs * 12; fam['Pet Care'] = mo.pets * 12; fam['Other Family Expenses'] = mo.other * 12
+  }
   p.family_shared_expenses = fam
   p.houses = []
   if (A.housing === 'own') {
@@ -146,6 +166,14 @@ function buildPlan(A: Answers, base: any, curve: Curve) {
     else p.major_purchases.push({ name: bp.label, year: CY + (bp.value === 'renovation' ? 5 : bp.value === 'wedding' ? 20 : 10), amount: amt,
       financing_years: 0, interest_rate: 0, asset_type: bp.value === 'boat' ? 'Depreciating' : 'Expense', appreciation_rate: bp.value === 'boat' ? -0.1 : 0 })
   }
+  for (const c of A.custom || []) {
+    if (!c.name || !c.amount) continue
+    if (c.kind === 'recurring') p.recurring_expenses.push({ name: c.name, category: 'Other', amount: c.amount, frequency_years: Math.max(1, c.every), start_year: c.year,
+      end_year: null, inflation_adjust: true, parent: 'Both', financing_years: 0, interest_rate: 0 })
+    else p.major_purchases.push({ name: c.name, year: c.year, amount: c.amount, financing_years: 0, interest_rate: 0, asset_type: 'Expense', appreciation_rate: 0 })
+  }
+  if (A.hsa) { p.hsa_balance = A.hsa.balance; p.hsa_contribution = A.hsa.contrib }
+  if (A.oop) p.health_expenses = [{ name: 'Out-of-pocket medical', annual_amount: A.oop, affected_person: 'Both', start_age: 0, end_age: 120 }]
   p.ss_insolvency_enabled = A.ssCut
   p.mc_simulations = 1000
   return p
@@ -211,13 +239,26 @@ export default function Onboarding() {
           <div key={w} className="grid grid-cols-[1fr_120px] gap-3">
             <BigField label={k === 0 ? 'Your first name' : "Partner's first name"}><TextInput big autoFocus={k === 0} value={A[w].name} onChange={v => setP(w, { name: v })} /></BigField>
             <BigField label="Age"><NumberInput big value={A[w].age} min={18} max={100} step={1} onChange={v => setP(w, { age: Math.round(v) })} /></BigField>
+            <div className="col-span-2 flex flex-wrap gap-1.5 -mt-1">{EMOJIS.map(e => (
+              <button key={e} onClick={() => setP(w, { emoji: e })} className={`w-9 h-9 rounded-lg text-lg ${A[w].emoji === e ? 'bg-accentSoft ring-2 ring-accent' : 'hover:bg-sunken'}`}>{e}</button>))}</div>
           </div>
         ))}
+        {couple && <BigField label="Year you married or joined finances (optional)"><NumberInput big value={A.marriage ?? null} placeholder="e.g. 2019" step={1} onChange={v => set({ marriage: Math.round(v) })} /></BigField>}
       </Question>) },
     { section: 0, body: (
       <Question title="Where do you live?" subtitle="We use it for local cost-of-living averages and state income tax." why="Living costs vary by 40%+ between cities, and state income tax ranges from 0% to over 10%.">
-        <BigField label="City, state or country"><Select className="!h-12 !text-[17px] !rounded-xl" value={A.location} options={reference?.locations || [A.location]} onChange={v => set({ location: v })} /></BigField>
-        <p className="text-sm text-muted">Planning a move? Add it later under Assumptions → Where you live.</p>
+        <BigField label="Country → state → city"><LocationPicker value={A.location} catalog={reference?.location_catalog} onChange={v => set({ location: v })} /></BigField>
+        <div className="space-y-2">
+          <span className="block text-[14px] font-medium">Planning to move?</span>
+          {(A.moves || []).map((m, j) => (
+            <div key={j} className="flex flex-wrap items-center gap-2">
+              <div className="w-24"><NumberInput value={m.year} step={1} onChange={v => set({ moves: A.moves!.map((x, k) => k === j ? { ...x, year: Math.round(v) } : x) })} /></div>
+              <LocationPicker value={m.location} catalog={reference?.location_catalog} compact onChange={v => set({ moves: A.moves!.map((x, k) => k === j ? { ...x, location: v } : x) })} />
+              <button className="p-1.5 text-muted hover:text-bad" onClick={() => set({ moves: A.moves!.filter((_, k) => k !== j) })}><Trash2 size={15} /></button>
+            </div>))}
+          <Button size="sm" onClick={() => set({ moves: [...(A.moves || []), { year: CY + 5, location: A.location }] })}><Plus size={14} />Add a move</Button>
+          <p className="text-[13px] text-muted">Taxes and everyday prices follow you when you move. Map and details under Where you live.</p>
+        </div>
       </Question>) },
     ...(['p1', ...(couple ? ['p2'] : [])] as ('p1' | 'p2')[]).map(w => ({ section: 1, body: (
       <Question title={w === 'p1' ? 'Are you working right now?' : `Is ${n2} working right now?`}>
@@ -231,6 +272,17 @@ export default function Onboarding() {
             <span className="block text-[14px] font-medium mb-2">How do you expect it to grow?</span>
             <ChoiceCards cols={3} value={A[w].raise} onChange={v => setP(w, { raise: v })} options={[
               { value: 2, label: 'Steady', desc: '~2% a year' }, { value: 3, label: 'Typical', desc: '~3% a year' }, { value: 5, label: 'Fast-growing', desc: '~5% a year' }]} />
+          </div>
+          <div className="space-y-2">
+            <span className="block text-[14px] font-medium">Expect a career change? (optional)</span>
+            {((A.jobs || { p1: [], p2: [] })[w] || []).map((j, k) => (
+              <div key={k} className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-ink2">In</span><div className="w-24"><NumberInput value={j.year} step={1} onChange={v => set({ jobs: { ...A.jobs!, [w]: A.jobs![w].map((x, q) => q === k ? { ...x, year: Math.round(v) } : x) } })} /></div>
+                <span className="text-sm text-ink2">new income</span><div className="w-40"><Money value={j.income} step={5000} onChange={v => set({ jobs: { ...A.jobs!, [w]: A.jobs![w].map((x, q) => q === k ? { ...x, income: v } : x) } })} /></div>
+                <button className="p-1.5 text-muted hover:text-bad" onClick={() => set({ jobs: { ...A.jobs!, [w]: A.jobs![w].filter((_, q) => q !== k) } })}><Trash2 size={15} /></button>
+                {j.year - CY + A[w].age >= A[w].retire && <span className="text-[12.5px] text-warn">After the planned retirement age — it won't count</span>}
+              </div>))}
+            <Button size="sm" onClick={() => set({ jobs: { ...(A.jobs || { p1: [], p2: [] }), [w]: [...((A.jobs || { p1: [], p2: [] })[w] || []), { year: CY + 3, income: Math.round(A[w].income * 1.25 / 1000) * 1000 }] } })}><Plus size={14} />Add a change</Button>
           </div>
         </>}
       </Question>) })),
@@ -330,6 +382,16 @@ export default function Onboarding() {
         <p className="text-sm text-muted">Tap a label to jump to it. You can fine-tune every category later under Spending.</p>
       </Question>) },
     { section: 5, body: (
+      <Question title="What do your household bills look like?" subtitle="Monthly amounts for the whole household. Rough guesses are fine."
+        why="These shared costs sit on top of personal spending. Utilities and subscriptions add up to thousands a year.">
+        <div className="grid sm:grid-cols-2 gap-3">
+          {([['utilities', 'Gas & electric'], ['water', 'Water & garbage'], ['internet', 'Internet & phone plans'], ['subs', 'Shared subscriptions'],
+            ['pets', 'Pets'], ['other', 'Other household costs']] as const).map(([k, l]) => (
+            <BigField key={k} label={`${l} per month`}><Money big value={A.monthly?.[k] ?? 0} step={10} onChange={v => set({ monthly: { ...A.monthly!, [k]: v } })} /></BigField>))}
+        </div>
+        <p className="text-sm text-muted">About <b className="text-ink">{money(Object.values(A.monthly || {}).reduce((a, b) => a + b, 0) * 12, { compact: false })}</b> a year.</p>
+      </Question>) },
+    { section: 5, body: (
       <Question title="How do you get health insurance?" why="Healthcare is often the biggest surprise in retirement, especially if you retire before Medicare starts at 65.">
         <ChoiceCards value={A.health} onChange={v => set({ health: v })} options={[
           { value: 'employer', label: 'Through work', icon: <Briefcase size={20} /> }, { value: 'marketplace', label: 'I buy my own', icon: <HeartPulse size={20} />, desc: 'Marketplace / ACA' },
@@ -338,6 +400,11 @@ export default function Onboarding() {
           <BigField label={A.health === 'marketplace' ? 'Monthly premium' : 'Estimated premium between retiring and Medicare (65)'}
             hint="Marketplace plans for a couple in their 60s are often $1,200–$2,000/mo before subsidies">
             <Money big value={A.bridge} step={100} onChange={v => set({ bridge: v })} /></BigField>}
+        <div className="grid sm:grid-cols-3 gap-3">
+          <BigField label="Out-of-pocket medical per year" hint="Deductibles, copays, prescriptions"><Money big value={A.oop ?? 0} step={250} onChange={v => set({ oop: v })} /></BigField>
+          <BigField label="HSA balance"><Money big value={A.hsa?.balance ?? 0} step={1000} onChange={v => set({ hsa: { ...(A.hsa || { balance: 0, contrib: 0 }), balance: v } })} /></BigField>
+          <BigField label="HSA contribution per year"><Money big value={A.hsa?.contrib ?? 0} step={500} onChange={v => set({ hsa: { ...(A.hsa || { balance: 0, contrib: 0 }), contrib: v } })} /></BigField>
+        </div>
       </Question>) },
     { section: 5, body: (
       <Question title="Any big plans we should include?" subtitle="Tap all that apply. Amounts are in today's dollars.">
@@ -349,9 +416,25 @@ export default function Onboarding() {
             <Money value={A.planAmounts[b.value]} step={1000} onChange={v => set({ planAmounts: { ...A.planAmounts, [b.value]: v } })} />
           </div>
         ))}
-        <BigField label="Plan until what age?" hint="We plan to this age for both of you. Planning long is safer.">
+        <div className="space-y-2">
+          <span className="block text-[14px] font-medium">Anything else? (optional)</span>
+          {(A.custom || []).map((c, j) => (
+            <div key={j} className="flex flex-wrap items-center gap-2">
+              <div className="w-48"><TextInput value={c.name} placeholder="e.g. Sabbatical, new roof" onChange={v => set({ custom: A.custom!.map((x, k) => k === j ? { ...x, name: v } : x) })} /></div>
+              <div className="w-36"><Money value={c.amount} step={1000} onChange={v => set({ custom: A.custom!.map((x, k) => k === j ? { ...x, amount: v } : x) })} /></div>
+              <div className="w-32"><Select value={c.kind} options={[{ value: 'once', label: 'Once, in' }, { value: 'recurring', label: 'Every N yrs from' }]} onChange={v => set({ custom: A.custom!.map((x, k) => k === j ? { ...x, kind: v as any } : x) })} /></div>
+              <div className="w-24"><NumberInput value={c.year} step={1} onChange={v => set({ custom: A.custom!.map((x, k) => k === j ? { ...x, year: Math.round(v) } : x) })} /></div>
+              {c.kind === 'recurring' && <><span className="text-sm text-ink2">every</span><div className="w-20"><NumberInput value={c.every} min={1} step={1} onChange={v => set({ custom: A.custom!.map((x, k) => k === j ? { ...x, every: Math.round(v) } : x) })} /></div><span className="text-sm text-ink2">yrs</span></>}
+              <button className="p-1.5 text-muted hover:text-bad" onClick={() => set({ custom: A.custom!.filter((_, k) => k !== j) })}><Trash2 size={15} /></button>
+            </div>))}
+          <Button size="sm" onClick={() => set({ custom: [...(A.custom || []), { name: '', amount: 10000, kind: 'once', year: CY + 5, every: 5 }] })}><Plus size={14} />Add your own</Button>
+        </div>
+        <BigField label={couple ? `Plan until what age? (${n1})` : 'Plan until what age?'} hint="Planning long is safer.">
           <ChoiceCards cols={3} value={A.lifeExp} onChange={v => set({ lifeExp: v })} options={[{ value: 90, label: '90' }, { value: 95, label: '95', badge: 'Recommended' }, { value: 100, label: '100' }]} />
         </BigField>
+        {couple && <BigField label={`Plan until what age? (${n2})`}>
+          <ChoiceCards cols={3} value={A.life2 ?? A.lifeExp} onChange={v => set({ life2: v })} options={[{ value: 90, label: '90' }, { value: 95, label: '95' }, { value: 100, label: '100' }]} />
+        </BigField>}
       </Question>) },
     { section: 6, body: (
       <Question title="How often should we check in?" subtitle="A check-in takes about 5 minutes: update your balances, see if you're on track, and the plan rolls forward."

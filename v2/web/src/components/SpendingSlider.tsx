@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Info } from 'lucide-react'
 import { Curve, getCurve, levelAt, sum, xForTotal, describe } from '../lib/spending'
 import { money, clsx } from '../lib/format'
@@ -32,15 +32,29 @@ export function SpendingSlider({ curve, value, onChange, adults = 1, compact }:
   { curve: Curve | null; value: number; onChange: (x: number) => void; adults?: number; compact?: boolean }) {
   const ms = useMemo(() => (curve ? milestones(curve) : []), [curve])
   const per = curve ? sum(levelAt(curve, value)) : 0
-  // stagger labels that would overlap
+  // stagger labels into rows so they never overlap (greedy, using the measured track width)
+  const trackRef = useRef<HTMLDivElement>(null)
+  const [w, setW] = useState(600)
+  useEffect(() => {
+    const el = trackRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setW(el.clientWidth || 600))
+    ro.observe(el); setW(el.clientWidth || 600)
+    return () => ro.disconnect()
+  }, [curve])
   const rows = useMemo(() => {
-    const r: number[] = []
-    let last0 = -99, last1 = -99
-    for (const m of ms) {
-      if (m.x - last0 >= 11) { r.push(0); last0 = m.x } else if (m.x - last1 >= 11) { r.push(1); last1 = m.x } else { r.push(2) }
-    }
-    return r
-  }, [ms])
+    const ends: number[] = []           // right edge (px) of the last label in each row
+    return ms.map(m => {
+      const width = Math.max(m.label.length * 6.4, 40) + 10
+      const center = (m.x / 100) * w
+      const left = m.x > 93 ? center - width : m.x < 7 ? center : center - width / 2
+      let r = ends.findIndex(e => left > e)
+      if (r === -1) { r = ends.length; ends.push(0) }
+      ends[r] = left + width
+      return r
+    })
+  }, [ms, w])
+  const nRows = Math.max(1, ...rows.map(r => r + 1))
   if (!curve) return <div className="h-40 flex items-center justify-center text-sm text-muted">Loading spending data…</div>
   const pct = (x: number) => `${x}%`
   return (
@@ -49,17 +63,17 @@ export function SpendingSlider({ curve, value, onChange, adults = 1, compact }:
         <span className={clsx('font-semibold tnum tracking-tight', compact ? 'text-[26px]' : 'text-[32px]')}>{money(per * adults, { compact: false })}</span>
         <span className="text-sm text-muted">per year{adults > 1 ? ` for ${adults} adults` : ' per adult'} · {money(per * adults / 12, { compact: false })}/mo</span>
       </div>
-      <div className="text-[13px] text-ink2 mt-0.5">{describe(curve, value).replace(' avg', ' average')}</div>
+      <div className="text-[13px] text-ink2 mt-0.5">{(ms.find(m => Math.abs(m.x - value) < 1.5)?.desc) ?? describe(curve, value).replace(' avg', ' average')}</div>
       <div className="relative mt-4 mb-2 px-1">
         <input type="range" min={0} max={100} step={1} value={value} onChange={e => onChange(+e.target.value)}
           aria-label="Spending level" className="w-full accent-[rgb(var(--accent))] relative z-10" />
-        <div className="relative h-[70px] mt-1">
+        <div ref={trackRef} className="relative mt-1" style={{ height: nRows * 30 + 6 }}>
           {ms.map((m, i) => (
             <button key={m.label + m.x} type="button" title={`${m.desc}: ${money(m.total * adults, { compact: false })}/yr`}
               onClick={() => onChange(Math.round(m.x))}
               className={clsx('absolute flex flex-col group', m.x > 93 ? '-translate-x-full items-end' : m.x < 7 ? 'items-start' : '-translate-x-1/2 items-center')}
-              style={{ left: pct(m.x), top: rows[i] * 22 }}>
-              <span className={clsx('w-px h-2', m.label.startsWith('Old app') ? 'bg-muted/50' : 'bg-ink2/60')} />
+              style={{ left: pct(m.x), top: rows[i] * 30 }}>
+              <span className={clsx('w-px', m.label.startsWith('Old app') ? 'bg-muted/50' : 'bg-ink2/60')} style={{ height: 8 + rows[i] * 30, marginTop: -rows[i] * 30 }} />
               <span className={clsx('text-[11px] whitespace-nowrap leading-4 group-hover:text-accent', Math.abs(m.x - value) < 1.5 ? 'text-accent font-semibold' : m.label.startsWith('Old app') ? 'text-muted' : 'text-ink2')}>
                 {m.label}</span>
               <span className="text-[10.5px] text-muted tnum leading-3">{money(m.total * adults)}</span>
