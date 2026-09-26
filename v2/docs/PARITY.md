@@ -29,7 +29,7 @@ Data compatibility is ✅ for everything: v2 reads and writes the same household
 | Career phases (salary, raise, bonus, RSUs, options) | ✅ |
 | Pooled / Separate finances with split % | ✅ |
 | Single-person plans | ✅ |
-| Setup wizard | ⏳ |
+| Setup wizard | ✅ TurboTax-style guided setup (`/setup`): one question per screen, 8 sections, live plan preview, review & edit; covers v0.8 wizard phase 1 + 2 (moves, HSA, custom purchase names and career phases are edited afterward on their pages) |
 | Guided mode / tab walkthroughs | ⏳ |
 
 ## Spending
@@ -90,5 +90,6 @@ Data compatibility is ✅ for everything: v2 reads and writes the same household
 | Retirement tab: early/delayed comparison, replacement ratio, 80% target | 🟡 claim-age benefit per person; comparison table not yet |
 | Cashflow "critical years" and "life stages" views, Sankey | ⏳ |
 | Stress tests (market crash, disabled child, unemployment, hyperinflation) | ⏳ |
-| Actuals entry, plan vs actual, Excel tracking workbook | ⏳ (data preserved; `/api/actuals` exists) |
+| Actuals entry, plan vs actual | 🟡 via **Check-ins**: quarterly/semiannual/annual cadence, due banner, guided and quick check-ins, on-track percentile, actual-vs-plan history, roll plan forward, .ics reminders. Q4 check-ins also write v0.8 `actuals[year].net_worth`. Detailed income/expense actuals: not yet |
+| Excel tracking workbook | ⏳ |
 | PDF report export | ⏳ |

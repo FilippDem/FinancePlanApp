@@ -26,8 +26,12 @@ sys.path.insert(0, str(ROOT / 'engine'))
 
 from finplan.engine import project, monte_carlo, historical_stats  # noqa: E402
 from finplan.plan import normalize_plan  # noqa: E402
+from finplan import checkin as CKE  # noqa: E402
 from finplan import reference as R  # noqa: E402
 from server import storage as S  # noqa: E402
+from server import checkins as CK  # noqa: E402
+from datetime import date as _date, datetime as _dt
+from fastapi.responses import PlainTextResponse
 
 app = FastAPI(title="Financial Planning Suite v2")
 COOKIE = 'fp_session'
@@ -280,6 +284,116 @@ def put_actuals(body: dict, request: Request):
     sess = _require(request)
     S.save_actuals(sess['hid'], body.get('actuals', {}), _pp(sess))
     return {'ok': True}
+
+
+# ── check-ins (docs/CHECKINS.md) ─────────────────────────────────────────
+def _ck_state(sess):
+    pp = _pp(sess)
+    settings = CK.normalize_settings(S.load_hh_key(sess['hid'], 'checkin_settings', None, pp))
+    items = S.load_hh_key(sess['hid'], 'checkins', [], pp) or []
+    return settings, sorted(items, key=lambda c: c.get('date', ''))
+
+
+@app.get('/api/checkins')
+def get_checkins(request: Request):
+    sess = _require(request)
+    settings, items = _ck_state(sess)
+    return {'settings': settings, 'checkins': items, 'due': CK.is_due(settings),
+            'period': CK.period_label(_date.today(), settings['cadence'] if settings['cadence'] != 'off' else 'quarterly')}
+
+
+class CheckinSettingsIn(BaseModel):
+    cadence: Optional[str] = None
+    snooze_days: Optional[int] = None
+    next_due: Optional[str] = None
+
+
+@app.put('/api/checkins/settings')
+def put_checkin_settings(body: CheckinSettingsIn, request: Request):
+    sess = _require(request)
+    settings, items = _ck_state(sess)
+    if body.cadence:
+        settings['cadence'] = body.cadence
+        last = _date.fromisoformat(items[-1]['date']) if items else _date.today()
+        if body.cadence != 'off':
+            settings['next_due'] = CK.next_period_start(last, body.cadence).isoformat()
+    if body.next_due:
+        settings['next_due'] = body.next_due
+    if body.snooze_days:
+        from datetime import timedelta
+        settings['snoozed_until'] = (_date.today() + timedelta(days=body.snooze_days)).isoformat()
+    settings = CK.normalize_settings(settings)
+    S.save_hh_key(sess['hid'], 'checkin_settings', settings, _pp(sess), encrypt_if_needed=False)
+    return {'settings': settings, 'due': CK.is_due(settings)}
+
+
+class CheckinIn(BaseModel):
+    checkin: dict[str, Any]
+
+
+@app.post('/api/checkins')
+def add_checkin(body: CheckinIn, request: Request):
+    sess = _require(request)
+    settings, items = _ck_state(sess)
+    c = dict(body.checkin)
+    d = _date.fromisoformat(c.get('date') or _date.today().isoformat())
+    c.update(id=CK.new_id(), date=d.isoformat(), entered_by=sess['email'], entered_at=_dt.now().isoformat(),
+             period=CK.period_label(d, settings['cadence'] if settings['cadence'] != 'off' else 'quarterly'))
+    c.setdefault('kind', 'manual')
+    items.append(c)
+    S.save_hh_key(sess['hid'], 'checkins', items, _pp(sess))
+    settings = CK.after_checkin(settings, d, c['kind'])
+    S.save_hh_key(sess['hid'], 'checkin_settings', settings, _pp(sess), encrypt_if_needed=False)
+    # v0.8 bridge: Q4 check-ins become that year's actual net worth (merge, never clobber)
+    nw = (c.get('totals') or {}).get('net_worth')
+    if nw is not None and d.month >= 10:
+        act = S.load_actuals(sess['hid'], _pp(sess))
+        yr = act.get(str(d.year), {}) or {}
+        yr.update(net_worth=nw, entered_at=c['entered_at'], entered_by=sess['email'],
+                  notes=yr.get('notes') or f"From check-in {c['period']}")
+        act[str(d.year)] = yr
+        S.save_actuals(sess['hid'], act, _pp(sess))
+    return {'checkin': c, 'settings': settings, 'due': CK.is_due(settings)}
+
+
+@app.delete('/api/checkins/{cid}')
+def delete_checkin(cid: str, request: Request):
+    sess = _require(request)
+    settings, items = _ck_state(sess)
+    S.save_hh_key(sess['hid'], 'checkins', [c for c in items if c.get('id') != cid], _pp(sess))
+    return {'ok': True}
+
+
+class EvalIn(BaseModel):
+    plan: dict[str, Any]
+    date: Optional[str] = None
+    investable: float = 0.0
+    net_worth: Optional[float] = None
+    balances: Optional[dict[str, Any]] = None
+
+
+@app.post('/api/checkins/evaluate')
+def checkin_evaluate(body: EvalIn):
+    d = _date.fromisoformat(body.date) if body.date else _date.today()
+    return CKE.evaluate(body.plan, d, body.investable, body.net_worth)
+
+
+@app.post('/api/checkins/rebase')
+def checkin_rebase(body: EvalIn):
+    d = _date.fromisoformat(body.date) if body.date else _date.today()
+    return {'plan': CKE.rebase(body.plan, body.balances or {}, d)}
+
+
+@app.get('/api/checkins/calendar.ics')
+def checkin_ics(request: Request):
+    sess = _require(request)
+    settings, _ = _ck_state(sess)
+    if settings['cadence'] == 'off':
+        raise HTTPException(400, 'Check-ins are turned off')
+    url = str(request.base_url).rstrip('/')
+    name = S.load_index().get(sess['hid'], {}).get('name', 'Household')
+    return PlainTextResponse(CK.ics(settings, url, name), media_type='text/calendar',
+                             headers={'Content-Disposition': 'attachment; filename="financial-checkins.ics"'})
 
 
 # ── engine ──────────────────────────────────────────────────────────────

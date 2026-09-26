@@ -62,9 +62,9 @@ export function Label({ children, hint }: { children: React.ReactNode; hint?: st
 const inputCls = 'w-full h-9 rounded-lg border border-line bg-surface px-3 text-sm text-ink tnum outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition'
 
 /** Numeric input that keeps its own text while typing and commits valid numbers. */
-export function NumberInput({ value, onChange, prefix, suffix, step, min, max, decimals = 0, className, disabled, placeholder }:
+export function NumberInput({ value, onChange, prefix, suffix, step, min, max, decimals = 0, className, disabled, placeholder, big }:
   { value: number | null | undefined; onChange: (v: number) => void; prefix?: string; suffix?: string; step?: number; min?: number; max?: number;
-    decimals?: number; className?: string; disabled?: boolean; placeholder?: string }) {
+    decimals?: number; className?: string; disabled?: boolean; placeholder?: string; big?: boolean }) {
   const fmt = (v: any) => (v === null || v === undefined || v === '' || !isFinite(v)) ? '' :
     Number(v).toLocaleString('en-US', { maximumFractionDigits: decimals, useGrouping: !!prefix })
   const [text, setText] = useState(fmt(value))
@@ -81,14 +81,14 @@ export function NumberInput({ value, onChange, prefix, suffix, step, min, max, d
   }
   return (
     <div className={clsx('relative', className)}>
-      {prefix && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm pointer-events-none">{prefix}</span>}
+      {prefix && <span className={clsx('absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none', big ? 'text-[17px] left-4' : 'text-sm')}>{prefix}</span>}
       <input
         inputMode="decimal"
         disabled={disabled}
         placeholder={placeholder}
-        className={clsx(inputCls, prefix && 'pl-6', suffix && 'pr-9', disabled && 'opacity-60')}
+        className={clsx(inputCls, prefix && (big ? 'pl-8' : 'pl-6'), suffix && 'pr-9', disabled && 'opacity-60', big && '!h-12 !text-[17px] !rounded-xl')}
         value={text}
-        onFocus={() => { focused.current = true; setText(value === null || value === undefined ? '' : String(+Number(value).toFixed(decimals))) }}
+        onFocus={e => { focused.current = true; setText(value === null || value === undefined ? '' : String(+Number(value).toFixed(decimals))); const el = e.currentTarget; requestAnimationFrame(() => el.select()) }}
         onBlur={() => { focused.current = false; commit(text); setText(fmt(value)) }}
         onChange={e => { setText(e.target.value); commit(e.target.value) }}
         onKeyDown={e => {
@@ -110,14 +110,14 @@ export const Money = (p: Omit<React.ComponentProps<typeof NumberInput>, 'prefix'
 
 /** Percent input. If `fraction`, the stored value is 0.05 for 5%. */
 export function Percent({ value, onChange, fraction = false, decimals = 2, ...rest }:
-  { value: number; onChange: (v: number) => void; fraction?: boolean; decimals?: number; min?: number; max?: number; disabled?: boolean; className?: string }) {
+  { value: number; onChange: (v: number) => void; fraction?: boolean; decimals?: number; min?: number; max?: number; disabled?: boolean; className?: string; big?: boolean }) {
   const shown = fraction ? +(Number(value || 0) * 100).toFixed(6) : value
   return <NumberInput value={shown} suffix="%" step={0.1} decimals={decimals}
     onChange={v => onChange(fraction ? +(v / 100).toFixed(8) : v)} {...rest} />
 }
 
-export function TextInput({ value, onChange, placeholder, className }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
-  return <input className={clsx(inputCls, className)} value={value ?? ''} placeholder={placeholder} onChange={e => onChange(e.target.value)} />
+export function TextInput({ value, onChange, placeholder, className, big, autoFocus }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string; big?: boolean; autoFocus?: boolean }) {
+  return <input autoFocus={autoFocus} className={clsx(inputCls, big && '!h-12 !text-[17px] !rounded-xl', className)} value={value ?? ''} placeholder={placeholder} onChange={e => onChange(e.target.value)} />
 }
 
 export function Select<T extends string | number>({ value, onChange, options, className }:

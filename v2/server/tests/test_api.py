@@ -100,3 +100,47 @@ def test_scenarios_and_engine_endpoints(client):
     assert 'Seattle' in ref['locations']
     t = c.post('/api/templates/children', json={'location': 'Seattle', 'strategy': 'Average'}).json()
     assert all(len(v) == 31 for v in t.values()) and t
+
+
+def test_checkins_flow_and_v08_actuals_bridge(client):
+    c, tmp = client
+    hid = v08_household(tmp)
+    c.post('/api/login', json={'email': 'filippdem@gmail.com'})
+    c.post('/api/households/select', json={'id': hid})
+    r = c.get('/api/checkins').json()
+    assert r['settings']['cadence'] == 'quarterly' and r['checkins'] == []
+    r = c.put('/api/checkins/settings', json={'cadence': 'semiannual'}).json()
+    assert r['settings']['cadence'] == 'semiannual'
+    ck = {'date': '2026-11-15', 'kind': 'scheduled', 'totals': {'investable': 300000, 'net_worth': 700000}, 'status': 'on_track'}
+    r = c.post('/api/checkins', json={'checkin': ck}).json()
+    assert r['checkin']['period'] == '2026-H2' and r['settings']['next_due'] == '2027-01-01'
+    stored = json.loads((tmp / 'households' / f'{hid}.json').read_text())
+    assert stored['actuals']['2026']['net_worth'] == 700000
+    assert stored['actuals']['2025'] == {'x': 1}          # untouched
+    assert stored['plan_data']['parent1_name'] == 'Filipp'  # untouched
+    assert len(c.get('/api/checkins').json()['checkins']) == 1
+    ics = c.get('/api/checkins/calendar.ics')
+    assert 'RRULE:FREQ=MONTHLY;INTERVAL=6' in ics.text
+    cid = r['checkin']['id']
+    c.delete(f'/api/checkins/{cid}')
+    assert c.get('/api/checkins').json()['checkins'] == []
+
+
+def test_checkin_schedule_rules():
+    from datetime import date
+    from server import checkins as CK
+    assert CK.next_period_start(date(2026, 9, 25), 'quarterly') == date(2026, 10, 1)
+    assert CK.next_period_start(date(2026, 12, 5), 'quarterly') == date(2027, 1, 1)
+    assert CK.next_period_start(date(2026, 3, 1), 'annual') == date(2027, 1, 1)
+    s = {'cadence': 'quarterly', 'next_due': '2026-10-01', 'snoozed_until': None}
+    assert CK.after_checkin(s, date(2026, 8, 1), 'manual')['next_due'] == '2026-10-01'   # off-cycle: no change
+    assert CK.after_checkin(s, date(2026, 9, 20), 'manual')['next_due'] == '2027-01-01'  # within 3 weeks: counts
+    assert CK.is_due(s, date(2026, 10, 2)) and not CK.is_due(s, date(2026, 9, 30))
+
+
+def test_baseline_checkin_schedules_next_period():
+    from datetime import date
+    from server import checkins as CK
+    s = {'cadence': 'quarterly', 'next_due': '2027-01-01', 'snoozed_until': None}
+    assert CK.after_checkin(s, date(2026, 9, 25), 'baseline')['next_due'] == '2027-01-01'
+    assert CK.after_checkin(s, date(2026, 8, 1), 'baseline')['next_due'] == '2026-10-01'

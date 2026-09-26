@@ -19,6 +19,8 @@ interface Ctx {
   names: [string, string]
   single: boolean
   household: any
+  ck: { settings: any; checkins: any[]; due: boolean; period: string } | null
+  refreshCheckins: () => Promise<void>
 }
 
 const PlanCtx = createContext<Ctx | null>(null)
@@ -48,6 +50,9 @@ export function PlanProvider({ initial, lastSaved: ls, household, children }:
   planRef.current = plan
 
   useEffect(() => { api.reference().then(setReference).catch(() => {}) }, [])
+  const [ck, setCk] = useState<any>(null)
+  const refreshCheckins = useCallback(async () => { try { setCk(await api.checkins()) } catch { /* ignore */ } }, [])
+  useEffect(() => { refreshCheckins() }, [refreshCheckins])
 
   const update = useCallback((fn: (d: Plan) => void) => {
     setPlan(prev => {
@@ -120,8 +125,8 @@ export function PlanProvider({ initial, lastSaved: ls, household, children }:
   const names: [string, string] = [plan.parent1_name || 'Person 1', single ? '' : (plan.parent2_name || 'Person 2')]
 
   const value = useMemo(() => ({
-    plan, update, replacePlan, saveState, lastSaved, proj, projecting, mc, mcLoading, runMC, reference, names, single, household,
-  }), [plan, update, replacePlan, saveState, lastSaved, proj, projecting, mc, mcLoading, runMC, reference, names[0], names[1], single, household])
+    plan, update, replacePlan, saveState, lastSaved, proj, projecting, mc, mcLoading, runMC, reference, names, single, household, ck, refreshCheckins,
+  }), [plan, update, replacePlan, saveState, lastSaved, proj, projecting, mc, mcLoading, runMC, reference, names[0], names[1], single, household, ck, refreshCheckins])
 
   return <PlanCtx.Provider value={value}>{children}</PlanCtx.Provider>
 }

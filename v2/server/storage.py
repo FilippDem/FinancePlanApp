@@ -271,3 +271,31 @@ def save_actuals(hid: str, actuals: dict, passphrase: Optional[str] = None) -> N
         hh['actuals'] = actuals
         hh.pop('actuals_encrypted', None)
     _atomic_write(path, hh)
+
+
+# ── generic household-level keys (check-ins etc.) ──────────────────────────
+def load_hh_key(hid: str, key: str, default, passphrase: Optional[str] = None):
+    hh = household_info(hid)
+    if f'{key}_encrypted' in hh:
+        if passphrase:
+            pt = decrypt(hh[f'{key}_encrypted'], passphrase)
+            if pt:
+                return json.loads(pt)
+        return default
+    v = hh.get(key)
+    return default if v is None else v
+
+
+def save_hh_key(hid: str, key: str, value, passphrase: Optional[str] = None, encrypt_if_needed: bool = True) -> None:
+    ensure_dirs()
+    path = hh_dir() / f"{hid}.json"
+    hh = _read(path)
+    if hh and not hid.startswith(TEST_PREFIX):
+        _backup(path, hid)
+    if encrypt_if_needed and hh.get('encrypted') and passphrase:
+        hh[f'{key}_encrypted'] = encrypt(json.dumps(value), passphrase)
+        hh.pop(key, None)
+    else:
+        hh[key] = value
+        hh.pop(f'{key}_encrypted', None)
+    _atomic_write(path, hh)

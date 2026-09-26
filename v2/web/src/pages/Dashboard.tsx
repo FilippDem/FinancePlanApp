@@ -6,6 +6,7 @@ import { money, pct } from '../lib/format'
 import { Card, Stat, Segmented, Badge, Button, Toggle } from '../components/ui'
 import { NetWorthChart, FanChart, Marker } from '../components/charts'
 import { useTodayDollars, deflate } from '../lib/hooks'
+import { DueBanner, CheckinStrip } from './Checkins'
 
 export function retirementMarkers(plan: any, names: [string, string], single: boolean): Marker[] {
   const cy = plan.current_year
@@ -41,7 +42,7 @@ export function buildAlerts(proj: any, mc: any, plan: any) {
 }
 
 export default function Dashboard({ isNew }: { isNew: boolean }) {
-  const { plan, proj, mc, mcLoading, names, single } = usePlan()
+  const { plan, proj, mc, mcLoading, names, single, ck } = usePlan()
   const [view, setView] = useState<'projection' | 'range'>('projection')
   const [today, setToday] = useTodayDollars()
   const nav = useNavigate()
@@ -76,14 +77,16 @@ export default function Dashboard({ isNew }: { isNew: boolean }) {
         <Toggle checked={today} onChange={setToday} label="Today's dollars" hint="Show future amounts in today's purchasing power" />
       </div>
 
-      {isNew && (
+      <DueBanner />
+      <CheckinStrip />
+      {isNew && !(ck?.checkins?.length) && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-accent/25 bg-accentSoft/70 px-5 py-4">
           <Sparkles className="text-accent" size={20} />
           <div className="flex-1 min-w-[220px]">
             <div className="font-medium">This household is new</div>
-            <div className="text-sm text-ink2">Start with People & income, or load one of the demo households from Scenarios to explore.</div>
+            <div className="text-sm text-ink2">Answer a few easy questions (about 10 minutes), or load a demo household from Scenarios to explore.</div>
           </div>
-          <Button variant="primary" onClick={() => nav('/people')}>Set up people<ArrowRight size={15} /></Button>
+          <Button variant="primary" onClick={() => nav('/setup')}>Start guided setup<ArrowRight size={15} /></Button>
           <Button onClick={() => nav('/scenarios')}>Browse demos</Button>
         </div>
       )}

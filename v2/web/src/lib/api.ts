@@ -37,6 +37,12 @@ export const api = {
   deleteScenario: (name: string) => req('DELETE', `/api/scenarios/${encodeURIComponent(name)}`),
   demos: () => req('GET', '/api/demos'),
   reference: () => req('GET', '/api/reference'),
+  checkins: () => req('GET', '/api/checkins'),
+  checkinSettings: (body: { cadence?: string; snooze_days?: number }) => req('PUT', '/api/checkins/settings', body),
+  addCheckin: (checkin: any) => req('POST', '/api/checkins', { checkin }),
+  deleteCheckin: (id: string) => req('DELETE', `/api/checkins/${encodeURIComponent(id)}`),
+  evaluate: (plan: any, date: string, investable: number, net_worth?: number) => req('POST', '/api/checkins/evaluate', { plan, date, investable, net_worth }),
+  rebase: (plan: any, balances: any, date: string) => req('POST', '/api/checkins/rebase', { plan, balances, date }),
   template: (kind: 'adult' | 'family' | 'children', location: string, strategy: string, current_year: number, inflation: number) =>
     req('POST', `/api/templates/${kind}`, { location, strategy, current_year, inflation }),
 }

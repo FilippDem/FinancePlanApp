@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { BrowserRouter, Route, Routes, useLocation, Navigate } from 'react-router-dom'
 import { api } from './lib/api'
 import { PlanProvider } from './lib/store'
 import { Shell } from './components/Shell'
@@ -14,6 +14,14 @@ import Assumptions from './pages/Assumptions'
 import Projections from './pages/Projections'
 import Timeline from './pages/Timeline'
 import Scenarios from './pages/Scenarios'
+import Onboarding from './pages/Onboarding'
+import CheckinFlow from './pages/CheckinFlow'
+import Checkins from './pages/Checkins'
+
+function skipSetup() {
+  try { if (sessionStorage.getItem('fp_setup_seen')) return true; sessionStorage.setItem('fp_setup_seen', '1') } catch { /* */ }
+  return false
+}
 
 function Loading() {
   return <div className="min-h-full flex items-center justify-center text-muted text-sm">Loading…</div>
@@ -44,21 +52,27 @@ function Gate() {
 
   return (
     <PlanProvider key={me.household.id} initial={planRes.plan} lastSaved={planRes.last_saved} household={me.household}>
-      <Shell me={me}>
-        <Routes>
-          <Route path="/" element={<Dashboard isNew={planRes.is_new} />} />
-          <Route path="/people" element={<People />} />
-          <Route path="/spending" element={<Spending />} />
-          <Route path="/kids" element={<Kids />} />
-          <Route path="/homes" element={<Homes />} />
-          <Route path="/healthcare" element={<Healthcare />} />
-          <Route path="/assumptions" element={<Assumptions />} />
-          <Route path="/projections" element={<Projections />} />
-          <Route path="/timeline" element={<Timeline />} />
-          <Route path="/scenarios" element={<Scenarios />} />
-          <Route path="*" element={<Dashboard isNew={false} />} />
-        </Routes>
-      </Shell>
+      <Routes>
+        <Route path="/setup" element={<Onboarding />} />
+        <Route path="/checkin" element={<CheckinFlow />} />
+        <Route path="*" element={
+          <Shell me={me}>
+            <Routes>
+              <Route path="/" element={planRes.is_new && !skipSetup() ? <Navigate to="/setup" replace /> : <Dashboard isNew={planRes.is_new} />} />
+              <Route path="/people" element={<People />} />
+              <Route path="/spending" element={<Spending />} />
+              <Route path="/kids" element={<Kids />} />
+              <Route path="/homes" element={<Homes />} />
+              <Route path="/healthcare" element={<Healthcare />} />
+              <Route path="/assumptions" element={<Assumptions />} />
+              <Route path="/projections" element={<Projections />} />
+              <Route path="/timeline" element={<Timeline />} />
+              <Route path="/scenarios" element={<Scenarios />} />
+              <Route path="/checkins" element={<Checkins />} />
+              <Route path="*" element={<Dashboard isNew={false} />} />
+            </Routes>
+          </Shell>} />
+      </Routes>
     </PlanProvider>
   )
 }

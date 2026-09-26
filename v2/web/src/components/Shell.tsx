@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Wallet, Baby, Home, HeartPulse, SlidersHorizontal, LineChart, CalendarRange, Layers,
-  Moon, Sun, LogOut, Check, Loader2, AlertCircle, ArrowLeftRight, Menu, X,
+  Moon, Sun, LogOut, Check, Loader2, AlertCircle, ArrowLeftRight, Menu, X, ClipboardCheck, Wand2,
 } from 'lucide-react'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
@@ -10,6 +10,7 @@ import { clsx } from '../lib/format'
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/checkins', label: 'Check-ins', icon: ClipboardCheck, badge: true },
   { group: 'Plan' },
   { to: '/people', label: 'People & income', icon: Users },
   { to: '/spending', label: 'Spending', icon: Wallet },
@@ -51,7 +52,7 @@ export function Shell({ me, children }: { me: any; children: React.ReactNode }) 
   const [dark, setDark] = useDarkMode()
   const [open, setOpen] = useState(false)
   const nav = useNavigate()
-  const { household } = usePlan()
+  const { household, ck } = usePlan()
   const initials = (me.email || '?').slice(0, 1).toUpperCase()
 
   const sidebar = (
@@ -73,12 +74,16 @@ export function Shell({ me, children }: { me: any; children: React.ReactNode }) 
               className={({ isActive }) => clsx('flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[14px] font-medium transition-colors',
                 isActive ? 'bg-accentSoft text-accent' : 'text-ink2 hover:bg-sunken hover:text-ink')}>
               <n.icon size={17} strokeWidth={1.9} />{n.label}
+              {n.badge && ck?.due && <span className="ml-auto text-[11px] font-semibold bg-accent text-white rounded-full px-1.5 py-0.5">Due</span>}
             </NavLink>
           ))}
       </div>
       <div className="border-t border-line p-2.5 space-y-0.5">
         <button onClick={() => setDark(!dark)} className="w-full flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[14px] text-ink2 hover:bg-sunken">
           {dark ? <Sun size={17} /> : <Moon size={17} />}{dark ? 'Light mode' : 'Dark mode'}
+        </button>
+        <button onClick={() => nav('/setup')} className="w-full flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[14px] text-ink2 hover:bg-sunken">
+          <Wand2 size={17} />Guided setup
         </button>
         <button onClick={() => nav('/households')} className="w-full flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[14px] text-ink2 hover:bg-sunken">
           <ArrowLeftRight size={17} />Switch household
