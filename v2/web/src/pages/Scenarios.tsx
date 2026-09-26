@@ -5,6 +5,7 @@ import { api } from '../lib/api'
 import { money, pct } from '../lib/format'
 import { Card, PageHeader, Button, TextInput, Modal, Badge, Empty, Note } from '../components/ui'
 import { LinesChart } from '../components/charts'
+import { ReportButton } from '../components/ReportButton'
 
 export default function Scenarios() {
   const { plan, replacePlan, household } = usePlan()
@@ -108,6 +109,7 @@ export default function Scenarios() {
           <div className="flex flex-wrap gap-2">
             <Button onClick={exportJson}><Download size={14} />Export JSON</Button>
             <Button onClick={() => fileRef.current?.click()}><Upload size={14} />Import</Button>
+            <ReportButton size="md" />
             <Button variant="ghost" onClick={() => setConfirm({ title: 'Start over with defaults?', body: 'Resets the current plan to the default example. Saved scenarios are kept.', run: () => replacePlan({}) })}><RotateCcw size={14} />Reset</Button>
             <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={e => e.target.files?.[0] && importJson(e.target.files[0])} />
           </div>

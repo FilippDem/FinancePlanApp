@@ -535,33 +535,64 @@ def checkin_test_email(request: Request):
 
 
 # ── reports ─────────────────────────────────────────────────────────────
-@app.get('/api/report.pdf')
-def report_pdf(request: Request):
-    from server import report as RP
-    sess = _require(request)
-    pp = _pp(sess)
-    plan = S.load_plan(sess['hid'], pp) or R.default_plan()
-    name = S.load_index().get(sess['hid'], {}).get('name', 'Household')
-    _, items = _ck_state(sess)
-    data = RP.build(plan, name, items)
-    return Response(data, media_type='application/pdf',
-                    headers={'Content-Disposition': f'attachment; filename="financial-plan-{_date.today().isoformat()}.pdf"'})
+REPORT_TYPES = {'pdf': ('application/pdf', 'pdf'),
+                'xlsx': ('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx'),
+                'csv': ('text/csv', 'csv'), 'json': ('application/json', 'json')}
 
 
 class ReportIn(BaseModel):
-    plan: dict[str, Any]
+    plan: Optional[dict[str, Any]] = None      # omit to use the saved plan
+    format: str = 'pdf'
+    sections: Optional[list[str]] = None
+    title: Optional[str] = None
+    today: bool = True
+    detail: bool = False                        # CSV: every line item instead of the category table
+
+
+def _report(sess, body: ReportIn) -> Response:
+    from server import report as RP
+    from server import report_data as RD
+    pp = _pp(sess)
+    plan = body.plan or S.load_plan(sess['hid'], pp) or R.default_plan()
+    name = S.load_index().get(sess['hid'], {}).get('name', 'Household')
+    _, items = _ck_state(sess)
+    fmt = body.format if body.format in REPORT_TYPES else 'pdf'
+    ctx = RD.compute(plan, n_mc=1000 if fmt in ('pdf', 'xlsx', 'json') else 200)
+    if fmt == 'pdf':
+        data = RP.build(plan, name, items, body.sections, body.title, body.today, ctx=ctx)
+    elif fmt == 'xlsx':
+        data = RP.build_xlsx(plan, name, body.today, ctx=ctx, checkins=items, sections=body.sections)
+    elif fmt == 'csv':
+        data = RP.build_csv(plan, body.today, ctx=ctx, detail=body.detail)
+    else:
+        data = RP.build_json(plan, body.today, ctx=ctx, checkins=items)
+    mime, ext = REPORT_TYPES[fmt]
+    base = ''.join(ch if ch.isalnum() or ch in '-_ ' else '' for ch in (body.title or 'financial-plan')).strip().replace(' ', '-') or 'financial-plan'
+    return Response(data, media_type=mime,
+                    headers={'Content-Disposition': f'attachment; filename="{base}-{_date.today().isoformat()}.{ext}"'})
+
+
+@app.get('/api/report/sections')
+def report_sections():
+    from server import report_data as RD
+    return {'sections': [{'key': k, 'label': v} for k, v in RD.SECTIONS.items()], 'formats': list(REPORT_TYPES)}
+
+
+@app.post('/api/report')
+def report_any(body: ReportIn, request: Request):
+    return _report(_require(request), body)
+
+
+@app.get('/api/report.pdf')
+def report_pdf(request: Request):
+    return _report(_require(request), ReportIn())
 
 
 @app.post('/api/report.pdf')
 def report_pdf_plan(body: ReportIn, request: Request):
-    """Report for an unsaved/what-if plan (the plan currently on screen)."""
-    from server import report as RP
-    sess = _require(request)
-    name = S.load_index().get(sess['hid'], {}).get('name', 'Household')
-    _, items = _ck_state(sess)
-    data = RP.build(body.plan, name, items)
-    return Response(data, media_type='application/pdf',
-                    headers={'Content-Disposition': f'attachment; filename="financial-plan-{_date.today().isoformat()}.pdf"'})
+    """PDF for the plan currently on screen (kept for older clients)."""
+    body.format = 'pdf'
+    return _report(_require(request), body)
 
 
 # ── engine ──────────────────────────────────────────────────────────────

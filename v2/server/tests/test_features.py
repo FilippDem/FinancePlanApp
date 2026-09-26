@@ -100,6 +100,22 @@ def test_report_pdf(client):
     plan['parentX_retirement_age'] = 60
     r = c.post('/api/report.pdf', json={'plan': plan})
     assert r.status_code == 200 and r.content[:4] == b'%PDF'
+    secs = [x['key'] for x in c.get('/api/report/sections').json()['sections']]
+    assert 'year_by_year' in secs and 'category_detail' in secs
+    r = c.post('/api/report', json={'format': 'pdf', 'sections': ['summary', 'year_by_year'], 'title': 'My plan'})
+    assert r.status_code == 200 and r.content[:4] == b'%PDF' and 'My-plan' in r.headers['content-disposition']
+    x = c.post('/api/report', json={'format': 'xlsx'})
+    assert x.content[:2] == b'PK'
+    import io
+    from openpyxl import load_workbook
+    wb = load_workbook(io.BytesIO(x.content))
+    assert {'Summary', 'Year by year', 'Line items', 'Monte Carlo'} <= set(wb.sheetnames)
+    cs = c.post('/api/report', json={'format': 'csv'}).content.decode('utf-8-sig')
+    assert cs.splitlines()[0].startswith('Year,Ages,Wages')
+    cd = c.post('/api/report', json={'format': 'csv', 'detail': True}).content.decode('utf-8-sig')
+    assert cd.startswith('Group,Line item')
+    js = c.post('/api/report', json={'format': 'json'}).json()
+    assert js['year_by_year'] and js['line_items']['lines'] and 'monte_carlo' in js
 
 
 def test_email_settings_and_reminder_job(client, monkeypatch):

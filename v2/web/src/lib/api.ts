@@ -71,6 +71,14 @@ export const api = {
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 5000)
   },
+  reportSections: () => req('GET', '/api/report/sections'),
+  report: async (opts: { plan?: any; format: string; sections?: string[]; title?: string; today?: boolean; detail?: boolean }): Promise<{ blob: Blob; filename: string }> => {
+    const r = await fetch('/api/report', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(opts) })
+    if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m } catch { /* */ } throw new ApiError(r.status, m) }
+    const cd = r.headers.get('content-disposition') || ''
+    const filename = /filename="([^"]+)"/.exec(cd)?.[1] || `financial-plan.${opts.format}`
+    return { blob: await r.blob(), filename }
+  },
   template: (kind: 'adult' | 'family' | 'children', location: string, strategy: string, current_year: number, inflation: number, source: 'calibrated' | 'v08' = 'calibrated') =>
     req('POST', `/api/templates/${kind}`, { location, strategy, current_year, inflation, source }),
   spendingCurve: (location: string, current_year: number, inflation: number) =>

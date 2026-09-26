@@ -133,7 +133,16 @@ def detail_lines(ctx: dict, today: bool = True) -> tuple[list[int], list[tuple[s
             add('Recurring', it['name'], t, it['amount'] / f)
         for it in d.get('purchases') or []:
             add('One-time', it['name'], t, it['amount'] / f)
-    return years, [(g, l, v) for (g, l), v in lines.items()]
+    def rank(g):
+        order = ['Income', 'Taxes', f'Living: {n1}', f'Living: {n2}', 'Household', 'Children', 'Children by category']
+        if g in order:
+            return (order.index(g), '')
+        if g.startswith('Home: '):
+            return (10, g)
+        return (20 + ['Homes', 'Healthcare', 'Recurring', 'One-time'].index(g) if g in ('Homes', 'Healthcare', 'Recurring', 'One-time') else 30, g)
+    items = list(lines.items())
+    items.sort(key=lambda kv: rank(kv[0][0]))       # stable: keeps first-seen order inside a group
+    return years, [(g, l, v) for (g, l), v in items]
 
 
 def people_table(ctx: dict) -> tuple[list[str], list[list]]:
