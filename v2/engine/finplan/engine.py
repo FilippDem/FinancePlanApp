@@ -34,6 +34,7 @@ import numpy as np
 from .plan import normalize_plan, is_single
 from .reference import child_expenses_for_age, ref, HEALTH_CATEGORIES
 from .taxes import total_taxes, marginal_rate, TAX_BASE_YEAR
+from .mortgage import loan_terms, year_flows
 
 TEMPLATE_BASE_YEAR = 2024
 
@@ -167,10 +168,10 @@ def build_schedule(p: dict) -> Schedule:
     for h in p['houses']:
         s = max(cy, h['purchase_year'])
         future = h['purchase_year'] > cy
-        pay = _amort_payment(h['mortgage_balance'], h['mortgage_rate'], h['mortgage_years_left'])
+        terms = loan_terms(h, cy)
         owner = h.get('owner', 'Shared')
         own_key = 'p1' if owner in ('Parent1', n1) else 'p2' if owner in ('Parent2', n2) else 'shared'
-        house_rows.append((h, s, future, pay, own_key))
+        house_rows.append((h, s, future, terms, own_key))
 
     for t, y in enumerate(years):
         age1, age2 = a1 + t, a2 + t
@@ -227,12 +228,10 @@ def build_schedule(p: dict) -> Schedule:
         lives_owned = False
         any_owned = False
         hdet = []
-        for (h, s, future, pay, own_key) in house_rows:
+        for (h, s, future, terms, own_key) in house_rows:
             st, rent = status_for_year(h, y)
             prev_st, _ = status_for_year(h, y - 1)
-            owned = st in ('Own_Live', 'Own_Rent') and y >= h['purchase_year'] - (0 if future else 10**6)
-            if y < s and future:
-                owned = False
+            owned = st in ('Own_Live', 'Own_Rent') and not (future and y < h['purchase_year'])
             row = {'name': h['name'], 'status': st if owned else ('Sold' if st == 'Sold' else 'Not owned')}
             if owned:
                 any_owned = True
@@ -240,41 +239,49 @@ def build_schedule(p: dict) -> Schedule:
                     lives_owned = True
                 k = y - s
                 value = h['current_value'] * (1 + h['appreciation_rate'] / 100) ** k
-                bal_start = _amort_balance(h['mortgage_balance'], h['mortgage_rate'], h['mortgage_years_left'], 12 * k)
-                bal_end = _amort_balance(h['mortgage_balance'], h['mortgage_rate'], h['mortgage_years_left'], 12 * (k + 1))
-                pi = pay if bal_start > 0.5 else 0.0
-                principal = bal_start - bal_end
-                interest = max(pi - principal, 0.0)
+                fl = year_flows(terms, y)
+                pi, interest, bal_end = fl['paid'], fl['interest'], fl['bal_end']
+                # PMI: until the balance reaches 78% of the purchase price
+                ltv_base = terms['price'] or h['current_value']
+                pmi = 0.0
+                if fl['bal_start'] > 0.78 * ltv_base and pi > 0:
+                    if h.get('mortgage_mode') == 'estimate':
+                        if h.get('down_payment_pct', 20) < 20:
+                            pmi = terms['original'] * h.get('pmi_rate', 0.5) / 100
+                    else:
+                        pmi = h.get('pmi_monthly', 0.0) * 12
+                hoa = h.get('hoa_monthly', 0.0) * 12 * ii
                 ptax = value * h['property_tax_rate']
                 ins = h['home_insurance'] * ii
                 maint = value * h['maintenance_rate']
                 upk = h['upkeep_costs'] * ii
-                total = pi + ptax + ins + maint + upk
+                total = pi + pmi + hoa + ptax + ins + maint + upk
                 C['house_exp'][t] += total
                 C[f'house_exp_{own_key}'][t] += total
                 C['mortgage_pi'][t] += pi
                 r_inc = rent * 12 * ii if st == 'Own_Rent' else 0.0
                 C['rent_income'][t] += r_inc
                 if r_inc:
-                    C['rent_taxable'][t] += max(0.0, r_inc - (interest + ptax + ins + maint + upk))
+                    C['rent_taxable'][t] += max(0.0, r_inc - (interest + pmi + hoa + ptax + ins + maint + upk))
                 C['home_value'][t] += value
                 C['mortgage_balance'][t] += bal_end
                 eq = value - bal_end
                 C['home_equity'][t] += eq
                 C[f'equity_{own_key}'][t] += eq
                 if future and y == h['purchase_year']:
-                    dp = max(h['purchase_price'] - h['mortgage_balance'], 0.0)
+                    dp = terms['down'] + h.get('closing_cost_pct', 0.0) / 100 * terms['price']
                     C['down_payment'][t] += dp
                     C[f'dp_{own_key}'][t] += dp
                     events.append({'year': y, 'type': 'house_buy', 'label': f"Buy {h['name']}", 'amount': h['purchase_price']})
-                row.update(value=value, balance=bal_end, equity=eq, mortgage_pi=pi, property_tax=ptax, insurance=ins,
+                row.update(value=value, balance=bal_end, equity=eq, mortgage_pi=pi, interest=interest,
+                           principal=fl['principal'], pmi=pmi, hoa=hoa, property_tax=ptax, insurance=ins,
                            maintenance=maint, upkeep=upk, rent=r_inc, total=total)
                 if prev_st in ('Own_Live', 'Own_Rent') and st != prev_st and y > cy:
                     events.append({'year': y, 'type': 'house_status', 'label': f"{h['name']}: {'rent out' if st == 'Own_Rent' else 'move in'}"})
-            elif st == 'Sold' and prev_st in ('Own_Live', 'Own_Rent') and y > cy and y > h['purchase_year'] - 1:
+            elif st == 'Sold' and prev_st in ('Own_Live', 'Own_Rent') and y > cy and y >= h['purchase_year']:
                 k = y - s
                 value = h['current_value'] * (1 + h['appreciation_rate'] / 100) ** k
-                bal = _amort_balance(h['mortgage_balance'], h['mortgage_rate'], h['mortgage_years_left'], 12 * k)
+                bal = year_flows(terms, y)['bal_start']
                 proceeds = value * (1 - sell_cost) - bal
                 C['sale_proceeds'][t] += proceeds
                 C[f'sale_{own_key}'][t] += proceeds

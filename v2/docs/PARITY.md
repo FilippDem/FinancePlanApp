@@ -56,6 +56,8 @@ Data compatibility is ✅ for everything: v2 reads and writes the same household
 | Multiple homes, owner, value, mortgage, tax, insurance, maintenance, upkeep, appreciation | ✅ |
 | Timeline: live in / rent out (monthly rent) / sell | ✅ |
 | Equity by owner | ✅ (engine; chart shows per property) |
+| Mortgage calculator: estimate (price / down % / term / rate) or actual loan (balance, rate, years, real payment) | ✅ new |
+| PMI, HOA, closing costs, property tax as % or $/yr, amortization chart | ✅ new |
 
 ## Healthcare
 | Feature | Status |

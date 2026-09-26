@@ -13,6 +13,7 @@ import copy
 from datetime import datetime
 
 from .reference import default_plan, adult_template, normalize_strategy_name
+from .mortgage import sync_legacy_fields
 
 # New optional keys introduced in v2 (all have safe defaults).
 V2_KEYS = {
@@ -37,6 +38,15 @@ HOUSE_DEFAULTS = {
     'mortgage_balance': 0.0, 'mortgage_rate': 0.065, 'mortgage_years_left': 30,
     'property_tax_rate': 0.01, 'home_insurance': 1500.0, 'maintenance_rate': 0.01,
     'upkeep_costs': 0.0, 'owner': 'Shared', 'location': '', 'appreciation_rate': 3.0, 'timeline': None,
+    # v2 mortgage calculator fields
+    'mortgage_mode': 'actual',          # 'estimate' (price/down%/term/rate) | 'actual' (statement numbers)
+    'down_payment_pct': None,           # estimate mode; derived from price & balance when missing
+    'loan_term_years': 30,
+    'mortgage_payment_override': None,  # actual mode: real monthly P&I (extra = faster payoff)
+    'pmi_rate': 0.5,                    # estimate mode: annual % of loan while down payment < 20%
+    'pmi_monthly': 0.0,                 # actual mode: PMI on your statement
+    'hoa_monthly': 0.0,
+    'closing_cost_pct': 0.0,            # paid with the down payment for future purchases
 }
 RECURRING_DEFAULTS = {'name': 'Expense', 'category': 'Other', 'amount': 0.0, 'frequency_years': 1,
                       'start_year': None, 'end_year': None, 'inflation_adjust': True, 'parent': 'Both',
@@ -212,6 +222,16 @@ def normalize_plan(raw: dict | None) -> dict:
             h[k] = _num(h[k], HOUSE_DEFAULTS[k] or 0.0)
         h['purchase_year'] = _int(h.get('purchase_year'), p['current_year'])
         h['mortgage_years_left'] = _int(h.get('mortgage_years_left'), 0)
+        for k in ('pmi_rate', 'pmi_monthly', 'hoa_monthly', 'closing_cost_pct'):
+            h[k] = _num(h.get(k), HOUSE_DEFAULTS[k])
+        h['loan_term_years'] = _num(h.get('loan_term_years'), 30) or 30
+        if h.get('mortgage_mode') not in ('estimate', 'actual'):
+            h['mortgage_mode'] = 'actual'
+        if h.get('down_payment_pct') is None:
+            h['down_payment_pct'] = round((1 - h['mortgage_balance'] / h['purchase_price']) * 100, 2) if h['purchase_price'] > 0 else 20.0
+        h['down_payment_pct'] = min(max(_num(h['down_payment_pct'], 20.0), 0.0), 100.0)
+        ov = h.get('mortgage_payment_override')
+        h['mortgage_payment_override'] = _num(ov) if ov not in (None, '', 0) and _num(ov) > 0 else None
         tl = []
         for e in h.get('timeline') or []:
             if not isinstance(e, dict) or e.get('year') is None:
@@ -222,6 +242,7 @@ def normalize_plan(raw: dict | None) -> dict:
         if not tl:
             tl = [{'year': h['purchase_year'], 'status': 'Own_Live', 'rental_income': 0.0}]
         h['timeline'] = sorted(tl, key=lambda e: e['year'])
+        sync_legacy_fields(h, p['current_year'])
         houses.append(h)
     p['houses'] = houses
 

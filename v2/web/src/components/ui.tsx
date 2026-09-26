@@ -202,7 +202,7 @@ export function Badge({ children, tone = 'neutral' }: { children: React.ReactNod
   )
 }
 
-export function Drawer({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; footer?: React.ReactNode }) {
+export function Drawer({ open, onClose, title, children, footer, wide }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean }) {
   useEffect(() => {
     const h = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     if (open) window.addEventListener('keydown', h)
@@ -212,7 +212,7 @@ export function Drawer({ open, onClose, title, children, footer }: { open: boole
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <aside className="absolute right-0 top-0 h-full w-full max-w-[520px] bg-surface border-l border-line shadow-2xl flex flex-col">
+      <aside className={clsx("absolute right-0 top-0 h-full w-full", wide ? 'max-w-[640px]' : 'max-w-[520px]', " bg-surface border-l border-line shadow-2xl flex flex-col")}>
         <header className="flex items-center justify-between px-5 h-14 border-b border-line">
           <h2 className="font-semibold">{title}</h2>
           <button onClick={onClose} className="p-1.5 rounded-md hover:bg-sunken text-muted"><X size={18} /></button>

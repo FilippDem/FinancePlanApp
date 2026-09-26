@@ -33,6 +33,19 @@ a test in `engine/tests/test_engine.py`.
 | 16 | Plans without `parentX_career_phases` (e.g. all six demos) silently used a default 75k phase starting at age 30, so the Tech Couple demo earned **$0** in year one. | Missing career phases means the simple income model is used: income, raise and job changes. |
 | 17 | 401(k) contributions were only a tax deduction and then disappeared. | Contributions (and HSA contributions) are deducted from taxable wages and accumulate in a pre-tax bucket. Shortfalls are withdrawn from it, grossed up for income tax. |
 
+## Mortgage calculator (new in v2)
+Homes can describe their loan in one of two ways (`mortgage_mode`):
+- **Estimate from rate.** Enter home price, down payment %, loan term and interest rate, like a listing calculator. The loan starts in the purchase year. For a home bought in the past, today's balance comes from amortizing the original loan. This matches Redfin's calculator: $1,399,000 with 20% down at 7.5% over 30 years gives $7,825 P&I, which is covered by a test.
+- **Actual loan.** Enter the current balance, rate and years left from your statement, plus optionally the monthly P&I you actually pay. Paying more than required is extra principal, so the loan pays off sooner.
+
+Both modes support:
+- PMI: a % of the loan when the down payment is under 20% (estimate mode), or a $/month amount (actual mode). PMI stops once the balance reaches 78% of the price.
+- HOA dues ($/month, inflated).
+- Closing costs (% of price, paid with the down payment on future purchases).
+- Property tax entered as a % or as $/yr. It is stored as a rate.
+
+`mortgage_balance` and `mortgage_years_left` are kept in sync in estimate mode, so v0.8 can still read the file. Old files load in actual mode, so their numbers are unchanged.
+
 ## Behaviour kept from v0.8 (intentionally)
 - Expense categories, templates and all reference data are identical, extracted automatically by `tools/extract_v08_data.py`.
 - Family "Mortgage/Rent" is skipped in years you live in an owned home. "Property Tax" and "Home Insurance" family lines are also skipped while any home is owned, because they come from the Homes page.

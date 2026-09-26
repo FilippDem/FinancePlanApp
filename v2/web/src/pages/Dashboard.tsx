@@ -26,6 +26,11 @@ export function buildAlerts(proj: any, mc: any, plan: any) {
   const working = rows.filter((r: any) => r.wages1 + r.wages2 > 0)
   const neg = working.filter((r: any) => r.cashflow < 0)
   if (neg.length) out.push({ tone: 'warn', title: `${neg.length} working year${neg.length > 1 ? 's' : ''} with negative cash flow`, detail: `First in ${neg[0].year} (${money(neg[0].cashflow)}). Spending exceeds after-tax income those years.` })
+  for (const r of rows.filter((r: any) => r.down_payment > 0 && r.investable < 0)) {
+    const buy = (proj.events || []).find((e: any) => e.type === 'house_buy' && e.year === r.year)
+    out.push({ tone: 'bad', title: `Not enough savings to buy ${buy ? buy.label.replace(/^Buy /, '') : 'a home'} in ${r.year}`,
+      detail: `The down payment and closing costs (${money(r.down_payment)}) push savings to ${money(r.investable)}. Lower the price, raise the down-payment savings or delay the purchase.` })
+  }
   const r0 = rows[0]
   if (r0 && r0.total_income > 0 && r0.exp_housing / r0.total_income > 0.35)
     out.push({ tone: 'warn', title: 'Housing costs are high', detail: `Housing is ${pct(r0.exp_housing / r0.total_income, 0)} of gross income this year (a common guideline is under 30–35%).` })
