@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Wallet, Baby, Home, HeartPulse, SlidersHorizontal, LineChart, CalendarRange, Layers,
-  Moon, Sun, LogOut, Check, Loader2, AlertCircle, ArrowLeftRight, Menu, X, ClipboardCheck, Wand2,
+  Moon, Sun, LogOut, Check, Loader2, AlertCircle, ArrowLeftRight, Menu, X, ClipboardCheck, Wand2, Receipt, Palmtree, ShieldAlert,
 } from 'lucide-react'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
@@ -11,6 +11,7 @@ import { clsx } from '../lib/format'
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/checkins', label: 'Check-ins', icon: ClipboardCheck, badge: true },
+  { to: '/actuals', label: 'Actuals', icon: Receipt },
   { group: 'Plan' },
   { to: '/people', label: 'People & income', icon: Users },
   { to: '/spending', label: 'Spending', icon: Wallet },
@@ -20,6 +21,8 @@ const NAV = [
   { to: '/assumptions', label: 'Assumptions', icon: SlidersHorizontal },
   { group: 'Analyze' },
   { to: '/projections', label: 'Projections', icon: LineChart },
+  { to: '/retirement', label: 'Retirement', icon: Palmtree },
+  { to: '/stress', label: 'Stress tests', icon: ShieldAlert },
   { to: '/timeline', label: 'Life timeline', icon: CalendarRange },
   { to: '/scenarios', label: 'Scenarios', icon: Layers },
 ] as const

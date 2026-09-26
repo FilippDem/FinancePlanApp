@@ -30,10 +30,23 @@ from finplan import checkin as CKE  # noqa: E402
 from finplan import reference as R  # noqa: E402
 from server import storage as S  # noqa: E402
 from server import checkins as CK  # noqa: E402
+from server import notify as NT  # noqa: E402
+from finplan import stress as ST  # noqa: E402
+from finplan import retirement as RT  # noqa: E402
+from finplan import actuals as AC  # noqa: E402
 from datetime import date as _date, datetime as _dt
 from fastapi.responses import PlainTextResponse
 
-app = FastAPI(title="Financial Planning Suite v2")
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def _lifespan(_app):
+    NT.start_scheduler()   # check-in reminder emails; no-op unless SMTP_HOST is set
+    yield
+
+
+app = FastAPI(title="Financial Planning Suite v2", lifespan=_lifespan)
 COOKIE = 'fp_session'
 ALLOW_DEV_LOGIN = os.environ.get('ALLOW_DEV_LOGIN', '1') == '1'
 _passphrases: dict[tuple, str] = {}
@@ -286,6 +299,104 @@ def put_actuals(body: dict, request: Request):
     return {'ok': True}
 
 
+@app.put('/api/actuals/{year}')
+def put_actuals_year(year: int, body: dict, request: Request):
+    """Merge one year's actuals (keys not sent are kept)."""
+    sess = _require(request)
+    pp = _pp(sess)
+    act = S.load_actuals(sess['hid'], pp)
+    cur = act.get(str(year), {}) or {}
+    for k, v in (body.get('actual') or {}).items():
+        if isinstance(v, dict) and isinstance(cur.get(k), dict):
+            for g, gv in v.items():
+                if isinstance(gv, dict) and isinstance(cur[k].get(g), dict):
+                    cur[k][g].update(gv)
+                else:
+                    cur[k][g] = gv
+        else:
+            cur[k] = v
+    cur.update(entered_at=_dt.now().isoformat(), entered_by=sess['email'])
+    act[str(year)] = cur
+    S.save_actuals(sess['hid'], act, pp)
+    return {'actual': cur}
+
+
+class PlannedIn(BaseModel):
+    plan: dict[str, Any]
+    year: int
+
+
+@app.post('/api/actuals/planned')
+def actuals_planned(body: PlannedIn):
+    pl = AC.planned_for_year(body.plan, body.year)
+    pl['group_totals'] = AC.group_totals(pl['expenses'])
+    return pl
+
+
+@app.get('/api/actuals/workbook.xlsx')
+def actuals_workbook(request: Request, start: Optional[int] = None, end: Optional[int] = None):
+    from server import workbook as WB
+    sess = _require(request)
+    pp = _pp(sess)
+    plan = normalize_plan(S.load_plan(sess['hid'], pp) or R.default_plan())
+    start = start or _date.today().year
+    end = min(end or start, start + 9)
+    data = WB.build(plan, start, end, S.load_actuals(sess['hid'], pp))
+    return Response(data, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    headers={'Content-Disposition': f'attachment; filename="financial-tracking-{start}-{end}.xlsx"'})
+
+
+@app.post('/api/actuals/import')
+async def actuals_import(request: Request):
+    from server import workbook as WB
+    sess = _require(request)
+    pp = _pp(sess)
+    raw = await request.body()
+    if not raw:
+        raise HTTPException(400, 'Empty file')
+    plan = normalize_plan(S.load_plan(sess['hid'], pp) or R.default_plan())
+    try:
+        parsed = WB.parse(raw, plan)
+    except Exception as e:
+        raise HTTPException(400, f'Could not read workbook: {e}')
+    act = WB.merge(S.load_actuals(sess['hid'], pp), parsed, sess['email'])
+    S.save_actuals(sess['hid'], act, pp)
+    return {'years': sorted(parsed.keys()), 'actuals': act}
+
+
+# ── version history ─────────────────────────────────────────────────────
+@app.get('/api/history')
+def history(request: Request):
+    sess = _require(request)
+    return {'versions': S.list_versions(sess['hid'])}
+
+
+class RestoreIn(BaseModel):
+    id: str
+
+
+@app.post('/api/history/preview')
+def history_preview(body: RestoreIn, request: Request):
+    sess = _require(request)
+    try:
+        plan = S.load_version_plan(sess['hid'], body.id, _pp(sess))
+    except (ValueError, FileNotFoundError):
+        raise HTTPException(404, 'Version not found')
+    if plan is None:
+        raise HTTPException(423, 'This version is encrypted; unlock the household with its passphrase first')
+    return {'plan': normalize_plan(plan)}
+
+
+@app.post('/api/history/restore')
+def history_restore(body: RestoreIn, request: Request):
+    sess = _require(request)
+    try:
+        saved = S.restore_version(sess['hid'], body.id, sess['email'], _pp(sess))
+    except (ValueError, FileNotFoundError) as e:
+        raise HTTPException(400, str(e))
+    return {'last_saved': saved, 'plan': normalize_plan(S.load_plan(sess['hid'], _pp(sess)) or {})}
+
+
 # ── check-ins (docs/CHECKINS.md) ─────────────────────────────────────────
 def _ck_state(sess):
     pp = _pp(sess)
@@ -306,6 +417,7 @@ class CheckinSettingsIn(BaseModel):
     cadence: Optional[str] = None
     snooze_days: Optional[int] = None
     next_due: Optional[str] = None
+    email_reminders: Optional[bool] = None
 
 
 @app.put('/api/checkins/settings')
@@ -319,6 +431,8 @@ def put_checkin_settings(body: CheckinSettingsIn, request: Request):
             settings['next_due'] = CK.next_period_start(last, body.cadence).isoformat()
     if body.next_due:
         settings['next_due'] = body.next_due
+    if body.email_reminders is not None:
+        settings['email_reminders'] = bool(body.email_reminders)
     if body.snooze_days:
         from datetime import timedelta
         settings['snoozed_until'] = (_date.today() + timedelta(days=body.snooze_days)).isoformat()
@@ -396,6 +510,60 @@ def checkin_ics(request: Request):
                              headers={'Content-Disposition': 'attachment; filename="financial-checkins.ics"'})
 
 
+@app.get('/api/notify/status')
+def notify_status(request: Request):
+    sess = _require(request)
+    return {'configured': NT.configured(), 'members': S.members(sess['hid']),
+            'scheduler_disabled': os.environ.get('DISABLE_REMINDERS') == '1'}
+
+
+@app.post('/api/checkins/test-email')
+def checkin_test_email(request: Request):
+    sess = _require(request)
+    if not NT.configured():
+        raise HTTPException(400, 'Email is not set up on the server (SMTP_HOST).')
+    name = S.load_index().get(sess['hid'], {}).get('name', 'Household')
+    settings, _ = _ck_state(sess)
+    cad = settings['cadence'] if settings['cadence'] != 'off' else 'quarterly'
+    subj, text, html = NT.reminder_email(name, CK.period_label(_date.today(), cad),
+                                         os.environ.get('APP_URL') or str(request.base_url))
+    try:
+        NT.send([sess['email']], '[Test] ' + subj, text, html)
+    except Exception as e:
+        raise HTTPException(502, f'Sending failed: {e}')
+    return {'ok': True, 'to': sess['email']}
+
+
+# ── reports ─────────────────────────────────────────────────────────────
+@app.get('/api/report.pdf')
+def report_pdf(request: Request):
+    from server import report as RP
+    sess = _require(request)
+    pp = _pp(sess)
+    plan = S.load_plan(sess['hid'], pp) or R.default_plan()
+    name = S.load_index().get(sess['hid'], {}).get('name', 'Household')
+    _, items = _ck_state(sess)
+    data = RP.build(plan, name, items)
+    return Response(data, media_type='application/pdf',
+                    headers={'Content-Disposition': f'attachment; filename="financial-plan-{_date.today().isoformat()}.pdf"'})
+
+
+class ReportIn(BaseModel):
+    plan: dict[str, Any]
+
+
+@app.post('/api/report.pdf')
+def report_pdf_plan(body: ReportIn, request: Request):
+    """Report for an unsaved/what-if plan (the plan currently on screen)."""
+    from server import report as RP
+    sess = _require(request)
+    name = S.load_index().get(sess['hid'], {}).get('name', 'Household')
+    _, items = _ck_state(sess)
+    data = RP.build(body.plan, name, items)
+    return Response(data, media_type='application/pdf',
+                    headers={'Content-Disposition': f'attachment; filename="financial-plan-{_date.today().isoformat()}.pdf"'})
+
+
 # ── engine ──────────────────────────────────────────────────────────────
 class ProjectIn(BaseModel):
     plan: dict[str, Any]
@@ -414,6 +582,38 @@ def api_project(body: ProjectIn):
 @app.post('/api/montecarlo')
 def api_mc(body: ProjectIn):
     return monte_carlo(body.plan, body.n, body.seed, body.normalized)
+
+
+class StressIn(BaseModel):
+    plan: dict[str, Any]
+    tests: Optional[list[dict[str, Any]]] = None
+    n: int = 400
+
+
+@app.post('/api/stress/defaults')
+def stress_defaults(body: StressIn):
+    return {'tests': ST.default_tests(body.plan)}
+
+
+@app.post('/api/stress')
+def stress_run(body: StressIn):
+    return ST.run(body.plan, body.tests, max(100, min(body.n, 2000)))
+
+
+class RetireIn(BaseModel):
+    plan: dict[str, Any]
+    withdrawal_rate: float = 0.04
+    n: int = 300
+
+
+@app.post('/api/retirement')
+def retirement(body: RetireIn):
+    return {'ss': RT.ss_options(body.plan), 'replacement': RT.replacement(body.plan, body.withdrawal_rate)}
+
+
+@app.post('/api/retirement/whatif')
+def retirement_whatif(body: RetireIn):
+    return {'rows': RT.retire_whatif(body.plan, n=max(100, min(body.n, 1000)))}
 
 
 @app.post('/api/normalize')

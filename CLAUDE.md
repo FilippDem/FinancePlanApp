@@ -22,6 +22,8 @@ This is a Streamlit-based lifetime financial planning application (V14) with:
 - Engine: `v2/engine/finplan` (pure numpy). Math changes vs v0.8 are listed in `v2/docs/ENGINE_CHANGES.md`; feature status in `v2/docs/PARITY.md` — keep it updated and never drop a ✅ item.
 - Tests: `cd v2/engine && python -m pytest -q` and `cd v2 && python -m pytest -q server/tests` must pass; `cd v2/web && npx tsc -b` must be clean.
 - Reference data (templates, tax tables, demos) is extracted from v0.8 by `v2/tools/extract_v08_data.py` — don't hand-edit the JSON.
+- Demo re-tuning lives in `v2/engine/finplan/data/demo_overrides.json` (applied by `reference.demo_plans()`); edit that, not `demo_plans.json`.
+- Roadmap and known gaps: `v2/docs/ROADMAP.md`. Email reminders run in-process: keep uvicorn at 1 worker.
 
 ## NAS Deployment Details
 

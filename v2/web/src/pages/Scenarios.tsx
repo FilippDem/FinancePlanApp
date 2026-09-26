@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Save, Upload, Download, Trash2, Pencil, FolderOpen, Sparkles, GitCompare, RotateCcw } from 'lucide-react'
+import { Save, Upload, Download, Trash2, Pencil, FolderOpen, Sparkles, GitCompare, RotateCcw, History, Eye } from 'lucide-react'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
 import { money, pct } from '../lib/format'
@@ -19,7 +19,23 @@ export default function Scenarios() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const load = () => api.scenarios().then(r => setSaved(r.scenarios))
-  useEffect(() => { load(); api.demos().then(r => setDemos(r.demos)) }, [])
+  const [versions, setVersions] = useState<any[]>([])
+  const [showAll, setShowAll] = useState(false)
+  const [preview, setPreview] = useState<{ v: any; plan: any; proj: any } | null>(null)
+  const loadVersions = () => api.history().then(r => setVersions(r.versions)).catch(() => {})
+  useEffect(() => { load(); loadVersions(); api.demos().then(r => setDemos(r.demos)) }, [])
+  const openPreview = async (v: any) => {
+    try {
+      const { plan: vp } = await api.previewVersion(v.id)
+      const pr = await api.project(vp)
+      setPreview({ v, plan: vp, proj: pr })
+    } catch (e: any) { flash(e.message) }
+  }
+  const restore = async (v: any) => {
+    const r = await api.restoreVersion(v.id)
+    await replacePlan(r.plan)
+    setPreview(null); loadVersions(); flash('Restored. Your previous version is in the history too.')
+  }
   const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 2500) }
 
   const saveAs = async () => {
@@ -65,6 +81,7 @@ export default function Scenarios() {
       <div className="flex-1 min-w-0">
         <div className="font-medium truncate">{n.replace('[DEMO] ', '')}</div>
         <div className="text-xs text-muted truncate">{p.parent1_name}{p.parent2_name && p.parent2_name !== 'N/A' ? ` & ${p.parent2_name}` : ''} · {(p.children_list || []).length} kids · {(p.houses || []).length} homes</div>
+        {demo && p.demo_note && <div className="text-xs text-ink2 mt-0.5 line-clamp-2" title={p.demo_note}>{p.demo_note}</div>}
       </div>
       {demo && <Badge tone="accent">demo</Badge>}
       <Button size="sm" onClick={() => setConfirm({ title: `Load “${n.replace('[DEMO] ', '')}”?`, body: 'This replaces the current plan (it is auto-saved). Save the current plan as a scenario first if you want to keep it.', run: () => replacePlan(p) })}><FolderOpen size={13} />Load</Button>
@@ -124,6 +141,44 @@ export default function Scenarios() {
           </table>
         </Card>
       )}
+
+      <Card title={<span className="flex items-center gap-2"><History size={16} className="text-accent" />Version history</span>}
+        subtitle="The server keeps the last 10 saves plus one snapshot per day (120 days). Restoring changes only the plan; check-ins, actuals and scenarios stay."
+        pad={false} action={versions.length > 8 && <Button size="sm" variant="ghost" onClick={() => setShowAll(!showAll)}>{showAll ? 'Show fewer' : `Show all ${versions.length}`}</Button>}>
+        {versions.length === 0 ? <Empty title="No history yet" body="Versions appear after the plan is saved a few times." /> : (
+          <table className="w-full text-sm">
+            <thead><tr className="text-left text-[12px] text-muted border-b border-line"><th className="px-5 py-2 font-medium">Saved</th><th className="font-medium">By</th>
+              <th className="font-medium text-right">Savings</th><th className="font-medium text-right">Homes</th><th className="font-medium text-right">Kids</th><th className="font-medium text-right">Retire at</th><th className="w-44" /></tr></thead>
+            <tbody>{(showAll ? versions : versions.slice(0, 8)).map(v => (
+              <tr key={v.id} className="border-b border-line last:border-0">
+                <td className="px-5 py-2 tnum">{new Date(v.last_saved || v.file_time).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                  {v.kind === 'daily' && <span className="ml-1.5"><Badge>daily</Badge></span>}</td>
+                <td className="text-[12.5px] text-muted truncate max-w-[160px]">{String(v.saved_by || '').split('@')[0]}{String(v.saved_by || '').includes('restored') ? ' (restore)' : ''}</td>
+                <td className="text-right tnum">{v.summary ? money(v.summary.savings) : v.encrypted ? 'encrypted' : '—'}</td>
+                <td className="text-right tnum">{v.summary?.homes ?? '—'}</td>
+                <td className="text-right tnum">{v.summary?.kids ?? '—'}</td>
+                <td className="text-right tnum">{v.summary ? v.summary.retire.filter((x: any) => x != null).join(' / ') : '—'}</td>
+                <td className="text-right pr-4 whitespace-nowrap"><Button size="sm" variant="ghost" onClick={() => openPreview(v)}><Eye size={13} />Preview</Button>
+                  <Button size="sm" onClick={() => setConfirm({ title: 'Restore this version?', body: 'The current plan is backed up first, so you can undo this from the history.', run: () => restore(v) })}><RotateCcw size={13} />Restore</Button></td>
+              </tr>))}</tbody>
+          </table>)}
+      </Card>
+
+      <Modal open={!!preview} onClose={() => setPreview(null)} title={preview ? `Version from ${new Date(preview.v.last_saved || preview.v.file_time).toLocaleString()}` : ''}
+        footer={<><Button onClick={() => setPreview(null)}>Close</Button><Button variant="primary" onClick={() => preview && restore(preview.v)}><RotateCcw size={14} />Restore</Button></>}>
+        {preview && (() => {
+          const a = preview.proj.summary
+          const lastA = preview.proj.rows[preview.proj.rows.length - 1]
+          return <div className="text-sm space-y-1.5">
+            <div className="flex justify-between"><span className="text-muted">People</span><span>{preview.plan.parent1_name}{preview.plan.parent2_name && preview.plan.parent2_name !== 'N/A' ? ` & ${preview.plan.parent2_name}` : ''}</span></div>
+            <div className="flex justify-between"><span className="text-muted">Net worth today</span><span className="tnum">{money(a.net_worth_now)}</span></div>
+            <div className="flex justify-between"><span className="text-muted">Retirement year</span><span className="tnum">{a.retirement_year}</span></div>
+            <div className="flex justify-between"><span className="text-muted">Savings run out</span><span className="tnum">{a.depletion_year ?? 'Never'}</span></div>
+            <div className="flex justify-between"><span className="text-muted">Net worth at end (today's $)</span><span className="tnum">{money(lastA.net_worth / lastA.infl_index)}</span></div>
+            <div className="flex justify-between"><span className="text-muted">Homes · kids · recurring</span><span>{(preview.plan.houses || []).length} · {(preview.plan.children_list || []).length} · {(preview.plan.recurring_expenses || []).length}</span></div>
+          </div>
+        })()}
+      </Modal>
 
       <Card title={<span className="flex items-center gap-2"><Sparkles size={16} className="text-accent" />Demo households</span>} subtitle="Example plans to explore features" pad={false}>
         <ul className="divide-y divide-line">{Object.entries(demos).map(([n, p]) => <ScenarioRow key={n} n={n} p={p} demo />)}</ul>

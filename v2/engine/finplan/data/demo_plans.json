@@ -1,0 +1,1507 @@
+{
+ "[DEMO] Tech Couple: SF\u2192Austin\u2192Seattle, Early Retirement @50": {
+  "current_year": 2026,
+  "parent1_name": "Alex",
+  "parent1_emoji": "\ud83d\udc68",
+  "parent2_name": "Jordan",
+  "parent2_emoji": "\ud83d\udc69",
+  "marriage_year": 2023,
+  "parentX_age": 28,
+  "parentX_net_worth": 150000.0,
+  "parentX_income": 180000.0,
+  "parentX_raise": 5.0,
+  "parentX_retirement_age": 50,
+  "parentX_ss_benefit": 2800.0,
+  "parentY_age": 27,
+  "parentY_net_worth": 120000.0,
+  "parentY_income": 165000.0,
+  "parentY_raise": 4.5,
+  "parentY_retirement_age": 51,
+  "parentY_ss_benefit": 2600.0,
+  "expenses": {
+   "Food & Groceries": 18000.0,
+   "Clothing": 6000.0,
+   "Transportation": 8000.0,
+   "Entertainment & Activities": 12000.0,
+   "Personal Care": 4800.0,
+   "Other Expenses": 9600.0
+  },
+  "children_list": [
+   {
+    "name": "Emma",
+    "birth_year": 2024,
+    "use_template": true,
+    "template_state": "San Francisco",
+    "template_strategy": "High-end",
+    "school_type": "Private",
+    "college_type": "Private",
+    "college_location": "San Francisco"
+   },
+   {
+    "name": "Lucas",
+    "birth_year": 2026,
+    "use_template": true,
+    "template_state": "San Francisco",
+    "template_strategy": "High-end",
+    "school_type": "Private",
+    "college_type": "Private",
+    "college_location": "New York"
+   }
+  ],
+  "houses": [
+   {
+    "name": "SF Condo",
+    "purchase_year": 2024,
+    "purchase_price": 1200000.0,
+    "current_value": 1300000.0,
+    "mortgage_balance": 900000.0,
+    "mortgage_rate": 0.065,
+    "mortgage_years_left": 28,
+    "property_tax_rate": 0.012,
+    "home_insurance": 2400.0,
+    "maintenance_rate": 0.005,
+    "upkeep_costs": 6000.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2024,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     },
+     {
+      "year": 2029,
+      "status": "Sold",
+      "rental_income": 0.0
+     }
+    ]
+   },
+   {
+    "name": "Austin House",
+    "purchase_year": 2029,
+    "purchase_price": 650000.0,
+    "current_value": 650000.0,
+    "mortgage_balance": 520000.0,
+    "mortgage_rate": 0.055,
+    "mortgage_years_left": 30,
+    "property_tax_rate": 0.021,
+    "home_insurance": 2000.0,
+    "maintenance_rate": 0.008,
+    "upkeep_costs": 5000.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2029,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     },
+     {
+      "year": 2034,
+      "status": "Own_Rent",
+      "rental_income": 3200.0
+     },
+     {
+      "year": 2041,
+      "status": "Sold",
+      "rental_income": 0.0
+     }
+    ]
+   },
+   {
+    "name": "Seattle House",
+    "purchase_year": 2034,
+    "purchase_price": 950000.0,
+    "current_value": 950000.0,
+    "mortgage_balance": 760000.0,
+    "mortgage_rate": 0.048,
+    "mortgage_years_left": 30,
+    "property_tax_rate": 0.01,
+    "home_insurance": 1800.0,
+    "maintenance_rate": 0.007,
+    "upkeep_costs": 6500.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2034,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     }
+    ]
+   }
+  ],
+  "major_purchases": [
+   {
+    "name": "Sabbatical Year Living Expenses",
+    "year": 2032,
+    "amount": 80000.0,
+    "financing_years": 0,
+    "interest_rate": 0.0,
+    "asset_type": "Expense",
+    "appreciation_rate": 0.0
+   },
+   {
+    "name": "Home Renovation (Austin)",
+    "year": 2031,
+    "amount": 75000.0,
+    "financing_years": 0,
+    "interest_rate": 0.0,
+    "asset_type": "Expense",
+    "appreciation_rate": 0.0
+   },
+   {
+    "name": "Boat Purchase",
+    "year": 2036,
+    "amount": 125000.0,
+    "financing_years": 5,
+    "interest_rate": 0.055,
+    "asset_type": "Depreciating",
+    "appreciation_rate": -0.08
+   }
+  ],
+  "recurring_expenses": [
+   {
+    "name": "Tech Equipment",
+    "category": "Work Equipment",
+    "amount": 5000.0,
+    "frequency_years": 2,
+    "start_year": 2026,
+    "end_year": 2048,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Electric Vehicles",
+    "category": "Vehicle",
+    "amount": 65000.0,
+    "frequency_years": 6,
+    "start_year": 2028,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Adventure Travel",
+    "category": "Travel",
+    "amount": 15000.0,
+    "frequency_years": 1,
+    "start_year": 2026,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Boat Maintenance",
+    "category": "Recreation",
+    "amount": 13000.0,
+    "frequency_years": 1,
+    "start_year": 2036,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Home Office Upgrades",
+    "category": "Work Equipment",
+    "amount": 3000.0,
+    "frequency_years": 3,
+    "start_year": 2027,
+    "end_year": 2048,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   }
+  ],
+  "state_timeline": [
+   {
+    "year": 2026,
+    "state": "San Francisco",
+    "spending_strategy": "High-end"
+   },
+   {
+    "year": 2029,
+    "state": "Houston",
+    "spending_strategy": "Average"
+   },
+   {
+    "year": 2034,
+    "state": "Seattle",
+    "spending_strategy": "Average"
+   }
+  ],
+  "economic_params": {
+   "investment_return": 0.08,
+   "inflation_rate": 0.02,
+   "expense_growth_rate": 0.02,
+   "healthcare_inflation_rate": 0.04,
+   "use_historical_returns": false,
+   "use_historical_inflation": false,
+   "use_historical_expense_growth": false,
+   "use_historical_healthcare_inflation": false
+  },
+  "ss_insolvency_enabled": true,
+  "ss_shortfall_percentage": 30.0
+ },
+ "[DEMO] 3-Kid Family: Seattle\u2192Portland\u2192Denver, Career Change, 4 Properties": {
+  "current_year": 2026,
+  "parent1_name": "Mike",
+  "parent1_emoji": "\ud83d\udc68",
+  "parent2_name": "Sarah",
+  "parent2_emoji": "\ud83d\udc69",
+  "marriage_year": 2014,
+  "parentX_age": 38,
+  "parentX_net_worth": 320000.0,
+  "parentX_income": 115000.0,
+  "parentX_raise": 3.5,
+  "parentX_retirement_age": 62,
+  "parentX_ss_benefit": 2800.0,
+  "parentY_age": 37,
+  "parentY_net_worth": 280000.0,
+  "parentY_income": 95000.0,
+  "parentY_raise": 3.0,
+  "parentY_retirement_age": 63,
+  "parentY_ss_benefit": 2500.0,
+  "expenses": {
+   "Food & Groceries": 15600.0,
+   "Clothing": 4800.0,
+   "Transportation": 14400.0,
+   "Entertainment & Activities": 7200.0,
+   "Personal Care": 3600.0,
+   "Other Expenses": 8400.0
+  },
+  "children_list": [
+   {
+    "name": "Olivia",
+    "birth_year": 2016,
+    "use_template": true,
+    "template_state": "Seattle",
+    "template_strategy": "Average",
+    "school_type": "Public",
+    "college_type": "Public",
+    "college_location": "Seattle"
+   },
+   {
+    "name": "Noah",
+    "birth_year": 2019,
+    "use_template": true,
+    "template_state": "Seattle",
+    "template_strategy": "Average",
+    "school_type": "Public",
+    "college_type": "Public",
+    "college_location": "Seattle"
+   },
+   {
+    "name": "Sophia",
+    "birth_year": 2022,
+    "use_template": true,
+    "template_state": "Seattle",
+    "template_strategy": "Average",
+    "school_type": "Public",
+    "college_type": "Private",
+    "college_location": "Seattle"
+   }
+  ],
+  "houses": [
+   {
+    "name": "Seattle Starter Home",
+    "purchase_year": 2018,
+    "purchase_price": 650000.0,
+    "current_value": 800000.0,
+    "mortgage_balance": 420000.0,
+    "mortgage_rate": 0.035,
+    "mortgage_years_left": 22,
+    "property_tax_rate": 0.01,
+    "home_insurance": 1800.0,
+    "maintenance_rate": 0.008,
+    "upkeep_costs": 5000.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2018,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     },
+     {
+      "year": 2031,
+      "status": "Own_Rent",
+      "rental_income": 2800.0
+     },
+     {
+      "year": 2044,
+      "status": "Sold",
+      "rental_income": 0.0
+     }
+    ]
+   },
+   {
+    "name": "Portland Family Home",
+    "purchase_year": 2031,
+    "purchase_price": 720000.0,
+    "current_value": 720000.0,
+    "mortgage_balance": 576000.0,
+    "mortgage_rate": 0.045,
+    "mortgage_years_left": 30,
+    "property_tax_rate": 0.011,
+    "home_insurance": 1900.0,
+    "maintenance_rate": 0.009,
+    "upkeep_costs": 5500.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2031,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     },
+     {
+      "year": 2038,
+      "status": "Sold",
+      "rental_income": 0.0
+     }
+    ]
+   },
+   {
+    "name": "Denver Home",
+    "purchase_year": 2038,
+    "purchase_price": 680000.0,
+    "current_value": 680000.0,
+    "mortgage_balance": 544000.0,
+    "mortgage_rate": 0.052,
+    "mortgage_years_left": 30,
+    "property_tax_rate": 0.0055,
+    "home_insurance": 1700.0,
+    "maintenance_rate": 0.008,
+    "upkeep_costs": 5200.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2038,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     }
+    ]
+   },
+   {
+    "name": "Colorado Mountain Cabin",
+    "purchase_year": 2041,
+    "purchase_price": 380000.0,
+    "current_value": 380000.0,
+    "mortgage_balance": 304000.0,
+    "mortgage_rate": 0.055,
+    "mortgage_years_left": 30,
+    "property_tax_rate": 0.005,
+    "home_insurance": 1200.0,
+    "maintenance_rate": 0.012,
+    "upkeep_costs": 4000.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2041,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     }
+    ]
+   }
+  ],
+  "major_purchases": [
+   {
+    "name": "Olivia's Wedding",
+    "year": 2044,
+    "amount": 32000.0,
+    "financing_years": 0,
+    "interest_rate": 0.0,
+    "asset_type": "Expense",
+    "appreciation_rate": 0.0
+   },
+   {
+    "name": "Career Change Education (Sarah MBA, public university)",
+    "year": 2033,
+    "amount": 95000.0,
+    "financing_years": 0,
+    "interest_rate": 0.0,
+    "asset_type": "Expense",
+    "appreciation_rate": 0.0
+   },
+   {
+    "name": "Kitchen Renovation (Portland)",
+    "year": 2034,
+    "amount": 55000.0,
+    "financing_years": 0,
+    "interest_rate": 0.0,
+    "asset_type": "Expense",
+    "appreciation_rate": 0.0
+   },
+   {
+    "name": "RV Purchase",
+    "year": 2042,
+    "amount": 95000.0,
+    "financing_years": 7,
+    "interest_rate": 0.058,
+    "asset_type": "Depreciating",
+    "appreciation_rate": -0.1
+   }
+  ],
+  "recurring_expenses": [
+   {
+    "name": "Family Minivan",
+    "category": "Vehicle",
+    "amount": 45000.0,
+    "frequency_years": 8,
+    "start_year": 2029,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 5,
+    "interest_rate": 0.045
+   },
+   {
+    "name": "Annual Family Vacation",
+    "category": "Travel",
+    "amount": 8000.0,
+    "frequency_years": 1,
+    "start_year": 2026,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Ski Equipment & Passes",
+    "category": "Recreation",
+    "amount": 4500.0,
+    "frequency_years": 1,
+    "start_year": 2038,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Home Office Equipment",
+    "category": "Work Equipment",
+    "amount": 2500.0,
+    "frequency_years": 3,
+    "start_year": 2027,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "College Visiting Trips",
+    "category": "Children",
+    "amount": 3000.0,
+    "frequency_years": 1,
+    "start_year": 2034,
+    "end_year": 2040,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   }
+  ],
+  "state_timeline": [
+   {
+    "year": 2026,
+    "state": "Seattle",
+    "spending_strategy": "Average"
+   },
+   {
+    "year": 2031,
+    "state": "Portland",
+    "spending_strategy": "Average"
+   },
+   {
+    "year": 2038,
+    "state": "Sacramento",
+    "spending_strategy": "Conservative"
+   },
+   {
+    "year": 2044,
+    "state": "Sacramento",
+    "spending_strategy": "Average"
+   }
+  ],
+  "economic_params": {
+   "investment_return": 0.06,
+   "inflation_rate": 0.03,
+   "expense_growth_rate": 0.02,
+   "healthcare_inflation_rate": 0.045,
+   "use_historical_returns": false,
+   "use_historical_inflation": false,
+   "use_historical_expense_growth": false,
+   "use_historical_healthcare_inflation": false
+  },
+  "ss_insolvency_enabled": true,
+  "ss_shortfall_percentage": 30.0
+ },
+ "[DEMO] Executives: NYC\u2192Miami\u2192Portugal, Early Retire @55, 5 Properties": {
+  "current_year": 2026,
+  "parent1_name": "David",
+  "parent1_emoji": "\ud83d\udc68",
+  "parent2_name": "Jennifer",
+  "parent2_emoji": "\ud83d\udc69",
+  "marriage_year": 2011,
+  "parentX_age": 45,
+  "parentX_net_worth": 2500000.0,
+  "parentX_income": 350000.0,
+  "parentX_raise": 4.0,
+  "parentX_retirement_age": 55,
+  "parentX_ss_benefit": 4500.0,
+  "parentY_age": 43,
+  "parentY_net_worth": 2200000.0,
+  "parentY_income": 280000.0,
+  "parentY_raise": 3.5,
+  "parentY_retirement_age": 55,
+  "parentY_ss_benefit": 4000.0,
+  "expenses": {
+   "Food & Groceries": 24000.0,
+   "Clothing": 12000.0,
+   "Transportation": 18000.0,
+   "Entertainment & Activities": 24000.0,
+   "Personal Care": 9600.0,
+   "Other Expenses": 18000.0
+  },
+  "children_list": [
+   {
+    "name": "Isabella",
+    "birth_year": 2013,
+    "use_template": true,
+    "template_state": "New York",
+    "template_strategy": "High-end",
+    "school_type": "Private",
+    "college_type": "Private",
+    "college_location": "New York"
+   },
+   {
+    "name": "William",
+    "birth_year": 2015,
+    "use_template": true,
+    "template_state": "New York",
+    "template_strategy": "High-end",
+    "school_type": "Private",
+    "college_type": "Private",
+    "college_location": "New York"
+   }
+  ],
+  "houses": [
+   {
+    "name": "Manhattan Apartment",
+    "purchase_year": 2016,
+    "purchase_price": 2500000.0,
+    "current_value": 3200000.0,
+    "mortgage_balance": 0.0,
+    "mortgage_rate": 0.0,
+    "mortgage_years_left": 0,
+    "property_tax_rate": 0.008,
+    "home_insurance": 4500.0,
+    "maintenance_rate": 0.004,
+    "upkeep_costs": 12000.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2016,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     },
+     {
+      "year": 2033,
+      "status": "Sold",
+      "rental_income": 0.0
+     }
+    ]
+   },
+   {
+    "name": "Hamptons Summer Home",
+    "purchase_year": 2021,
+    "purchase_price": 1800000.0,
+    "current_value": 2100000.0,
+    "mortgage_balance": 0.0,
+    "mortgage_rate": 0.0,
+    "mortgage_years_left": 0,
+    "property_tax_rate": 0.018,
+    "home_insurance": 3200.0,
+    "maintenance_rate": 0.008,
+    "upkeep_costs": 12000.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2021,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     },
+     {
+      "year": 2033,
+      "status": "Own_Rent",
+      "rental_income": 8500.0
+     },
+     {
+      "year": 2041,
+      "status": "Sold",
+      "rental_income": 0.0
+     }
+    ]
+   },
+   {
+    "name": "Miami Penthouse",
+    "purchase_year": 2033,
+    "purchase_price": 2800000.0,
+    "current_value": 2800000.0,
+    "mortgage_balance": 0.0,
+    "mortgage_rate": 0.0,
+    "mortgage_years_left": 0,
+    "property_tax_rate": 0.012,
+    "home_insurance": 5500.0,
+    "maintenance_rate": 0.005,
+    "upkeep_costs": 14000.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2033,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     },
+     {
+      "year": 2041,
+      "status": "Own_Rent",
+      "rental_income": 7000.0
+     }
+    ]
+   },
+   {
+    "name": "Portugal Villa (Algarve)",
+    "purchase_year": 2041,
+    "purchase_price": 850000.0,
+    "current_value": 850000.0,
+    "mortgage_balance": 0.0,
+    "mortgage_rate": 0.0,
+    "mortgage_years_left": 0,
+    "property_tax_rate": 0.004,
+    "home_insurance": 2200.0,
+    "maintenance_rate": 0.008,
+    "upkeep_costs": 8000.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2041,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     }
+    ]
+   },
+   {
+    "name": "Aspen Ski Chalet",
+    "purchase_year": 2029,
+    "purchase_price": 3200000.0,
+    "current_value": 3200000.0,
+    "mortgage_balance": 0.0,
+    "mortgage_rate": 0.0,
+    "mortgage_years_left": 0,
+    "property_tax_rate": 0.006,
+    "home_insurance": 5500.0,
+    "maintenance_rate": 0.012,
+    "upkeep_costs": 22000.0,
+    "appreciation_rate": 4.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2029,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     }
+    ]
+   }
+  ],
+  "major_purchases": [
+   {
+    "name": "Isabella's Wedding Reception",
+    "year": 2038,
+    "amount": 75000.0,
+    "financing_years": 0,
+    "interest_rate": 0.0,
+    "asset_type": "Expense",
+    "appreciation_rate": 0.0
+   },
+   {
+    "name": "William's Wedding Reception",
+    "year": 2042,
+    "amount": 80000.0,
+    "financing_years": 0,
+    "interest_rate": 0.0,
+    "asset_type": "Expense",
+    "appreciation_rate": 0.0
+   },
+   {
+    "name": "Luxury Yacht Purchase",
+    "year": 2034,
+    "amount": 450000.0,
+    "financing_years": 0,
+    "interest_rate": 0.0,
+    "asset_type": "Depreciating",
+    "appreciation_rate": -0.06
+   },
+   {
+    "name": "Art Collection Investment",
+    "year": 2031,
+    "amount": 200000.0,
+    "financing_years": 0,
+    "interest_rate": 0.0,
+    "asset_type": "Appreciating",
+    "appreciation_rate": 0.04
+   }
+  ],
+  "recurring_expenses": [
+   {
+    "name": "Luxury Vehicles (2 Cars)",
+    "category": "Vehicle",
+    "amount": 150000.0,
+    "frequency_years": 4,
+    "start_year": 2028,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "International Luxury Travel",
+    "category": "Travel",
+    "amount": 30000.0,
+    "frequency_years": 1,
+    "start_year": 2026,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Charitable Giving",
+    "category": "Philanthropy",
+    "amount": 30000.0,
+    "frequency_years": 1,
+    "start_year": 2026,
+    "end_year": null,
+    "inflation_adjust": false,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Yacht Maintenance",
+    "category": "Recreation",
+    "amount": 35000.0,
+    "frequency_years": 1,
+    "start_year": 2034,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Wine Collection & Storage",
+    "category": "Lifestyle",
+    "amount": 12000.0,
+    "frequency_years": 1,
+    "start_year": 2026,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Private Club Memberships",
+    "category": "Lifestyle",
+    "amount": 25000.0,
+    "frequency_years": 1,
+    "start_year": 2026,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   }
+  ],
+  "state_timeline": [
+   {
+    "year": 2026,
+    "state": "New York",
+    "spending_strategy": "High-end"
+   },
+   {
+    "year": 2033,
+    "state": "Los Angeles",
+    "spending_strategy": "High-end"
+   },
+   {
+    "year": 2041,
+    "state": "Paris",
+    "spending_strategy": "Average"
+   }
+  ],
+  "economic_params": {
+   "investment_return": 0.06,
+   "inflation_rate": 0.03,
+   "expense_growth_rate": 0.02,
+   "healthcare_inflation_rate": 0.045,
+   "use_historical_returns": false,
+   "use_historical_inflation": false,
+   "use_historical_expense_growth": false,
+   "use_historical_healthcare_inflation": false
+  },
+  "ss_insolvency_enabled": true,
+  "ss_shortfall_percentage": 30.0
+ },
+ "[DEMO] Single Mom: Sacramento\u2192San Diego, Teacher\u2192Principal, 3 Properties": {
+  "current_year": 2026,
+  "parent1_name": "Maria",
+  "parent1_emoji": "\ud83d\udc69",
+  "parent2_name": "N/A",
+  "parent2_emoji": "\ud83d\udc64",
+  "marriage_year": "N/A",
+  "parentX_age": 35,
+  "parentX_net_worth": 95000.0,
+  "parentX_income": 95000.0,
+  "parentX_raise": 3.0,
+  "parentX_retirement_age": 62,
+  "parentX_ss_benefit": 2200.0,
+  "parentY_age": 35,
+  "parentY_net_worth": 0.0,
+  "parentY_income": 0.0,
+  "parentY_raise": 0.0,
+  "parentY_retirement_age": 67,
+  "parentY_ss_benefit": 0.0,
+  "expenses": {
+   "Food & Groceries": 8400.0,
+   "Clothing": 1800.0,
+   "Transportation": 6000.0,
+   "Entertainment & Activities": 2400.0,
+   "Personal Care": 1800.0,
+   "Other Expenses": 3600.0
+  },
+  "children_list": [
+   {
+    "name": "Diego",
+    "birth_year": 2018,
+    "use_template": true,
+    "template_state": "Sacramento",
+    "template_strategy": "Average",
+    "school_type": "Public",
+    "college_type": "Public",
+    "college_location": "Sacramento"
+   }
+  ],
+  "houses": [
+   {
+    "name": "Sacramento Townhouse",
+    "purchase_year": 2023,
+    "purchase_price": 410000.0,
+    "current_value": 430000.0,
+    "mortgage_balance": 330000.0,
+    "mortgage_rate": 0.055,
+    "mortgage_years_left": 27,
+    "property_tax_rate": 0.011,
+    "home_insurance": 1200.0,
+    "maintenance_rate": 0.005,
+    "upkeep_costs": 2500.0,
+    "owner": "ParentX",
+    "timeline": [
+     {
+      "year": 2023,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     },
+     {
+      "year": 2032,
+      "status": "Own_Rent",
+      "rental_income": 2400.0
+     },
+     {
+      "year": 2044,
+      "status": "Sold",
+      "rental_income": 0.0
+     }
+    ]
+   },
+   {
+    "name": "San Diego Condo",
+    "purchase_year": 2032,
+    "purchase_price": 520000.0,
+    "current_value": 520000.0,
+    "mortgage_balance": 416000.0,
+    "mortgage_rate": 0.055,
+    "mortgage_years_left": 30,
+    "property_tax_rate": 0.0073,
+    "home_insurance": 1500.0,
+    "maintenance_rate": 0.006,
+    "upkeep_costs": 3500.0,
+    "owner": "ParentX",
+    "timeline": [
+     {
+      "year": 2032,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     }
+    ]
+   }
+  ],
+  "major_purchases": [
+   {
+    "name": "Sabbatical Year (Educational Travel)",
+    "year": 2036,
+    "amount": 35000.0,
+    "financing_years": 0,
+    "interest_rate": 0.0,
+    "asset_type": "Expense",
+    "appreciation_rate": 0.0
+   },
+   {
+    "name": "Diego's College Graduation Gift",
+    "year": 2044,
+    "amount": 15000.0,
+    "financing_years": 0,
+    "interest_rate": 0.0,
+    "asset_type": "Expense",
+    "appreciation_rate": 0.0
+   }
+  ],
+  "recurring_expenses": [
+   {
+    "name": "Reliable Sedan",
+    "category": "Vehicle",
+    "amount": 32000.0,
+    "frequency_years": 8,
+    "start_year": 2030,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "ParentX",
+    "financing_years": 5,
+    "interest_rate": 0.045
+   },
+   {
+    "name": "Summer Camp & Activities",
+    "category": "Children",
+    "amount": 2500.0,
+    "frequency_years": 1,
+    "start_year": 2026,
+    "end_year": 2036,
+    "inflation_adjust": true,
+    "parent": "ParentX",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Professional Development",
+    "category": "Work Equipment",
+    "amount": 2000.0,
+    "frequency_years": 1,
+    "start_year": 2026,
+    "end_year": 2053,
+    "inflation_adjust": true,
+    "parent": "ParentX",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Annual Vacation",
+    "category": "Travel",
+    "amount": 4500.0,
+    "frequency_years": 1,
+    "start_year": 2032,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "ParentX",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   }
+  ],
+  "state_timeline": [
+   {
+    "year": 2026,
+    "state": "Sacramento",
+    "spending_strategy": "Conservative"
+   },
+   {
+    "year": 2032,
+    "state": "San Francisco",
+    "spending_strategy": "Average"
+   },
+   {
+    "year": 2041,
+    "state": "San Francisco",
+    "spending_strategy": "Average"
+   }
+  ],
+  "economic_params": {
+   "investment_return": 0.04,
+   "inflation_rate": 0.03,
+   "expense_growth_rate": 0.02,
+   "healthcare_inflation_rate": 0.05,
+   "use_historical_returns": false,
+   "use_historical_inflation": false,
+   "use_historical_expense_growth": false,
+   "use_historical_healthcare_inflation": false
+  },
+  "ss_insolvency_enabled": true,
+  "ss_shortfall_percentage": 30.0
+ },
+ "[DEMO] Empty Nesters: Early Retire @60, Portland\u2192Arizona\u2192RV, 4 Properties": {
+  "current_year": 2026,
+  "parent1_name": "Robert",
+  "parent1_emoji": "\ud83d\udc68",
+  "parent2_name": "Linda",
+  "parent2_emoji": "\ud83d\udc69",
+  "marriage_year": 1994,
+  "parentX_age": 58,
+  "parentX_net_worth": 1200000.0,
+  "parentX_income": 125000.0,
+  "parentX_raise": 2.0,
+  "parentX_retirement_age": 60,
+  "parentX_ss_benefit": 3200.0,
+  "parentY_age": 57,
+  "parentY_net_worth": 950000.0,
+  "parentY_income": 98000.0,
+  "parentY_raise": 2.0,
+  "parentY_retirement_age": 60,
+  "parentY_ss_benefit": 2800.0,
+  "expenses": {
+   "Food & Groceries": 12000.0,
+   "Clothing": 3600.0,
+   "Transportation": 9600.0,
+   "Entertainment & Activities": 8400.0,
+   "Personal Care": 4200.0,
+   "Other Expenses": 7200.0
+  },
+  "children_list": [],
+  "houses": [
+   {
+    "name": "Portland Family Home",
+    "purchase_year": 2001,
+    "purchase_price": 350000.0,
+    "current_value": 720000.0,
+    "mortgage_balance": 0.0,
+    "mortgage_rate": 0.0,
+    "mortgage_years_left": 0,
+    "property_tax_rate": 0.009,
+    "home_insurance": 1600.0,
+    "maintenance_rate": 0.01,
+    "upkeep_costs": 6000.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2001,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     },
+     {
+      "year": 2028,
+      "status": "Sold",
+      "rental_income": 0.0
+     }
+    ]
+   },
+   {
+    "name": "Portland Downsized Condo",
+    "purchase_year": 2028,
+    "purchase_price": 420000.0,
+    "current_value": 420000.0,
+    "mortgage_balance": 0.0,
+    "mortgage_rate": 0.0,
+    "mortgage_years_left": 0,
+    "property_tax_rate": 0.009,
+    "home_insurance": 1200.0,
+    "maintenance_rate": 0.005,
+    "upkeep_costs": 3000.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2028,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     },
+     {
+      "year": 2031,
+      "status": "Own_Rent",
+      "rental_income": 2200.0
+     },
+     {
+      "year": 2038,
+      "status": "Sold",
+      "rental_income": 0.0
+     }
+    ]
+   },
+   {
+    "name": "Arizona Winter Home",
+    "purchase_year": 2031,
+    "purchase_price": 380000.0,
+    "current_value": 380000.0,
+    "mortgage_balance": 0.0,
+    "mortgage_rate": 0.0,
+    "mortgage_years_left": 0,
+    "property_tax_rate": 0.0062,
+    "home_insurance": 1400.0,
+    "maintenance_rate": 0.008,
+    "upkeep_costs": 3500.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2031,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     },
+     {
+      "year": 2038,
+      "status": "Sold",
+      "rental_income": 0.0
+     }
+    ]
+   },
+   {
+    "name": "Montana Lakeside Cabin",
+    "purchase_year": 2034,
+    "purchase_price": 320000.0,
+    "current_value": 320000.0,
+    "mortgage_balance": 0.0,
+    "mortgage_rate": 0.0,
+    "mortgage_years_left": 0,
+    "property_tax_rate": 0.0081,
+    "home_insurance": 1100.0,
+    "maintenance_rate": 0.011,
+    "upkeep_costs": 3500.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2034,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     }
+    ]
+   }
+  ],
+  "major_purchases": [
+   {
+    "name": "Luxury RV Purchase",
+    "year": 2038,
+    "amount": 225000.0,
+    "financing_years": 0,
+    "interest_rate": 0.0,
+    "asset_type": "Depreciating",
+    "appreciation_rate": -0.09
+   },
+   {
+    "name": "World Cruise Retirement Trip",
+    "year": 2030,
+    "amount": 45000.0,
+    "financing_years": 0,
+    "interest_rate": 0.0,
+    "asset_type": "Expense",
+    "appreciation_rate": 0.0
+   }
+  ],
+  "recurring_expenses": [
+   {
+    "name": "Healthcare Premiums (Pre-Medicare)",
+    "category": "Healthcare",
+    "amount": 18000.0,
+    "frequency_years": 1,
+    "start_year": 2026,
+    "end_year": 2033,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Healthcare Costs (Post-Medicare)",
+    "category": "Healthcare",
+    "amount": 8000.0,
+    "frequency_years": 1,
+    "start_year": 2033,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Help Adult Children",
+    "category": "Family Support",
+    "amount": 15000.0,
+    "frequency_years": 1,
+    "start_year": 2026,
+    "end_year": 2046,
+    "inflation_adjust": false,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "RV Maintenance & Campgrounds",
+    "category": "Recreation",
+    "amount": 18000.0,
+    "frequency_years": 1,
+    "start_year": 2038,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Active Retirement Travel",
+    "category": "Travel",
+    "amount": 12000.0,
+    "frequency_years": 1,
+    "start_year": 2028,
+    "end_year": 2051,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Grandchildren Support & Gifts",
+    "category": "Family Support",
+    "amount": 8000.0,
+    "frequency_years": 1,
+    "start_year": 2031,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Golf Club Membership",
+    "category": "Recreation",
+    "amount": 6000.0,
+    "frequency_years": 1,
+    "start_year": 2031,
+    "end_year": 2038,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   }
+  ],
+  "state_timeline": [
+   {
+    "year": 2026,
+    "state": "Portland",
+    "spending_strategy": "Average"
+   },
+   {
+    "year": 2028,
+    "state": "Portland",
+    "spending_strategy": "Conservative"
+   },
+   {
+    "year": 2031,
+    "state": "Houston",
+    "spending_strategy": "Average"
+   },
+   {
+    "year": 2038,
+    "state": "Los Angeles",
+    "spending_strategy": "Conservative"
+   }
+  ],
+  "economic_params": {
+   "investment_return": 0.04,
+   "inflation_rate": 0.03,
+   "expense_growth_rate": 0.02,
+   "healthcare_inflation_rate": 0.05,
+   "use_historical_returns": false,
+   "use_historical_inflation": false,
+   "use_historical_expense_growth": false,
+   "use_historical_healthcare_inflation": false
+  },
+  "ss_insolvency_enabled": true,
+  "ss_shortfall_percentage": 30.0
+ },
+ "[DEMO] Budget Family: Houston\u2192Austin, Careful Savers": {
+  "current_year": 2026,
+  "parent1_name": "Chris",
+  "parent1_emoji": "\ud83d\udc68",
+  "parent2_name": "Pat",
+  "parent2_emoji": "\ud83d\udc69",
+  "marriage_year": 2023,
+  "parentX_age": 32,
+  "parentX_net_worth": 15000.0,
+  "parentX_income": 55000.0,
+  "parentX_raise": 3.0,
+  "parentX_retirement_age": 67,
+  "parentX_ss_benefit": 1800.0,
+  "parentY_age": 30,
+  "parentY_net_worth": 8000.0,
+  "parentY_income": 45000.0,
+  "parentY_raise": 2.5,
+  "parentY_retirement_age": 67,
+  "parentY_ss_benefit": 1500.0,
+  "pretax_401k": 3000.0,
+  "expenses": {
+   "Food & Groceries": 9600.0,
+   "Clothing": 2400.0,
+   "Transportation": 9600.0,
+   "Entertainment & Activities": 3000.0,
+   "Personal Care": 2400.0,
+   "Other Expenses": 3600.0
+  },
+  "children_list": [
+   {
+    "name": "Emma",
+    "birth_year": 2024,
+    "use_template": true,
+    "template_state": "Houston",
+    "template_strategy": "Conservative",
+    "school_type": "Public",
+    "college_type": "Public",
+    "college_location": "Houston"
+   },
+   {
+    "name": "Liam",
+    "birth_year": 2028,
+    "use_template": true,
+    "template_state": "Houston",
+    "template_strategy": "Conservative",
+    "school_type": "Public",
+    "college_type": "Public",
+    "college_location": "Houston"
+   }
+  ],
+  "houses": [
+   {
+    "name": "Houston Starter Home",
+    "purchase_year": 2025,
+    "purchase_price": 280000.0,
+    "current_value": 290000.0,
+    "mortgage_balance": 252000.0,
+    "mortgage_rate": 0.069,
+    "mortgage_years_left": 29,
+    "property_tax_rate": 0.022,
+    "home_insurance": 1800.0,
+    "maintenance_rate": 0.008,
+    "upkeep_costs": 2500.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2025,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     },
+     {
+      "year": 2034,
+      "status": "Sold",
+      "rental_income": 0.0
+     }
+    ]
+   },
+   {
+    "name": "Austin Family Home",
+    "purchase_year": 2034,
+    "purchase_price": 380000.0,
+    "current_value": 380000.0,
+    "mortgage_balance": 342000.0,
+    "mortgage_rate": 0.058,
+    "mortgage_years_left": 30,
+    "property_tax_rate": 0.02,
+    "home_insurance": 2000.0,
+    "maintenance_rate": 0.008,
+    "upkeep_costs": 3000.0,
+    "owner": "Shared",
+    "timeline": [
+     {
+      "year": 2034,
+      "status": "Own_Live",
+      "rental_income": 0.0
+     }
+    ]
+   }
+  ],
+  "major_purchases": [
+   {
+    "name": "Pat's Career Certification",
+    "year": 2029,
+    "amount": 8000.0,
+    "financing_years": 0,
+    "interest_rate": 0.0,
+    "asset_type": "Expense",
+    "appreciation_rate": 0.0
+   }
+  ],
+  "recurring_expenses": [
+   {
+    "name": "Used Family Car",
+    "category": "Vehicle",
+    "amount": 22000.0,
+    "frequency_years": 8,
+    "start_year": 2029,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 5,
+    "interest_rate": 0.059
+   },
+   {
+    "name": "Budget Family Vacation",
+    "category": "Travel",
+    "amount": 2500.0,
+    "frequency_years": 1,
+    "start_year": 2028,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   },
+   {
+    "name": "Home Maintenance Fund",
+    "category": "Home",
+    "amount": 1500.0,
+    "frequency_years": 1,
+    "start_year": 2026,
+    "end_year": null,
+    "inflation_adjust": true,
+    "parent": "Both",
+    "financing_years": 0,
+    "interest_rate": 0.0
+   }
+  ],
+  "state_timeline": [
+   {
+    "year": 2026,
+    "state": "Houston",
+    "spending_strategy": "Conservative"
+   },
+   {
+    "year": 2034,
+    "state": "Houston",
+    "spending_strategy": "Average"
+   }
+  ],
+  "economic_params": {
+   "investment_return": 0.06,
+   "inflation_rate": 0.03,
+   "expense_growth_rate": 0.025,
+   "healthcare_inflation_rate": 0.05,
+   "use_historical_returns": false,
+   "use_historical_inflation": false,
+   "use_historical_expense_growth": false,
+   "use_historical_healthcare_inflation": false
+  },
+  "ss_insolvency_enabled": true,
+  "ss_shortfall_percentage": 30.0
+ }
+}

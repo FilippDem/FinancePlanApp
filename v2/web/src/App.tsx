@@ -17,6 +17,9 @@ import Scenarios from './pages/Scenarios'
 import Onboarding from './pages/Onboarding'
 import CheckinFlow from './pages/CheckinFlow'
 import Checkins from './pages/Checkins'
+import Actuals from './pages/Actuals'
+import Stress from './pages/Stress'
+import Retirement from './pages/Retirement'
 
 function skipSetup() {
   try { if (sessionStorage.getItem('fp_setup_seen')) return true; sessionStorage.setItem('fp_setup_seen', '1') } catch { /* */ }
@@ -69,6 +72,9 @@ function Gate() {
               <Route path="/timeline" element={<Timeline />} />
               <Route path="/scenarios" element={<Scenarios />} />
               <Route path="/checkins" element={<Checkins />} />
+              <Route path="/actuals" element={<Actuals />} />
+              <Route path="/stress" element={<Stress />} />
+              <Route path="/retirement" element={<Retirement />} />
               <Route path="*" element={<Dashboard isNew={false} />} />
             </Routes>
           </Shell>} />

@@ -19,4 +19,4 @@ ENV DATA_DIR=/app/data PYTHONUNBUFFERED=1
 RUN mkdir -p /app/data/households
 EXPOSE 8502
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD curl -fs http://localhost:8502/api/health || exit 1
-CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "8502", "--workers", "2"]
+CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "8502", "--workers", "1"]

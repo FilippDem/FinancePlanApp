@@ -16,4 +16,15 @@ services:
       - DATA_DIR=/app/data
       # Set to 0 when behind Cloudflare Access so only the CF identity is trusted
       - ALLOW_DEV_LOGIN=1
+      # Check-in reminder emails (optional). Leave SMTP_HOST empty to disable.
+      # Gmail: SMTP_HOST=smtp.gmail.com, SMTP_USER=you@gmail.com, SMTP_PASSWORD=<App Password>
+      - SMTP_HOST=
+      - SMTP_PORT=587
+      - SMTP_USER=
+      - SMTP_PASSWORD=
+      - SMTP_FROM=
+      - SMTP_TLS=starttls
+      # Link used in the emails (your Cloudflare URL)
+      - APP_URL=http://localhost:8502
+      - REMINDER_CHECK_MINUTES=60
     restart: unless-stopped

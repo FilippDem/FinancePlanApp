@@ -6,6 +6,7 @@ import { Card, PageHeader, Tabs, Stat, Button, Segmented, Toggle, NumberInput, B
 import { NetWorthChart, CashflowChart, FanChart, StackedBars, LinesChart } from '../components/charts'
 import { useTodayDollars, deflate } from '../lib/hooks'
 import { retirementMarkers } from './Dashboard'
+import { ReportButton } from '../components/ReportButton'
 
 const COLS: [string, string][] = [
   ['year', 'Year'], ['age1', 'Age'], ['total_income', 'Income'], ['taxes', 'Taxes'], ['total_expenses', 'Spending'],
@@ -78,6 +79,7 @@ export default function Projections() {
         actions={<>
           <Toggle checked={today} onChange={setToday} label="Today's dollars" />
           <Button size="sm" onClick={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([toCsv(rows)], { type: 'text/csv' })); a.download = `projection_${today ? 'todays' : 'nominal'}_dollars.csv`; a.click() }}><Download size={14} />CSV</Button>
+          <ReportButton />
         </>} />
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'networth', label: 'Net worth' }, { value: 'cashflow', label: 'Cash flow' },
         { value: 'mc', label: 'Monte Carlo' }, { value: 'taxes', label: 'Taxes' }, { value: 'table', label: 'Year by year' }]} />

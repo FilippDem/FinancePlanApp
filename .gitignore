@@ -22,3 +22,6 @@ Thumbs.db
 .nas_password
 *.pyc
 __pycache__/
+
+# v2 reference data is source, not user data
+!v2/engine/finplan/data/

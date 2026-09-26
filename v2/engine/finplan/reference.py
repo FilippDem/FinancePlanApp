@@ -27,9 +27,52 @@ def default_plan() -> dict:
 
 
 @lru_cache(maxsize=1)
-def demo_plans() -> dict:
+def demo_plans(raw: bool = False) -> dict:
+    """Demo households. demo_plans.json is extracted verbatim from v0.8; demo_overrides.json
+    re-tunes them for v2's corrected math (real mortgages, taxes in Monte Carlo) so they show a
+    realistic spread of outcomes instead of mostly failing. Pass raw=True for the v0.8 originals."""
     with open(DATA_DIR / "demo_plans.json", encoding="utf-8") as f:
-        return json.load(f)
+        demos = json.load(f)
+    if raw:
+        return demos
+    ov_path = DATA_DIR / "demo_overrides.json"
+    if ov_path.exists():
+        with open(ov_path, encoding="utf-8") as f:
+            overrides = json.load(f)
+        for name, ov in overrides.items():
+            if name in demos and not name.startswith('_'):
+                demos[name] = apply_demo_override(demos[name], ov)
+    return demos
+
+
+def apply_demo_override(plan: dict, ov: dict) -> dict:
+    """Override shape: {set: {key: value}, houses|recurring_expenses|major_purchases|children_list:
+    {item name: {field: value} | null (remove)}, add: {list key: [items]}, _note: str}."""
+    import copy
+    p = copy.deepcopy(plan)
+    for k, v in (ov.get('set') or {}).items():
+        if isinstance(v, dict) and isinstance(p.get(k), dict):
+            p[k] = {**p[k], **v}
+        else:
+            p[k] = v
+    for list_key in ('houses', 'recurring_expenses', 'major_purchases', 'children_list'):
+        patch = ov.get(list_key)
+        if not patch:
+            continue
+        items = []
+        for it in p.get(list_key) or []:
+            name = it.get('name')
+            if name in patch:
+                if patch[name] is None:
+                    continue
+                it = {**it, **patch[name]}
+            items.append(it)
+        p[list_key] = items
+    for list_key, extra in (ov.get('add') or {}).items():
+        p[list_key] = list(p.get(list_key) or []) + list(extra)
+    if ov.get('_note'):
+        p['demo_note'] = ov['_note']
+    return p
 
 
 STATISTICAL_STRATEGIES = ["Conservative (statistical)", "Average (statistical)", "High-end (statistical)"]

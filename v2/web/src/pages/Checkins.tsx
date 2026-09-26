@@ -1,11 +1,11 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { CalendarPlus, Zap, ClipboardCheck, Trash2, BellRing, CheckCircle2, ArrowRight } from 'lucide-react'
+import { CalendarPlus, Zap, ClipboardCheck, Trash2, BellRing, CheckCircle2, ArrowRight, Mail, Receipt } from 'lucide-react'
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, Scatter } from 'recharts'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
 import { money, pct, axisMoney } from '../lib/format'
-import { Card, PageHeader, Button, Select, Badge, Empty, Note } from '../components/ui'
+import { Card, PageHeader, Button, Select, Badge, Empty, Note, Toggle } from '../components/ui'
 import { S } from '../components/charts'
 import { STATUS_META } from './CheckinFlow'
 
@@ -62,6 +62,9 @@ export default function Checkins() {
   const nav = useNavigate()
   const [params, setParams] = useSearchParams()
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
+  const [notify, setNotify] = useState<any>(null)
+  const [mailMsg, setMailMsg] = useState('')
+  useEffect(() => { api.notifyStatus().then(setNotify).catch(() => {}) }, [])
   const items: any[] = ck?.checkins || []
   const lastScored = [...items].reverse().find(c => c.status !== 'baseline')
   const last = items[items.length - 1]
@@ -89,6 +92,7 @@ export default function Checkins() {
             const c = changes.find(x => CHANGE_LINKS[x][1] === to)!
             return <Button key={to} size="sm" onClick={() => nav(to)}>{CHANGE_LINKS[c][0]}<ArrowRight size={13} /></Button>
           })}</div>}
+          {params.get('year_end') === '1' || new Date().getMonth() >= 9 ? <div className="mt-2.5"><Button size="sm" onClick={() => nav('/actuals')}><Receipt size={13} />Log this year's income & spending</Button></div> : null}
           <button className="text-[12.5px] text-muted mt-2" onClick={() => setParams({})}>Dismiss</button>
         </div>
       )}
@@ -111,6 +115,20 @@ export default function Checkins() {
             <div className="w-44"><Select value={ck?.settings?.cadence || 'quarterly'} options={CADENCES} onChange={async v => { await api.checkinSettings({ cadence: v }); refreshCheckins() }} /></div>
             {ck?.settings?.cadence !== 'off' && <a href="/api/checkins/calendar.ics" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-line text-sm font-medium hover:bg-sunken"><CalendarPlus size={15} />Add to calendar</a>}
           </div>
+          {ck?.settings?.cadence !== 'off' && (
+            <div className="mt-4 pt-3 border-t border-line">
+              <Toggle checked={!!ck?.settings?.email_reminders} label="Email reminders"
+                hint="Emails everyone in the household when a check-in is due, plus one follow-up a week later"
+                onChange={async v => { await api.checkinSettings({ email_reminders: v }); refreshCheckins() }} />
+              {notify && !notify.configured && <p className="text-[12px] text-muted mt-1.5">Email isn't set up on the server yet (SMTP settings in docker-compose.yml). Until then, use Add to calendar.</p>}
+              {notify?.configured && ck?.settings?.email_reminders && (
+                <button className="mt-1.5 text-[12.5px] text-accent font-medium inline-flex items-center gap-1" onClick={async () => {
+                  try { const r = await api.testEmail(); setMailMsg(`Test email sent to ${r.to}`) } catch (e: any) { setMailMsg(e.message) }
+                  setTimeout(() => setMailMsg(''), 4000)
+                }}><Mail size={13} />Send me a test email</button>)}
+              {mailMsg && <p className="text-[12px] text-ink2 mt-1">{mailMsg}</p>}
+            </div>
+          )}
         </Card>
         <Card title="History">
           <div className="text-[28px] font-semibold tnum">{items.length}</div>

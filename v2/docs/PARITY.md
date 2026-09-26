@@ -16,9 +16,10 @@ Data compatibility is ✅ for everything: v2 reads and writes the same household
 | Scenario comparison | ✅ | New: side-by-side chart + table (v0.8 only had a tip) |
 | JSON export/import (v0.8, V14, V13 formats) | ✅ | V13 migration covered by a test |
 | Reset to defaults | ✅ | |
-| Demo households | ✅ | Numbers change, see ENGINE_CHANGES.md |
+| Demo households | ✅ | Re-tuned for the corrected math (overrides file, originals kept); each shows what changed |
 | Users tab: member list, invite code | 🟡 | Members and code show in the household picker |
-| Version history / "What's new" | ⏳ | Server keeps 10 backups per household already |
+| Version history | ✅ | Scenarios → Version history: last 10 saves + one snapshot per day (120 days), preview, restore (plan only; check-ins, actuals, scenarios kept; current plan backed up first) |
+| "What's new" changelog | ⏳ | |
 
 ## People & income
 | Feature | Status |
@@ -39,8 +40,8 @@ Data compatibility is ✅ for everything: v2 reads and writes the same household
 | Shared household categories, add/remove custom | ✅ |
 | Recurring expenses (frequency, start/end, inflation, financing, owner) | ✅ (financing now actually applied) |
 | One-time purchases (financing, asset type, appreciation) | ✅ (edit & delete, which V13 lacked) |
-| Custom named templates per location | ⏳ |
-| Custom locations / world map | ⏳ |
+| Custom named templates per location | ⏳ (data kept; see ROADMAP) |
+| Custom locations / world map | ⏳ (data kept; see ROADMAP) |
 
 ## Kids
 | Feature | Status |
@@ -87,9 +88,9 @@ Data compatibility is ✅ for everything: v2 reads and writes the same household
 | Monte Carlo fan chart (10/25/50/75/90), success rate, final stats | ✅ |
 | Timeline of life events | ✅ (swim lanes + by decade) |
 | Taxes by year | ✅ |
-| Retirement tab: early/delayed comparison, replacement ratio, 80% target | 🟡 claim-age benefit per person; comparison table not yet |
+| Retirement tab: early/delayed comparison, replacement ratio, 80% target | ✅ Retirement page: SS claim options (62/67/70/planned, lifetime, break-even), retire −3…+3 years what-if with success rates, replacement ratio vs 80% target with adjustable withdrawal rate |
 | Cashflow "critical years" and "life stages" views, Sankey | ⏳ |
-| Stress tests (market crash, disabled child, unemployment, hyperinflation) | ⏳ |
-| Actuals entry, plan vs actual | 🟡 via **Check-ins**: quarterly/semiannual/annual cadence, due banner, guided and quick check-ins, on-track percentile, actual-vs-plan history, roll plan forward, .ics reminders. Q4 check-ins also write v0.8 `actuals[year].net_worth`. Detailed income/expense actuals: not yet |
-| Excel tracking workbook | ⏳ |
-| PDF report export | ⏳ |
+| Stress tests (market crash, disabled child, unemployment, hyperinflation) | ✅ Stress tests page: market crash, income loss, extra cost (disabled child / parent care / LTC), inflation spike, early death (+ life insurance); editable, add/remove, results table + chart |
+| Actuals entry, plan vs actual | ✅ **Check-ins** (quarterly/semiannual/annual, due banner, email + .ics reminders, guided & quick, on-track percentile, roll forward) + **Actuals** page (income by source, spending by category with variance, taxes, year-end net worth, plan-vs-actual chart). Same v0.8 `actuals[year]` shape |
+| Excel tracking workbook | ✅ Download per year range (monthly columns, plan vs actual, variance formulas, Summary sheet), import merges back |
+| PDF report export | ✅ Dashboard / Projections → PDF report: KPIs, net worth with MC band, income & spending chart, assumptions, homes, year-by-year table, check-in history |

@@ -59,5 +59,19 @@ Both modes support:
 - House prices, values and mortgage balances are nominal as entered.
 - `parentX_net_worth` means **savings & investments excluding home equity**. That matches how v0.8's math used it. Homes are added from the Homes list.
 
-## Why the demo plans now look much worse
-The six demo households were tuned against the v0.8 engine, which never charged mortgage payments or down payments. With those included, most demos run out of money, because they buy several homes with little income headroom. They still load and are useful for exploring the UI, but they need re-tuning.
+## Demo plans (re-tuned)
+The six demo households were tuned against the v0.8 engine, which never charged mortgage payments or down payments. Under the corrected math most of them ran out of money. `engine/finplan/data/demo_overrides.json` now re-tunes them. `demo_plans.json` stays a verbatim extract of v0.8, and `reference.demo_plans(raw=True)` returns the originals. Each demo carries a `demo_note` explaining what changed, and it's shown on the Scenarios page. The overrides also set a return volatility that matches each demo's expected return (4% return → 8% volatility, not the v0.8 default of 15%). Monte Carlo success after tuning (1,000 runs):
+
+| Demo | v0.8 data | Re-tuned | Story |
+|---|---|---|---|
+| Tech Couple (FIRE) | 39% | ~82% | Retire at 52, public K-12 |
+| 3-Kid Family | 5% | ~71% | Work to 66, cabin later, downsize in 2058 |
+| Executives | 1% | ~80% | Finance the chalet then sell it, no yacht, retire at 58 |
+| Single Mom | 0% | ~40% | Deliberately tight: a plan to stress-test |
+| Empty Nesters | 28% | ~80% | Retire at 63/62, balanced portfolio |
+| Budget Family | 0% | ~63% | Slightly higher pay, later move |
+
+## Analysis modules added in v2
+- **Stress tests** (`finplan/stress.py`). A runtime-only `plan['_stress']` list, never saved, applies one bad event per run: a market crash (overrides that year's return), income loss (a % of one or both earners' wages for N years), an extra cost (today's $ per year for N years), an inflation spike (prices *and* inflation-indexed items follow a higher rate for N years; salaries stay nominal, so this is a harsh test), or early death (sets the death age, with an optional life-insurance payout). Survivor Social Security benefits are **not** modeled yet.
+- **Retirement** (`finplan/retirement.py`). Social Security claim options at 62/67/70/planned, with lifetime totals that include the insolvency cut and the break-even age. Retire-age what-if (−3…+3 years, 300 MC runs each). Replacement ratio: the best household wages in the last 5 working years, compared with SS + a withdrawal-rate draw on savings + rent in the first fully retired year.
+- **Actuals** (`finplan/actuals.py`). Planned values for any year in the v0.8 `actuals[year]` shape, so plan-vs-actual lines up category by category.

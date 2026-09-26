@@ -1,0 +1,249 @@
+{
+  "_about": "Re-tunes the v0.8 demo households for v2's corrected math (real mortgage payments, purchase prices, taxes inside Monte Carlo). Applied by reference.demo_plans(); demo_plans.json stays a verbatim extract of v0.8.",
+  "[DEMO] Tech Couple: SF→Austin→Seattle, Early Retirement @50": {
+    "_note": "Retire at 52 instead of 50; public K-12 with private college; EVs every 8 years from 2031. A FIRE plan that works if markets cooperate.",
+    "set": {
+      "parentX_retirement_age": 52,
+      "parentY_retirement_age": 52,
+      "parentX_pretax_balance": 60000,
+      "parentY_pretax_balance": 50000,
+      "mc_return_variability": 15.0,
+      "mc_return_variability_positive": 15.0,
+      "mc_return_variability_negative": 15.0
+    },
+    "children_list": {
+      "Emma": {
+        "school_type": "Public"
+      },
+      "Lucas": {
+        "school_type": "Public"
+      }
+    },
+    "recurring_expenses": {
+      "Electric Vehicles": {
+        "amount": 55000,
+        "frequency_years": 8,
+        "start_year": 2031
+      }
+    }
+  },
+  "[DEMO] 3-Kid Family: Seattle→Portland→Denver, Career Change, 4 Properties": {
+    "_note": "Both work to 66; cabin bought in 2044 after the kids leave and becomes home when the Denver house is sold in 2058; RV dropped; 401(k) savings counted in net worth.",
+    "set": {
+      "parentX_retirement_age": 66,
+      "parentY_retirement_age": 66,
+      "parentX_pretax_balance": 250000,
+      "parentY_pretax_balance": 200000,
+      "mc_return_variability": 12.0,
+      "mc_return_variability_positive": 12.0,
+      "mc_return_variability_negative": 12.0,
+      "parentX_net_worth": 480000,
+      "parentY_net_worth": 400000,
+      "economic_params": {
+        "investment_return": 0.065
+      }
+    },
+    "houses": {
+      "Colorado Mountain Cabin": {
+        "purchase_year": 2044,
+        "timeline": [
+          {
+            "year": 2044,
+            "status": "Own_Live",
+            "rental_income": 0.0
+          }
+        ]
+      },
+      "Denver Home": {
+        "timeline": [
+          {
+            "year": 2038,
+            "status": "Own_Live",
+            "rental_income": 0.0
+          },
+          {
+            "year": 2058,
+            "status": "Sold",
+            "rental_income": 0.0
+          }
+        ]
+      }
+    },
+    "major_purchases": {
+      "RV Purchase": null
+    },
+    "recurring_expenses": {
+      "Annual Family Vacation": {
+        "amount": 6000
+      }
+    }
+  },
+  "[DEMO] Executives: NYC→Miami→Portugal, Early Retire @55, 5 Properties": {
+    "_note": "Aspen chalet financed (25% down) and sold in 2045; yacht dropped; retire at 58. Big lifestyle, still well funded.",
+    "set": {
+      "parentX_retirement_age": 58,
+      "parentY_retirement_age": 58,
+      "parentX_pretax_balance": 900000,
+      "parentY_pretax_balance": 750000,
+      "mc_return_variability": 12.0,
+      "mc_return_variability_positive": 12.0,
+      "mc_return_variability_negative": 12.0,
+      "parentX_net_worth": 3000000,
+      "parentY_net_worth": 2600000
+    },
+    "houses": {
+      "Aspen Ski Chalet": {
+        "purchase_price": 3200000,
+        "current_value": 3200000,
+        "mortgage_balance": 2400000,
+        "mortgage_rate": 0.062,
+        "mortgage_years_left": 30,
+        "timeline": [
+          {
+            "year": 2029,
+            "status": "Own_Live",
+            "rental_income": 0.0
+          },
+          {
+            "year": 2045,
+            "status": "Sold",
+            "rental_income": 0.0
+          }
+        ]
+      }
+    },
+    "major_purchases": {
+      "Luxury Yacht Purchase": null
+    },
+    "recurring_expenses": {
+      "Yacht Maintenance": null,
+      "Luxury Vehicles (2 Cars)": {
+        "amount": 120000,
+        "frequency_years": 6
+      },
+      "Private Club Memberships": {
+        "end_year": 2045
+      },
+      "Wine Collection & Storage": {
+        "amount": 6000
+      },
+      "Charitable Giving": {
+        "amount": 20000
+      }
+    }
+  },
+  "[DEMO] Single Mom: Sacramento→San Diego, Teacher→Principal, 3 Properties": {
+    "_note": "Sells the Sacramento townhouse to buy in San Diego in 2034; raises slightly above inflation; works to 67; teacher pension modeled as the retirement benefit (so no Social Security cut). Tight but workable, a good plan to stress-test.",
+    "set": {
+      "parentX_retirement_age": 67,
+      "parentX_pretax_balance": 40000,
+      "mc_return_variability": 8.0,
+      "mc_return_variability_positive": 8.0,
+      "mc_return_variability_negative": 8.0,
+      "parentX_raise": 3.5,
+      "parentX_income": 112000,
+      "parentX_ss_benefit": 3400,
+      "ss_insolvency_enabled": false
+    },
+    "houses": {
+      "Sacramento Townhouse": {
+        "timeline": [
+          {
+            "year": 2023,
+            "status": "Own_Live",
+            "rental_income": 0.0
+          },
+          {
+            "year": 2034,
+            "status": "Sold",
+            "rental_income": 0.0
+          }
+        ]
+      },
+      "San Diego Condo": {
+        "purchase_year": 2034,
+        "purchase_price": 520000,
+        "current_value": 520000,
+        "mortgage_balance": 416000,
+        "timeline": [
+          {
+            "year": 2034,
+            "status": "Own_Live",
+            "rental_income": 0.0
+          }
+        ]
+      }
+    },
+    "major_purchases": {
+      "Sabbatical Year (Educational Travel)": null
+    }
+  },
+  "[DEMO] Empty Nesters: Early Retire @60, Portland→Arizona→RV, 4 Properties": {
+    "_note": "Retire at 63/62; balanced portfolio (5.5%); help for adult children ends 2036; RV bought used. Comfortable with room to spare.",
+    "set": {
+      "parentX_retirement_age": 63,
+      "parentY_retirement_age": 62,
+      "parentX_pretax_balance": 450000,
+      "parentY_pretax_balance": 380000,
+      "economic_params": {
+        "investment_return": 0.055
+      },
+      "mc_return_variability": 10.0,
+      "mc_return_variability_positive": 10.0,
+      "mc_return_variability_negative": 10.0
+    },
+    "major_purchases": {
+      "Luxury RV Purchase": {
+        "amount": 140000
+      }
+    },
+    "recurring_expenses": {
+      "Help Adult Children": {
+        "end_year": 2036
+      }
+    }
+  },
+  "[DEMO] Budget Family: Houston→Austin, Careful Savers": {
+    "_note": "Slightly higher pay with 401(k) balances; move to Austin in 2036. Modest but steady.",
+    "set": {
+      "parentX_income": 66000,
+      "parentY_income": 55000,
+      "parentX_pretax_balance": 25000,
+      "parentY_pretax_balance": 12000,
+      "mc_return_variability": 12.0,
+      "mc_return_variability_positive": 12.0,
+      "mc_return_variability_negative": 12.0,
+      "parentX_raise": 3.5,
+      "parentY_raise": 3.25
+    },
+    "houses": {
+      "Houston Starter Home": {
+        "timeline": [
+          {
+            "year": 2025,
+            "status": "Own_Live",
+            "rental_income": 0.0
+          },
+          {
+            "year": 2036,
+            "status": "Sold",
+            "rental_income": 0.0
+          }
+        ]
+      },
+      "Austin Family Home": {
+        "purchase_year": 2036,
+        "purchase_price": 360000,
+        "current_value": 360000,
+        "mortgage_balance": 324000,
+        "timeline": [
+          {
+            "year": 2036,
+            "status": "Own_Live",
+            "rental_income": 0.0
+          }
+        ]
+      }
+    }
+  }
+}

@@ -141,6 +141,19 @@ def build_schedule(p: dict) -> Schedule:
     T = len(years)
     tscale = (1 + infl) ** max(0, cy - TEMPLATE_BASE_YEAR)  # template $ -> today's $
 
+    # inflation path (stress tests can override years)
+    stress = p.get('_stress') or []
+    infl_path = [infl] * T
+    for sx in stress:
+        if sx.get('type') == 'inflation_spike':
+            for t_ in range(T):
+                if sx['start_year'] <= years[t_] < sx['start_year'] + sx.get('years', 5):
+                    infl_path[t_] = sx.get('rate', 0.08)
+    ii_arr, hi_arr = [1.0] * T, [1.0] * T
+    for t_ in range(1, T):
+        ii_arr[t_] = ii_arr[t_ - 1] * (1 + infl_path[t_])
+        hi_arr[t_] = hi_arr[t_ - 1] * (1 + hc_infl + (infl_path[t_] - infl))
+
     C = {k: np.zeros(T) for k in (
         'age1', 'age2', 'alive1', 'alive2', 'work1', 'work2', 'wages1', 'wages2', 'ss1', 'ss2',
         'contrib', 'contrib1', 'contrib2', 'p1_exp', 'p2_exp', 'family_exp', 'children_exp', 'recurring_exp',
@@ -179,8 +192,8 @@ def build_schedule(p: dict) -> Schedule:
         alive2 = (not single) and age2 <= d2
         work1 = alive1 and age1 < p['parentX_retirement_age']
         work2 = alive2 and age2 < p['parentY_retirement_age']
-        ii = (1 + infl) ** t
-        hi = (1 + hc_infl) ** t
+        ii = ii_arr[t]
+        hi = hi_arr[t]
         C['age1'][t], C['age2'][t] = age1, age2
         C['alive1'][t], C['alive2'][t] = alive1, alive2
         C['work1'][t], C['work2'][t] = work1, work2
@@ -431,6 +444,26 @@ def build_schedule(p: dict) -> Schedule:
         if cy < e['year'] <= years[-1] and e['state'] != prev['state']:
             events.append({'year': e['year'], 'type': 'move', 'label': f"Move to {e['state']}"})
 
+    # stress tests that act on the schedule
+    for sx in stress:
+        kind = sx.get('type')
+        if kind == 'income_loss':
+            who = sx.get('person', 1)
+            for t_, y in enumerate(years):
+                if sx['start_year'] <= y < sx['start_year'] + sx.get('years', 1):
+                    keep = 1 - sx.get('pct', 100) / 100
+                    for w in ((1, 2) if who == 'both' else (int(who),)):
+                        C[f'wages{w}'][t_] *= keep
+                        C[f'contrib{w}'][t_] *= keep
+                    C['contrib'][t_] = C['contrib1'][t_] + C['contrib2'][t_]
+        elif kind == 'extra_cost':
+            for t_, y in enumerate(years):
+                if sx['start_year'] <= y < sx['start_year'] + sx.get('years', 1):
+                    amt = sx.get('amount', 0) * C['infl_index'][t_]
+                    C['family_exp'][t_] += amt
+                    details[t_].setdefault('recurring', [])
+            events.append({'year': sx['start_year'], 'type': 'stress', 'label': sx.get('name', 'Extra cost')})
+
     events.sort(key=lambda e: e['year'])
     return Schedule(years=years, T=T, cols=C, details=details, events=events,
                     meta={'location': loc, 'single': single, 'claim1': claim1, 'claim2': claim2,
@@ -492,6 +525,11 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
     C, T, n = S.cols, S.T, n_paths
     rng = np.random.default_rng(seed)
     R = _returns(p, T, n, stochastic, rng)
+    for sx in p.get('_stress') or []:
+        if sx.get('type') == 'market_crash':
+            for t_, y in enumerate(S.years):
+                if y == sx['year']:
+                    R[t_] = sx.get('drop', -0.3)
     IM = _mult(p, 'income', T, n, stochastic, rng)
     EM = _mult(p, 'expense', T, n, stochastic, rng)
     infl = p['economic_params']['inflation_rate']
@@ -572,7 +610,7 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
                 L1 = L1 + add
             taxes = tx2['total']
             tx = tx2
-        fac = (1 + infl) ** t if normalized else 1.0
+        fac = C['infl_index'][t] if normalized else 1.0
         home = C['home_equity'][t] + C['other_assets'][t] - C['consumer_debt'][t]
         out['liquid'][t] = (L1 + L2) / fac
         out['liquid1'][t] = L1 / fac
@@ -594,9 +632,23 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
 
 # ─────────────────────────────── public API ──────────────────────────────
 
+def _apply_plan_stress(p: dict) -> dict:
+    for sx in p.get('_stress') or []:
+        if sx.get('type') == 'early_death':
+            who = 'X' if int(sx.get('person', 1)) == 1 else 'Y'
+            age_then = p[f'parent{who}_age'] + (sx['year'] - p['current_year'])
+            p[f'parent{who}_death_age'] = min(p[f'parent{who}_death_age'], age_then - 1)
+            if sx.get('life_insurance'):
+                p.setdefault('major_purchases', [])
+                # payout modeled as a negative one-time cost (cash in)
+                p['major_purchases'].append({'name': 'Life insurance payout', 'year': sx['year'], 'amount': -abs(sx['life_insurance']),
+                                             'financing_years': 0, 'interest_rate': 0.0, 'asset_type': 'Expense', 'appreciation_rate': 0.0})
+    return p
+
+
 def project(plan: dict) -> dict:
     """Deterministic projection with a full row per year (for tables/charts)."""
-    p = normalize_plan(plan)
+    p = _apply_plan_stress(normalize_plan(plan))
     S = build_schedule(p)
     res = simulate(p, 1, False, _p=p, _sched=S)
     P, C = res['paths'], S.cols
@@ -664,7 +716,7 @@ PCTS = (5, 10, 25, 50, 75, 90, 95)
 
 
 def monte_carlo(plan: dict, n: int | None = None, seed: int | None = 42, normalized: bool | None = None) -> dict:
-    p = normalize_plan(plan)
+    p = _apply_plan_stress(normalize_plan(plan))
     S = build_schedule(p)
     n = int(n or p.get('mc_simulations', 1000))
     n = max(10, min(n, 20000))

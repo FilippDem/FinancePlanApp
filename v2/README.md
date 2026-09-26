@@ -13,7 +13,8 @@ v2/
 │               serves the built web app
 ├── web/        React + TypeScript + Vite + Tailwind + Recharts
 ├── tools/      extract_v08_data.py (pulls templates/demos from v0.8)
-└── docs/       ENGINE_CHANGES.md (math changes vs v0.8), PARITY.md (feature checklist)
+└── docs/       ENGINE_CHANGES.md (math changes vs v0.8), PARITY.md (feature checklist),
+                CHECKINS.md (living-plan scheme), ROADMAP.md (gaps + what to build next)
 ```
 
 ## Run locally (development)
@@ -39,10 +40,19 @@ The Streamlit app keeps running on 8501. When you're happy with v2, point the
 volume in `docker-compose.yml` at `../app-data` (every save makes a backup in
 `data/backups/`). Behind Cloudflare Access, set `ALLOW_DEV_LOGIN=0`.
 
+## Email reminders for check-ins (optional)
+Set the `SMTP_*` variables in `docker-compose.yml` (Gmail needs an App Password), plus `APP_URL`
+(the address people open, e.g. your Cloudflare URL). Then turn on **Email reminders** on the
+Check-ins page; "Send me a test email" checks the setup. The server checks hourly and emails every
+household member once when a check-in is due, plus one follow-up a week later. Run a single worker
+(the default in the Dockerfile) so reminders aren't sent twice. Without SMTP, "Add to calendar"
+(an .ics with a repeating event) still works.
+
 ## Tests
 ```bash
 cd v2/engine && python -m pytest -q          # engine: taxes, mortgages, SS, MC, migrations
-cd v2 && python -m pytest -q server/tests    # API: auth, merge-save, backups, encryption
+cd v2 && python -m pytest -q server/tests    # API: auth, merge-save, backups, encryption, actuals,
+                                             # Excel round-trip, history/restore, stress, PDF, reminders
 ```
 
 ## How it works

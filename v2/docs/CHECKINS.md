@@ -1,6 +1,6 @@
 # Financial check-ins: keeping the plan alive
 
-> **Status:** v1 is implemented. It includes cadence settings, the due banner and nav badge, guided and quick check-ins, scoring, roll-forward with a snapshot, the history chart, the `.ics` reminder, and the v0.8 actuals bridge. Email reminders are not built yet (phase 2).
+> **Status:** implemented. It includes cadence settings, the due banner and nav badge, guided and quick check-ins, scoring, roll-forward with a snapshot, the history chart, the `.ics` reminder, the v0.8 actuals bridge, **email reminders** (SMTP, opt-in per household), and the yearly **Actuals** page with an Excel tracking workbook.
 
 **Goal:** a plan should be something a family opens every few months, not something they set up once and forget. A check-in takes about 5 minutes. It records where you actually are, tells you plainly whether you're on track, and rolls the plan forward so the next projection starts from reality.
 
@@ -19,7 +19,7 @@
 | Due date | Start of the next period after the last check-in (Jan 1 / Apr 1 / Jul 1 / Oct 1 for quarterly) | Stored as `checkin_settings.next_due` |
 | In-app prompt | A banner on the Dashboard plus a badge on "Check-ins" in the sidebar once due. Snoozing moves it 2 weeks. | Everyone in the household sees it, so either partner can do it |
 | Calendar reminder | "Add to calendar" downloads an `.ics` file with a repeating event (RRULE) that links back to the app | Works with Google, Apple and Outlook, with no email server needed |
-| Email reminder (later) | A small scheduled job on the NAS emails household members when a check-in is due | Needs SMTP settings, so it's a phase 2 item |
+| Email reminder | A background job in the server (hourly) emails every household member when a check-in is due, plus one follow-up 7 days later | Opt-in toggle on the Check-ins page; needs `SMTP_*` settings (see README). State kept in `checkin_settings.last_emailed_due / last_emailed_at / followup_sent` |
 
 **Manual check-ins** are available at any time, off cycle. "Quick update" asks only for total savings and home values (about 30 seconds). A full check-in adds per-person accounts, debts and life changes. A manual check-in doesn't move the scheduled due date unless it happens within 3 weeks of it, in which case it counts as that period's check-in.
 
@@ -76,7 +76,10 @@ When you choose "Update my plan":
 - Check-ins are **household history**, so they live outside `plan_data`. Loading a scenario never erases them.
 - **v0.8 bridge:** a check-in dated Oct–Dec also writes `actuals[<year>].net_worth` (merging, never overwriting other fields), so v0.8's Plan vs Actual keeps working.
 
-## 7. Where it shows up
+## 7. Yearly actuals (the fuller picture)
+Check-ins track balances. Once a year (the app suggests it after a Q4 check-in) you can also record **what actually happened**: income by source, spending by category, taxes and year-end net worth. The **Actuals** page lays each category next to the plan's number for that year and shows the variance. Leave blank whatever you don't track. For month-by-month tracking, download the **Excel workbook** (plan in blue, your cells in yellow, one sheet per year), fill it in, and import it; importing merges into what's already stored and never erases. Everything uses the v0.8 `actuals[year]` shape, so v0.8's Plan vs Actual still reads it.
+
+## 8. Where it shows up
 - **Dashboard:** the "Check-in due" banner, the last status chip ("On track · 71st percentile · Sep 25"), and a net worth chart with your actual check-ins drawn as dots over the plan's range. That picture is what makes it a living document.
 - **Check-ins page:** status, the history chart, a table of all check-ins, the cadence setting, "Add to calendar", "Start check-in" and "Quick update".
 - **Onboarding** finishes by choosing a cadence and recording a *baseline* check-in, the starting point every later check-in is measured against.

@@ -222,3 +222,16 @@ def test_separate_mode_runs_and_splits():
     r = project(p)['rows']
     assert r[0]['liquid1'] != 0 and r[0]['liquid2'] != 0
     assert r[0]['liquid'] == pytest.approx(r[0]['liquid1'] + r[0]['liquid2'])
+
+
+def test_demo_overrides_apply_and_keep_raw():
+    raw = demo_plans(raw=True)
+    tuned = demo_plans()
+    assert raw.keys() == tuned.keys()
+    k = next(n for n in raw if 'Tech Couple' in n)
+    assert raw[k]['parentX_retirement_age'] == 50 and tuned[k]['parentX_retirement_age'] == 52
+    assert tuned[k].get('demo_note')
+    # removed items disappear, untouched ones remain
+    ex = next(n for n in raw if 'Executives' in n)
+    names = [x['name'] for x in tuned[ex]['major_purchases']]
+    assert 'Luxury Yacht Purchase' not in names and "Isabella's Wedding Reception" in names

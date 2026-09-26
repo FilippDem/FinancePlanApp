@@ -73,6 +73,16 @@ def _backup(path: Path, stem: str, keep: int = 10) -> None:
         olds = sorted(bdir.glob(f"{stem}_2*.json"))
         for o in olds[:-keep]:
             o.unlink()
+        # v2: one snapshot per day (kept 120 days) so version history spans months,
+        # not just the last 10 autosaves
+        if stem != 'households_index':
+            ddir = bdir / 'daily'
+            ddir.mkdir(exist_ok=True)
+            daily = ddir / f"{stem}_{datetime.now():%Y%m%d}.json"
+            if not daily.exists():
+                shutil.copy2(path, daily)
+                for o in sorted(ddir.glob(f"{stem}_2*.json"))[:-120]:
+                    o.unlink()
     except Exception:
         pass
 
@@ -299,3 +309,68 @@ def save_hh_key(hid: str, key: str, value, passphrase: Optional[str] = None, enc
         hh[key] = value
         hh.pop(f'{key}_encrypted', None)
     _atomic_write(path, hh)
+
+
+# ── version history ──────────────────────────────────────────────────────
+def list_versions(hid: str) -> list:
+    bdir = data_dir() / 'backups'
+    out = []
+    for kind, folder in (('recent', bdir), ('daily', bdir / 'daily')):
+        if not folder.exists():
+            continue
+        for f in folder.glob(f"{hid}_2*.json"):
+            hh = _read(f)
+            pd = hh.get('plan_data') if isinstance(hh.get('plan_data'), dict) else None
+            if pd is None and 'plan_data_encrypted' not in hh:
+                continue   # snapshot taken before any plan was saved
+            summary = None
+            if pd:
+                summary = {'names': [pd.get('parent1_name'), pd.get('parent2_name')],
+                           'savings': (pd.get('parentX_net_worth') or 0) + (pd.get('parentY_net_worth') or 0),
+                           'homes': len(pd.get('houses') or []), 'kids': len(pd.get('children_list') or []),
+                           'retire': [pd.get('parentX_retirement_age'), pd.get('parentY_retirement_age')]}
+            out.append({'id': f"{kind}/{f.name}", 'kind': kind, 'file_time': datetime.fromtimestamp(f.stat().st_mtime).isoformat(),
+                        'last_saved': hh.get('last_saved'), 'saved_by': hh.get('saved_by'),
+                        'encrypted': 'plan_data_encrypted' in hh, 'summary': summary})
+    out.sort(key=lambda v: v['last_saved'] or v['file_time'], reverse=True)
+    return out
+
+
+def _version_path(hid: str, vid: str) -> Path:
+    kind, name = vid.split('/', 1)
+    if '/' in name or '..' in name or not name.startswith(f"{hid}_") or kind not in ('recent', 'daily'):
+        raise ValueError('bad version id')
+    bdir = data_dir() / 'backups'
+    return (bdir if kind == 'recent' else bdir / 'daily') / name
+
+
+def load_version_plan(hid: str, vid: str, passphrase: Optional[str] = None) -> Optional[dict]:
+    hh = _read(_version_path(hid, vid))
+    if 'plan_data_encrypted' in hh:
+        pt = decrypt(hh['plan_data_encrypted'], passphrase) if passphrase else None
+        return json.loads(pt) if pt else None
+    return hh.get('plan_data')
+
+
+def restore_version(hid: str, vid: str, user: str, passphrase: Optional[str] = None) -> str:
+    """Restore only plan_data from a snapshot (check-ins, scenarios and actuals are kept)."""
+    plan = load_version_plan(hid, vid, passphrase)
+    if plan is None:
+        raise ValueError('snapshot has no readable plan')
+    try:
+        current = load_plan(hid, passphrase) or {}
+    except LockedError:
+        current = {}
+    plan = {**current, **plan}   # merge: keys added since the snapshot are kept
+    path = hh_dir() / f"{hid}.json"
+    hh = _read(path)
+    _backup(path, hid)
+    if hh.get('encrypted') and passphrase:
+        hh['plan_data_encrypted'] = encrypt(json.dumps(plan), passphrase)
+        hh.pop('plan_data', None)
+    else:
+        hh['plan_data'] = plan
+    hh['last_saved'] = datetime.now().isoformat()
+    hh['saved_by'] = f"{user} (restored {vid.split('/', 1)[1]})"
+    _atomic_write(path, hh)
+    return hh['last_saved']

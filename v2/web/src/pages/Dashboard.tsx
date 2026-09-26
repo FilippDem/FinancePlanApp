@@ -7,6 +7,7 @@ import { Card, Stat, Segmented, Badge, Button, Toggle } from '../components/ui'
 import { NetWorthChart, FanChart, Marker } from '../components/charts'
 import { useTodayDollars, deflate } from '../lib/hooks'
 import { DueBanner, CheckinStrip } from './Checkins'
+import { ReportButton } from '../components/ReportButton'
 
 export function retirementMarkers(plan: any, names: [string, string], single: boolean): Marker[] {
   const cy = plan.current_year
@@ -74,7 +75,10 @@ export default function Dashboard({ isNew }: { isNew: boolean }) {
           <h1 className="text-[22px] font-semibold tracking-tight">{greet}, {names[0]}{!single && names[1] ? ` & ${names[1]}` : ''}</h1>
           <p className="text-sm text-muted mt-1">Your plan runs {plan.current_year}–{s?.end_year ?? '…'}. Every change recalculates instantly.</p>
         </div>
-        <Toggle checked={today} onChange={setToday} label="Today's dollars" hint="Show future amounts in today's purchasing power" />
+        <div className="flex items-center gap-3">
+          <Toggle checked={today} onChange={setToday} label="Today's dollars" hint="Show future amounts in today's purchasing power" />
+          <ReportButton />
+        </div>
       </div>
 
       <DueBanner />
