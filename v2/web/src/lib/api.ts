@@ -71,6 +71,7 @@ export const api = {
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 5000)
   },
+  locationsInfo: (plan: any) => req('POST', '/api/locations/info', { plan }),
   reportSections: () => req('GET', '/api/report/sections'),
   report: async (opts: { plan?: any; format: string; sections?: string[]; title?: string; today?: boolean; detail?: boolean }): Promise<{ blob: Blob; filename: string }> => {
     const r = await fetch('/api/report', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(opts) })

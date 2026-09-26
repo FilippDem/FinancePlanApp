@@ -194,6 +194,9 @@ def build_schedule(p: dict) -> Schedule:
         if e['year'] <= cy:
             base_loc, base_strat = e['state'], e.get('spending_strategy', 'Average')
     custom_t = p.get('custom_expense_templates') or None
+    custom_l = p.get('custom_locations') or {}
+    # a custom city borrows prices from the location it is "like" unless it has its own template
+    price_loc = lambda l: l if (custom_t and l in custom_t) else (custom_l.get(l, {}).get('cost_like') or l)
     col = [1.0] * T
     rentf = [1.0] * T                   # rent follows a rent index, not the everyday-prices ratio
     if p.get('move_adjusts_spending', True):
@@ -205,8 +208,8 @@ def build_schedule(p: dict) -> Schedule:
                     loc_, st_ = e['state'], e.get('spending_strategy', 'Average')
             key = (loc_, st_)
             if key not in cache:
-                cf_ = col_factor(base_loc, base_strat, loc_, st_, custom_t)
-                rf_ = rent_factor(base_loc, loc_)
+                cf_ = col_factor(price_loc(base_loc), base_strat, price_loc(loc_), st_, custom_t)
+                rf_ = rent_factor(price_loc(base_loc), price_loc(loc_))
                 cache[key] = (cf_, rf_ if rf_ is not None else cf_)
             col[t_], rentf[t_] = cache[key]
     C['col_factor'] = np.array(col)
@@ -487,7 +490,8 @@ def build_schedule(p: dict) -> Schedule:
         for e in stl:
             if e['year'] <= y:
                 cur = e['state']
-        loc.append(cur)
+        # custom cities are taxed like the jurisdiction the user picked
+        loc.append((custom_l.get(cur) or {}).get('tax_location') or cur)
     for prev, e in zip(stl, stl[1:]):
         if cy < e['year'] <= years[-1] and e['state'] != prev['state']:
             events.append({'year': e['year'], 'type': 'move', 'label': f"Move to {e['state']}"})

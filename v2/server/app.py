@@ -671,6 +671,8 @@ def reference():
         'us_state_tax': r['US_STATE_TAX_INFO'], 'country_tax': r['COUNTRY_TAX_INFO'],
         'data_sources': r['EXPENSE_DATA_SOURCES'],
         'template_base_year': 2024,
+        'location_catalog': R.location_catalog(),
+        'coordinates': R.location_coordinates(),
         'historical': historical_stats(),
     }
 
@@ -687,6 +689,49 @@ class TemplateIn(BaseModel):
 def tmpl_adult(body: TemplateIn):
     scale = (1 + body.inflation) ** max(0, body.current_year - 2024)
     return {k: round(v * scale) for k, v in R.adult_template_for(body.location, body.strategy, body.source).items()}
+
+
+class LocIn(BaseModel):
+    plan: dict[str, Any]
+
+
+def _tax_summary(loc: str, custom: dict) -> dict:
+    tax_loc = (custom.get(loc) or {}).get('tax_location') or loc
+    kind, info = R.location_tax_info(tax_loc)
+    if kind == 'us_state':
+        t = info.get('type')
+        text = 'No state income tax' if t == 'none' else f"State income tax up to {info.get('rate', 0) * 100:.1f}%" if t == 'progressive' \
+            else f"State income tax {info.get('rate', 0) * 100:.1f}%"
+    elif kind == 'country':
+        text = f"National income tax, about {info.get('effective_rate', 0) * 100:.0f}% effective" + ('' if info.get('has_fica', True) else ', no US FICA')
+    else:
+        text = 'Unknown tax rules: US federal + your state-tax override'
+    return {'kind': kind, 'tax_location': tax_loc, 'text': text}
+
+
+@app.post('/api/locations/info')
+def locations_info(body: LocIn):
+    """Per timeline entry: spending and rent factors versus today, tax summary and data basis."""
+    from finplan import calibrate as K
+    p = normalize_plan(body.plan)
+    custom_l = p.get('custom_locations') or {}
+    custom_t = p.get('custom_expense_templates') or None
+    stl = p['state_timeline']
+    cy = p['current_year']
+    base = next((e for e in reversed(stl) if e['year'] <= cy), stl[0])
+    price = lambda l: l if (custom_t and l in custom_t) else (custom_l.get(l, {}).get('cost_like') or l)
+    out = []
+    for e in stl:
+        loc = e['state']
+        curve_basis = K.spending_curve(price(loc), lambda a, b: R.adult_template_exact(a, b))['basis']
+        out.append({'year': e['year'], 'location': loc, 'strategy': e.get('spending_strategy', 'Average'),
+                    'spending_factor': R.col_factor(price(base['state']), base.get('spending_strategy', 'Average'), price(loc),
+                                                    e.get('spending_strategy', 'Average'), custom_t),
+                    'rent_factor': R.rent_factor(price(base['state']), price(loc)),
+                    'basis': 'custom' if (custom_t and loc in custom_t) else curve_basis,
+                    'tax': _tax_summary(loc, custom_l), 'custom': loc in custom_l,
+                    'coords': (custom_l.get(loc) or {}).get('lat') is not None or loc in R.location_coordinates()})
+    return {'entries': out, 'adjusts_spending': p.get('move_adjusts_spending', True)}
 
 
 @app.get('/api/spending/curve')

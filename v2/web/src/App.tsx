@@ -20,6 +20,7 @@ import Checkins from './pages/Checkins'
 import Actuals from './pages/Actuals'
 import Stress from './pages/Stress'
 import Retirement from './pages/Retirement'
+import Locations from './pages/Locations'
 
 function skipSetup() {
   try { if (sessionStorage.getItem('fp_setup_seen')) return true; sessionStorage.setItem('fp_setup_seen', '1') } catch { /* */ }
@@ -75,6 +76,7 @@ function Gate() {
               <Route path="/actuals" element={<Actuals />} />
               <Route path="/stress" element={<Stress />} />
               <Route path="/retirement" element={<Retirement />} />
+              <Route path="/locations" element={<Locations />} />
               <Route path="*" element={<Dashboard isNew={false} />} />
             </Routes>
           </Shell>} />

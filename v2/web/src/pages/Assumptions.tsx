@@ -52,7 +52,7 @@ export default function Assumptions() {
             <Field label="Home selling costs"><Percent value={plan.home_selling_cost_pct} decimals={1} onChange={v => update(d => { d.home_selling_cost_pct = v })} /></Field>
           </div>
         </Card>
-        <Card title="Where you live" subtitle="Sets state/country income tax each year"
+        <Card title="Where you live" subtitle={<>Sets income tax each year{plan.move_adjusts_spending !== false ? ' and scales everyday spending' : ''}. <a className="text-accent" href="/locations">Map, cost of living and custom places →</a></>}
           action={<Button size="sm" variant="ghost" onClick={() => update(d => { const last = d.state_timeline[d.state_timeline.length - 1]; d.state_timeline.push({ year: last.year + 5, state: last.state, spending_strategy: last.spending_strategy }) })}><Plus size={14} />Add move</Button>}>
           <div className="space-y-2">
             {plan.state_timeline.map((e: any, i: number) => (

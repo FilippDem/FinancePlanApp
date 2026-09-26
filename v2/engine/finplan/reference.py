@@ -143,8 +143,43 @@ CITY_TO_STATE = {
     'NYC': 'New York', 'New York': 'New York', 'Boston': 'Massachusetts', 'Chicago': 'Illinois',
     'Miami': 'Florida', 'Denver': 'Colorado', 'Phoenix': 'Arizona', 'Las Vegas': 'Nevada',
     'Atlanta': 'Georgia', 'Philadelphia': 'Pennsylvania', 'Washington DC': 'District of Columbia',
-    'DC': 'District of Columbia',
+    'DC': 'District of Columbia', 'Columbus': 'Ohio', 'Honolulu': 'Hawaii', 'San Jose': 'California',
 }
+
+
+@lru_cache(maxsize=1)
+def location_coordinates() -> dict:
+    out = {}
+    for f in ('location_coordinates.json', 'location_coordinates_v2.json'):
+        path = DATA_DIR / f
+        if path.exists():
+            with open(path, encoding='utf-8') as fh:
+                out.update({k: v for k, v in json.load(fh).items() if not k.startswith('_')})
+    return out
+
+
+V2_CITIES = {'Washington': ['Seattle'], 'Texas': ['Houston', 'Austin', 'Dallas'], 'Illinois': ['Chicago'], 'Florida': ['Miami'],
+             'Ohio': ['Columbus'], 'Hawaii': ['Honolulu'], 'Colorado': ['Denver'], 'Arizona': ['Phoenix'], 'Massachusetts': ['Boston'],
+             'Georgia': ['Atlanta'], 'Nevada': ['Las Vegas'], 'Pennsylvania': ['Philadelphia'], 'Oregon': ['Portland'],
+             'New York': ['New York'], 'District of Columbia': ['Washington DC']}
+
+
+@lru_cache(maxsize=1)
+def location_catalog() -> dict:
+    """v0.8 LOCATION_HIERARCHY plus the metros with BEA price data and every country with tax rules."""
+    h = copy.deepcopy(ref()['LOCATION_HIERARCHY'])
+    us = h.setdefault('United States', {'has_states': True, 'states': {}})
+    for st in ref()['US_STATE_TAX_INFO']:
+        if st in ('Federal',):
+            continue
+        us['states'].setdefault(st, {})
+    for st, cities in V2_CITIES.items():
+        node = us['states'].setdefault(st, {})
+        node['cities'] = list(dict.fromkeys((node.get('cities') or []) + cities))
+    for country in ref()['COUNTRY_TAX_INFO']:
+        if country not in h and country != 'United States':
+            h[country] = {'has_states': False, 'cities': []}
+    return h
 
 
 def get_strategy_base_name(name: str) -> str:
