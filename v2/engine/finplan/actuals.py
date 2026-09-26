@@ -31,7 +31,8 @@ def planned_for_year(plan: dict, year: int) -> dict:
     if row:
         d = row['details']
         for c in d.get('children', []):
-            exp['children'][c['name']] = {'Total': c['total']}
+            # per-category (v0.8 tracked each child's categories) plus the total for older files
+            exp['children'][c['name']] = {**{k: v for k, v in (c.get('cats') or {}).items()}, 'Total': c['total']}
         for h in d.get('houses', []):
             if 'total' in h:
                 exp['housing'][h['name']] = {'mortgage': h.get('mortgage_pi', 0) + h.get('pmi', 0), 'property_tax': h.get('property_tax', 0),
@@ -66,6 +67,11 @@ def group_totals(expenses: dict) -> dict:
             continue
         tot = 0.0
         for x in v.values():
-            tot += sum(float(y or 0) for y in x.values()) if isinstance(x, dict) else float(x or 0)
+            if isinstance(x, dict):
+                # a child's dict may carry both categories and their 'Total': don't double count
+                cats = {k: y for k, y in x.items() if k != 'Total'}
+                tot += sum(float(y or 0) for y in cats.values()) if cats else float(x.get('Total') or 0)
+            else:
+                tot += float(x or 0)
         out[g] = tot
     return out

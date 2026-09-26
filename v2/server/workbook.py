@@ -27,8 +27,9 @@ def _sections(plan: dict, planned: dict):
     if n2 not in ('N/A', '') and sum(e['parentY'].values()) > 0:
         yield f"{n2} — Individual", 'parentY', None, e['parentY']
     yield "Family Shared", 'family', None, e['family']
-    if e['children']:
-        yield "Children", 'children', 'Total', {k: v['Total'] for k, v in e['children'].items()}
+    for kid, cats in e['children'].items():
+        itemized = {k: v for k, v in cats.items() if k != 'Total'}
+        yield f"Child — {kid}", 'children', kid, (itemized or {'Total': cats.get('Total', 0)})
     for h, cats in e['housing'].items():
         yield f"Housing — {h}", 'housing', h, cats
     yield "Healthcare", 'healthcare', None, e['healthcare'] or {'insurance_premiums': 0, 'out_of_pocket': 0}
@@ -130,6 +131,8 @@ def parse(data: bytes, plan: dict) -> dict:
                     group = 'parentX' if tl.startswith(n1) and n1 else ('parentY' if 'parentX' in exp else 'parentX')
                 elif tl.startswith('family'):
                     group = 'family'
+                elif tl.startswith('child —') or tl.startswith('child -'):
+                    group, sub = 'children_cat', t.split('—', 1)[-1].strip() if '—' in t else t.split('-', 1)[-1].strip()
                 elif tl.startswith('children'):
                     group = 'children'
                 elif tl.startswith('housing'):
@@ -147,6 +150,9 @@ def parse(data: bytes, plan: dict) -> dict:
             nums = [float(v) for v in months if isinstance(v, (int, float))]
             total = sum(nums) if nums else (r[15].value if isinstance(r[15].value, (int, float)) else None)
             if total is None:
+                continue
+            if group == 'children_cat':
+                exp.setdefault('children', {}).setdefault(sub, {})[str(cat)] = float(total)
                 continue
             g = exp.setdefault(group, {})
             if group == 'children':

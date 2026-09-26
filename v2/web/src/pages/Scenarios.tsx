@@ -56,13 +56,38 @@ export default function Scenarios() {
     } catch { flash('That file is not valid JSON') }
   }
 
-  const compare = async () => {
-    const items = [{ name: 'Current plan', plan }, ...sel.map(n => ({ name: n, plan: saved[n] ?? demos[n] }))]
+  const compare = async (extra?: { name: string; plan: any }[]) => {
+    const items = extra ?? [{ name: 'Current plan', plan }, ...sel.map(n => ({ name: n, plan: saved[n] ?? demos[n] }))]
     const res = await Promise.all(items.map(async it => {
       const [p, m] = await Promise.all([api.project(it.plan), api.monteCarlo(it.plan, 400)])
-      return { name: it.name, proj: p, mc: m }
+      return { name: it.name, proj: p, mc: m, plan: p.plan ?? it.plan }
     }))
     setCmp(res)
+  }
+
+  // v0.8 one-click what-ifs: saves the current plan once as "Current Plan (before what-if)", then a changed copy as its own scenario
+  const WHATIFS: { key: string; label: string; name: string; apply: (d: any) => void }[] = [
+    { key: 'early', label: 'Retire 2 years earlier', name: 'Early Retirement (-2yr)', apply: d => { d.parentX_retirement_age -= 2; d.parentY_retirement_age -= 2 } },
+    { key: 'late', label: 'Retire 2 years later', name: 'Late Retirement (+2yr)', apply: d => { d.parentX_retirement_age += 2; d.parentY_retirement_age += 2 } },
+    { key: 'child', label: 'Add one more child', name: 'One More Child', apply: d => {
+      const n = (d.children_list || []).length + 1
+      const loc = d.state_timeline?.[0]?.state || 'Seattle'
+      d.children_list = [...(d.children_list || []), { name: `Child ${n}`, birth_year: d.current_year + 1, use_template: true, template_state: loc,
+        template_strategy: 'Average', school_type: 'Public', college_type: 'Public', college_location: loc }]
+    } },
+    { key: 'bull', label: 'Strong returns (8%)', name: 'Aggressive Returns', apply: d => { d.economic_params.investment_return = 0.08 } },
+    { key: 'bear', label: 'Weak returns (4%)', name: 'Bear Market Returns', apply: d => { d.economic_params.investment_return = 0.04 } },
+    { key: 'save', label: 'Save $500/mo more', name: 'Extra Savings (+$6k/yr)', apply: d => { d.pretax_401k = (d.pretax_401k || 0) + 6000 } },
+  ]
+  const runWhatIf = async (w: typeof WHATIFS[number]) => {
+    const base = 'Current Plan (before what-if)'
+    if (!saved[base]) await api.saveScenario(base, plan)
+    const copy = structuredClone(plan)
+    w.apply(copy)
+    await api.saveScenario(w.name, copy)
+    await load()
+    flash(`Created “${w.name}”`)
+    compare([{ name: 'Current plan', plan }, { name: w.name, plan: copy }])
   }
 
   const cmpData = cmp ? (() => {
@@ -117,7 +142,13 @@ export default function Scenarios() {
         </Card>
       </div>
 
-      <Card title="Saved scenarios" pad={false} action={sel.length > 0 && <Button size="sm" variant="primary" onClick={compare}><GitCompare size={14} />Compare {sel.length + 1}</Button>}>
+      <Card title="Quick what-ifs" subtitle="One click saves a changed copy of your plan as a scenario and compares it with the current plan. Your plan itself is not changed.">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {WHATIFS.map(w => <Button key={w.key} onClick={() => runWhatIf(w)}><Sparkles size={14} />{w.label}</Button>)}
+        </div>
+      </Card>
+
+      <Card title="Saved scenarios" pad={false} action={sel.length > 0 && <Button size="sm" variant="primary" onClick={() => compare()}><GitCompare size={14} />Compare {sel.length + 1}</Button>}>
         {Object.keys(saved).filter(n => !n.startsWith('[DEMO]')).length === 0
           ? <Empty title="No saved scenarios yet" body="Save the current plan to keep a snapshot before trying a what-if." />
           : <ul className="divide-y divide-line">{Object.entries(saved).filter(([n]) => !n.startsWith('[DEMO]')).map(([n, p]) => <ScenarioRow key={n} n={n} p={p} />)}</ul>}
@@ -141,6 +172,7 @@ export default function Scenarios() {
                 <td className="text-right tnum">{pct(c.mc.success_rate, 0)}</td></tr>
             })}</tbody>
           </table>
+          <PlanInputsTable items={cmp} />
         </Card>
       )}
 
@@ -194,6 +226,45 @@ export default function Scenarios() {
         footer={<><Button onClick={() => setRename(null)}>Cancel</Button><Button variant="primary" onClick={async () => { await api.renameScenario(rename!.from, rename!.to); setRename(null); load() }}>Rename</Button></>}>
         <TextInput value={rename?.to || ''} onChange={v => setRename(r => r && { ...r, to: v })} />
       </Modal>
+    </div>
+  )
+}
+
+
+function PlanInputsTable({ items }: { items: any[] }) {
+  const attrs: [string, (p: any) => any, boolean][] = [
+    ['People', p => `${p.parent1_name}${p.parent2_name && p.parent2_name !== 'N/A' ? ` & ${p.parent2_name}` : ''}`, false],
+    ['Ages', p => `${p.parentX_age}${p.parent2_name && p.parent2_name !== 'N/A' ? ` / ${p.parentY_age}` : ''}`, false],
+    ['Children', p => (p.children_list || []).length, true],
+    ['Combined income', p => (p.parentX_income || 0) + (p.parentY_income || 0), true],
+    ['Combined savings', p => (p.parentX_net_worth || 0) + (p.parentY_net_worth || 0), true],
+    ['Earliest retirement age', p => Math.min(p.parentX_retirement_age, p.parent2_name && p.parent2_name !== 'N/A' ? p.parentY_retirement_age : 999), true],
+    ['Properties', p => (p.houses || []).length, true],
+    ['Investment return', p => `${((p.economic_params?.investment_return || 0) * 100).toFixed(1)}%`, false],
+    ['401(k) per year', p => p.pretax_401k || 0, true],
+    ['Starting location', p => p.state_timeline?.[0]?.state || '—', false],
+    ['Locations over time', p => (p.state_timeline || []).length, true],
+  ]
+  const fmt = (label: string, v: any) => typeof v === 'number' && /income|savings|401/.test(label) ? money(v) : String(v)
+  return (
+    <div className="mt-6 overflow-x-auto">
+      <div className="text-[12.5px] font-semibold uppercase tracking-wide text-muted mb-1">Plan inputs</div>
+      <table className="w-full text-sm">
+        <thead><tr className="text-left text-[12px] text-muted border-b border-line"><th className="py-1.5 font-medium" />{items.map(c => <th key={c.name} className="font-medium text-right">{c.name.replace('[DEMO] ', '')}</th>)}</tr></thead>
+        <tbody>{attrs.map(([label, get, numeric]) => {
+          const base = get(items[0].plan)
+          return (
+            <tr key={label} className="border-b border-line last:border-0"><td className="py-1.5 text-ink2">{label}</td>
+              {items.map((c, i) => {
+                const v = get(c.plan)
+                const diff = i > 0 && numeric && typeof v === 'number' && typeof base === 'number' && v !== base
+                const changed = i > 0 && !numeric && v !== base
+                return <td key={c.name} className={`text-right tnum ${changed ? 'text-accent font-medium' : ''}`}>{fmt(label, v)}
+                  {diff && <span className={`ml-1.5 text-[12px] ${v > base ? 'text-good' : 'text-bad'}`}>{v > base ? '+' : '−'}{fmt(label, Math.abs(v - base))}</span>}</td>
+              })}
+            </tr>)
+        })}</tbody>
+      </table>
     </div>
   )
 }

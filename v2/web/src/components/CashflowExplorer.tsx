@@ -75,7 +75,7 @@ export function CashflowExplorer({ rows, rawRows, events, names, single, today }
   )
 }
 
-function Donut({ items, title }: { items: { name: string; value: number }[]; title: string }) {
+export function Donut({ items, title }: { items: { name: string; value: number }[]; title: string }) {
   const total = items.reduce((a, b) => a + b.value, 0)
   return (
     <div>

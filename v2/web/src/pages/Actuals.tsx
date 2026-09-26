@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, Upload, Save, ChevronDown, ChevronRight, CheckCircle2, AlertCircle, FileSpreadsheet } from 'lucide-react'
-import { ResponsiveContainer, ComposedChart, Line, Scatter, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
+import { Download, Upload, Save, ChevronDown, ChevronRight, CheckCircle2, AlertCircle, FileSpreadsheet, Plus, TrendingUp, TrendingDown } from 'lucide-react'
+import { ResponsiveContainer, ComposedChart, Line, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Bar, BarChart, Cell, ReferenceLine } from 'recharts'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
 import { money, axisMoney, clsx } from '../lib/format'
-import { Card, PageHeader, Button, Money, Select, Stat, Note, Empty } from '../components/ui'
+import { Card, PageHeader, Button, Money, Select, Stat, Note, Empty, Modal, Field, TextInput } from '../components/ui'
 import { S } from '../components/charts'
 
 const INCOME: [string, string][] = [['parent1_employment', 'Employment (%1)'], ['parent2_employment', 'Employment (%2)'],
@@ -35,7 +35,14 @@ function buildGroups(planned: any, actual: any, names: [string, string], single:
   if (!single) gs.push(flat('parentY', `${names[1]} — personal`))
   gs.push(flat('family', 'Household'))
   const kids = new Set([...Object.keys(e.children || {}), ...Object.keys(a.children || {})])
-  if (kids.size) gs.push({ key: 'children', title: 'Children', rows: [...kids].map(k => ({ path: ['expenses', 'children', k, 'Total'], label: k, planned: num(e.children?.[k]?.Total) ?? 0 })) })
+  kids.forEach(k => {
+    const pc = e.children?.[k] || {}, ac = a.children?.[k] || {}
+    const cats = [...new Set([...Object.keys(pc), ...Object.keys(ac)])].filter(c => c !== 'Total')
+    const rows = cats.map(c => ({ path: ['expenses', 'children', k, c], label: c, planned: num(pc[c]) ?? 0 }))
+    // older actuals only have a per-child total; keep it editable
+    if (!cats.length || (num(ac.Total) !== null && !cats.some(c => num(ac[c]) !== null))) rows.push({ path: ['expenses', 'children', k, 'Total'], label: 'Total (not itemized)', planned: cats.length ? 0 : (num(pc.Total) ?? 0) })
+    gs.push({ key: `child:${k}`, title: `Child — ${k}`, rows })
+  })
   const houses = new Set([...Object.keys(e.housing || {}), ...Object.keys(a.housing || {})])
   houses.forEach(h => {
     const cats = new Set([...Object.keys(e.housing?.[h] || {}), ...Object.keys(a.housing?.[h] || {})])
@@ -69,6 +76,7 @@ export default function Actuals() {
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [msg, setMsg] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null)
   const [xlYears, setXlYears] = useState(1)
+  const [addBuy, setAddBuy] = useState<{ name: string; amount: number } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const load = async () => { const r = await api.getActuals(); setAll(r.actuals || {}); return r.actuals || {} }
@@ -166,7 +174,8 @@ export default function Actuals() {
           </Card>
         </div>
 
-        <Card title="Spending by category" subtitle="Annual amounts. Leave blank what you don't track; group totals count only what you fill in." pad={false}>
+        <Card title="Spending by category" subtitle="Annual amounts. Leave blank what you don't track; group totals count only what you fill in." pad={false}
+          action={<Button size="sm" onClick={() => setAddBuy({ name: '', amount: 0 })}><Plus size={14} />Unplanned purchase</Button>}>
           <div className="divide-y divide-line">
             {groups.map(g => {
               const isOpen = open[g.key] ?? false
@@ -201,6 +210,18 @@ export default function Actuals() {
         </Card>
       </div>
 
+      {hasDetail && <PlanVsActual groups={groups} draft={draft} savingsPlan={t.income ? (t.income - t.spending - (t.taxes || 0)) / t.income : null}
+        incomeActual={incomeActual} spendingActual={spendingActual} taxesActual={num(draft.taxes_paid)} nwPlan={t.net_worth} nwActual={num(draft.net_worth)} />}
+
+      <Modal open={!!addBuy} onClose={() => setAddBuy(null)} title={`Unplanned purchase in ${year}`}
+        footer={<><Button onClick={() => setAddBuy(null)}>Cancel</Button><Button variant="primary" disabled={!addBuy?.name.trim()} onClick={() => {
+          set(['expenses', 'major_purchases', addBuy!.name.trim()], addBuy!.amount); setOpen({ ...open, major_purchases: true }); setAddBuy(null) }}>Add</Button></>}>
+        {addBuy && <div className="space-y-3">
+          <Field label="What was it?"><TextInput value={addBuy.name} onChange={v => setAddBuy({ ...addBuy, name: v })} placeholder="e.g. New roof, car repair" /></Field>
+          <Field label="Amount"><Money value={addBuy.amount} onChange={v => setAddBuy({ ...addBuy, amount: v })} /></Field>
+        </div>}
+      </Modal>
+
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Card title="Net worth: plan vs actual" subtitle="Line is the plan (nominal $); dots are the year-end net worth you recorded">
           {nwData.some((d: any) => d.actual != null) ? (
@@ -219,7 +240,7 @@ export default function Actuals() {
         <Card title="Excel tracking workbook" subtitle="Fill in month by month in Excel or Google Sheets, then import it here">
           <div className="flex items-center gap-2 text-sm">
             <span className="text-ink2">Years</span>
-            <div className="w-40"><Select value={xlYears} options={[{ value: 1, label: `${year} only` }, { value: 3, label: `${year}–${year + 2}` }, { value: 5, label: `${year}–${year + 4}` }]} onChange={setXlYears} /></div>
+            <div className="w-40"><Select value={xlYears} options={[{ value: 1, label: `${year} only` }, { value: 3, label: `${year}–${year + 2}` }, { value: 5, label: `${year}–${year + 4}` }, { value: 10, label: `${year}–${year + 9}` }]} onChange={setXlYears} /></div>
           </div>
           <div className="flex flex-wrap gap-2 mt-3">
             <a className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-line text-sm font-medium hover:bg-sunken"
@@ -255,3 +276,58 @@ function Row({ label, planned, value, onChange, spend = true }: { label: string;
   )
 }
 
+
+
+function PlanVsActual({ groups, draft, savingsPlan, incomeActual, spendingActual, taxesActual, nwPlan, nwActual }: any) {
+  const rows = groups.map((g: Group) => {
+    const filled = g.rows.filter(r => num(getIn(draft, r.path)) !== null)
+    const plan = filled.reduce((s, r) => s + r.planned, 0)
+    const act = filled.reduce((s, r) => s + (num(getIn(draft, r.path)) ?? 0), 0)
+    return { name: g.title.replace(' — personal', ''), plan, actual: act, variance: act - plan, n: filled.length }
+  }).filter((r: any) => r.n > 0)
+  const lines: any[] = groups.flatMap((g: Group) => g.rows.filter(r => num(getIn(draft, r.path)) !== null)
+    .map(r => ({ name: `${r.label} (${g.title.replace(' — personal', '')})`, v: (num(getIn(draft, r.path)) ?? 0) - r.planned })))
+  const over = [...lines].filter(l => l.v > 0).sort((a, b) => b.v - a.v).slice(0, 3)
+  const under = [...lines].filter(l => l.v < 0).sort((a, b) => a.v - b.v).slice(0, 3)
+  const sr = incomeActual ? (incomeActual - spendingActual - (taxesActual || 0)) / incomeActual : null
+  const varData = [...rows].sort((a: any, b: any) => b.variance - a.variance)
+  return (
+    <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
+      <Card title="Plan vs actual by category" subtitle="Only categories you filled in">
+        <ResponsiveContainer width="100%" height={Math.max(220, rows.length * 34)}>
+          <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 12, left: 0, bottom: 0 }} barGap={2}>
+            <CartesianGrid horizontal={false} stroke="var(--grid)" />
+            <XAxis type="number" tickFormatter={axisMoney} tickLine={false} axisLine={false} fontSize={11} stroke="var(--axis)" />
+            <YAxis type="category" dataKey="name" width={150} tickLine={false} axisLine={false} fontSize={12} stroke="var(--axis)" />
+            <Tooltip formatter={(v: any) => money(v, { compact: false })} contentStyle={{ background: 'rgb(var(--surface))', border: '1px solid rgb(var(--line))', borderRadius: 8, fontSize: 12 }} />
+            <Bar dataKey="plan" name="Plan" fill={S[1]} isAnimationActive={false} radius={[0, 3, 3, 0]} />
+            <Bar dataKey="actual" name="Actual" fill={S[0]} isAnimationActive={false} radius={[0, 3, 3, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+        <div className="flex gap-4 text-[12.5px] text-ink2"><span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: S[1] }} />Plan</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: S[0] }} />Actual</span></div>
+      </Card>
+      <div className="space-y-4">
+        <Card title="Over / under budget">
+          <ResponsiveContainer width="100%" height={Math.max(160, varData.length * 26)}>
+            <BarChart data={varData} layout="vertical" margin={{ top: 0, right: 12, left: 0, bottom: 0 }}>
+              <XAxis type="number" tickFormatter={axisMoney} tickLine={false} axisLine={false} fontSize={11} stroke="var(--axis)" />
+              <YAxis type="category" dataKey="name" width={120} tickLine={false} axisLine={false} fontSize={11.5} stroke="var(--axis)" />
+              <ReferenceLine x={0} stroke="var(--axis)" />
+              <Tooltip formatter={(v: any) => money(v, { sign: true })} contentStyle={{ background: 'rgb(var(--surface))', border: '1px solid rgb(var(--line))', borderRadius: 8, fontSize: 12 }} />
+              <Bar dataKey="variance" name="Over (+) / under (−)" isAnimationActive={false}>{varData.map((d: any, i: number) => <Cell key={i} fill={d.variance > 0 ? 'rgb(var(--bad))' : 'rgb(var(--good))'} />)}</Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+        <Card title="Insights">
+          <ul className="space-y-2 text-sm">
+            {over.length > 0 && <li className="flex gap-2"><TrendingUp size={16} className="text-bad shrink-0 mt-0.5" /><span><b>Most over budget:</b> {over.map(o => `${o.name} ${money(o.v, { sign: true })}`).join('; ')}</span></li>}
+            {under.length > 0 && <li className="flex gap-2"><TrendingDown size={16} className="text-good shrink-0 mt-0.5" /><span><b>Most under budget:</b> {under.map(o => `${o.name} ${money(o.v, { sign: true })}`).join('; ')}</span></li>}
+            {sr !== null && savingsPlan !== null && <li><b>Savings rate:</b> {(sr * 100).toFixed(0)}% actual vs {(savingsPlan * 100).toFixed(0)}% planned ({((sr - savingsPlan) * 100).toFixed(0)} pts)</li>}
+            {nwActual !== null && nwPlan != null && <li><b>Net worth:</b> {nwActual >= nwPlan ? 'ahead of' : 'behind'} plan by {money(Math.abs(nwActual - nwPlan))}</li>}
+          </ul>
+        </Card>
+      </div>
+    </div>
+  )
+}
