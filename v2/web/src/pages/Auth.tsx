@@ -44,6 +44,8 @@ export function Households({ me, onDone }: { me: any; onDone: () => void }) {
   useDarkMode()
   const [name, setName] = useState('')
   const [pass, setPass] = useState('')
+  const [pass2, setPass2] = useState('')
+  const [secure, setSecure] = useState<'standard' | 'encrypted'>('standard')
   const [joinId, setJoinId] = useState('')
   const [unlock, setUnlock] = useState<{ id: string; pass: string } | null>(null)
   const [err, setErr] = useState('')
@@ -85,9 +87,20 @@ export function Households({ me, onDone }: { me: any; onDone: () => void }) {
           <Card title="New household">
             <div className="space-y-3">
               <TextInput value={name} onChange={setName} placeholder="e.g. Filipp & Erin" />
-              <input type="password" className="w-full h-9 rounded-lg border border-line bg-surface px-3 text-sm" placeholder="Passphrase (optional, encrypts plan)"
-                value={pass} onChange={e => setPass(e.target.value)} />
-              <Button variant="primary" className="w-full" onClick={() => run(() => api.createHousehold(name || 'My Household', pass || undefined))}><Plus size={15} />Create</Button>
+              <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-sunken text-[13px]">
+                {(['standard', 'encrypted'] as const).map(k => <button key={k} onClick={() => setSecure(k)}
+                  className={`h-8 rounded-md ${secure === k ? 'bg-surface shadow-sm font-medium' : 'text-ink2'}`}>{k === 'standard' ? 'Standard' : 'Encrypted'}</button>)}
+              </div>
+              <p className="text-[12px] text-muted">{secure === 'standard'
+                ? 'Stored as plain files on your server, with backups. Anyone with access to the server files can read it.'
+                : 'The plan is encrypted with your passphrase. Every member needs it to open the plan, and it cannot be recovered if lost.'}</p>
+              {secure === 'encrypted' && <>
+                <input type="password" className="w-full h-9 rounded-lg border border-line bg-surface px-3 text-sm" placeholder="Passphrase (8+ characters)" value={pass} onChange={e => setPass(e.target.value)} />
+                <input type="password" className="w-full h-9 rounded-lg border border-line bg-surface px-3 text-sm" placeholder="Confirm passphrase" value={pass2} onChange={e => setPass2(e.target.value)} />
+                {pass2 && pass !== pass2 && <p className="text-[12px] text-bad">Passphrases don't match</p>}
+              </>}
+              <Button variant="primary" className="w-full" disabled={secure === 'encrypted' && (pass.length < 8 || pass !== pass2)}
+                onClick={() => run(() => api.createHousehold(name || 'My Household', secure === 'encrypted' ? pass : undefined))}><Plus size={15} />Create</Button>
             </div>
           </Card>
           <Card title="Join with a code">

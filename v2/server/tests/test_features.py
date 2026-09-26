@@ -141,3 +141,21 @@ def test_email_settings_and_reminder_job(client, monkeypatch):
     # off → nothing
     c.put('/api/checkins/settings', json={'email_reminders': False, 'next_due': '2026-04-01'})
     assert notify.run_once(date(2026, 4, 3), sender=lambda *a: sent.append(a)) == []
+
+
+def test_household_admin(client):
+    c, tmp = client
+    hid = _login(c, tmp)
+    h = c.get('/api/household').json()
+    assert h['id'] == hid and h['you'] == 'filippdem@gmail.com'
+    assert c.put('/api/household', json={'name': 'Demenschonok'}).json()['name'] == 'Demenschonok'
+    idx = json.loads((tmp / 'households_index.json').read_text())
+    assert idx[hid]['name'] == 'Demenschonok'
+    assert c.delete('/api/household/members/filippdem@gmail.com').status_code == 400   # last member
+    demos = c.get('/api/demos').json()['demos']
+    name = next(iter(demos))
+    r = c.post('/api/demos/open', json={'name': name}).json()
+    assert r['id'].startswith('_test_')
+    assert c.get('/api/plan').json()['plan']['parent1_name'] == demos[name]['parent1_name']
+    assert c.post('/api/households/cleanup-tests').json()['removed'] >= 1
+    assert hid in json.loads((tmp / 'households_index.json').read_text())

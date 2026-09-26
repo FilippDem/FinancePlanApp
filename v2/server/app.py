@@ -182,6 +182,68 @@ def create_test(request: Request, response: Response):
     return {'id': hid}
 
 
+@app.get('/api/household')
+def household_details(request: Request):
+    sess = _require(request)
+    info = S.load_index().get(sess['hid'], {})
+    hh = S.household_info(sess['hid'])
+    return {'id': sess['hid'], 'name': info.get('name'), 'members': info.get('members', []), 'you': sess['email'],
+            'created_at': info.get('created_at'), 'created_by': info.get('created_by'), 'encrypted': info.get('encrypted', False),
+            'is_test': sess['hid'].startswith(S.TEST_PREFIX), 'last_saved': hh.get('last_saved'), 'saved_by': hh.get('saved_by'),
+            'cloudflare': bool(sess.get('cloudflare')), 'versions': len(S.list_versions(sess['hid']))}
+
+
+@app.put('/api/household')
+def household_rename(body: HouseholdIn, request: Request):
+    sess = _require(request)
+    name = (body.name or '').strip()
+    if not name:
+        raise HTTPException(400, 'Name required')
+    S.rename_household(sess['hid'], name)
+    return {'ok': True, 'name': name}
+
+
+@app.delete('/api/household/members/{email}')
+def household_remove_member(email: str, request: Request):
+    sess = _require(request)
+    if not S.remove_member(sess['hid'], email.strip().lower()):
+        raise HTTPException(400, 'Cannot remove the last member')
+    return {'ok': True}
+
+
+@app.post('/api/households/cleanup-tests')
+def cleanup_tests(request: Request, response: Response):
+    sess = _require(request, household=False)
+    if sess['email'] not in S.ADMIN_EMAILS:
+        raise HTTPException(403, 'Admins only')
+    n = S.cleanup_test_households(sess['email'])
+    if (sess.get('hid') or '').startswith(S.TEST_PREFIX):
+        sess.pop('hid', None)
+        _set(response, sess)
+    return {'removed': n}
+
+
+class DemoIn(BaseModel):
+    name: str
+
+
+@app.post('/api/demos/open')
+def demo_open(body: DemoIn, request: Request, response: Response):
+    """Admin: open a demo household in a fresh, isolated test household (v0.8 behaviour)."""
+    sess = _require(request, household=False)
+    if sess['email'] not in S.ADMIN_EMAILS:
+        raise HTTPException(403, 'Admins only')
+    demos = R.demo_plans()
+    if body.name not in demos:
+        raise HTTPException(404, 'Unknown demo')
+    hid = S.create_test_household(sess['email'])
+    S.rename_household(hid, 'Test: ' + body.name.replace('[DEMO] ', '').split(':')[0])
+    S.save_plan(hid, normalize_plan(demos[body.name]), sess['email'])
+    sess['hid'] = hid
+    _set(response, sess)
+    return {'id': hid}
+
+
 @app.post('/api/households/join')
 def join(body: HouseholdIn, request: Request, response: Response):
     sess = _require(request, household=False)

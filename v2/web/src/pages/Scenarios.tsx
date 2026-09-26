@@ -110,6 +110,8 @@ export default function Scenarios() {
         {demo && p.demo_note && <div className="text-xs text-ink2 mt-0.5 line-clamp-2" title={p.demo_note}>{p.demo_note}</div>}
       </div>
       {demo && <Badge tone="accent">demo</Badge>}
+      {demo && household?.is_admin && <Button size="sm" variant="ghost" title="Open in a new isolated test household (admin)"
+        onClick={async () => { await api.openDemo(n); location.href = '/' }}>Test household</Button>}
       <Button size="sm" onClick={() => setConfirm({ title: `Load “${n.replace('[DEMO] ', '')}”?`, body: 'This replaces the current plan (it is auto-saved). Save the current plan as a scenario first if you want to keep it.', run: () => replacePlan(p) })}><FolderOpen size={13} />Load</Button>
       {!demo && <>
         <button className="p-1.5 rounded-md text-muted hover:bg-sunken" title="Rename" onClick={() => setRename({ from: n, to: n })}><Pencil size={14} /></button>

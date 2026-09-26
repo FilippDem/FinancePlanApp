@@ -21,6 +21,7 @@ import Actuals from './pages/Actuals'
 import Stress from './pages/Stress'
 import Retirement from './pages/Retirement'
 import Locations from './pages/Locations'
+import Household from './pages/Household'
 
 function skipSetup() {
   try { if (sessionStorage.getItem('fp_setup_seen')) return true; sessionStorage.setItem('fp_setup_seen', '1') } catch { /* */ }
@@ -55,7 +56,7 @@ function Gate() {
   if (!planRes) return <Loading />
 
   return (
-    <PlanProvider key={me.household.id} initial={planRes.plan} lastSaved={planRes.last_saved} household={me.household}>
+    <PlanProvider key={me.household.id} initial={planRes.plan} lastSaved={planRes.last_saved} household={{ ...me.household, is_admin: me.is_admin, email: me.email }}>
       <Routes>
         <Route path="/setup" element={<Onboarding />} />
         <Route path="/checkin" element={<CheckinFlow />} />
@@ -77,6 +78,7 @@ function Gate() {
               <Route path="/stress" element={<Stress />} />
               <Route path="/retirement" element={<Retirement />} />
               <Route path="/locations" element={<Locations />} />
+              <Route path="/household" element={<Household />} />
               <Route path="*" element={<Dashboard isNew={false} />} />
             </Routes>
           </Shell>} />

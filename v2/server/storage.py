@@ -178,6 +178,44 @@ def join_household(hid: str, email: str):
     return True, index[hid]['name']
 
 
+def rename_household(hid: str, name: str) -> None:
+    index = load_index()
+    if hid not in index:
+        return
+    index[hid]['name'] = name
+    save_index(index)                      # backs up the index first
+    path = hh_dir() / f"{hid}.json"
+    hh = _read(path)
+    if not hid.startswith(TEST_PREFIX):
+        _backup(path, hid)
+    hh['household_name'] = name
+    _atomic_write(path, hh)
+
+
+def remove_member(hid: str, email: str) -> bool:
+    index = load_index()
+    mem = index.get(hid, {}).get('members', [])
+    if email not in mem or len(mem) <= 1:
+        return False
+    index[hid]['members'] = [m for m in mem if m != email]
+    save_index(index)
+    return True
+
+
+def cleanup_test_households(email: str) -> int:
+    """Remove this admin's _test_ households (exempt from the backup rule, see CLAUDE.md)."""
+    index = load_index()
+    gone = [h for h, i in index.items() if h.startswith(TEST_PREFIX) and email in i.get('members', [])]
+    for h in gone:
+        index.pop(h, None)
+        f = hh_dir() / f"{h}.json"
+        if f.exists():
+            f.unlink()
+    if gone:
+        save_index(index)
+    return len(gone)
+
+
 def is_member(hid: str, email: str) -> bool:
     return email in load_index().get(hid, {}).get('members', [])
 

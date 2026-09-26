@@ -71,6 +71,11 @@ export const api = {
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 5000)
   },
+  householdDetails: () => req('GET', '/api/household'),
+  renameHousehold: (name: string) => req('PUT', '/api/household', { name }),
+  removeMember: (email: string) => req('DELETE', `/api/household/members/${encodeURIComponent(email)}`),
+  cleanupTests: () => req('POST', '/api/households/cleanup-tests'),
+  openDemo: (name: string) => req('POST', '/api/demos/open', { name }),
   locationsInfo: (plan: any) => req('POST', '/api/locations/info', { plan }),
   reportSections: () => req('GET', '/api/report/sections'),
   report: async (opts: { plan?: any; format: string; sections?: string[]; title?: string; today?: boolean; detail?: boolean }): Promise<{ blob: Blob; filename: string }> => {

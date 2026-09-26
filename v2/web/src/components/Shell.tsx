@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Wallet, Baby, Home, HeartPulse, SlidersHorizontal, LineChart, CalendarRange, Layers,
-  Moon, Sun, LogOut, Check, Loader2, AlertCircle, ArrowLeftRight, Menu, X, ClipboardCheck, Wand2, Receipt, Palmtree, ShieldAlert, MapPin,
+  Moon, Sun, LogOut, Check, Loader2, AlertCircle, ArrowLeftRight, Menu, X, ClipboardCheck, Wand2, Receipt, Palmtree, ShieldAlert, MapPin, UserCog, FlaskConical, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
-import { clsx } from '../lib/format'
+import { clsx, money } from '../lib/format'
+import { buildAlerts } from '../pages/Dashboard'
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -81,6 +82,7 @@ export function Shell({ me, children }: { me: any; children: React.ReactNode }) 
               {n.badge && ck?.due && <span className="ml-auto text-[11px] font-semibold bg-accent text-white rounded-full px-1.5 py-0.5">Due</span>}
             </NavLink>
           ))}
+        <QuickSummary />
       </div>
       <div className="border-t border-line p-2.5 space-y-0.5">
         <button onClick={() => setDark(!dark)} className="w-full flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[14px] text-ink2 hover:bg-sunken">
@@ -88,6 +90,9 @@ export function Shell({ me, children }: { me: any; children: React.ReactNode }) 
         </button>
         <button onClick={() => nav('/setup')} className="w-full flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[14px] text-ink2 hover:bg-sunken">
           <Wand2 size={17} />Guided setup
+        </button>
+        <button onClick={() => { nav('/household'); setOpen(false) }} className="w-full flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[14px] text-ink2 hover:bg-sunken">
+          <UserCog size={17} />Household & members
         </button>
         <button onClick={() => nav('/households')} className="w-full flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[14px] text-ink2 hover:bg-sunken">
           <ArrowLeftRight size={17} />Switch household
@@ -116,10 +121,41 @@ export function Shell({ me, children }: { me: any; children: React.ReactNode }) 
         <header className="sticky top-0 z-30 h-14 flex items-center justify-between gap-3 px-4 sm:px-8 bg-bg/85 backdrop-blur border-b border-line/60">
           <button className="lg:hidden p-2 -ml-2 rounded-md hover:bg-sunken" onClick={() => setOpen(true)}>{open ? <X size={18} /> : <Menu size={18} />}</button>
           <div className="flex-1" />
+          {household?.is_test && <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-warn bg-warn/10 rounded-md px-2 h-7">
+            <FlaskConical size={14} />Test mode<button className="underline ml-1" onClick={() => nav('/households')}>Exit</button></span>}
           <SaveIndicator />
         </header>
         <main className="px-4 sm:px-8 py-6 max-w-[1280px] mx-auto">{children}</main>
       </div>
+    </div>
+  )
+}
+
+
+/** v0.8 sidebar quick summary: key numbers, location and alert counts. */
+function QuickSummary() {
+  const { plan, proj, mc, single } = usePlan()
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem('fp_qs') !== '0' } catch { return true } })
+  useEffect(() => { try { localStorage.setItem('fp_qs', open ? '1' : '0') } catch { /* */ } }, [open])
+  if (!proj) return null
+  const r0 = proj.rows[0]
+  const alerts = buildAlerts(proj, mc, plan)
+  const bad = alerts.filter(a => a.tone === 'bad').length, warn = alerts.filter(a => a.tone === 'warn').length
+  const loc = (plan.state_timeline || []).filter((e: any) => e.year <= plan.current_year).pop() || plan.state_timeline?.[0]
+  return (
+    <div className="mt-5 mx-1 rounded-lg border border-line bg-sunken/50 text-[12.5px]">
+      <button className="w-full flex items-center justify-between px-2.5 h-8 font-semibold text-[11px] uppercase tracking-wider text-muted" onClick={() => setOpen(!open)}>
+        Quick summary {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</button>
+      {open && <dl className="grid grid-cols-[1fr_auto] gap-y-1 px-2.5 pb-2.5">
+        <dt className="text-ink2">Net worth</dt><dd className="tnum text-right">{money(proj.summary.net_worth_now)}</dd>
+        <dt className="text-ink2">Income</dt><dd className="tnum text-right">{money(r0.total_income)}</dd>
+        <dt className="text-ink2">Spending</dt><dd className="tnum text-right">{money(r0.total_expenses)}</dd>
+        <dt className="text-ink2">{single ? 'Kids' : 'Kids · homes'}</dt><dd className="tnum text-right">{(plan.children_list || []).length}{single ? '' : ` · ${(plan.houses || []).length}`}</dd>
+        <dt className="text-ink2">Where</dt><dd className="text-right truncate max-w-[110px]" title={`${loc?.state} · ${loc?.spending_strategy}`}>{loc?.state}</dd>
+        <dt className="text-ink2">Alerts</dt><dd className="text-right">
+          {bad > 0 && <span className="text-bad font-medium">{bad} critical</span>}{bad > 0 && warn > 0 && ' · '}
+          {warn > 0 && <span className="text-warn font-medium">{warn} warn</span>}{!bad && !warn && <span className="text-good">none</span>}</dd>
+      </dl>}
     </div>
   )
 }
