@@ -1,15 +1,32 @@
 {
   "_about": "Re-tunes the v0.8 demo households for v2's corrected math (real mortgage payments, purchase prices, taxes inside Monte Carlo). Applied by reference.demo_plans(); demo_plans.json stays a verbatim extract of v0.8.",
   "[DEMO] Tech Couple: SF→Austin→Seattle, Early Retirement @50": {
-    "_note": "Retire at 52 instead of 50; public K-12 with private college; EVs every 8 years from 2031. A FIRE plan that works if markets cooperate.",
+    "_note": "Retires at 50/51 as planned; moves SF → Austin → Seattle with spending adjusting to each city; public K-12 with private college; EVs every 8 years from 2031.",
     "set": {
-      "parentX_retirement_age": 52,
-      "parentY_retirement_age": 52,
+      "parentX_retirement_age": 50,
+      "parentY_retirement_age": 51,
       "parentX_pretax_balance": 60000,
       "parentY_pretax_balance": 50000,
       "mc_return_variability": 15.0,
       "mc_return_variability_positive": 15.0,
-      "mc_return_variability_negative": 15.0
+      "mc_return_variability_negative": 15.0,
+      "state_timeline": [
+        {
+          "year": 2026,
+          "state": "San Francisco",
+          "spending_strategy": "High-end"
+        },
+        {
+          "year": 2029,
+          "state": "Austin",
+          "spending_strategy": "Average"
+        },
+        {
+          "year": 2034,
+          "state": "Seattle",
+          "spending_strategy": "Average"
+        }
+      ]
     },
     "children_list": {
       "Emma": {
@@ -28,10 +45,10 @@
     }
   },
   "[DEMO] 3-Kid Family: Seattle→Portland→Denver, Career Change, 4 Properties": {
-    "_note": "Both work to 66; cabin bought in 2044 after the kids leave and becomes home when the Denver house is sold in 2058; RV dropped; 401(k) savings counted in net worth.",
+    "_note": "Seattle → Portland → Denver with cost of living adjusting; both work to 63; cabin bought in 2044 after the kids leave and becomes home when the Denver house is sold in 2058; 401(k) savings counted in net worth.",
     "set": {
-      "parentX_retirement_age": 66,
-      "parentY_retirement_age": 66,
+      "parentX_retirement_age": 63,
+      "parentY_retirement_age": 63,
       "parentX_pretax_balance": 250000,
       "parentY_pretax_balance": 200000,
       "mc_return_variability": 12.0,
@@ -41,7 +58,24 @@
       "parentY_net_worth": 400000,
       "economic_params": {
         "investment_return": 0.065
-      }
+      },
+      "state_timeline": [
+        {
+          "year": 2026,
+          "state": "Seattle",
+          "spending_strategy": "Average"
+        },
+        {
+          "year": 2031,
+          "state": "Portland",
+          "spending_strategy": "Average"
+        },
+        {
+          "year": 2038,
+          "state": "Denver",
+          "spending_strategy": "Average"
+        }
+      ]
     },
     "houses": {
       "Colorado Mountain Cabin": {
@@ -79,17 +113,34 @@
     }
   },
   "[DEMO] Executives: NYC→Miami→Portugal, Early Retire @55, 5 Properties": {
-    "_note": "Aspen chalet financed (25% down) and sold in 2045; yacht dropped; retire at 58. Big lifestyle, still well funded.",
+    "_note": "NYC → Miami → Portugal (spending drops abroad); Aspen chalet financed (25% down) and sold in 2045; yacht dropped; retire at 55. Big lifestyle, still well funded.",
     "set": {
-      "parentX_retirement_age": 58,
-      "parentY_retirement_age": 58,
+      "parentX_retirement_age": 55,
+      "parentY_retirement_age": 55,
       "parentX_pretax_balance": 900000,
       "parentY_pretax_balance": 750000,
       "mc_return_variability": 12.0,
       "mc_return_variability_positive": 12.0,
       "mc_return_variability_negative": 12.0,
       "parentX_net_worth": 3000000,
-      "parentY_net_worth": 2600000
+      "parentY_net_worth": 2600000,
+      "state_timeline": [
+        {
+          "year": 2026,
+          "state": "New York",
+          "spending_strategy": "High-end"
+        },
+        {
+          "year": 2033,
+          "state": "Miami",
+          "spending_strategy": "High-end"
+        },
+        {
+          "year": 2041,
+          "state": "Portugal",
+          "spending_strategy": "Average"
+        }
+      ]
     },
     "houses": {
       "Aspen Ski Chalet": {
@@ -133,7 +184,7 @@
     }
   },
   "[DEMO] Single Mom: Sacramento→San Diego, Teacher→Principal, 3 Properties": {
-    "_note": "Sells the Sacramento townhouse to buy in San Diego in 2034; raises slightly above inflation; works to 67; teacher pension modeled as the retirement benefit (so no Social Security cut). Tight but workable, a good plan to stress-test.",
+    "_note": "Sells the Sacramento townhouse to buy in San Diego in 2034 and keeps a careful budget; raises slightly above inflation; works to 67; teacher pension modeled as the retirement benefit (so no Social Security cut). Tight but workable, a good plan to stress-test.",
     "set": {
       "parentX_retirement_age": 67,
       "parentX_pretax_balance": 40000,
@@ -141,9 +192,21 @@
       "mc_return_variability_positive": 8.0,
       "mc_return_variability_negative": 8.0,
       "parentX_raise": 3.5,
-      "parentX_income": 112000,
+      "parentX_income": 118000,
       "parentX_ss_benefit": 3400,
-      "ss_insolvency_enabled": false
+      "ss_insolvency_enabled": false,
+      "state_timeline": [
+        {
+          "year": 2026,
+          "state": "Sacramento",
+          "spending_strategy": "Conservative"
+        },
+        {
+          "year": 2034,
+          "state": "San Diego",
+          "spending_strategy": "Conservative"
+        }
+      ]
     },
     "houses": {
       "Sacramento Townhouse": {
@@ -179,10 +242,10 @@
     }
   },
   "[DEMO] Empty Nesters: Early Retire @60, Portland→Arizona→RV, 4 Properties": {
-    "_note": "Retire at 63/62; balanced portfolio (5.5%); help for adult children ends 2036; RV bought used. Comfortable with room to spare.",
+    "_note": "Retire at 60, downsize, snowbird in Arizona, then a Montana cabin; balanced portfolio (5.5%); help for adult children ends 2036; RV bought used.",
     "set": {
-      "parentX_retirement_age": 63,
-      "parentY_retirement_age": 62,
+      "parentX_retirement_age": 60,
+      "parentY_retirement_age": 60,
       "parentX_pretax_balance": 450000,
       "parentY_pretax_balance": 380000,
       "economic_params": {
@@ -190,7 +253,29 @@
       },
       "mc_return_variability": 10.0,
       "mc_return_variability_positive": 10.0,
-      "mc_return_variability_negative": 10.0
+      "mc_return_variability_negative": 10.0,
+      "state_timeline": [
+        {
+          "year": 2026,
+          "state": "Portland",
+          "spending_strategy": "Average"
+        },
+        {
+          "year": 2028,
+          "state": "Portland",
+          "spending_strategy": "Conservative"
+        },
+        {
+          "year": 2031,
+          "state": "Arizona",
+          "spending_strategy": "Average"
+        },
+        {
+          "year": 2038,
+          "state": "Montana",
+          "spending_strategy": "Conservative"
+        }
+      ]
     },
     "major_purchases": {
       "Luxury RV Purchase": {
@@ -204,7 +289,7 @@
     }
   },
   "[DEMO] Budget Family: Houston→Austin, Careful Savers": {
-    "_note": "Slightly higher pay with 401(k) balances; move to Austin in 2036. Modest but steady.",
+    "_note": "Careful budget in Houston, then Austin in 2036; slightly higher pay with 401(k) balances. Modest but steady.",
     "set": {
       "parentX_income": 66000,
       "parentY_income": 55000,
@@ -214,7 +299,19 @@
       "mc_return_variability_positive": 12.0,
       "mc_return_variability_negative": 12.0,
       "parentX_raise": 3.5,
-      "parentY_raise": 3.25
+      "parentY_raise": 3.25,
+      "state_timeline": [
+        {
+          "year": 2026,
+          "state": "Houston",
+          "spending_strategy": "Conservative"
+        },
+        {
+          "year": 2036,
+          "state": "Austin",
+          "spending_strategy": "Conservative"
+        }
+      ]
     },
     "houses": {
       "Houston Starter Home": {

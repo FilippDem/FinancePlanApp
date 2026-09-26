@@ -31,6 +31,11 @@ V2_KEYS = {
     'mc_historical_mode': 'random',  # 'random' (iid bootstrap) | 'sequential' (historical sequences)
     'debt_interest_rate': 0.07,      # interest charged when liquid savings go negative
     'home_selling_cost_pct': 6.0,    # realtor + closing costs when a home is sold
+    # Locations: moving (or changing spending level) scales everyday spending by the
+    # cost-of-living ratio of the expense templates. v0.8 promised this but never applied it.
+    'move_adjusts_spending': True,
+    'custom_expense_templates': {},  # {location: {strategy: {category: annual $}}}
+    'custom_locations': {},          # {name: {country, region, lat, lon, tax_location}}
 }
 
 HOUSE_DEFAULTS = {

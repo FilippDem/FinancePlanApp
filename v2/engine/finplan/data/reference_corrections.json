@@ -1,0 +1,446 @@
+{
+ "_about": "Corrections to the v0.8 cost-of-living data, from the 2026-09-26 audit (docs/COST_OF_LIVING_AUDIT.md). Applied on top of reference_data.json by reference.ref(); the raw v0.8 numbers stay available via reference.ref_raw(). Order: location_scale -> strategy_scale -> state Medical override -> state_uniform_scale.",
+ "_sources": "BEA Regional Price Parities 2024 (FRED), Numbeo 2025, BLS Consumer Expenditure Survey 2024, Child Care Aware 2024, College Board Trends in College Pricing 2024, HUD FY2024 Fair Market Rents",
+ "location_scale": {
+  "ADULT_EXPENSE_TEMPLATES": {
+   "New York": 0.857,
+   "San Francisco": 0.805,
+   "Los Angeles": 0.86,
+   "Chicago": 1.209,
+   "Miami": 1.243,
+   "Washington DC": 1.148,
+   "San Diego": 1.283,
+   "Columbus": 1.468,
+   "Honolulu": 1.204,
+   "Toronto": 0.819,
+   "Vancouver": 0.757,
+   "Paris": 0.72,
+   "Toulouse": 0.824,
+   "Berlin": 0.889,
+   "Munich": 0.835,
+   "Sydney": 0.779,
+   "Melbourne": 0.735,
+   "Brisbane": 0.767,
+   "Auckland": 0.832,
+   "Wellington": 0.817
+  },
+  "PROVINCE_EXPENSE_TEMPLATES": {
+   "Ontario": 0.819,
+   "British Columbia": 0.757
+  }
+ },
+ "strategy_scale": {
+  "ADULT_EXPENSE_TEMPLATES": {
+   "Seattle": {
+    "Conservative (statistical)": 1.044,
+    "High-end (statistical)": 0.865
+   },
+   "Sacramento": {
+    "Conservative (statistical)": 1.063,
+    "High-end (statistical)": 0.853
+   },
+   "Houston": {
+    "Conservative (statistical)": 1.078,
+    "High-end (statistical)": 0.858
+   },
+   "New York": {
+    "Conservative (statistical)": 1.004,
+    "High-end (statistical)": 0.871
+   },
+   "San Francisco": {
+    "Conservative (statistical)": 1.041,
+    "High-end (statistical)": 0.867
+   },
+   "Los Angeles": {
+    "Conservative (statistical)": 1.041,
+    "High-end (statistical)": 0.867
+   },
+   "Portland": {
+    "Conservative (statistical)": 1.044,
+    "High-end (statistical)": 0.865
+   },
+   "Toronto": {
+    "Conservative (statistical)": 1.044,
+    "High-end (statistical)": 0.865
+   },
+   "Vancouver": {
+    "Conservative (statistical)": 1.044,
+    "High-end (statistical)": 0.865
+   },
+   "Paris": {
+    "Conservative (statistical)": 1.044,
+    "High-end (statistical)": 0.865
+   },
+   "Toulouse": {
+    "Conservative (statistical)": 1.044,
+    "High-end (statistical)": 0.865
+   },
+   "Berlin": {
+    "Conservative (statistical)": 1.044,
+    "High-end (statistical)": 0.865
+   },
+   "Munich": {
+    "Conservative (statistical)": 1.044,
+    "High-end (statistical)": 0.865
+   },
+   "Sydney": {
+    "Conservative (statistical)": 1.044,
+    "High-end (statistical)": 0.865
+   },
+   "Melbourne": {
+    "Conservative (statistical)": 1.044,
+    "High-end (statistical)": 0.865
+   },
+   "Brisbane": {
+    "Conservative (statistical)": 1.044,
+    "High-end (statistical)": 0.865
+   },
+   "Auckland": {
+    "Conservative (statistical)": 1.044,
+    "High-end (statistical)": 0.865
+   },
+   "Wellington": {
+    "Conservative (statistical)": 1.044,
+    "High-end (statistical)": 0.865
+   }
+  }
+ },
+ "state_medical": {
+  "Alabama": {
+   "Conservative (statistical)": 770,
+   "Average (statistical)": 1100,
+   "High-end (statistical)": 1650
+  },
+  "Alaska": {
+   "Conservative (statistical)": 830,
+   "Average (statistical)": 1180,
+   "High-end (statistical)": 1770
+  },
+  "Arizona": {
+   "Conservative (statistical)": 790,
+   "Average (statistical)": 1130,
+   "High-end (statistical)": 1700
+  },
+  "Arkansas": {
+   "Conservative (statistical)": 750,
+   "Average (statistical)": 1070,
+   "High-end (statistical)": 1600
+  },
+  "California": {
+   "Conservative (statistical)": 830,
+   "Average (statistical)": 1180,
+   "High-end (statistical)": 1770
+  },
+  "Colorado": {
+   "Conservative (statistical)": 790,
+   "Average (statistical)": 1130,
+   "High-end (statistical)": 1700
+  },
+  "Connecticut": {
+   "Conservative (statistical)": 800,
+   "Average (statistical)": 1140,
+   "High-end (statistical)": 1710
+  },
+  "Delaware": {
+   "Conservative (statistical)": 790,
+   "Average (statistical)": 1130,
+   "High-end (statistical)": 1700
+  },
+  "Florida": {
+   "Conservative (statistical)": 800,
+   "Average (statistical)": 1140,
+   "High-end (statistical)": 1710
+  },
+  "Georgia": {
+   "Conservative (statistical)": 780,
+   "Average (statistical)": 1110,
+   "High-end (statistical)": 1660
+  },
+  "Hawaii": {
+   "Conservative (statistical)": 850,
+   "Average (statistical)": 1210,
+   "High-end (statistical)": 1820
+  },
+  "Idaho": {
+   "Conservative (statistical)": 780,
+   "Average (statistical)": 1110,
+   "High-end (statistical)": 1660
+  },
+  "Illinois": {
+   "Conservative (statistical)": 800,
+   "Average (statistical)": 1150,
+   "High-end (statistical)": 1720
+  },
+  "Indiana": {
+   "Conservative (statistical)": 780,
+   "Average (statistical)": 1110,
+   "High-end (statistical)": 1660
+  },
+  "Iowa": {
+   "Conservative (statistical)": 740,
+   "Average (statistical)": 1060,
+   "High-end (statistical)": 1590
+  },
+  "Kansas": {
+   "Conservative (statistical)": 750,
+   "Average (statistical)": 1070,
+   "High-end (statistical)": 1600
+  },
+  "Kentucky": {
+   "Conservative (statistical)": 770,
+   "Average (statistical)": 1100,
+   "High-end (statistical)": 1650
+  },
+  "Louisiana": {
+   "Conservative (statistical)": 760,
+   "Average (statistical)": 1080,
+   "High-end (statistical)": 1620
+  },
+  "Maine": {
+   "Conservative (statistical)": 800,
+   "Average (statistical)": 1140,
+   "High-end (statistical)": 1710
+  },
+  "Maryland": {
+   "Conservative (statistical)": 810,
+   "Average (statistical)": 1160,
+   "High-end (statistical)": 1740
+  },
+  "Massachusetts": {
+   "Conservative (statistical)": 800,
+   "Average (statistical)": 1150,
+   "High-end (statistical)": 1720
+  },
+  "Michigan": {
+   "Conservative (statistical)": 780,
+   "Average (statistical)": 1120,
+   "High-end (statistical)": 1680
+  },
+  "Minnesota": {
+   "Conservative (statistical)": 800,
+   "Average (statistical)": 1140,
+   "High-end (statistical)": 1710
+  },
+  "Mississippi": {
+   "Conservative (statistical)": 760,
+   "Average (statistical)": 1090,
+   "High-end (statistical)": 1640
+  },
+  "Missouri": {
+   "Conservative (statistical)": 760,
+   "Average (statistical)": 1090,
+   "High-end (statistical)": 1640
+  },
+  "Montana": {
+   "Conservative (statistical)": 780,
+   "Average (statistical)": 1110,
+   "High-end (statistical)": 1660
+  },
+  "Nebraska": {
+   "Conservative (statistical)": 740,
+   "Average (statistical)": 1060,
+   "High-end (statistical)": 1590
+  },
+  "Nevada": {
+   "Conservative (statistical)": 780,
+   "Average (statistical)": 1110,
+   "High-end (statistical)": 1660
+  },
+  "New Hampshire": {
+   "Conservative (statistical)": 810,
+   "Average (statistical)": 1160,
+   "High-end (statistical)": 1740
+  },
+  "New Jersey": {
+   "Conservative (statistical)": 830,
+   "Average (statistical)": 1190,
+   "High-end (statistical)": 1780
+  },
+  "New Mexico": {
+   "Conservative (statistical)": 780,
+   "Average (statistical)": 1110,
+   "High-end (statistical)": 1660
+  },
+  "New York": {
+   "Conservative (statistical)": 840,
+   "Average (statistical)": 1200,
+   "High-end (statistical)": 1800
+  },
+  "North Carolina": {
+   "Conservative (statistical)": 780,
+   "Average (statistical)": 1110,
+   "High-end (statistical)": 1660
+  },
+  "North Dakota": {
+   "Conservative (statistical)": 740,
+   "Average (statistical)": 1060,
+   "High-end (statistical)": 1590
+  },
+  "Ohio": {
+   "Conservative (statistical)": 770,
+   "Average (statistical)": 1100,
+   "High-end (statistical)": 1650
+  },
+  "Oklahoma": {
+   "Conservative (statistical)": 760,
+   "Average (statistical)": 1080,
+   "High-end (statistical)": 1620
+  },
+  "Oregon": {
+   "Conservative (statistical)": 810,
+   "Average (statistical)": 1160,
+   "High-end (statistical)": 1740
+  },
+  "Pennsylvania": {
+   "Conservative (statistical)": 790,
+   "Average (statistical)": 1130,
+   "High-end (statistical)": 1700
+  },
+  "Rhode Island": {
+   "Conservative (statistical)": 800,
+   "Average (statistical)": 1140,
+   "High-end (statistical)": 1710
+  },
+  "South Carolina": {
+   "Conservative (statistical)": 780,
+   "Average (statistical)": 1110,
+   "High-end (statistical)": 1660
+  },
+  "South Dakota": {
+   "Conservative (statistical)": 740,
+   "Average (statistical)": 1060,
+   "High-end (statistical)": 1590
+  },
+  "Tennessee": {
+   "Conservative (statistical)": 760,
+   "Average (statistical)": 1090,
+   "High-end (statistical)": 1640
+  },
+  "Texas": {
+   "Conservative (statistical)": 780,
+   "Average (statistical)": 1110,
+   "High-end (statistical)": 1660
+  },
+  "Utah": {
+   "Conservative (statistical)": 780,
+   "Average (statistical)": 1110,
+   "High-end (statistical)": 1660
+  },
+  "Vermont": {
+   "Conservative (statistical)": 790,
+   "Average (statistical)": 1130,
+   "High-end (statistical)": 1700
+  },
+  "Virginia": {
+   "Conservative (statistical)": 800,
+   "Average (statistical)": 1140,
+   "High-end (statistical)": 1710
+  },
+  "Washington": {
+   "Conservative (statistical)": 830,
+   "Average (statistical)": 1180,
+   "High-end (statistical)": 1770
+  },
+  "West Virginia": {
+   "Conservative (statistical)": 780,
+   "Average (statistical)": 1120,
+   "High-end (statistical)": 1680
+  },
+  "Wisconsin": {
+   "Conservative (statistical)": 780,
+   "Average (statistical)": 1110,
+   "High-end (statistical)": 1660
+  },
+  "Wyoming": {
+   "Conservative (statistical)": 780,
+   "Average (statistical)": 1120,
+   "High-end (statistical)": 1680
+  }
+ },
+ "state_uniform_scale": 1.084,
+ "aliases": {
+  "District of Columbia": "Washington DC"
+ },
+ "children": {
+  "daycare": {
+   "Conservative (statistical)": {
+    "Chicago": 16400,
+    "Miami": 9700,
+    "Columbus": 11300,
+    "Honolulu": 16200,
+    "San Diego": 17200,
+    "Washington DC": 18900
+   },
+   "Average (statistical)": {
+    "Chicago": 20100,
+    "Miami": 11900,
+    "Columbus": 13800,
+    "Honolulu": 19800,
+    "San Diego": 21000,
+    "Washington DC": 23100
+   },
+   "High-end (statistical)": {
+    "Chicago": 27400,
+    "Miami": 16200,
+    "Columbus": 18800,
+    "Honolulu": 27000,
+    "San Diego": 28600,
+    "Washington DC": 31500
+   }
+  },
+  "explicit_daycare_scale": {
+   "Houston": 0.65,
+   "Sacramento": 0.81
+  },
+  "drop_teen_auto_payment": true,
+  "college_reductions": {
+   "x0.3": [
+    "Food",
+    "Groceries",
+    "Dining Out",
+    "Coffee Shops"
+   ],
+   "x0.4": [
+    "Transportation",
+    "Gas & Fuel",
+    "Auto Maintenance",
+    "Auto Insurance",
+    "Parking & Tolls",
+    "Public Transit",
+    "Ride Shares",
+    "Auto Payment"
+   ],
+   "x0.5": [
+    "Entertainment",
+    "Hobbies"
+   ]
+  }
+ },
+ "education": {
+  "public_tuition_fallback": 11610,
+  "private_tuition_fallback": 43350,
+  "room_board_public_fallback": 13310,
+  "room_board_private_extra": 1940,
+  "private_school_fallback": 13300,
+  "private_school": {
+   "Chicago": 14100,
+   "Miami": 16500,
+   "Columbus": 11800,
+   "Honolulu": 21500,
+   "San Diego": 25000,
+   "Washington DC": 27500
+  }
+ },
+ "rent_index": {
+  "Seattle": 1.0,
+  "San Francisco": 1.287,
+  "Los Angeles": 1.126,
+  "Sacramento": 0.861,
+  "Houston": 0.691,
+  "New York": 0.982,
+  "Portland": 0.827,
+  "Chicago": 0.74,
+  "Miami": 1.028,
+  "Columbus": 0.581
+ }
+}

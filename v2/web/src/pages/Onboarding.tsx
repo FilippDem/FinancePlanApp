@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { User, Users, Home, Key, Building2, Baby, CalendarCheck, Sparkles, Briefcase, Coffee, Armchair, Plus, Trash2, HeartPulse } from 'lucide-react'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
+import { SpendingSlider, useCurve } from '../components/SpendingSlider'
+import { Curve, rescale, strategyFor, describe } from '../lib/spending'
 import { money, pct } from '../lib/format'
 import { FlowShell, Question, ChoiceCards, Chips, BigField, Slider } from '../components/flow'
 import { Money, NumberInput, Percent, TextInput, Select, Button, Card, Note } from '../components/ui'
@@ -27,6 +29,7 @@ interface Answers {
   kids: 'none' | 'yes'
   children: Kid[]
   style: 'Conservative' | 'Average' | 'High-end'
+  level?: number
   health: 'employer' | 'marketplace' | 'medicare'
   bridge: number
   plans: string[]
@@ -64,10 +67,11 @@ export function estimateSS(income: number) {
   return Math.round(pia / 10) * 10
 }
 
-function buildPlan(A: Answers, base: any, tmpl: Record<string, any>) {
+function buildPlan(A: Answers, base: any, curve: Curve) {
   const p: any = structuredClone(base)
   const single = A.household === 'single'
-  const strat = `${A.style} (statistical)`
+  const level = A.level ?? 50
+  const strat = strategyFor(level)
   p.current_year = CY
   const person = (who: 'X' | 'Y', a: Answers['p1'], n: string, idx: number) => {
     p[`parent${idx}_name`] = a.name || (idx === 1 ? 'Me' : 'Partner')
@@ -84,7 +88,8 @@ function buildPlan(A: Answers, base: any, tmpl: Record<string, any>) {
     p[`parent${who}_job_changes`] = []
     p[`parent${who}_expense_location`] = A.location
     p[`parent${who}_expense_strategy`] = strat
-    p[`parent${who}_expenses`] = tmpl[A.style] ? { ...tmpl[A.style] } : p[`parent${who}_expenses`]
+    p[`parent${who}_expenses`] = rescale({}, curve, null, level)
+    p[`parent${who}_spending_level`] = level
   }
   person('X', A.p1, A.p1.name, 1)
   if (single) {
@@ -99,7 +104,7 @@ function buildPlan(A: Answers, base: any, tmpl: Record<string, any>) {
     p.tax_filing_status = 'married'
   }
   p.pretax_401k = A.contrib
-  p.state_timeline = [{ year: CY, state: A.location, spending_strategy: A.style }]
+  p.state_timeline = [{ year: CY, state: A.location, spending_strategy: strat.replace(' (statistical)', '') }]
   // housing
   const fam = { ...p.family_shared_expenses }
   fam['Mortgage/Rent'] = A.housing === 'rent' ? A.rent * 12 : 0
@@ -122,7 +127,7 @@ function buildPlan(A: Answers, base: any, tmpl: Record<string, any>) {
   }
   // kids
   p.children_list = A.kids === 'yes' ? A.children.map(k => ({ name: k.name || 'Child', birth_year: k.birth_year, use_template: true,
-    template_state: A.location, template_strategy: A.style, school_type: k.school, college_type: k.college, college_location: A.location })) : []
+    template_state: A.location, template_strategy: strat.replace(' (statistical)', ''), school_type: k.school, college_type: k.college, college_location: A.location })) : []
   // healthcare: bridge coverage between early retirement and Medicare
   p.health_insurances = []
   const earliest = Math.min(A.p1.work === 'working' ? A.p1.retire : 99, !single && A.p2.work === 'working' ? A.p2.retire : 99)
@@ -158,7 +163,6 @@ export default function Onboarding() {
   })
   const [i, setI] = useState(0)
   const [base, setBase] = useState<any>(null)
-  const [tmpl, setTmpl] = useState<Record<string, any>>({})
   const [preview, setPreview] = useState<any>(null)
   const [busy, setBusy] = useState(false)
   const set = (patch: Partial<Answers>) => setA(a => ({ ...a, ...patch }))
@@ -168,14 +172,9 @@ export default function Onboarding() {
 
   useEffect(() => { try { sessionStorage.setItem('fp_onboarding', JSON.stringify(A)) } catch { /* */ } }, [A])
   useEffect(() => { api.normalize({}).then(r => setBase(r.plan)) }, [])
-  useEffect(() => {
-    let live = true
-    Promise.all((['Conservative', 'Average', 'High-end'] as const).map(s => api.template('adult', A.location, `${s} (statistical)`, CY, 0.03)))
-      .then(([c, a, h]) => live && setTmpl({ Conservative: c, Average: a, 'High-end': h }))
-    return () => { live = false }
-  }, [A.location])
+  const curve = useCurve(A.location, CY, 0.03)
 
-  const plan = useMemo(() => base && Object.keys(tmpl).length ? buildPlan(A, base, tmpl) : null, [A, base, tmpl])
+  const plan = useMemo(() => base && curve ? buildPlan(A, base, curve) : null, [A, base, curve])
   const seq = useRef(0)
   useEffect(() => {
     if (!plan || i < 3) return
@@ -187,11 +186,6 @@ export default function Onboarding() {
     return () => clearTimeout(t)
   }, [plan, i])
 
-  const householdSpend = (style: string) => {
-    const t = tmpl[style]; if (!t) return 0
-    const per = Object.values(t).reduce((a: number, b: any) => a + (+b || 0), 0)
-    return per * (couple ? 2 : 1)
-  }
 
   const steps: { section: number; body: React.ReactNode; valid?: boolean; skip?: boolean; next?: string }[] = [
     { section: 0, next: "Let's start", body: (
@@ -330,12 +324,10 @@ export default function Onboarding() {
         </div>}
       </Question>) },
     { section: 5, body: (
-      <Question title="Which best describes your spending?" subtitle={`Typical personal spending for ${couple ? 'two adults' : 'one adult'} in ${A.location}, not counting housing, kids or healthcare.`}>
-        <ChoiceCards value={A.style} onChange={v => set({ style: v })} options={[
-          { value: 'Conservative', label: 'Frugal', desc: `About ${money(householdSpend('Conservative') / 12, { compact: false })}/mo · cook at home, keep cars long` },
-          { value: 'Average', label: 'Typical', desc: `About ${money(householdSpend('Average') / 12, { compact: false })}/mo · like most of your neighbors`, badge: 'Most common' },
-          { value: 'High-end', label: 'Comfortable', desc: `About ${money(householdSpend('High-end') / 12, { compact: false })}/mo · dining out, travel, nicer things` }]} />
-        <p className="text-sm text-muted">You can fine-tune every category later under Spending.</p>
+      <Question title="How much do you spend on yourselves?" subtitle={`Everyday personal spending for ${couple ? 'two adults' : 'one adult'} in ${A.location}: food, transport, clothing, fun. Not housing, kids or healthcare premiums.`}>
+        <SpendingSlider curve={curve} value={A.level ?? 50} adults={couple ? 2 : 1}
+          onChange={x => set({ level: x, style: strategyFor(x).replace(' (statistical)', '') as Answers['style'] })} />
+        <p className="text-sm text-muted">Tap a label to jump to it. You can fine-tune every category later under Spending.</p>
       </Question>) },
     { section: 5, body: (
       <Question title="How do you get health insurance?" why="Healthcare is often the biggest surprise in retirement, especially if you retire before Medicare starts at 65.">
@@ -379,7 +371,7 @@ export default function Onboarding() {
             ['Savings', `${money(A.p1.savings + A.p1.retirement + (couple ? A.p2.savings + A.p2.retirement : 0))} saved · ${money(A.contrib)}/yr to retirement accounts`, 2],
             ['Home', A.housing === 'rent' ? `Renting at ${money(A.rent, { compact: false })}/mo` : A.housing === 'own' ? `Own ${money(A.home.value)} home, ${money(A.home.balance)} mortgage` : 'Living with family', 3],
             ['Family', A.kids === 'yes' ? `${A.children.length} ${A.children.length === 1 ? 'child' : 'children'}` : 'No kids', 4],
-            ['Lifestyle', `${A.style === 'Conservative' ? 'Frugal' : A.style === 'Average' ? 'Typical' : 'Comfortable'} spending · ${A.plans.length} big plans · plan to ${A.lifeExp}`, 5],
+            ['Lifestyle', `${curve ? describe(curve, A.level ?? 50).replace(/^US /, '') : A.style} · ${A.plans.length} big plans · plan to ${A.lifeExp}`, 5],
             ['Check-ins', A.cadence === 'off' ? 'Whenever I want' : A.cadence === 'quarterly' ? 'Every quarter' : A.cadence === 'semiannual' ? 'Twice a year' : 'Once a year', 6],
           ].map(([t, d, go]) => (
             <button key={t as string} onClick={() => setI(steps.findIndex(x => x.section === go))} className="w-full text-left flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3 hover:border-accent/40">

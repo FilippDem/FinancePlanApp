@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -15,9 +16,64 @@ DATA_DIR = Path(__file__).parent / "data"
 
 
 @lru_cache(maxsize=1)
-def ref() -> dict:
+def ref_raw() -> dict:
+    """The v0.8 reference data exactly as extracted."""
     with open(DATA_DIR / "reference_data.json", encoding="utf-8") as f:
         return json.load(f)
+
+
+@lru_cache(maxsize=1)
+def corrections() -> dict:
+    path = DATA_DIR / "reference_corrections.json"
+    if not path.exists() or os.environ.get('FP_RAW_REFERENCE') == '1':
+        return {}
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _r10(x: float) -> float:
+    return float(round(x / 10) * 10) if abs(x) >= 100 else float(round(x))
+
+
+@lru_cache(maxsize=1)
+def ref() -> dict:
+    """Reference data with the cost-of-living corrections applied (docs/COST_OF_LIVING_AUDIT.md)."""
+    r = copy.deepcopy(ref_raw())
+    c = corrections()
+    if not c:
+        return r
+    for table, scales in (c.get('location_scale') or {}).items():
+        for loc, k in scales.items():
+            for strat, cats in (r.get(table, {}).get(loc) or {}).items():
+                for cat in cats:
+                    cats[cat] = _r10(cats[cat] * k)
+    for table, locs in (c.get('strategy_scale') or {}).items():
+        for loc, per in locs.items():
+            for strat, k in per.items():
+                cats = (r.get(table, {}).get(loc) or {}).get(strat)
+                if isinstance(cats, dict) and isinstance(k, (int, float)):
+                    for cat in cats:
+                        cats[cat] = _r10(cats[cat] * k)
+    u = c.get('state_uniform_scale') or 1.0
+    for st, strats in r.get('STATE_EXPENSE_TEMPLATES', {}).items():
+        for strat, cats in strats.items():
+            for cat in cats:
+                if cat != 'Medical':
+                    cats[cat] = _r10(cats[cat] * u)
+            med = (c.get('state_medical') or {}).get(st, {}).get(strat)
+            if med is not None and 'Medical' in cats:
+                cats['Medical'] = float(med)
+    # aliases: a location with no template of its own uses another's
+    for alias, target in (c.get('aliases') or {}).items():
+        for table in ('ADULT_EXPENSE_TEMPLATES', 'CHILDREN_EXPENSE_TEMPLATES', 'FAMILY_EXPENSE_TEMPLATES'):
+            if target in r.get(table, {}) and alias not in r[table]:
+                r[table][alias] = copy.deepcopy(r[table][target])
+    # explicit children templates: daycare correction
+    for loc, k in ((c.get('children') or {}).get('explicit_daycare_scale') or {}).items():
+        for strat, cats in (r['CHILDREN_EXPENSE_TEMPLATES'].get(loc) or {}).items():
+            if 'Daycare' in cats:
+                cats['Daycare'] = [_r10(v * k) for v in cats['Daycare']]
+    return r
 
 
 @lru_cache(maxsize=1)
@@ -140,6 +196,99 @@ def adult_template(location: str, strategy: str) -> dict:
     return copy.deepcopy(r["ADULT_EXPENSE_TEMPLATES"]["Seattle"]["Average (statistical)"])
 
 
+def adult_template_exact(location: str, strategy: str, custom: dict | None = None) -> dict | None:
+    """Like adult_template but returns None instead of falling back to Seattle.
+    `custom` = plan['custom_expense_templates'] ({location: {strategy: {cat: amt}}})."""
+    r = ref()
+    strategy = normalize_strategy_name(strategy)
+    if custom:
+        loc = custom.get(location)
+        if isinstance(loc, dict):
+            for key in (strategy, get_strategy_base_name(strategy), f"{get_strategy_base_name(strategy)} (custom)"):
+                if isinstance(loc.get(key), dict) and loc[key]:
+                    return copy.deepcopy(loc[key])
+    for table in (r["ADULT_EXPENSE_TEMPLATES"], r["STATE_EXPENSE_TEMPLATES"], r["PROVINCE_EXPENSE_TEMPLATES"]):
+        t = _lookup(table, location, strategy)
+        if t is not None:
+            return t
+    state = CITY_TO_STATE.get(location)
+    if state:
+        return _lookup(r["STATE_EXPENSE_TEMPLATES"], state, strategy)
+    return None
+
+
+def adult_template_calibrated(location: str, strategy: str) -> dict | None:
+    """Per-adult template calibrated to BLS CEX 2024 levels and BEA 2024 price parities
+    (see calibrate.py / docs/COST_DATA_AUDIT.md). None if the location is unknown."""
+    from .calibrate import calibrated_adult
+    level = get_strategy_base_name(normalize_strategy_name(strategy))
+    level = level if level in ('Conservative', 'Average', 'High-end') else 'Average'
+    return calibrated_adult(location, level, lambda loc, lv: adult_template_exact(loc, lv))
+
+
+def adult_template_for(location: str, strategy: str, source: str = 'calibrated', custom: dict | None = None) -> dict:
+    """Template a user applies from the UI. source: 'calibrated' (default) | 'v08' (original v0.8 numbers)."""
+    if custom:
+        t = adult_template_exact(location, strategy, custom) if (location in custom) else None
+        if t:
+            return t
+    if source == 'calibrated':
+        t = adult_template_calibrated(location, strategy)
+        if t:
+            return t
+        from .calibrate import national_adult
+        level = get_strategy_base_name(normalize_strategy_name(strategy))
+        return {k: round(v / 10) * 10 for k, v in national_adult(level if level in ('Conservative', 'Average', 'High-end') else 'Average').items()}
+    return adult_template(location, strategy)
+
+
+def spending_curve(location: str) -> dict:
+    """Slider anchors (per adult per year) for a location; see calibrate.spending_curve."""
+    from .calibrate import spending_curve as _sc
+    return _sc(location, lambda loc, lv: adult_template_exact(loc, lv))
+
+
+def spending_at_level(location: str, x: float) -> dict:
+    from .calibrate import level_at
+    return {k: round(v / 10) * 10 for k, v in level_at(spending_curve(location), x).items()}
+
+
+def cost_of_living(location: str, strategy: str, custom: dict | None = None) -> float | None:
+    """Annual per-adult spending for a location + spending level (2024 $), or None if the location is unknown.
+    Uses the calibrated data (BEA price parities) so moves scale spending realistically; user-defined
+    custom templates win when present."""
+    if custom and location in custom:
+        t = adult_template_exact(location, strategy, custom)
+        if t:
+            return float(sum(v for v in t.values() if isinstance(v, (int, float))))
+    t = adult_template_calibrated(location, strategy)
+    return float(sum(t.values())) if t else None
+
+
+def col_factor(base_loc: str, base_strat: str, loc: str, strat: str, custom: dict | None = None) -> float:
+    """Spending multiplier when moving from (base_loc, base_strat) to (loc, strat).
+    Unknown locations keep the base location's costs; a spending-level change still applies."""
+    b = cost_of_living(base_loc, base_strat, custom)
+    n = cost_of_living(loc, strat, custom)
+    if n is None:                       # unknown destination: only the spending level changes
+        n = cost_of_living(base_loc, strat, custom) if b is not None else None
+    if b is None or n is None or b <= 0:
+        return 1.0
+    return n / b
+
+
+def rent_factor(base_loc: str, loc: str) -> float | None:
+    """Rent level of `loc` relative to `base_loc` (BEA 2024 RPP rents), None if either is unknown."""
+    from .calibrate import rent_factor as _rf
+    f = _rf(base_loc, loc)
+    if f is not None:
+        return f
+    idx = corrections().get('rent_index') or {}
+    b = idx.get(base_loc) or idx.get(CITY_TO_STATE.get(base_loc, ''))
+    n = idx.get(loc) or idx.get(CITY_TO_STATE.get(loc, ''))
+    return (n / b) if (b and n) else None
+
+
 def family_template(location: str, strategy: str, custom: dict | None = None) -> dict | None:
     strategy = normalize_strategy_name(strategy)
     t = _lookup(ref()["FAMILY_EXPENSE_TEMPLATES"], location, strategy)
@@ -159,7 +308,7 @@ def _age_scale(age: int) -> float:
     return 0.0
 
 
-def generate_children_template_from_adult(a: dict, level: str = 'Average') -> dict:
+def generate_children_template_from_adult(a: dict, level: str = 'Average', location: str | None = None) -> dict:
     """Verbatim port of v0.8 generate_children_template_from_adult."""
     g = lambda k: a.get(k, 0)
     s = _age_scale
@@ -171,6 +320,8 @@ def generate_children_template_from_adult(a: dict, level: str = 'Average') -> di
     coffee = [0] * 13 + [0.1, 0.15, 0.20, 0.30, 0.40, 0.35, 0.30, 0.25, 0.20, 0.15] + [0] * 9
     t['Coffee Shops'] = [g('Coffee Shops') * coffee[i] for i in range(31)]
     autop = [0] * 16 + [0.5, 0.6, 0.6, 0.5, 0.5, 0.5, 0.4] + [0] * 8
+    if (corrections().get('children') or {}).get('drop_teen_auto_payment'):
+        autop = [0] * 31   # a teen's car is better modelled as a one-time purchase
     t['Auto Payment'] = [g('Auto Payment') * autop[i] for i in range(31)]
     gas = [0.05] * 13 + [0.15, 0.20, 0.25, 0.40, 0.50, 0.45, 0.40, 0.35, 0.30, 0.25] + [0] * 8
     t['Gas & Fuel'] = [g('Gas & Fuel') * gas[i] for i in range(31)]
@@ -200,6 +351,9 @@ def generate_children_template_from_adult(a: dict, level: str = 'Average') -> di
     be = 5000 if level == 'High-end' else 3000 if level == 'Average' else 2000
     t['Baby Equipment'] = [be, be * 0.15, be * 0.10, be * 0.07, be * 0.05] + [0] * 26
     dc = 30000 if level == 'High-end' else 22000 if level == 'Average' else 18000
+    dc_table = ((corrections().get('children') or {}).get('daycare') or {}).get(f'{level} (statistical)') or {}
+    if location in dc_table:
+        dc = dc_table[location]
     t['Daycare'] = [dc] * 5 + [dc * 0.4, dc * 0.3, dc * 0.2, dc * 0.1] + [0] * 22
     sb = 800 if level == 'High-end' else 500 if level == 'Average' else 300
     t['School Supplies'] = [sb * 0.1] * 5 + [sb * i / 13 for i in range(1, 14)] + [0] * 13
@@ -220,7 +374,7 @@ def _children_template_cached(location: str, strategy: str) -> str:
     t = _lookup(ref()["CHILDREN_EXPENSE_TEMPLATES"], location, strategy)
     if t is None:
         level = 'Conservative' if 'Conservative' in strategy else 'High-end' if 'High' in strategy else 'Average'
-        t = generate_children_template_from_adult(adult_template(location, strategy), level)
+        t = generate_children_template_from_adult(adult_template(location, strategy), level, location)
     return json.dumps(t)
 
 
@@ -258,19 +412,30 @@ def child_expenses_for_age(child: dict, age: int, legacy_table: list | None = No
             exp = {k: v for k, v in legacy_table[age].items() if k != 'Age'}
         else:
             exp = {}
+    ed = corrections().get('education') or {}
     if child.get('school_type', 'Public') == 'Private' and 5 <= age <= 17:
-        exp['Education'] = exp.get('Education', 0) + PRIVATE_SCHOOL.get(child.get('template_state', 'Seattle'), 20000)
+        loc0 = child.get('template_state', 'Seattle')
+        fee = PRIVATE_SCHOOL.get(loc0) or (ed.get('private_school') or {}).get(loc0) or ed.get('private_school_fallback', 20000)
+        exp['Education'] = exp.get('Education', 0) + fee
     if at_college:
-        exp['Food'] = exp.get('Food', 0) * 0.3
-        exp['Transportation'] = exp.get('Transportation', 0) * 0.4
-        exp['Entertainment'] = exp.get('Entertainment', 0) * 0.5
-        if child.get('college_type', 'Public') == 'Public':
-            tuition = PUBLIC_TUITION.get(location, 12000)
+        red = (corrections().get('children') or {}).get('college_reductions') or \
+            {'x0.3': ['Food'], 'x0.4': ['Transportation'], 'x0.5': ['Entertainment']}
+        for factor, cats in red.items():
+            k = float(factor[1:])
+            for cat in cats:
+                if cat in exp:
+                    exp[cat] = exp[cat] * k
+        private = child.get('college_type', 'Public') != 'Public'
+        if not private:
+            tuition = PUBLIC_TUITION.get(location, ed.get('public_tuition_fallback', 12000))
         else:
-            tuition = PRIVATE_TUITION.get(location, 55000)
+            tuition = PRIVATE_TUITION.get(location, ed.get('private_tuition_fallback', 55000))
+        rb = ROOM_BOARD.get(location, ed.get('room_board_public_fallback', 18000))
+        if private and location not in ROOM_BOARD:
+            rb += ed.get('room_board_private_extra', 0)
         # v0.8 added tuition on top of the template's own college 'Education'
         # amount (double counting). v2 replaces it: tuition + room & board.
-        exp['Education'] = tuition + ROOM_BOARD.get(location, 18000)
+        exp['Education'] = tuition + rb
     return exp
 
 

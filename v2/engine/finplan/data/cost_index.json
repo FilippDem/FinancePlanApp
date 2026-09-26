@@ -1,0 +1,750 @@
+{
+ "_about": "Price and spending benchmarks used to calibrate cost-of-living. RPP = BEA Regional Price Parities (US average = 100). CEX = BLS Consumer Expenditure Survey.",
+ "_sources": {
+  "rpp_2024_states": "BEA Regional Price Parities by State, 2024 (released 2026-02-20), via FRED release tables https://fred.stlouisfed.org/release/tables?eid=233639&rid=403",
+  "rpp_2024_metros": "BEA Regional Price Parities by MSA, 2024, via FRED https://fred.stlouisfed.org/release/tables?eid=233895&rid=403 and series RPPALL/RPPGOOD/RPPSERVERENT/RPPSERVEOTH + MSA code",
+  "cex_2022_quintiles": "BLS CE Table 1101, quintiles of income before taxes, 2022 https://www.bls.gov/cex/tables/calendar-year/mean-item-share-average-standard-error/cu-income-quintiles-before-taxes-2022.pdf",
+  "cex_2024_all": "BLS Consumer Expenditures 2024 news release (2025-12-19) https://www.bls.gov/news.release/cesan.nr0.htm",
+  "country_price_level": "World Bank WDI PA.NUS.PPPC.RF, price level ratio of PPP conversion factor (GDP) to market exchange rate, 2020 (US = 1.00), via https://www.indexmundi.com/facts/indicators/PA.NUS.PPPC.RF/rankings. Rough: GDP-wide, dated, and exchange-rate sensitive."
+ },
+ "rpp_year": 2024,
+ "rpp_states": {
+  "Alabama": [
+   88.823,
+   96.399,
+   61.785,
+   96.711
+  ],
+  "Alaska": [
+   102.359,
+   106.319,
+   93.784,
+   102.208
+  ],
+  "Arizona": [
+   100.677,
+   95.361,
+   106.804,
+   102.808
+  ],
+  "Arkansas": [
+   86.937,
+   93.597,
+   58.203,
+   95.312
+  ],
+  "California": [
+   110.72,
+   106.098,
+   154.346,
+   102.591
+  ],
+  "Colorado": [
+   103.052,
+   98.727,
+   127.359,
+   99.613
+  ],
+  "Connecticut": [
+   103.61,
+   97.33,
+   117.048,
+   102.658
+  ],
+  "Delaware": [
+   99.808,
+   96.155,
+   102.015,
+   101.235
+  ],
+  "District of Columbia": [
+   109.901,
+   106.502,
+   154.984,
+   102.964
+  ],
+  "Florida": [
+   103.414,
+   98.059,
+   122.107,
+   101.324
+  ],
+  "Georgia": [
+   96.293,
+   98.929,
+   88.694,
+   97.343
+  ],
+  "Hawaii": [
+   109.951,
+   111.562,
+   125.304,
+   102.898
+  ],
+  "Idaho": [
+   95.494,
+   96.311,
+   90.027,
+   99.015
+  ],
+  "Illinois": [
+   99.958,
+   103.832,
+   93.944,
+   100.156
+  ],
+  "Indiana": [
+   93.329,
+   95.509,
+   73.926,
+   99.145
+  ],
+  "Iowa": [
+   87.762,
+   93.73,
+   65.322,
+   92.927
+  ],
+  "Kansas": [
+   90.068,
+   94.027,
+   71.156,
+   93.816
+  ],
+  "Kentucky": [
+   90.159,
+   95.967,
+   64.313,
+   97.25
+  ],
+  "Louisiana": [
+   88.207,
+   93.7,
+   63.104,
+   95.706
+  ],
+  "Maine": [
+   97.05,
+   97.171,
+   78.94,
+   103.191
+  ],
+  "Maryland": [
+   104.959,
+   102.524,
+   121.079,
+   101.596
+  ],
+  "Massachusetts": [
+   105.757,
+   98.82,
+   128.068,
+   102.852
+  ],
+  "Michigan": [
+   96.217,
+   95.993,
+   82.332,
+   100.933
+  ],
+  "Minnesota": [
+   98.621,
+   100.519,
+   91.281,
+   100.213
+  ],
+  "Mississippi": [
+   86.953,
+   96.219,
+   56.456,
+   96.09
+  ],
+  "Missouri": [
+   90.817,
+   96.299,
+   69.88,
+   95.169
+  ],
+  "Montana": [
+   94.645,
+   96.006,
+   84.648,
+   98.715
+  ],
+  "Nebraska": [
+   90.103,
+   94.101,
+   75.174,
+   92.98
+  ],
+  "Nevada": [
+   99.979,
+   96.271,
+   114.135,
+   98.744
+  ],
+  "New Hampshire": [
+   104.165,
+   98.578,
+   114.947,
+   103.879
+  ],
+  "New Jersey": [
+   108.805,
+   107.066,
+   134.292,
+   103.529
+  ],
+  "New Mexico": [
+   92.212,
+   96.144,
+   73.611,
+   98.54
+  ],
+  "New York": [
+   107.921,
+   107.254,
+   122.168,
+   104.067
+  ],
+  "North Carolina": [
+   94.326,
+   96.621,
+   81.364,
+   98.186
+  ],
+  "North Dakota": [
+   88.959,
+   95.701,
+   71.421,
+   91.158
+  ],
+  "Ohio": [
+   92.774,
+   93.67,
+   73.012,
+   98.947
+  ],
+  "Oklahoma": [
+   87.843,
+   93.778,
+   62.763,
+   95.458
+  ],
+  "Oregon": [
+   103.361,
+   105.261,
+   108.628,
+   100.298
+  ],
+  "Pennsylvania": [
+   97.572,
+   99.357,
+   85.068,
+   99.762
+  ],
+  "Rhode Island": [
+   102.28,
+   97.165,
+   105.62,
+   102.84
+  ],
+  "South Carolina": [
+   93.749,
+   96.339,
+   80.49,
+   98.284
+  ],
+  "South Dakota": [
+   88.586,
+   95.473,
+   67.642,
+   91.899
+  ],
+  "Tennessee": [
+   91.87,
+   96.247,
+   79.07,
+   95.142
+  ],
+  "Texas": [
+   97.057,
+   98.083,
+   96.503,
+   97.081
+  ],
+  "Utah": [
+   98.864,
+   96.446,
+   107.814,
+   98.959
+  ],
+  "Vermont": [
+   97.958,
+   97.274,
+   86.502,
+   101.586
+  ],
+  "Virginia": [
+   101.104,
+   100.368,
+   106.799,
+   100.233
+  ],
+  "Washington": [
+   107.013,
+   104.359,
+   125.979,
+   103.873
+  ],
+  "West Virginia": [
+   89.497,
+   96.539,
+   54.241,
+   99.94
+  ],
+  "Wisconsin": [
+   94.095,
+   94.31,
+   79.312,
+   99.501
+  ],
+  "Wyoming": [
+   92.691,
+   95.368,
+   71.127,
+   100.428
+  ]
+ },
+ "rpp_metros": {
+  "Seattle": [
+   111.133,
+   103.972,
+   151.314,
+   106.835
+  ],
+  "San Francisco": [
+   115.613,
+   108.465,
+   194.718,
+   106.207
+  ],
+  "Los Angeles": [
+   113.566,
+   106.623,
+   170.433,
+   104.362
+  ],
+  "San Diego": [
+   111.887,
+   107.963,
+   179.267,
+   99.597
+  ],
+  "Sacramento": [
+   106.67,
+   105.168,
+   130.23,
+   100.267
+  ],
+  "New York": [
+   112.563,
+   110.261,
+   148.616,
+   105.836
+  ],
+  "Houston": [
+   98.629,
+   100.639,
+   104.51,
+   95.595
+  ],
+  "Austin": [
+   98.066,
+   93.757,
+   120.361,
+   96.24
+  ],
+  "Dallas": [
+   103.09,
+   102.838,
+   117.874,
+   99.673
+  ],
+  "Portland": [
+   105.421,
+   105.222,
+   125.114,
+   100.136
+  ],
+  "Chicago": [
+   103.595,
+   107.258,
+   112.01,
+   100.492
+  ],
+  "Miami": [
+   114.155,
+   103.556,
+   155.551,
+   109.113
+  ],
+  "Washington DC": [
+   108.884,
+   104.847,
+   151.134,
+   102.321
+  ],
+  "Columbus": [
+   95.469,
+   93.628,
+   87.945,
+   98.939
+  ],
+  "Honolulu": [
+   110.961,
+   111.562,
+   135.538,
+   102.898
+  ],
+  "Denver": [
+   105.782,
+   100.957,
+   146.919,
+   99.448
+  ],
+  "Phoenix": [
+   103.316,
+   95.024,
+   121.236,
+   104.016
+  ],
+  "Boston": [
+   108.266,
+   99.651,
+   148.424,
+   103.603
+  ],
+  "Atlanta": [
+   100.058,
+   100.416,
+   111.022,
+   96.701
+  ],
+  "Las Vegas": [
+   100.215,
+   96.271,
+   115.538,
+   98.744
+  ],
+  "Philadelphia": [
+   102.554,
+   96.833,
+   113.141,
+   103.052
+  ]
+ },
+ "rpp_columns": [
+  "all_items",
+  "goods",
+  "rents",
+  "other_services"
+ ],
+ "cex_2022_quintiles": {
+  "columns": [
+   "all",
+   "q1",
+   "q2",
+   "q3",
+   "q4",
+   "q5"
+  ],
+  "income": [
+   94003,
+   14191,
+   37441,
+   65659,
+   108730,
+   244025
+  ],
+  "persons": [
+   2.4,
+   1.6,
+   2.1,
+   2.4,
+   2.9,
+   3.2
+  ],
+  "children": [
+   0.6,
+   0.3,
+   0.4,
+   0.6,
+   0.7,
+   0.8
+  ],
+  "vehicles": [
+   1.9,
+   1.0,
+   1.5,
+   1.9,
+   2.3,
+   2.6
+  ],
+  "total": [
+   72967,
+   32612,
+   47657,
+   61950,
+   81957,
+   140654
+  ],
+  "food_home": [
+   5703,
+   3624,
+   4310,
+   5525,
+   6529,
+   8523
+  ],
+  "food_away": [
+   3639,
+   1466,
+   2229,
+   3030,
+   4275,
+   7191
+  ],
+  "apparel": [
+   1945,
+   904,
+   1216,
+   1719,
+   2270,
+   3611
+  ],
+  "vehicle_purchases": [
+   4496,
+   1416,
+   2612,
+   3404,
+   5327,
+   9722
+  ],
+  "gasoline": [
+   3120,
+   1553,
+   2360,
+   3166,
+   3919,
+   4601
+  ],
+  "vehicle_insurance": [
+   1592,
+   815,
+   1284,
+   1627,
+   1952,
+   2285
+  ],
+  "transportation": [
+   12295,
+   4928,
+   8156,
+   10749,
+   14719,
+   22926
+  ],
+  "healthcare": [
+   5850,
+   3355,
+   4441,
+   5951,
+   6694,
+   8814
+  ],
+  "health_insurance": [
+   3843,
+   2253,
+   3097,
+   3699,
+   4515,
+   5654
+  ],
+  "entertainment": [
+   3458,
+   1233,
+   1972,
+   2932,
+   3765,
+   7389
+  ],
+  "personal_care": [
+   866,
+   393,
+   606,
+   814,
+   974,
+   1544
+  ],
+  "telephone": [
+   1431,
+   819,
+   1167,
+   1409,
+   1737,
+   2026
+  ],
+  "maintenance": [
+   1160,
+   550,
+   848,
+   1078,
+   1391,
+   1934
+  ],
+  "vehicle_finance": [
+   295,
+   88,
+   182,
+   292,
+   396,
+   515
+  ],
+  "vehicle_fees": [
+   787,
+   245,
+   441,
+   637,
+   889,
+   1724
+  ],
+  "public_transport": [
+   845,
+   262,
+   429,
+   544,
+   845,
+   2145
+  ],
+  "alcohol": [
+   583,
+   232,
+   311,
+   471,
+   666,
+   1234
+  ],
+  "tobacco": [
+   371,
+   374,
+   415,
+   374,
+   418,
+   276
+  ],
+  "reading": [
+   117,
+   71,
+   79,
+   91,
+   124,
+   218
+  ],
+  "misc": [
+   1009,
+   501,
+   673,
+   803,
+   1187,
+   1878
+  ],
+  "fees_admissions": [
+   833,
+   139,
+   272,
+   524,
+   899,
+   2328
+  ],
+  "audio_visual": [
+   1020,
+   591,
+   801,
+   908,
+   1222,
+   1580
+  ],
+  "pets_toys_hobbies": [
+   908,
+   415,
+   641,
+   788,
+   1056,
+   1638
+  ],
+  "other_entertainment": [
+   698,
+   88,
+   null,
+   null,
+   588,
+   1843
+  ],
+  "_note": "Suppressed cells (None) are interpolated in calibrate.py"
+ },
+ "cex_2024_all": {
+  "total": 78535,
+  "food_home": 6224,
+  "food_away": 3945,
+  "apparel": 2001,
+  "transportation": 13318,
+  "healthcare": 6197,
+  "entertainment": 3609,
+  "personal_care": 978,
+  "housing": 26266
+ },
+ "country_price_level": {
+  "Argentina": 0.41,
+  "Australia": 0.97,
+  "Austria": 0.87,
+  "Bahamas": 0.77,
+  "Belgium": 0.85,
+  "Brazil": 0.46,
+  "Canada": 0.93,
+  "Cayman Islands": 1.19,
+  "Chile": 0.53,
+  "China": 0.61,
+  "Costa Rica": 0.55,
+  "Denmark": 1.01,
+  "Finland": 0.97,
+  "France": 0.83,
+  "Germany": 0.84,
+  "Hong Kong": 0.78,
+  "India": 0.3,
+  "Indonesia": 0.32,
+  "Ireland": 0.92,
+  "Israel": 1.12,
+  "Italy": 0.76,
+  "Japan": 0.95,
+  "Malaysia": 0.37,
+  "Mexico": 0.45,
+  "Netherlands": 0.88,
+  "New Zealand": 0.93,
+  "Norway": 1.07,
+  "Philippines": 0.39,
+  "Portugal": 0.65,
+  "Saudi Arabia": 0.43,
+  "Singapore": 0.61,
+  "South Korea": 0.7,
+  "Spain": 0.72,
+  "Sweden": 0.95,
+  "Switzerland": 1.21,
+  "Thailand": 0.39,
+  "Turkey": 0.31,
+  "United Arab Emirates": 0.54,
+  "United Kingdom": 0.88,
+  "United States": 1.0,
+  "Vietnam": 0.32
+ }
+}

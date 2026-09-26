@@ -649,12 +649,28 @@ class TemplateIn(BaseModel):
     strategy: str
     current_year: int = 2026
     inflation: float = 0.03
+    source: str = 'calibrated'    # 'calibrated' (BLS/BEA, default) | 'v08' (original v0.8 amounts, audited)
 
 
 @app.post('/api/templates/adult')
 def tmpl_adult(body: TemplateIn):
     scale = (1 + body.inflation) ** max(0, body.current_year - 2024)
-    return {k: round(v * scale) for k, v in R.adult_template(body.location, body.strategy).items()}
+    return {k: round(v * scale) for k, v in R.adult_template_for(body.location, body.strategy, body.source).items()}
+
+
+@app.get('/api/spending/curve')
+def spending_curve(location: str = 'Seattle', current_year: int = 2026, inflation: float = 0.03):
+    """Spending-level slider: anchors per adult per year in today's dollars."""
+    from finplan import calibrate as K
+    scale = (1 + inflation) ** max(0, current_year - 2024)
+    c = R.spending_curve(location)
+    for a in c['anchors']:
+        a['cats'] = {k: round(v * scale) for k, v in a['cats'].items()}
+        a['total'] = sum(a['cats'].values())
+    nat = K.national_adult_col('all')
+    c['us_average_total'] = round(sum(nat.values()) * scale)
+    c['scale'] = scale
+    return c
 
 
 @app.post('/api/templates/family')

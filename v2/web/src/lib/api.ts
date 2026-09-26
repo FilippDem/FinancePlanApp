@@ -71,6 +71,8 @@ export const api = {
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 5000)
   },
-  template: (kind: 'adult' | 'family' | 'children', location: string, strategy: string, current_year: number, inflation: number) =>
-    req('POST', `/api/templates/${kind}`, { location, strategy, current_year, inflation }),
+  template: (kind: 'adult' | 'family' | 'children', location: string, strategy: string, current_year: number, inflation: number, source: 'calibrated' | 'v08' = 'calibrated') =>
+    req('POST', `/api/templates/${kind}`, { location, strategy, current_year, inflation, source }),
+  spendingCurve: (location: string, current_year: number, inflation: number) =>
+    req('GET', `/api/spending/curve?location=${encodeURIComponent(location)}&current_year=${current_year}&inflation=${inflation}`),
 }

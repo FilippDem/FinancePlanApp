@@ -229,9 +229,77 @@ def test_demo_overrides_apply_and_keep_raw():
     tuned = demo_plans()
     assert raw.keys() == tuned.keys()
     k = next(n for n in raw if 'Tech Couple' in n)
-    assert raw[k]['parentX_retirement_age'] == 50 and tuned[k]['parentX_retirement_age'] == 52
+    assert raw[k]['state_timeline'][1]['state'] == 'Houston' and tuned[k]['state_timeline'][1]['state'] == 'Austin'
     assert tuned[k].get('demo_note')
     # removed items disappear, untouched ones remain
     ex = next(n for n in raw if 'Executives' in n)
     names = [x['name'] for x in tuned[ex]['major_purchases']]
     assert 'Luxury Yacht Purchase' not in names and "Isabella's Wedding Reception" in names
+
+
+def test_moves_adjust_spending_by_cost_of_living():
+    from finplan.engine import project
+    p = default_plan()
+    cy = p['current_year']
+    p['state_timeline'] = [{'year': cy, 'state': 'Seattle', 'spending_strategy': 'Average'},
+                           {'year': cy + 3, 'state': 'Texas', 'spending_strategy': 'Average'}]
+    rows = project(p)['rows']
+    before, after = rows[2], rows[3]
+    assert after['col_factor'] < 1.0 and before['col_factor'] == 1.0
+    assert after['exp_family'] / after['infl_index'] < before['exp_family'] / before['infl_index'] * 0.99
+    # per-category detail sums to the totals
+    d = after['details']['living']
+    assert abs(sum(d['shared'].values()) - after['exp_family']) < 1e-6
+    assert abs(sum(d['p1'].values()) - after['exp_person1']) < 1e-6
+    # toggle off -> v0.8 behaviour (location only changes taxes)
+    p['move_adjusts_spending'] = False
+    rows2 = project(p)['rows']
+    assert rows2[3]['col_factor'] == 1.0
+
+
+def test_detail_breakdowns_present():
+    from finplan.engine import project
+    p = default_plan()
+    r = project(p)['rows'][0]
+    for c in r['details']['children']:
+        assert abs(sum(c['cats'].values()) - c['total']) < 1e-6
+    assert 'investment_growth' in r and 'effective_tax_rate' in r
+    assert isinstance(r['details']['healthcare'], list)
+
+
+def test_cost_of_living_corrections():
+    from finplan import reference as R
+    sea = R.cost_of_living('Seattle', 'Average')
+    # BEA 2024 non-housing prices: SF and Seattle are within a few percent of each other
+    assert 0.97 < R.cost_of_living('San Francisco', 'Average') / sea < 1.10
+    assert R.cost_of_living('Columbus', 'Average') > R.cost_of_living('Mississippi', 'Average') * 0.95
+    assert R.cost_of_living('New York', 'Average') > R.cost_of_living('Houston', 'Average')
+    for loc in ('Seattle', 'Chicago', 'Texas', 'Ontario'):
+        a = R.cost_of_living(loc, 'Average')
+        assert 0.65 < R.cost_of_living(loc, 'Conservative') / a < 0.85
+        assert 1.25 < R.cost_of_living(loc, 'High-end') / a < 1.50
+    assert R.cost_of_living('District of Columbia', 'Average') is not None
+    raw = R.ref_raw()['ADULT_EXPENSE_TEMPLATES']['Columbus']['Average (statistical)']
+    assert sum(raw.values()) == 21220          # v0.8 extract untouched
+    assert R.rent_factor('Seattle', 'Houston') < 0.75
+
+
+def test_spending_slider_curve():
+    from finplan import reference as R
+    c = R.spending_curve('Seattle')
+    xs = [a['x'] for a in c['anchors']]
+    tots = [a['total'] for a in c['anchors']]
+    assert xs == sorted(xs) and tots == sorted(tots) and c['basis'] == 'bea'
+    keys = [a['key'] for a in c['anchors']]
+    assert {'q2', 'all', 'q5', 'v08_avg', 'v08_high'} <= set(keys)
+    # BLS average adult in Seattle is far below the old v0.8 "Average"
+    avg = next(a for a in c['anchors'] if a['key'] == 'all')['total']
+    old = next(a for a in c['anchors'] if a['key'] == 'v08_avg')['total']
+    assert 14000 < avg < 22000 and old > 1.6 * avg
+    # interpolation is monotone and hits anchors
+    prev = 0
+    for x in range(0, 101, 5):
+        t = sum(R.spending_at_level('Seattle', x).values())
+        assert t >= prev - 20
+        prev = t
+    assert abs(sum(R.spending_at_level('Seattle', 90).values()) - old) < 50

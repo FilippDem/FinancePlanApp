@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .plan import normalize_plan, is_single
-from .reference import child_expenses_for_age, ref, HEALTH_CATEGORIES
+from .reference import child_expenses_for_age, ref, HEALTH_CATEGORIES, col_factor, rent_factor
 from .taxes import total_taxes, marginal_rate, TAX_BASE_YEAR
 from .mortgage import loan_terms, year_flows
 
@@ -149,6 +149,7 @@ def build_schedule(p: dict) -> Schedule:
             for t_ in range(T):
                 if sx['start_year'] <= years[t_] < sx['start_year'] + sx.get('years', 5):
                     infl_path[t_] = sx.get('rate', 0.08)
+    wage_pt = max([sx.get('wage_passthrough', 50) / 100 for sx in stress if sx.get('type') == 'inflation_spike'] + [0.0])
     ii_arr, hi_arr = [1.0] * T, [1.0] * T
     for t_ in range(1, T):
         ii_arr[t_] = ii_arr[t_ - 1] * (1 + infl_path[t_])
@@ -186,6 +187,30 @@ def build_schedule(p: dict) -> Schedule:
         own_key = 'p1' if owner in ('Parent1', n1) else 'p2' if owner in ('Parent2', n2) else 'shared'
         house_rows.append((h, s, future, terms, own_key))
 
+    # cost of living: moves / spending-level changes scale everyday spending
+    stl = p['state_timeline']
+    base_loc, base_strat = stl[0]['state'], stl[0].get('spending_strategy', 'Average')
+    for e in stl:
+        if e['year'] <= cy:
+            base_loc, base_strat = e['state'], e.get('spending_strategy', 'Average')
+    custom_t = p.get('custom_expense_templates') or None
+    col = [1.0] * T
+    rentf = [1.0] * T                   # rent follows a rent index, not the everyday-prices ratio
+    if p.get('move_adjusts_spending', True):
+        cache = {}
+        for t_, y_ in enumerate(years):
+            loc_, st_ = base_loc, base_strat
+            for e in stl:
+                if e['year'] <= y_:
+                    loc_, st_ = e['state'], e.get('spending_strategy', 'Average')
+            key = (loc_, st_)
+            if key not in cache:
+                cf_ = col_factor(base_loc, base_strat, loc_, st_, custom_t)
+                rf_ = rent_factor(base_loc, loc_)
+                cache[key] = (cf_, rf_ if rf_ is not None else cf_)
+            col[t_], rentf[t_] = cache[key]
+    C['col_factor'] = np.array(col)
+
     for t, y in enumerate(years):
         age1, age2 = a1 + t, a2 + t
         alive1 = age1 <= d1
@@ -217,6 +242,10 @@ def build_schedule(p: dict) -> Schedule:
                 w2 = simple_income(p['parentY_income'], p['parentY_raise'], p['parentY_job_changes'], cy, y)
         else:
             w2 = 0.0
+        if wage_pt:
+            # stress: part of an inflation spike passes through to pay
+            bump = 1 + (ii / ((1 + infl) ** t) - 1) * wage_pt
+            w1, w2 = w1 * bump, w2 * bump
         C['wages1'][t], C['wages2'][t] = w1, w2
         det['comp1'], det['comp2'] = comp1, comp2
 
@@ -303,9 +332,10 @@ def build_schedule(p: dict) -> Schedule:
             hdet.append(row)
         det['houses'] = hdet
 
-        # base living expenses
-        e1 = sum(p['parentX_expenses'].values()) * ii if alive1 else 0.0
-        e2 = sum(p['parentY_expenses'].values()) * ii if alive2 else 0.0
+        # base living expenses (per category, scaled by cost of living)
+        f = ii * col[t]
+        liv1 = {k: v * f for k, v in p['parentX_expenses'].items()} if alive1 else {}
+        liv2 = {k: v * f for k, v in p['parentY_expenses'].items()} if alive2 else {}
         fam = dict(p['family_shared_expenses'])
         if lives_owned:
             fam['Mortgage/Rent'] = 0.0
@@ -313,8 +343,12 @@ def build_schedule(p: dict) -> Schedule:
             for k in ('Property Tax', 'Home Insurance'):
                 if k in fam:
                     fam[k] = 0.0
-        famtot = sum(fam.values()) * ii if (alive1 or alive2) else 0.0
+        livf = {k: v * (ii * rentf[t] if k == 'Mortgage/Rent' else f) for k, v in fam.items()} if (alive1 or alive2) else {}
+        e1, e2, famtot = sum(liv1.values()), sum(liv2.values()), sum(livf.values())
         C['p1_exp'][t], C['p2_exp'][t], C['family_exp'][t] = e1, e2, famtot
+        det['living'] = {'p1': {k: v for k, v in liv1.items() if v}, 'p2': {k: v for k, v in liv2.items() if v},
+                         'shared': {k: v for k, v in livf.items() if v}}
+        det['col_factor'] = col[t]
 
         # children
         ch_total, ch_det = 0.0, []
@@ -328,48 +362,62 @@ def build_schedule(p: dict) -> Schedule:
             if not exp:
                 continue
             tot = 0.0
+            cats = {}
+            cf = 1.0 if 18 <= age <= 21 else col[t]     # college costs follow the college's location
             for cat, v in exp.items():
-                tot += v * tscale * (hi if cat in HEALTH_CATEGORIES else ii)
+                amt = v * tscale * (hi if cat in HEALTH_CATEGORIES else ii) * cf
+                if amt:
+                    cats[cat] = amt
+                tot += amt
             ch_total += tot
             if tot > 0:
-                ch_det.append({'name': ch['name'], 'age': age, 'total': tot})
+                ch_det.append({'name': ch['name'], 'age': age, 'total': tot, 'cats': cats,
+                               'in_college': 18 <= age <= 21})
         C['children_exp'][t] = ch_total
         det['children'] = ch_det
 
         # healthcare
         hc = {'p1': 0.0, 'p2': 0.0, 'shared': 0.0}
+        hc_items = []
+
+        def _hc(key, name, amt):
+            hc[key] += amt
+            if amt:
+                hc_items.append({'name': name, 'who': {'p1': n1, 'p2': n2, 'shared': 'Family'}[key], 'amount': amt})
         for ins in p['health_insurances']:
             prem = ins['monthly_premium'] * 12 * hi
             cb = ins['covered_by']
             in1 = alive1 and ins['start_age'] <= age1 <= ins['end_age']
             in2 = alive2 and ins['start_age'] <= age2 <= ins['end_age']
             if cb == 'Parent 1' and in1:
-                hc['p1'] += prem
+                _hc('p1', ins.get('name') or 'Health insurance', prem)
             elif cb == 'Parent 2' and in2:
-                hc['p2'] += prem
+                _hc('p2', ins.get('name') or 'Health insurance', prem)
             elif cb in ('Both', 'Family') and (in1 or in2):
-                hc['shared'] += prem
-        med = (p['medicare_part_b_premium'] + p['medicare_part_d_premium'] + p['medigap_premium']) * 12 * hi
-        if alive1 and age1 >= 65:
-            hc['p1'] += med
-        if alive2 and age2 >= 65:
-            hc['p2'] += med
+                _hc('shared', ins.get('name') or 'Health insurance', prem)
+        for key, alive_, age_ in (('p1', alive1, age1), ('p2', alive2, age2)):
+            if alive_ and age_ >= 65:
+                _hc(key, 'Medicare Part B', p['medicare_part_b_premium'] * 12 * hi)
+                _hc(key, 'Medicare Part D', p['medicare_part_d_premium'] * 12 * hi)
+                _hc(key, 'Medigap', p['medigap_premium'] * 12 * hi)
         for ltc in p['ltc_insurances']:
             if ltc['covered_person'] == 'Parent 1' and alive1 and age1 >= ltc['start_age']:
-                hc['p1'] += ltc['monthly_premium'] * 12
+                _hc('p1', ltc.get('name') or 'Long-term care', ltc['monthly_premium'] * 12)
             elif ltc['covered_person'] == 'Parent 2' and alive2 and age2 >= ltc['start_age']:
-                hc['p2'] += ltc['monthly_premium'] * 12
+                _hc('p2', ltc.get('name') or 'Long-term care', ltc['monthly_premium'] * 12)
         for he in p['health_expenses']:
             who = he['affected_person']
             in1 = alive1 and he['start_age'] <= age1 <= he['end_age']
             in2 = alive2 and he['start_age'] <= age2 <= he['end_age']
             amt = he['annual_amount'] * hi
+            nm = he.get('name') or he.get('category') or 'Health expense'
             if who == 'Parent 1' and in1:
-                hc['p1'] += amt
+                _hc('p1', nm, amt)
             elif who == 'Parent 2' and in2:
-                hc['p2'] += amt
+                _hc('p2', nm, amt)
             elif who not in ('Parent 1', 'Parent 2') and (in1 or in2):
-                hc['shared'] += amt
+                _hc('shared', nm, amt)
+        det['healthcare'] = hc_items
         C['hc_p1'][t], C['hc_p2'][t], C['hc_shared'][t] = hc['p1'], hc['p2'], hc['shared']
         C['healthcare_exp'][t] = sum(hc.values())
 
@@ -547,7 +595,7 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
     P = np.full(n, pre1 + pre2 + p.get('hsa_balance', 0.0))
 
     out = {k: np.zeros((T, n)) for k in ('liquid', 'pretax', 'net_worth', 'investable', 'taxes', 'cashflow',
-                                          'wages', 'expenses', 'withdrawal', 'returns', 'liquid1', 'liquid2')}
+                                          'wages', 'expenses', 'withdrawal', 'returns', 'liquid1', 'liquid2', 'growth')}
     tax_parts = {k: np.zeros((T, n)) for k in ('federal', 'state', 'fica', 'foreign')}
 
     for t in range(T):
@@ -579,13 +627,16 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
             in2 = inflow - in1
             net1 = in1 - taxes * inc_share - C['contrib1'][t] - e1
             net2 = in2 - taxes * (1 - inc_share) - C['contrib2'][t] - e2
+            gain = np.where(L1 >= 0, L1 * r, L1 * debt_rate) + np.where(L2 >= 0, L2 * r, L2 * debt_rate)
             L1 = L1 + np.where(L1 >= 0, L1 * r, L1 * debt_rate) + net1
             L2 = L2 + np.where(L2 >= 0, L2 * r, L2 * debt_rate) + net2
         else:
             L = L1 + L2
-            L = L + np.where(L >= 0, L * r, L * debt_rate) + net
+            gain = np.where(L >= 0, L * r, L * debt_rate)
+            L = L + gain + net
             L1, L2 = L, np.zeros(n)
 
+        gain = gain + P * r
         P = P * (1 + r) + contrib
         # cover a liquid shortfall from pre-tax accounts (grossed up for tax)
         Lsum = L1 + L2
@@ -624,6 +675,7 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
         out['expenses'][t] = expenses / fac
         out['withdrawal'][t] = W / fac
         out['returns'][t] = r
+        out['growth'][t] = gain / fac
         for k in tax_parts:
             tax_parts[k][t] = tx[k] / fac
     out.update({f'tax_{k}': v for k, v in tax_parts.items()})
@@ -678,6 +730,10 @@ def project(plan: dict) -> dict:
             'home_equity': float(C['home_equity'][t]), 'other_assets': float(C['other_assets'][t]),
             'consumer_debt': float(C['consumer_debt'][t]), 'net_worth': g('net_worth'),
             'liquid1': g('liquid1'), 'liquid2': g('liquid2'),
+            'investment_growth': g('growth'),
+            'effective_tax_rate': (g('taxes') / float(C['wages1'][t] + C['wages2'][t] + C['ss1'][t] + C['ss2'][t] + C['rent_income'][t])
+                                   if (C['wages1'][t] + C['wages2'][t] + C['ss1'][t] + C['ss2'][t] + C['rent_income'][t]) > 0 else 0.0),
+            'col_factor': float(C['col_factor'][t]),
             'location': S.meta['location'][t], 'infl_index': float(C['infl_index'][t]),
             'details': S.details[t],
         })

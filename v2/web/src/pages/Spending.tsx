@@ -3,6 +3,10 @@ import { Plus, Trash2, Pencil, Wand2, Repeat, ShoppingBag } from 'lucide-react'
 import { usePlan, pk } from '../lib/store'
 import { api } from '../lib/api'
 import { money } from '../lib/format'
+import { SpendingSlider, useCurve } from '../components/SpendingSlider'
+import { rescale, strategyFor, xForTotal, levelAt, sum as sumCats } from '../lib/spending'
+
+const SHARED_LIFESTYLE = ['Family Vacations', 'Shared Subscriptions', 'Pet Care', 'Other Family Expenses', 'Home Improvement']
 import { Card, PageHeader, Tabs, Field, Money, NumberInput, Percent, TextInput, Select, Button, Drawer, Toggle, Empty, Badge, Note } from '../components/ui'
 
 const STRATS = ['Conservative (statistical)', 'Average (statistical)', 'High-end (statistical)']
@@ -44,16 +48,44 @@ function CategoryEditor({ values, groups, onChange, onRemove }:
 function PersonalTab() {
   const { plan, update, reference, names, single } = usePlan()
   const [who, setWho] = useState<'X' | 'Y'>('X')
-  const [loc, setLoc] = useState<string>(plan[pk(who, 'expense_location')] || 'Seattle')
+  const [loc, setLoc] = useState<string>(plan[pk(who, 'expense_location')] || plan.state_timeline?.[0]?.state || 'Seattle')
   const [strat, setStrat] = useState<string>(plan[pk(who, 'expense_strategy')] || 'Average (statistical)')
+  const [source, setSource] = useState<'calibrated' | 'v08'>('calibrated')
+  const [both, setBoth] = useState(!single)
   const [busy, setBusy] = useState(false)
+  const infl = plan.economic_params?.inflation_rate ?? 0.03
+  const curve = useCurve(loc, plan.current_year, infl)
   const vals = plan[pk(who, 'expenses')] || {}
   const total = Object.values(vals).reduce((a: number, b: any) => a + (+b || 0), 0)
+  const stored = plan[pk(who, 'spending_level')]
+  const x = typeof stored === 'number' ? stored : curve ? Math.round(xForTotal(curve, total)) : 50
+  const [scaleShared, setScaleShared] = useState(true)
+  const move = (nx: number) => {
+    if (!curve) return
+    const whoList: ('X' | 'Y')[] = both && !single ? ['X', 'Y'] : [who]
+    update(d => {
+      if (scaleShared) {
+        const fromX = typeof d[pk(who, 'spending_level')] === 'number' ? d[pk(who, 'spending_level')] : x
+        const k = sumCats(levelAt(curve, nx)) / Math.max(sumCats(levelAt(curve, fromX)), 1)
+        for (const c of SHARED_LIFESTYLE) if (typeof d.family_shared_expenses?.[c] === 'number') d.family_shared_expenses[c] = Math.round(d.family_shared_expenses[c] * k / 10) * 10
+      }
+      for (const w of whoList) {
+        const cur = d[pk(w, 'expenses')] || {}
+        const curTotal = Object.values(cur).reduce((a: number, b: any) => a + (+b || 0), 0)
+        const from = typeof d[pk(w, 'spending_level')] === 'number' ? d[pk(w, 'spending_level')] : (curTotal > 0 ? xForTotal(curve, curTotal) : null)
+        d[pk(w, 'expenses')] = rescale(cur, curve, from, nx)
+        d[pk(w, 'spending_level')] = nx
+        d[pk(w, 'expense_location')] = loc
+        d[pk(w, 'expense_strategy')] = strategyFor(nx)
+        d[pk(w, 'use_template')] = true
+      }
+    })
+  }
   const apply = async () => {
     setBusy(true)
     try {
-      const t = await api.template('adult', loc, strat, plan.current_year, plan.economic_params.inflation_rate)
-      update(d => { d[pk(who, 'expenses')] = t; d[pk(who, 'expense_location')] = loc; d[pk(who, 'expense_strategy')] = strat; d[pk(who, 'use_template')] = true })
+      const t = await api.template('adult', loc, strat, plan.current_year, infl, source)
+      update(d => { d[pk(who, 'expenses')] = t; d[pk(who, 'expense_location')] = loc; d[pk(who, 'expense_strategy')] = strat; d[pk(who, 'use_template')] = true; delete d[pk(who, 'spending_level')] })
     } finally { setBusy(false) }
   }
   return (
@@ -62,20 +94,31 @@ function PersonalTab() {
         <div className="flex gap-2">
           {(['X', 'Y'] as const).map((w, i) => (
             <Button key={w} variant={who === w ? 'primary' : 'secondary'} size="sm" onClick={() => {
-              setWho(w); setLoc(plan[pk(w, 'expense_location')] || 'Seattle'); setStrat(plan[pk(w, 'expense_strategy')] || 'Average (statistical)')
+              setWho(w); setLoc(plan[pk(w, 'expense_location')] || plan.state_timeline?.[0]?.state || 'Seattle'); setStrat(plan[pk(w, 'expense_strategy')] || 'Average (statistical)')
             }}>{names[i]} · {money(Object.values(plan[pk(w, 'expenses')] || {}).reduce((a: number, b: any) => a + (+b || 0), 0))}</Button>
           ))}
         </div>
       )}
+      <Card title="Spending level" subtitle="Slide to a level that feels right; every category below follows. Edit any category afterwards and the slider keeps your changes in proportion."
+        action={<div className="flex items-center gap-3">
+          {!single && <Toggle checked={both} onChange={setBoth} label="Both adults" />}
+          <Toggle checked={scaleShared} onChange={setScaleShared} label="Shared extras too" hint="Also scale vacations, shared subscriptions, pets, home improvement and other shared lifestyle costs" />
+          <div className="w-44"><Select value={loc} options={[...new Set([loc, ...(reference?.locations || []), ...Object.keys(reference?.country_tax || {})])]} onChange={setLoc} /></div>
+        </div>}>
+        <SpendingSlider curve={curve} value={x} onChange={move} />
+      </Card>
       <Card title={`${names[who === 'X' ? 0 : 1]}'s personal spending`} subtitle={`${money(total, { compact: false })} per year · ${money(total / 12, { compact: false })} per month, today's dollars`}>
-        <div className="flex flex-wrap items-end gap-3 mb-6 p-3.5 rounded-lg bg-sunken/70 border border-line">
-          <Wand2 size={16} className="text-accent mb-2.5" />
-          <Field label="Fill from template: location" className="w-56">
-            <Select value={loc} options={(reference?.locations || [loc])} onChange={setLoc} /></Field>
-          <Field label="Lifestyle" className="w-56"><Select value={strat} options={STRATS.map(s => ({ value: s, label: s.replace(' (statistical)', '') }))} onChange={setStrat} /></Field>
-          <Button onClick={apply} disabled={busy}>{busy ? 'Applying…' : 'Apply template'}</Button>
-          <span className="text-xs text-muted mb-2.5">Overwrites the amounts below with regional averages (inflated to {plan.current_year}).</span>
-        </div>
+        <details className="mb-6 rounded-lg bg-sunken/70 border border-line">
+          <summary className="cursor-pointer px-3.5 py-2.5 text-sm text-ink2 flex items-center gap-2"><Wand2 size={15} className="text-accent" />Or fill from a lifestyle template</summary>
+          <div className="flex flex-wrap items-end gap-3 px-3.5 pb-3.5">
+            <Field label="Location" className="w-52">
+              <Select value={loc} options={(reference?.locations || [loc])} onChange={setLoc} /></Field>
+            <Field label="Lifestyle" className="w-48"><Select value={strat} options={STRATS.map(s => ({ value: s, label: s.replace(' (statistical)', '') }))} onChange={setStrat} /></Field>
+            <Field label="Data" className="w-56"><Select value={source} options={[{ value: 'calibrated', label: 'BLS / BEA 2024 (recommended)' }, { value: 'v08', label: 'v0.8 original (about 2x higher)' }]} onChange={setSource} /></Field>
+            <Button onClick={apply} disabled={busy}>{busy ? 'Applying…' : 'Apply template'}</Button>
+            <span className="text-xs text-muted mb-2.5 basis-full">Overwrites the amounts below (inflated to {plan.current_year}).</span>
+          </div>
+        </details>
         <CategoryEditor values={vals} groups={reference?.adult_categories || {}} onChange={(k, v) => update(d => { d[pk(who, 'expenses')][k] = v })} />
       </Card>
     </div>
