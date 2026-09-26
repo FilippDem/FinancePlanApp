@@ -7,6 +7,7 @@ import { NetWorthChart, CashflowChart, FanChart, StackedBars, LinesChart } from 
 import { useTodayDollars, deflate } from '../lib/hooks'
 import { retirementMarkers } from './Dashboard'
 import { ReportButton } from '../components/ReportButton'
+import { CashflowExplorer } from '../components/CashflowExplorer'
 
 const COLS: [string, string][] = [
   ['year', 'Year'], ['age1', 'Age'], ['total_income', 'Income'], ['taxes', 'Taxes'], ['total_expenses', 'Spending'],
@@ -89,9 +90,12 @@ export default function Projections() {
         {mcView && <Card title="Range of outcomes" subtitle={`${mcView.n.toLocaleString()} simulations`}><FanChart mc={mcView} field="net_worth" markers={markers} /></Card>}
       </div>}
 
-      {tab === 'cashflow' && <Card title="Income vs spending" subtitle="Spending stacked by category, taxes on top; the line is total income">
-        <CashflowChart rows={rows} markers={markers} height={380} />
-      </Card>}
+      {tab === 'cashflow' && <div className="space-y-4">
+        <CashflowExplorer rows={rows} rawRows={proj?.rows || []} events={proj?.events || []} names={names} single={single} today={today} />
+        <Card title="Income vs spending by category" subtitle="Spending stacked by category, taxes on top; the line is total income">
+          <CashflowChart rows={rows} markers={markers} height={380} />
+        </Card>
+      </div>}
 
       {tab === 'mc' && <div className="space-y-4">
         <Card title="Monte Carlo" subtitle={mc ? `${mc.n.toLocaleString()} runs · ${mc.mode === 'historical' ? 'historical S&P 500 returns' : 'statistical returns'} · avg return ${pct(mc.avg_return)} ± ${pct(mc.return_std)}` : ''}
