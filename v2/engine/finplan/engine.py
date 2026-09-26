@@ -82,7 +82,9 @@ def career_comp(phases: list, age_now: int, current_year: int, year: int) -> dic
     yrs = age - ph['start_age']
     base = ph['base_salary'] * (1 + ph['annual_raise_pct'] / 100) ** yrs
     bonus = base * ph['annual_bonus_pct'] / 100
-    rsu = ph['rsu_annual_grant'] if yrs >= 1 else 0.0
+    # each yearly grant vests evenly over the vesting period, so RSU income ramps up to the full grant
+    vest = max(1, int(ph.get('rsu_vesting_years') or 1))
+    rsu = ph['rsu_annual_grant'] * min(yrs, vest) / vest if yrs >= 1 else 0.0
     opt = 0.0
     if ph['stock_options_grant'] > 0 and ph['stock_options_liquidity_year'] == year:
         held = year - (current_year + (ph['start_age'] - age_now))

@@ -796,6 +796,30 @@ def locations_info(body: LocIn):
     return {'entries': out, 'adjusts_spending': p.get('move_adjusts_spending', True)}
 
 
+class ChildPreviewIn(BaseModel):
+    location: str = 'Seattle'
+    strategy: str = 'Average'
+    school_type: str = 'Public'
+    college_type: str = 'Public'
+    college_location: Optional[str] = None
+    current_year: int = 2026
+    inflation: float = 0.03
+
+
+@app.post('/api/templates/child_preview')
+def child_preview(body: ChildPreviewIn):
+    """Per-age costs (0-30) for a hypothetical child, including private school and college (today's $)."""
+    scale = (1 + body.inflation) ** max(0, body.current_year - 2024)
+    child = {'template_state': body.location, 'template_strategy': body.strategy, 'school_type': body.school_type,
+             'college_type': body.college_type, 'college_location': body.college_location or body.location}
+    rows = []
+    for age in range(31):
+        e = R.child_expenses_for_age(child, age)
+        rows.append({'age': age, **{k: round(v * scale) for k, v in e.items()}})
+    src = R.ref()['EXPENSE_DATA_SOURCES'].get(body.location)
+    return {'rows': rows, 'source': src}
+
+
 @app.get('/api/spending/curve')
 def spending_curve(location: str = 'Seattle', current_year: int = 2026, inflation: float = 0.03):
     """Spending-level slider: anchors per adult per year in today's dollars."""

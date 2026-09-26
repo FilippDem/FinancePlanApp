@@ -27,9 +27,23 @@ export default function Assumptions() {
             <Field label="Borrowing rate if savings go negative"><Percent fraction value={plan.debt_interest_rate} onChange={v => update(d => { d.debt_interest_rate = v })} /></Field>
           </div>
           {hist && <div className="mt-4 flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={() => update(d => { d.economic_params.investment_return = +hist.mean.toFixed(4); d.economic_params.use_historical_returns = true })}>Use S&P 500 average ({pct(hist.mean)})</Button>
-            <Button size="sm" onClick={() => update(d => { d.economic_params.investment_return = 0.06; d.economic_params.use_historical_returns = false })}>Balanced 60/40 (~6%)</Button>
+            <span className="text-[12.5px] text-muted w-full">Historical averages (v0.8 “Historical average” option):</span>
+            <Button size="sm" onClick={() => update(d => { d.economic_params.investment_return = +hist.mean.toFixed(4); d.economic_params.use_historical_returns = true })}>Return: S&P 500 ({pct(hist.mean)})</Button>
+            <Button size="sm" onClick={() => update(d => { d.economic_params.investment_return = 0.06; d.economic_params.use_historical_returns = false })}>Return: balanced 60/40 (~6%)</Button>
+            <Button size="sm" onClick={() => update(d => { d.economic_params.inflation_rate = 0.03; d.economic_params.use_historical_inflation = true })}>Inflation: 3.0%</Button>
+            <Button size="sm" onClick={() => update(d => { d.economic_params.healthcare_inflation_rate = 0.055; d.economic_params.use_historical_healthcare_inflation = true })}>Healthcare: 5.5%</Button>
+            <Button size="sm" onClick={() => update(d => { d.economic_params.expense_growth_rate = 0.02; d.economic_params.use_historical_expense_growth = true })}>Expense growth: 2.0%</Button>
           </div>}
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <Field label="Expense growth (kept from v0.8)" hint="v0.8 stored this but never used it; spending grows with inflation. Kept so old files round-trip.">
+              <Percent fraction value={ep.expense_growth_rate ?? 0.02} onChange={v => setE('expense_growth_rate', v)} /></Field>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mt-4">
+            {[['Real return', ep.investment_return - ep.inflation_rate, 'after inflation'], ['Money doubles in', Math.log(2) / Math.log(1 + Math.max(ep.investment_return, 0.001)), 'years (nominal)'],
+              ['Prices double in', Math.log(2) / Math.log(1 + Math.max(ep.inflation_rate, 0.001)), 'years']].map(([l, v, sub]: any, i) => (
+              <div key={l} className="rounded-lg bg-sunken/70 p-2.5"><div className="text-[11.5px] text-muted">{l}</div>
+                <div className="font-semibold tnum">{i === 0 ? pct(v) : v.toFixed(0)}</div><div className="text-[11px] text-muted">{sub}</div></div>))}
+          </div>
           {ep.investment_return > 0.09 && <div className="mt-3"><Note tone="warn">Returns above ~9% assume an all-stock portfolio with no fees. {pct(hist?.mean ?? 0.124)} is the 100-year S&P 500 arithmetic average; the compound (geometric) return is lower.</Note></div>}
         </Card>
         <Card title="Social Security">

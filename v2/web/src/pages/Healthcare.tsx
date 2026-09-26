@@ -28,6 +28,19 @@ export default function Healthcare() {
   return (
     <div className="space-y-5">
       <PageHeader title="Healthcare" subtitle="Premiums and care costs grow with healthcare inflation" />
+      {proj?.rows?.[0] && (() => {
+        const items: any[] = proj.rows[0].details?.healthcare || []
+        const ins = items.filter(x => !/Medicare|Medigap/.test(x.name) && (plan.health_insurances || []).some((h: any) => h.name === x.name)).reduce((a, b) => a + b.amount, 0)
+        const ltc = items.filter(x => (plan.ltc_insurances || []).some((l: any) => l.name === x.name)).reduce((a, b) => a + b.amount, 0)
+        const med = (plan.medicare_part_b_premium + plan.medicare_part_d_premium + plan.medigap_premium) * 12
+        const life = (proj.rows as any[]).reduce((a, r) => a + r.exp_healthcare / r.infl_index, 0)
+        return <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          <Card><div className="text-[12.5px] text-muted">Health insurance this year</div><div className="text-[22px] font-semibold tnum">{money(ins, { compact: false })}</div></Card>
+          <Card><div className="text-[12.5px] text-muted">Long-term care premiums</div><div className="text-[22px] font-semibold tnum">{money(ltc, { compact: false })}</div></Card>
+          <Card><div className="text-[12.5px] text-muted">Medicare per person at 65 (today's $)</div><div className="text-[22px] font-semibold tnum">{money(med, { compact: false })}/yr</div></Card>
+          <Card><div className="text-[12.5px] text-muted">Total this year · lifetime</div><div className="text-[22px] font-semibold tnum">{money(proj.rows[0].exp_healthcare)} · {money(life)}</div><div className="text-[11.5px] text-muted">lifetime in today's dollars</div></Card>
+        </div>
+      })()}
       <Card title="Health insurance" subtitle="Premiums apply while the covered person's age is in range (e.g. until Medicare at 65)">
         <Rows items={plan.health_insurances} empty="No insurance plans. Add employer or marketplace coverage, especially for early retirement."
           onAdd={() => update(d => { d.health_insurances.push({ name: 'Marketplace plan', type: 'Marketplace', monthly_premium: 900, annual_deductible: 4000, annual_out_of_pocket_max: 9000, copay_primary: 30, copay_specialist: 60, covered_by: 'Both', start_age: d.parentX_retirement_age, end_age: 64 }) })}

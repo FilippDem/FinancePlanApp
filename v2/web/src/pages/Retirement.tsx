@@ -9,7 +9,7 @@ import { Card, PageHeader, Button, Badge, Note, Percent, Stat } from '../compone
 import { S } from '../components/charts'
 
 export default function Retirement() {
-  const { plan, update, single } = usePlan()
+  const { plan, update, single, names } = usePlan()
   const nav = useNavigate()
   const [wr, setWr] = useState(0.04)
   const [base, setBase] = useState<any>(null)
@@ -35,6 +35,21 @@ export default function Retirement() {
   return (
     <div className="space-y-5">
       <PageHeader title="Retirement" subtitle="When to retire, when to claim Social Security, and whether retirement income will be enough (today's dollars)" />
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        {[['X', 0], ...(single ? [] : [['Y', 1]])].map(([w, k]: any) => {
+          const age = plan[`parent${w}_age`], ret = plan[`parent${w}_retirement_age`]
+          const claim = plan[`parent${w}_ss_claim_age`] || Math.min(Math.max(ret, 62), 70)
+          const opt = base?.ss?.find((x: any) => x.who === w)?.options?.find((o: any) => o.planned)
+          const cut = plan.ss_insolvency_enabled ? 1 - plan.ss_shortfall_percentage / 100 : 1
+          return <React.Fragment key={w}>
+            <Card><div className="text-[12.5px] text-muted">{names[k]} retires</div><div className="text-[22px] font-semibold tnum">{ret <= age ? 'Retired' : `${plan.current_year + ret - age}`}</div>
+              <div className="text-[12px] text-muted">{ret <= age ? `at ${ret}` : `at ${ret}, in ${ret - age} years`}</div></Card>
+            <Card><div className="text-[12.5px] text-muted">{names[k]}'s Social Security at {Math.round(claim)}</div>
+              <div className="text-[22px] font-semibold tnum">{opt ? `${money(opt.annual / 12, { compact: false })}/mo` : '…'}</div>
+              <div className="text-[12px] text-muted">{opt ? `${money(opt.annual)}/yr` : ''}{plan.ss_insolvency_enabled && opt ? ` · after ${plan.ss_insolvency_year}: ${money(opt.annual / 12 * cut, { compact: false })}/mo (−${plan.ss_shortfall_percentage}%)` : ''}</div></Card>
+          </React.Fragment>
+        })}
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
         <Card title="Income replacement" subtitle={r ? `Last working year ${r.last_working_year} vs first retired year ${r.first_retired_year}` : undefined}>

@@ -6,6 +6,8 @@ import { Card, PageHeader, Field, Money, NumberInput, Percent, TextInput, Select
 import { LinesChart } from '../components/charts'
 
 const EMOJIS = ['👨', '👩', '🧑', '👤', '🧔', '👱‍♀️', '⭐', '🎯']
+const STYLE_DEFAULTS: Record<string, { raise: number; bonus: number }> = {
+  'Stable': { raise: 3, bonus: 5 }, 'Climbing the Ladder': { raise: 5, bonus: 15 }, 'Startup': { raise: 2, bonus: 10 }, 'Part-time': { raise: 1, bonus: 0 }, 'Coasting': { raise: 2, bonus: 5 } }
 const PHILOSOPHIES = ['Stable', 'Climbing the Ladder', 'Startup', 'Part-time', 'Coasting']
 
 function ssFactor(age: number) {
@@ -106,17 +108,21 @@ function IncomeCard({ who }: { who: 'X' | 'Y' }) {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Field label="From age"><NumberInput value={ph.start_age} step={1} onChange={v => setPhase(i, 'start_age', Math.round(v))} /></Field>
                 <Field label="To age"><NumberInput value={ph.end_age} step={1} onChange={v => setPhase(i, 'end_age', Math.round(v))} /></Field>
-                <Field label="Style"><Select value={ph.philosophy} options={PHILOSOPHIES} onChange={v => setPhase(i, 'philosophy', v)} /></Field>
+                <Field label="Style" hint="Choosing a style fills in its typical raise and bonus"><Select value={ph.philosophy} options={PHILOSOPHIES} onChange={v => update(d => {
+                  const x = d[pk(who, 'career_phases')][i]; x.philosophy = v
+                  const def = STYLE_DEFAULTS[v]; if (def) { x.annual_raise_pct = def.raise; x.annual_bonus_pct = def.bonus } })} /></Field>
                 <Field label="Base salary"><Money value={ph.base_salary} onChange={v => setPhase(i, 'base_salary', v)} /></Field>
                 <Field label="Raise"><Percent value={ph.annual_raise_pct} onChange={v => setPhase(i, 'annual_raise_pct', v)} /></Field>
                 <Field label="Bonus"><Percent value={ph.annual_bonus_pct} onChange={v => setPhase(i, 'annual_bonus_pct', v)} /></Field>
                 <Field label="RSUs / year"><Money value={ph.rsu_annual_grant} onChange={v => setPhase(i, 'rsu_annual_grant', v)} /></Field>
+                {ph.rsu_annual_grant > 0 && <Field label="Vesting (years)" hint="Each year's grant vests evenly over this period, so RSU income ramps up"><NumberInput value={ph.rsu_vesting_years ?? 4} min={1} max={6} step={1} onChange={v => setPhase(i, 'rsu_vesting_years', Math.round(v))} /></Field>}
                 <Field label="Stock options grant"><Money value={ph.stock_options_grant} onChange={v => setPhase(i, 'stock_options_grant', v)} /></Field>
                 {ph.stock_options_grant > 0 && <>
                   <Field label="Options growth"><Percent value={ph.stock_options_growth_pct} onChange={v => setPhase(i, 'stock_options_growth_pct', v)} /></Field>
                   <Field label="Liquidity year"><NumberInput value={ph.stock_options_liquidity_year} step={1} onChange={v => setPhase(i, 'stock_options_liquidity_year', Math.round(v))} /></Field>
                 </>}
               </div>
+              {ph.end_age > plan[pk(who, 'retirement_age')] && <p className="text-[12.5px] text-warn">This phase runs past the retirement age ({plan[pk(who, 'retirement_age')]}); income after retiring is not counted.</p>}
             </div>
           ))}
           <Button size="sm" onClick={() => update(d => {

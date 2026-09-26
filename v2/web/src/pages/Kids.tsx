@@ -102,7 +102,7 @@ export default function Kids() {
     <div className="space-y-5">
       <PageHeader title="Kids" subtitle="Costs by age from regional templates, plus private school and college"
         actions={<Button variant="primary" onClick={add}><Plus size={15} />Add child</Button>} />
-      {kids.length === 0 ? <Card><Empty icon={<Baby size={20} />} title="No children in the plan" body="Add current or future children to include their costs from birth through age 30." action={<Button variant="primary" onClick={add}><Plus size={15} />Add child</Button>} /></Card> : <>
+      {kids.length === 0 ? <><Card><Empty icon={<Baby size={20} />} title="No children in the plan" body="Add current or future children to include their costs from birth through age 30." action={<Button variant="primary" onClick={add}><Plus size={15} />Add child</Button>} /></Card><TemplatePreview /></> : <>
         <Card title="Children's costs by year" subtitle={today ? "Today's dollars" : 'Nominal dollars'}>
           <StackedBars data={data} xKey="year" series={kids.slice(0, 8).map(k => ({ key: k.name, label: k.name }))} />
         </Card>
@@ -130,8 +130,59 @@ export default function Kids() {
             </tbody>
           </table>
         </Card>
+        <TemplatePreview />
         <Note>Healthcare categories grow with healthcare inflation; everything else with general inflation. College adds tuition plus room & board for the college location (ages 18–21).</Note>
       </>}
     </div>
+  )
+}
+
+
+/** v0.8 children template preview: pick location, lifestyle, school and college, see the cost of each age. */
+function TemplatePreview() {
+  const { plan, reference } = usePlan()
+  const [o, setO] = useState({ location: 'Seattle', strategy: 'Average', school_type: 'Public', college_type: 'Public', college_location: 'Seattle' })
+  const [data, setData] = useState<any>(null)
+  const [show, setShow] = useState(false)
+  const locs = reference?.locations || ['Seattle']
+  React.useEffect(() => {
+    if (!show) return
+    let live = true
+    api.childPreview({ ...o, current_year: plan.current_year, inflation: plan.economic_params.inflation_rate }).then(r => live && setData(r))
+    return () => { live = false }
+  }, [o, show, plan.current_year])
+  const cats = data ? [...new Set(data.rows.flatMap((r: any) => Object.keys(r).filter(k => k !== 'age')))] as string[] : []
+  const total = (r: any) => cats.reduce((s, c) => s + (r[c] || 0), 0)
+  const set = (k: string, v: string) => setO({ ...o, [k]: v })
+  return (
+    <Card title="Cost template explorer" subtitle="See what a child costs at each age for any location and choice, before adding one"
+      action={<Button size="sm" onClick={() => setShow(!show)}>{show ? 'Hide' : 'Show'}</Button>}>
+      {show && <>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+          <Field label="Where they grow up"><Select value={o.location} options={locs} onChange={v => set('location', v)} /></Field>
+          <Field label="Lifestyle"><Select value={o.strategy} options={STRATS} onChange={v => set('strategy', v)} /></Field>
+          <Field label="K-12"><Select value={o.school_type} options={['Public', 'Private']} onChange={v => set('school_type', v)} /></Field>
+          <Field label="College"><Select value={o.college_type} options={['Public', 'Private']} onChange={v => set('college_type', v)} /></Field>
+          <Field label="College location"><Select value={o.college_location} options={locs} onChange={v => set('college_location', v)} /></Field>
+        </div>
+        {data && <>
+          <StackedBars data={data.rows.map((r: any) => ({ age: r.age, total: total(r) }))} xKey="age" xLabel={(a: any) => `Age ${a}`} series={[{ key: 'total', label: 'Total per year' }]} height={220} />
+          <div className="text-sm mt-2">From birth to 17: <b>{money(data.rows.slice(0, 18).reduce((s: number, r: any) => s + total(r), 0), { compact: false })}</b> ·
+            College (18–21): <b>{money(data.rows.slice(18, 22).reduce((s: number, r: any) => s + total(r), 0), { compact: false })}</b> ·
+            Ages 0–30: <b>{money(data.rows.reduce((s: number, r: any) => s + total(r), 0), { compact: false })}</b> (today's dollars)</div>
+          <div className="overflow-auto max-h-[420px] mt-3 border border-line rounded-lg">
+            <table className="text-[12.5px] w-full">
+              <thead className="sticky top-0 bg-surface"><tr className="text-muted border-b border-line"><th className="px-2 py-1.5 text-left font-medium">Age</th>
+                {cats.map(c => <th key={c} className="px-2 font-medium text-right whitespace-nowrap">{c}</th>)}<th className="px-2 font-medium text-right">Total</th></tr></thead>
+              <tbody>{data.rows.map((r: any) => (
+                <tr key={r.age} className="border-b border-line/60"><td className="px-2 py-1 tnum">{r.age}</td>
+                  {cats.map(c => <td key={c} className="px-2 text-right tnum">{r[c] ? money(r[c]) : '—'}</td>)}
+                  <td className="px-2 text-right tnum font-medium">{money(total(r))}</td></tr>))}</tbody>
+            </table>
+          </div>
+          <p className="text-[12px] text-muted mt-2">{data.source ? `Source: ${data.source.source} (${data.source.year}). ${data.source.notes || ''}` : 'Generated from the adult template for this location (no dedicated children data).'} Daycare, college fees and generated templates were corrected in the 2026 audit.</p>
+        </>}
+      </>}
+    </Card>
   )
 }

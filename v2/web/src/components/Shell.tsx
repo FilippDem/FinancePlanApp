@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { HELP } from '../lib/help'
 import {
   LayoutDashboard, Users, Wallet, Baby, Home, HeartPulse, SlidersHorizontal, LineChart, CalendarRange, Layers,
-  Moon, Sun, LogOut, Check, Loader2, AlertCircle, ArrowLeftRight, Menu, X, ClipboardCheck, Wand2, Receipt, Palmtree, ShieldAlert, MapPin, UserCog, FlaskConical, ChevronDown, ChevronUp,
+  Moon, Sun, LogOut, Check, Loader2, AlertCircle, ArrowLeftRight, Menu, X, ClipboardCheck, Wand2, Receipt, Palmtree, ShieldAlert, MapPin, UserCog, FlaskConical, ChevronDown, ChevronUp, HelpCircle,
 } from 'lucide-react'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
@@ -123,6 +124,7 @@ export function Shell({ me, children }: { me: any; children: React.ReactNode }) 
           <div className="flex-1" />
           {household?.is_test && <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-warn bg-warn/10 rounded-md px-2 h-7">
             <FlaskConical size={14} />Test mode<button className="underline ml-1" onClick={() => nav('/households')}>Exit</button></span>}
+          <HelpButton />
           <SaveIndicator />
         </header>
         <main className="px-4 sm:px-8 py-6 max-w-[1280px] mx-auto">{children}</main>
@@ -156,6 +158,29 @@ function QuickSummary() {
           {bad > 0 && <span className="text-bad font-medium">{bad} critical</span>}{bad > 0 && warn > 0 && ' · '}
           {warn > 0 && <span className="text-warn font-medium">{warn} warn</span>}{!bad && !warn && <span className="text-good">none</span>}</dd>
       </dl>}
+    </div>
+  )
+}
+
+
+function HelpButton() {
+  const loc = useLocation()
+  const [open, setOpen] = useState(false)
+  const h = HELP[loc.pathname]
+  useEffect(() => setOpen(false), [loc.pathname])
+  if (!h) return null
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(!open)} className="flex items-center gap-1 text-[12.5px] text-ink2 hover:text-ink px-2 h-8 rounded-md hover:bg-sunken" aria-label="Help for this page">
+        <HelpCircle size={15} />Help</button>
+      {open && <>
+        <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+        <div className="absolute right-0 top-9 z-50 w-[340px] rounded-xl border border-line bg-surface shadow-2xl p-4 text-sm">
+          <div className="font-semibold mb-1">About this page</div>
+          <p className="text-ink2">{h.what}</p>
+          {h.tips.length > 0 && <ul className="mt-2 space-y-1 list-disc pl-4 text-ink2">{h.tips.map(t => <li key={t}>{t}</li>)}</ul>}
+        </div>
+      </>}
     </div>
   )
 }
