@@ -75,6 +75,9 @@ export const api = {
   retirement: (plan: any, withdrawal_rate = 0.04) => req('POST', '/api/retirement', { plan, withdrawal_rate }),
   retireWhatif: (plan: any, n = 300) => req('POST', '/api/retirement/whatif', { plan, n }),
   solve: (plan: any, target = 0.85) => req('POST', '/api/solve', { plan, target }),
+  economies: () => req('GET', '/api/scenarios/economies'),
+  evaluateScenario: (plan: any, economies: string[], target = 0.85, n = 300) => req('POST', '/api/scenarios/evaluate', { plan, economies, target, n }),
+  buildVariant: (plan: any, changes: any) => req('POST', '/api/scenarios/variant', { plan, changes }),
   notifyStatus: () => req('GET', '/api/notify/status'),
   testEmail: () => req('POST', '/api/checkins/test-email'),
   downloadReport: async (plan: any) => {

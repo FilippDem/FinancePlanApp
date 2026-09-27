@@ -860,6 +860,12 @@ def _report(sess, body: ReportIn) -> Response:
     _, items = _ck_state(sess)
     fmt = body.format if body.format in REPORT_TYPES else 'pdf'
     ctx = RD.compute(plan, n_mc=1000 if fmt in ('pdf', 'xlsx', 'json') else 200)
+    secs = body.sections or RD.DEFAULT_SECTIONS
+    if 'scenario_matrix' in secs and fmt in ('pdf', 'xlsx', 'json'):
+        try:
+            ctx['matrix'] = RD.scenario_matrix(plan, S.load_scenarios(sess['hid']))
+        except Exception:
+            ctx['matrix'] = None
     if fmt == 'pdf':
         data = RP.build(plan, name, items, body.sections, body.title, body.today, ctx=ctx)
     elif fmt == 'xlsx':
@@ -953,6 +959,38 @@ class SolveIn(BaseModel):
     plan: dict[str, Any]
     target: float = 0.85
     n: int = 600
+
+
+class MatrixIn(BaseModel):
+    plan: dict[str, Any]
+    economies: Optional[list[str]] = None
+    target: float = 0.85
+    n: int = 300
+
+
+@app.get('/api/scenarios/economies')
+def scenario_economies():
+    from finplan.matrix import ECONOMIES, DEFAULT_ECONOMIES
+    return {'economies': [{'id': k, **v} for k, v in ECONOMIES.items()], 'default': DEFAULT_ECONOMIES}
+
+
+@app.post('/api/scenarios/evaluate')
+def scenario_evaluate(body: MatrixIn):
+    """One row of the scenario matrix: a life scenario under each economic condition."""
+    from finplan.matrix import evaluate
+    return evaluate(body.plan, body.economies, n=body.n, target=min(max(body.target, 0.5), 0.99))
+
+
+class VariantIn(BaseModel):
+    plan: dict[str, Any]
+    changes: dict[str, Any]
+
+
+@app.post('/api/scenarios/variant')
+def scenario_variant(body: VariantIn):
+    """A copy of the plan with simple life changes (kids, a move, retirement ages, lifestyle)."""
+    from finplan.matrix import build_variant
+    return {'plan': build_variant(body.plan, body.changes)}
 
 
 @app.post('/api/solve')

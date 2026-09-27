@@ -20,6 +20,7 @@ SECTIONS = OrderedDict([
     ('ownership', 'Who owns what (separate vs marital property, gifts & inheritances)'),
     ('assumptions', 'Economic assumptions'),
     ('monte_carlo', 'Monte Carlo results'),
+    ('scenario_matrix', 'Scenario matrix (saved scenarios × economies)'),
     ('year_by_year', 'Year by year by category'),
     ('category_detail', 'Detailed category breakdown (every line item, every year)'),
     ('checkins', 'Check-in history'),
@@ -356,3 +357,38 @@ def windfalls_table(ctx: dict) -> tuple[list[str], list[list]]:
     return (['Gift / inheritance', 'Year', "Amount (today's $)", 'To', 'Kept separate'],
             [[w['name'], w['year'], w['amount'], who.get(w['recipient'], w['recipient']), 'yes' if w['separate'] and w['recipient'] != 'Both' else 'no']
              for w in p.get('windfalls') or []])
+
+
+# ── scenario matrix ────────────────────────────────────────────────────────
+def scenario_matrix(plan: dict, scenarios: dict | None, economies: list | None = None, target: float = 0.85,
+                    n: int = 300, max_rows: int = 6) -> dict:
+    """Current plan + up to max_rows saved scenarios, each under the default economies (success rates)."""
+    import json as _json
+    from finplan.matrix import evaluate, ECONOMIES, DEFAULT_ECONOMIES
+    econs = [e for e in (economies or DEFAULT_ECONOMIES) if e in ECONOMIES]
+    items = [('Current plan', plan)]
+    for k, v in (scenarios or {}).items():
+        if str(k).startswith('[DEMO]'):
+            continue
+        if isinstance(v, str):
+            try:
+                v = _json.loads(v)
+            except ValueError:
+                continue
+        if isinstance(v, dict) and v:
+            items.append((k, v))
+    items = items[:max_rows + 1]
+    rows = []
+    for name, pl in items:
+        try:
+            r = evaluate(pl, econs, n=n, target=target)
+        except Exception:  # a broken old scenario must not break the report
+            continue
+        f = r['facts']
+        rows.append({'name': name, 'kids': f['kids'], 'places': ' → '.join(f['places']), 'retire': '/'.join(str(x) for x in f['retire']),
+                     'success': [r['cells'][e]['success'] for e in econs],
+                     'final_median': [r['cells'][e]['final_median'] for e in econs],
+                     'passed': r['passed'], 'total': r['total'], 'verdict': r['verdict']})
+    return {'economies': [ECONOMIES[e]['label'] for e in econs], 'descriptions': [ECONOMIES[e]['desc'] for e in econs],
+            'target': target, 'rows': rows}
+

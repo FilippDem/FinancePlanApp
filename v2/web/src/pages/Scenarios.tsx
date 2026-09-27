@@ -6,6 +6,7 @@ import { money, pct } from '../lib/format'
 import { Card, PageHeader, Button, TextInput, Modal, Badge, Empty, Note } from '../components/ui'
 import { LinesChart } from '../components/charts'
 import { ReportButton } from '../components/ReportButton'
+import { ScenarioMatrix } from '../components/ScenarioMatrix'
 
 export default function Scenarios() {
   const { plan, replacePlan, household } = usePlan()
@@ -122,7 +123,7 @@ export default function Scenarios() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Scenarios" subtitle="Save what-ifs, compare them side by side, import and export" />
+      <PageHeader title="Scenarios" subtitle="Save versions of your life, test them all against different economies, compare side by side, import and export" />
       {msg && <Note>{msg}</Note>}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Save current plan" className="lg:col-span-2">
@@ -143,6 +144,9 @@ export default function Scenarios() {
           <p className="text-xs text-muted mt-2">Imports files from v0.8, V14 and V13.</p>
         </Card>
       </div>
+
+      <ScenarioMatrix saved={saved} onSaved={load}
+        onLoad={(n, p) => setConfirm({ title: `Load “${n}”?`, body: 'This replaces the current plan (it is auto-saved). Save the current plan as a scenario first if you want to keep it.', run: () => replacePlan(p) })} />
 
       <Card title="Quick what-ifs" subtitle="One click saves a changed copy of your plan as a scenario and compares it with the current plan. Your plan itself is not changed.">
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">

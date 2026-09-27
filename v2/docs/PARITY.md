@@ -17,6 +17,8 @@ Data compatibility is ✅ for everything: v2 reads and writes the same household
 | Auto-save with backups before every write | ✅ | Load-then-merge, 10 rolling backups, atomic writes |
 | Named scenarios (save/load/rename/delete) | ✅ | Stored in the household file like v0.8 |
 | Scenario comparison + what-if buttons | ✅ | Side-by-side chart and inputs table; quick what-ifs save "Current Plan (before what-if)" first |
+| Scenario matrix: every life scenario × every economy (as planned, weak/strong markets, high inflation, crash at retirement, 1970s-style, real history) | ✅ | New in v2. Same market paths in every cell; verdict per scenario (holds up / fragile / falls short); median net-worth chart per economy; in PDF/Excel/JSON reports |
+| New life scenario builder (number of kids and birth years, a move, retirement ages, lifestyle) | ✅ | New in v2 |
 | JSON export/import (v0.8, V14, V13 formats) | ✅ | V13 migration covered by a test |
 | Reset to defaults | ✅ | |
 | Demo households | ✅ | Re-tuned for the corrected math (originals kept); each explains what changed |
@@ -73,7 +75,7 @@ Data compatibility is ✅ for everything: v2 reads and writes the same household
 ## Where you live (v0.8 Settings → location timeline)
 | Feature | Status |
 |---|---|
-| Location & lifestyle timeline (moves) | ✅ |
+| Location & lifestyle timeline (moves) | ✅ Now three lanes: where, which home (or renting, homes rented out), kids at home; also on the Dashboard |
 | Timeline Gantt, "now / next 5 years", relocation journey text | ✅ |
 | Everyday prices and rent follow moves | ✅ New; can be turned off to match v0.8 |
 | Tax rules per location, including countries | ✅ |

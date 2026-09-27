@@ -9,6 +9,7 @@ import { S } from '../components/charts'
 import { WorldMap, MapStop } from '../components/WorldMap'
 import { lifestyleOptions, BASE_LIFESTYLES, priceLoc } from '../lib/spending'
 import { useCites } from '../components/Cite'
+import { LivingTimeline } from '../components/LivingTimeline'
 
 const LOC_SOURCES = ['bea_rpp_2024', 'worldbank_pli', 'hud_fmr', 'taxfoundation_state_2025', 'oecd_taxing_wages_2025', 'mit_living_wage', 'numbeo', 'bls_cex_2022', 'bls_cex_2024']
 type CiteT = ReturnType<typeof useCites>['Cite']
@@ -155,16 +156,8 @@ export default function Locations() {
         </div>
       </Card>
 
-      <Card title="Timeline" subtitle={`Location and lifestyle from ${cy} until ${endYear}`}>
-        <div className="flex h-12 rounded-lg overflow-hidden border border-line">
-          {segments.map((s, i) => (
-            <div key={i} title={`${s.state} · ${s.spending_strategy} · ${s.from}–${s.to}`} className="flex flex-col justify-center px-2 text-white text-[12px] leading-tight overflow-hidden whitespace-nowrap"
-              style={{ width: `${((s.to - s.from + 1) / (endYear - cy + 1)) * 100}%`, background: colorOf[s.state], opacity: s.spending_strategy === 'Conservative' ? 0.8 : s.spending_strategy === 'High-end' ? 1 : 0.9 }}>
-              <span className="font-semibold truncate">{s.state}</span><span className="truncate opacity-90">{s.spending_strategy} · {s.from}–{s.to}</span>
-            </div>
-          ))}
-        </div>
-        <div className="flex justify-between text-[11.5px] text-muted mt-1 tnum">{Array.from({ length: 7 }, (_, k) => Math.round(cy + (endYear - cy) * k / 6)).map(y => <span key={y}>{y}</span>)}</div>
+      <Card title="Timeline" subtitle={`Where you live, which home, and kids at home, from ${cy} until ${endYear}`}>
+        <LivingTimeline />
         <p className="text-[13px] text-ink2 mt-3">The timeline runs to <b>{endYear}</b>: {names[0]} reaches {plan.parentX_death_age} in {death1}{!single && <>, {names[1]} reaches {plan.parentY_death_age} in {death2}</>}.</p>
         <div className="grid sm:grid-cols-2 gap-3 mt-3">
           <div className="rounded-lg bg-sunken/70 p-3 text-sm"><div className="text-[12px] text-muted mb-0.5">Now</div>

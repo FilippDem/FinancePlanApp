@@ -177,3 +177,27 @@ def test_cited_sources_exist():
     ctx = {'plan': {'state_timeline': [{'state': 'Portugal'}], 'mc_use_historical': True}}
     for sec in RD.SECTIONS:
         assert set(RD.section_sources(ctx, sec)) <= set(src)
+
+
+def test_scenario_matrix_endpoints_and_report(client):
+    c, tmp = client
+    _login(c, tmp)
+    plan = c.get('/api/plan').json()['plan']
+    eco = c.get('/api/scenarios/economies').json()
+    ids = [e['id'] for e in eco['economies']]
+    assert {'plan', 'weak', 'strong', 'inflation', 'crash', 'seventies', 'history'} <= set(ids) and eco['default']
+    kids = len(plan.get('children_list') or [])
+    v = c.post('/api/scenarios/variant', json={'plan': plan, 'changes': {'kids': kids + 1, 'kid_years': [plan['current_year'] + 2],
+                                                                          'move': {'location': 'Texas', 'year': plan['current_year'] + 4}}}).json()['plan']
+    assert len(v['children_list']) == kids + 1 and v['children_list'][-1]['birth_year'] == plan['current_year'] + 2
+    assert v['state_timeline'][-1]['state'] == 'Texas'
+    c.post('/api/scenarios', json={'name': 'One more kid, Texas', 'plan': v})
+    r = c.post('/api/scenarios/evaluate', json={'plan': v, 'economies': ['plan', 'weak', 'strong'], 'n': 150}).json()
+    assert set(r['cells']) == {'plan', 'weak', 'strong'} and r['verdict'] in ('robust', 'fragile', 'fails')
+    assert r['cells']['weak']['success'] <= r['cells']['plan']['success'] <= r['cells']['strong']['success']
+    assert r['facts']['kids'] == kids + 1 and r['facts']['places'][-1] == 'Texas'
+    js = c.post('/api/report', json={'format': 'json', 'sections': ['summary', 'scenario_matrix']}).json()
+    names = [x['name'] for x in js['scenario_matrix']['rows']]
+    assert names[0] == 'Current plan' and 'One more kid, Texas' in names
+    pdf = c.post('/api/report', json={'format': 'pdf', 'sections': ['summary', 'scenario_matrix']})
+    assert pdf.content[:4] == b'%PDF'

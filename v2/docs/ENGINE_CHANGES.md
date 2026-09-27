@@ -133,6 +133,20 @@ The six demo households were tuned against the v0.8 engine, which never charged 
 - Each option is a bisection over the Monte Carlo success rate with a fixed seed, so every candidate sees the same market paths. The answer is a patch the UI applies after saving the old plan as a scenario.
 - There is no "save more" option: money not spent is already saved in this model, so it is the same lever as "spend less".
 
+### Scenario matrix (`finplan/matrix.py`, `/api/scenarios/economies`, `/api/scenarios/evaluate`, `/api/scenarios/variant`)
+- Each saved life scenario is run under several economic conditions. Every condition is expressed with the existing stress primitives, so the plan itself never changes:
+  - Weak or strong markets: returns 2 points lower or higher every year. This uses the new `return_shift` primitive, which also works in historical mode and can be limited to a range of years.
+  - High inflation: +1.5 points a year, with pay catching up by half.
+  - Crash at retirement: markets fall 35% in the first retirement year.
+  - 1970s-style decade: 8% inflation for 6 years and returns 3 points lower for 10 years.
+  - Real market history: sequential historical S&P 500 returns at the plan's stock share.
+- All cells use one seed, so scenarios in a column face identical markets.
+- Verdict per scenario:
+  - *holds up*: reaches the target in every economy.
+  - *fragile*: reaches it as planned but not in every economy.
+  - *falls short*: doesn't reach it as planned.
+- `build_variant` makes a life scenario from a plan. You can set the number of children (with birth years; lowering it drops the youngest), add a move (replacing moves from that year on), change retirement ages, or change the lifestyle.
+
 ### Cost-of-living data re-check
 Every table in `data/cost_index.json` was re-checked against its publisher; see `COST_OF_LIVING_AUDIT.md` → *Raw-data re-check*.
 - World Bank country price levels moved from 2020 to 2024 values [2].

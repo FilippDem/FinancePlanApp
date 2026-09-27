@@ -11,6 +11,7 @@ import { useTodayDollars, deflate } from '../lib/hooks'
 import { DueBanner, CheckinStrip } from './Checkins'
 import { ReportButton } from '../components/ReportButton'
 import { WhatItTakes } from '../components/WhatItTakes'
+import { LivingTimeline } from '../components/LivingTimeline'
 
 export function retirementMarkers(plan: any, names: [string, string], single: boolean): Marker[] {
   const cy = plan.current_year
@@ -231,6 +232,11 @@ export default function Dashboard({ isNew }: { isNew: boolean }) {
         {view === 'projection'
           ? (rows.length ? <NetWorthChart rows={rows} markers={markers} /> : <div className="h-[300px]" />)
           : (mcToday ? <FanChart mc={mcToday} markers={markers} /> : <div className="h-[320px] flex items-center justify-center text-muted text-sm">Simulating…</div>)}
+      </Card>
+
+      <Card title="Where you'll live" subtitle="Place and lifestyle, home, and kids at home, year by year"
+        action={<Button size="sm" variant="ghost" onClick={() => nav('/locations')}>Plan moves<ArrowRight size={14} /></Button>}>
+        <LivingTimeline />
       </Card>
 
       {plan.finance_mode === 'Separate' && !single && rows.length > 0 && (

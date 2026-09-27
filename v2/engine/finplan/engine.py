@@ -647,6 +647,18 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
     rng = np.random.default_rng(seed)
     R = _returns(p, T, n, stochastic, rng)
     for sx in p.get('_stress') or []:
+        if sx.get('type') == 'return_shift':
+            # scenario matrix: returns higher/lower by a fixed amount (works in historical mode too)
+            # (optionally only for years start_year .. start_year + years - 1)
+            sh = float(sx.get('shift', 0.0))
+            if sx.get('start_year') is None:
+                R = R + sh
+            else:
+                R = R.copy()
+                for t_, y in enumerate(S.years):
+                    if sx['start_year'] <= y < sx['start_year'] + int(sx.get('years', 1)):
+                        R[t_] = R[t_] + sh
+    for sx in p.get('_stress') or []:
         if sx.get('type') == 'market_crash':
             for t_, y in enumerate(S.years):
                 if y == sx['year']:

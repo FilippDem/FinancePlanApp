@@ -503,3 +503,30 @@ def test_spending_curves_are_sane_everywhere():
     assert tot('Mississippi') < tot('Texas') < tot('Seattle') < tot('San Francisco')
     assert tot('India') < tot('Mexico') < tot('Portugal') < tot('Seattle')
     assert K.rent_factor('Seattle', 'San Francisco') > 1.2 and K.rent_factor('Seattle', 'Mississippi') < 0.5
+
+
+def test_scenario_matrix_economies_and_variants():
+    from finplan import reference as R, matrix as M
+    plan = R.default_plan()
+    r = M.evaluate(plan, list(M.ECONOMIES), n=200)
+    c = r['cells']
+    assert c['weak']['success'] <= c['plan']['success'] <= c['strong']['success']
+    assert c['weak']['final_median'] < c['plan']['final_median'] < c['strong']['final_median']
+    assert c['crash']['final_median'] < c['plan']['final_median']
+    assert c['seventies']['final_median'] < c['plan']['final_median']
+    assert r['passed'] == sum(x['ok'] for x in c.values()) and r['total'] == len(M.ECONOMIES)
+    # the plan itself is untouched by the economy overlays
+    assert '_stress' not in plan
+    # variants: add two kids with given years, a move, a retirement age; removing kids drops the youngest
+    cy = plan['current_year']
+    n0 = len(plan['children_list'])
+    v = M.build_variant(plan, {'kids': n0 + 2, 'kid_years': [cy + 1, cy + 4], 'move': {'location': 'Portugal', 'year': cy + 5},
+                               'retire_x': plan['parentX_retirement_age'] + 2})
+    assert [k['birth_year'] for k in v['children_list'][-2:]] == [cy + 1, cy + 4]
+    assert len({k['name'] for k in v['children_list']}) == n0 + 2
+    assert v['state_timeline'][-1] == {'year': cy + 5, 'state': 'Portugal', 'spending_strategy': v['state_timeline'][-2]['spending_strategy']}
+    assert v['parentX_retirement_age'] == plan['parentX_retirement_age'] + 2
+    fewer = M.build_variant(v, {'kids': n0})
+    assert [k['name'] for k in fewer['children_list']] == [k['name'] for k in plan['children_list']]
+    more_kids = M.evaluate(v, ['plan'], n=200)['cells']['plan']['final_median']
+    assert more_kids != c['plan']['final_median']

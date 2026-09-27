@@ -290,6 +290,17 @@ def build(plan: dict, household: str, checkins: list | None = None, sections: li
                             f"({'today' if today else 'nominal'}'s dollars){' · every 5th year shown' if step > 1 else ''}".replace("nominal's", 'nominal'), st.Mu),
                   _table([h] + [[r[0]] + [_m(v) for v in r[1:-1]] + [f"{r[-1] * 100:.0f}%"] for r in sel])]
 
+    if 'scenario_matrix' in sections and ctx.get('matrix') and ctx['matrix']['rows']:
+        mx = ctx['matrix']
+        vt = {'robust': 'Holds up', 'fragile': 'Fragile', 'fails': 'Falls short'}
+        story += [CondPageBreak(2 * inch), Paragraph('Scenario matrix', st.H2),
+                  Paragraph(f"Chance the money lasts for each saved scenario under different economies (target {mx['target'] * 100:.0f}%). "
+                            'Every cell uses the same simulated markets.', st.Mu),
+                  _table([['Scenario', 'Kids', 'Places', 'Retire'] + mx['economies'] + ['Reaches target']] +
+                         [[r['name'][:28], r['kids'], r['places'][:34], r['retire']] + [f"{s * 100:.0f}%" for s in r['success']] +
+                          [f"{r['passed']} of {r['total']} · {vt.get(r['verdict'], '')}"] for r in mx['rows']], right_from=4),
+                  Paragraph(' · '.join(f"<b>{a}</b>: {b}" for a, b in zip(mx['economies'], mx['descriptions'])), st.Mu)]
+
     if 'year_by_year' in sections:
         hdr, data = RD.category_table(ctx, today)
         keys = [k for k, _, _ in RD.CATEGORY_COLS if not (single and k == 'p2')]
@@ -377,6 +388,7 @@ def build_json(plan: dict, today: bool = True, ctx: dict | None = None, checkins
         'monte_carlo': {'n': ctx['mc']['n'], 'success_rate': ctx['mc']['success_rate'], 'final': ctx['mc']['final'],
                         'percentiles_by_year': [dict(zip(mh, r)) for r in md]},
         'events': ctx['proj']['events'], 'checkins': checkins or [],
+        'scenario_matrix': ctx.get('matrix'),
         'ownership': ({'rules': dict(RD.ownership_rules(ctx)), 'by_year': [dict(zip(RD.ownership_table(ctx, today)[0], r)) for r in RD.ownership_table(ctx, today)[1]]}
                       if RD.ownership_enabled(ctx) else None),
         'sources': [{'n': k, 'id': i, **d} for k, (i, d) in enumerate(RD.sources_for(ctx, list(RD.SECTIONS)), 1)],
@@ -472,6 +484,11 @@ def build_xlsx(plan: dict, household: str, today: bool = True, ctx: dict | None 
     if 'monte_carlo' in sections:
         h, d = RD.mc_percentiles(ctx, today)
         sheet('Monte Carlo', h, d)
+    if 'scenario_matrix' in sections and ctx.get('matrix') and ctx['matrix']['rows']:
+        mx = ctx['matrix']
+        sheet('Scenario matrix', ['Scenario', 'Kids', 'Places', 'Retire'] + [f'{e} (% success)' for e in mx['economies']] + ['Economies reaching target', 'Verdict'],
+              [[r['name'], r['kids'], r['places'], r['retire']] + [round(s * 100, 1) for s in r['success']] + [f"{r['passed']} of {r['total']}", r['verdict']]
+               for r in mx['rows']], widths={1: 28, 3: 34})
     if 'checkins' in sections and checkins:
         sheet('Check-ins', ['Date', 'Type', 'Savings', 'Expected', 'Net worth', 'Status'],
               [[c.get('date'), c.get('kind'), (c.get('totals') or {}).get('investable'), (c.get('expected') or {}).get('investable'),

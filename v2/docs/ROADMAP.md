@@ -27,9 +27,11 @@ v2 now covers every v0.8 tab and adds a set of "living plan" features. See `PARI
 | **"What would it take?"** solver on the Dashboard | ✅ |
 | Pages load on first visit (smaller first download) | ✅ |
 | Cost-of-living raw data re-checked against BEA, BLS and World Bank (2026-09-27) | ✅ |
+| **Scenario matrix**: every life scenario × every economy, with a builder for kids / moves / retirement / lifestyle variants | ✅ |
+| **Where you'll live** lanes (place, home, kids at home) on the Dashboard and Where you live page | ✅ |
 | Demo households re-tuned for the corrected math | ✅ |
 
-Tests: 60 engine tests, 22 API tests, and a clean `tsc` build. The UI was checked end to end with Playwright.
+Tests: 61 engine tests, 23 API tests, and a clean `tsc` build. The UI was checked end to end with Playwright.
 
 ## 2. What's still missing
 
@@ -60,6 +62,46 @@ The app cites every major dataset (`engine/finplan/data/sources.json`). Datasets
 - **Spending actuals still come from typing.** Balances can now come from linked accounts (CSV or SnapTrade), but transactions (Monarch Money, bank CSVs) don't fill Actuals yet.
 - **Nothing is live on the NAS yet.** v2 runs only locally, the NAS still serves v0.8, and there's no CI.
 - **Bundle size.** Pages now load on first visit (main chunk 786 kB, was 1,068 kB). Recharts could still be split out.
+
+## 2d. Compared with other planners (checked 2026-09-27)
+
+Compared with ProjectionLab, Boldin, and adviser tools like RightCapital, Pralana and MaxiFi.
+
+**Where v2 is ahead:**
+- Separate vs marital property.
+- Kids' costs by age.
+- Cost-of-living moves priced with BEA data.
+- Check-ins and plan-vs-actual.
+- A shared household.
+- Worst-year stress tests.
+- The scenario × economy matrix. Boldin compares up to 10 plans side by side, but not each plan under several economies.
+- Self-hosted: the data stays at home.
+
+**What they have that v2 doesn't, most valuable first:**
+
+| Gap | Who has it | Why it matters |
+|---|---|---|
+| Roth conversion optimizer + tax-bracket view (fill the 12%/22% bracket) | Boldin (Roth Conversion Explorer), ProjectionLab (premium), Pralana | Usually the single biggest lifetime-tax lever for pre-tax-heavy savers |
+| Capital-gains tax on taxable accounts, cost basis, withdrawal-order options | ProjectionLab, Boldin, Pralana | Retirement taxes are understated today |
+| Medicare IRMAA surcharges and ACA subsidy cliffs | Boldin, Pralana | Big hidden costs for early retirees and high-income retirees |
+| Safe-spending target / guardrails ("you can spend $X and stay at 80%") | Boldin, MaxiFi (consumption smoothing) | Turns success % into a spending number people can act on |
+| Goals and milestones with progress (FI date, college funded, house paid off) | ProjectionLab | Makes the plan motivating and trackable |
+| Historical backtest of every rolling period ("would have survived 1929, 1966, 2000 starts") | ProjectionLab, cFIREsim | More intuitive than random Monte Carlo |
+| Asset classes and a glide path (stocks/bonds/cash by age) | Boldin, ProjectionLab | Sequence risk around retirement |
+| Pensions/annuities, debts (student/auto), 529 plans | Boldin, RightCapital, ProjectionLab | Common situations that need workarounds today |
+| Estate and legacy (what heirs get, estate tax, step-up) | RightCapital, ProjectionLab | Matters with larger estates and for the ownership feature |
+| Insurance needs (life/disability coverage gap) | RightCapital | Complements the early-death and disability stress tests |
+| Bank/brokerage aggregation (Plaid/MX), budgeting import (Monarch/YNAB) | Boldin (Plaid/MX), ProjectionLab (Monarch/YNAB) | v2 has SnapTrade + CSV for balances; transactions still typed |
+| Plan-aware AI assistant | Boldin AI | Could be added with Claude later |
+
+**Suggested order:**
+1. Tax depth: capital gains, Roth conversions with a bracket-fill optimizer, IRMAA, ACA.
+2. Safe-spending guardrails.
+3. Goals.
+4. Rolling-history backtest (a column in the scenario matrix).
+5. Glide path.
+6. Pensions, debts and 529s.
+7. Estate.
 
 ## 3. Plan (in priority order)
 
