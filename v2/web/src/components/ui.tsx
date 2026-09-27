@@ -136,8 +136,8 @@ export function Select<T extends string | number>({ value, onChange, options, cl
   )
 }
 
-export function Field({ label, hint, children, className }: { label: string; hint?: string; children: React.ReactNode; className?: string }) {
-  return <label className={clsx('block', className)}><Label hint={hint}>{label}</Label>{children}</label>
+export function Field({ label, hint, children, className, cite }: { label: string; hint?: string; children: React.ReactNode; className?: string; cite?: React.ReactNode }) {
+  return <label className={clsx('block', className)}><Label hint={hint}>{label}{cite}</Label>{children}</label>
 }
 
 export function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label?: string; hint?: string }) {

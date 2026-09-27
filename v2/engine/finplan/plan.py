@@ -296,7 +296,8 @@ def normalize_plan(raw: dict | None) -> dict:
     p['health_insurances'] = [_fill(x, HEALTH_INS_DEFAULTS) for x in p.get('health_insurances') or []]
     p['ltc_insurances'] = [_fill(x, LTC_DEFAULTS) for x in p.get('ltc_insurances') or []]
     p['health_expenses'] = [_fill(x, HEALTH_EXP_DEFAULTS) for x in p.get('health_expenses') or []]
-    for k, d in (('medicare_part_b_premium', 174.70), ('medicare_part_d_premium', 55.0), ('medigap_premium', 150.0),
+    # 2026 standard Part B premium (CMS fact sheet, sources.json cms_partb_2026); v0.8 used 174.70 (the 2024 figure)
+    for k, d in (('medicare_part_b_premium', 202.90), ('medicare_part_d_premium', 55.0), ('medigap_premium', 150.0),
                  ('hsa_balance', 0.0), ('hsa_contribution', 0.0)):
         p[k] = _num(p.get(k), d)
 

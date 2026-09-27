@@ -1,0 +1,214 @@
+{
+  "_about": "Datasets the app relies on. The UI, PDF/Excel reports and docs cite these by id as numbered references [n] with links. Each entry was checked on 2026-09-26. 'used_for' says where the numbers enter the plan; 'note' flags caveats.",
+  "bls_cex_2022": {
+    "publisher": "U.S. Bureau of Labor Statistics",
+    "title": "Consumer Expenditure Surveys, Table 1101: Quintiles of income before taxes, 2022",
+    "year": "2022 (published Sept 2023)",
+    "url": "https://www.bls.gov/cex/tables/calendar-year/mean-item-share-average-standard-error/cu-income-quintiles-before-taxes-2022.pdf",
+    "used_for": "Spending-level slider: category mix and the income-group milestones (lowest to highest 20%)"
+  },
+  "bls_cex_2024": {
+    "publisher": "U.S. Bureau of Labor Statistics",
+    "title": "Consumer Expenditures — 2024 (news release)",
+    "year": "2024 (released Dec 19, 2025)",
+    "url": "https://www.bls.gov/news.release/cesan.nr0.htm",
+    "used_for": "Grows the 2022 quintile spending to 2024 totals ($78,535 average per household)"
+  },
+  "bea_rpp_2024": {
+    "publisher": "U.S. Bureau of Economic Analysis",
+    "title": "Regional Price Parities by State and Metro Area, 2024 (via FRED release tables)",
+    "year": "2024 (released Feb 2026)",
+    "url": "https://www.bea.gov/data/prices-inflation/regional-price-parities-state-and-metro-area",
+    "alt_url": "https://fred.stlouisfed.org/release/tables?eid=233639&rid=403",
+    "used_for": "City and state price levels: goods and services scale everyday spending, the rents index scales rent when you move"
+  },
+  "worldbank_pli": {
+    "publisher": "World Bank, World Development Indicators",
+    "title": "Price level ratio of PPP conversion factor (GDP) to market exchange rate (PA.NUS.PPPC.RF)",
+    "year": "2020 values",
+    "url": "https://data.worldbank.org/indicator/PA.NUS.PPPC.RF",
+    "alt_url": "https://www.indexmundi.com/facts/indicators/PA.NUS.PPPC.RF/rankings",
+    "used_for": "Price levels outside the US (US = 1.00)",
+    "note": "Rough: economy-wide, dated and sensitive to exchange rates"
+  },
+  "numbeo": {
+    "publisher": "Numbeo",
+    "title": "Cost of Living database (crowdsourced)",
+    "year": "2025",
+    "url": "https://www.numbeo.com/cost-of-living/",
+    "used_for": "Cross-check of international city templates in the 2026 audit",
+    "note": "Crowdsourced, not an official statistic"
+  },
+  "mit_living_wage": {
+    "publisher": "MIT (Glasmeier)",
+    "title": "Living Wage Calculator",
+    "year": "2024",
+    "url": "https://livingwage.mit.edu/",
+    "used_for": "Basis of the original v0.8 location templates (kept as the 'v0.8 original' option and for children)"
+  },
+  "hud_fmr": {
+    "publisher": "U.S. Department of Housing and Urban Development",
+    "title": "Fair Market Rents",
+    "year": "FY2024",
+    "url": "https://www.huduser.gov/portal/datasets/fmr.html",
+    "used_for": "Rent index for places without BEA data"
+  },
+  "childcareaware_2024": {
+    "publisher": "Child Care Aware of America",
+    "title": "Child Care in America: 2024 Price & Supply",
+    "year": "2024",
+    "url": "https://www.childcareaware.org/price-landscape24/",
+    "used_for": "Daycare costs in children's templates (national average $13,128 a year)"
+  },
+  "collegeboard": {
+    "publisher": "College Board",
+    "title": "Trends in College Pricing",
+    "year": "2024 edition (link shows the latest)",
+    "url": "https://research.collegeboard.org/trends/college-pricing",
+    "used_for": "College tuition, fees, room and board in children's templates"
+  },
+  "fed_scf_2022": {
+    "publisher": "Federal Reserve Board",
+    "title": "Changes in U.S. Family Finances from 2019 to 2022: Evidence from the Survey of Consumer Finances (Table 2)",
+    "year": "2022 (published Oct 2023)",
+    "url": "https://www.federalreserve.gov/publications/files/scf23.pdf",
+    "used_for": "Net worth vs. people your age (median and mean by age)"
+  },
+  "bea_saving_rate": {
+    "publisher": "U.S. Bureau of Economic Analysis via FRED",
+    "title": "Personal Saving Rate (PSAVERT)",
+    "year": "monthly, latest mid-2026",
+    "url": "https://fred.stlouisfed.org/series/PSAVERT",
+    "used_for": "Typical US saving rate shown next to yours"
+  },
+  "damodaran_sp500": {
+    "publisher": "NYU Stern (A. Damodaran)",
+    "title": "Historical Returns on Stocks, Bonds and Bills: S&P 500 including dividends",
+    "year": "1928–2024",
+    "url": "https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html",
+    "used_for": "Historical S&P 500 returns (Monte Carlo historical mode, historical average button)",
+    "note": "The app's 100-year list (1924–2023) comes from v0.8; four years that disagreed with this series by >2 points were corrected"
+  },
+  "bls_cpi": {
+    "publisher": "U.S. Bureau of Labor Statistics",
+    "title": "Consumer Price Index for All Urban Consumers (CPI-U), series CUUR0000SA0",
+    "year": "1913–present",
+    "url": "https://data.bls.gov/timeseries/CUUR0000SA0",
+    "used_for": "Long-run inflation (about 3% a year)"
+  },
+  "cms_nhe": {
+    "publisher": "Centers for Medicare & Medicaid Services",
+    "title": "National Health Expenditure Data: Historical",
+    "year": "1960–2024",
+    "url": "https://www.cms.gov/data-research/statistics-trends-and-reports/national-health-expenditure-data/historical",
+    "used_for": "Healthcare inflation default (health spending has outgrown general prices)"
+  },
+  "irs_2024_tax": {
+    "publisher": "Internal Revenue Service",
+    "title": "IRS provides tax inflation adjustments for tax year 2024 (Rev. Proc. 2023-34)",
+    "year": "2024",
+    "url": "https://www.irs.gov/newsroom/irs-provides-tax-inflation-adjustments-for-tax-year-2024",
+    "used_for": "Federal brackets and standard deduction (indexed to inflation after 2024)"
+  },
+  "irs_401k_2026": {
+    "publisher": "Internal Revenue Service",
+    "title": "401(k) limit increases to $24,500 for 2026, IRA limit increases to $7,500",
+    "year": "2026",
+    "url": "https://www.irs.gov/newsroom/401k-limit-increases-to-24500-for-2026-ira-limit-increases-to-7500",
+    "used_for": "401(k) contribution guidance"
+  },
+  "irs_hsa_2026": {
+    "publisher": "Internal Revenue Service",
+    "title": "Rev. Proc. 2025-19: 2026 HSA limits ($4,400 self-only, $8,750 family)",
+    "year": "2026",
+    "url": "https://www.irs.gov/pub/irs-drop/rp-25-19.pdf",
+    "used_for": "HSA contribution guidance"
+  },
+  "ssa_wage_base": {
+    "publisher": "Social Security Administration",
+    "title": "Contribution and Benefit Base",
+    "year": "2024–2026",
+    "url": "https://www.ssa.gov/oact/cola/cbb.html",
+    "used_for": "Social Security tax wage cap (FICA) and benefit estimates"
+  },
+  "ssa_bend_points": {
+    "publisher": "Social Security Administration",
+    "title": "Benefit formula bend points",
+    "year": "2026",
+    "url": "https://www.ssa.gov/oact/cola/bendpoints.html",
+    "used_for": "Quick Social Security estimate in guided setup"
+  },
+  "ssa_claiming": {
+    "publisher": "Social Security Administration",
+    "title": "Retirement age and benefit reduction",
+    "year": "current rules",
+    "url": "https://www.ssa.gov/benefits/retirement/planner/agereduction.html",
+    "used_for": "Claiming at 62–70: early reduction and delayed credits"
+  },
+  "ssa_trustees_2026": {
+    "publisher": "Social Security Board of Trustees",
+    "title": "2026 Trustees Report: combined trust funds pay full benefits until 2034, then 83% (OASI alone: late 2032, 78%)",
+    "year": "2026",
+    "url": "https://www.ssa.gov/news/en/press/releases/2026-06-09.html",
+    "alt_url": "https://www.ssa.gov/OACT/TR/2026/",
+    "used_for": "Social Security shortfall year and size (default cut of 30% is more cautious than the Trustees' 17–22%)"
+  },
+  "cms_partb_2026": {
+    "publisher": "Centers for Medicare & Medicaid Services",
+    "title": "2026 Medicare Parts A & B Premiums and Deductibles ($202.90/month standard Part B premium)",
+    "year": "2026",
+    "url": "https://www.cms.gov/newsroom/fact-sheets/2026-medicare-parts-b-premiums-deductibles",
+    "used_for": "Medicare Part B premium default"
+  },
+  "cms_partd_2026": {
+    "publisher": "Centers for Medicare & Medicaid Services",
+    "title": "2026 Medicare Part D Bid Information (base beneficiary premium $38.99/month)",
+    "year": "2026",
+    "url": "https://www.cms.gov/newsroom/fact-sheets/2026-medicare-part-d-bid-information-and-part-d-premium-stabilization-demonstration-parameters",
+    "used_for": "Part D premium reference (the app's $55 default includes a typical plan's extra over the base premium)"
+  },
+  "kff_ehbs_2025": {
+    "publisher": "KFF",
+    "title": "2025 Employer Health Benefits Survey (workers pay $6,850 a year toward family coverage)",
+    "year": "2025",
+    "url": "https://www.kff.org/health-costs/2025-employer-health-benefits-survey/",
+    "used_for": "Employer premium share guidance"
+  },
+  "kff_marketplace": {
+    "publisher": "KFF",
+    "title": "Health Insurance Marketplace Calculator",
+    "year": "current plan year",
+    "url": "https://www.kff.org/interactive/subsidy-calculator/",
+    "used_for": "Marketplace (ACA) premium guidance before Medicare"
+  },
+  "taxfoundation_state_2025": {
+    "publisher": "Tax Foundation",
+    "title": "2025 State Individual Income Tax Rates and Brackets",
+    "year": "2025",
+    "url": "https://taxfoundation.org/data/all/state/state-income-tax-rates/",
+    "used_for": "Reference for the state income tax table",
+    "note": "The app's state table comes from v0.8 and uses one flat or top rate per state"
+  },
+  "oecd_taxing_wages_2025": {
+    "publisher": "OECD",
+    "title": "Taxing Wages 2025",
+    "year": "2024 tax year",
+    "url": "https://www.oecd.org/en/publications/2025/04/taxing-wages-2025_20d1a01d.html",
+    "used_for": "Reference for the rough effective income-tax rates used for other countries",
+    "note": "The app's country rates are v0.8 estimates, not taken from this report"
+  },
+  "kff_benchmark_2026": {
+    "publisher": "KFF State Health Facts",
+    "title": "Marketplace Average Benchmark Premiums (40-year-old: $625/month in 2026, $497 in 2025)",
+    "year": "2026",
+    "url": "https://www.kff.org/affordable-care-act/state-indicator/marketplace-average-benchmark-premiums/",
+    "used_for": "Marketplace premium guidance before Medicare"
+  },
+  "cms_age_rating": {
+    "publisher": "Centers for Medicare & Medicaid Services",
+    "title": "Market Rating Reforms (age rating up to 3:1 on the federal default age curve)",
+    "year": "current rules",
+    "url": "https://www.cms.gov/cciio/programs-and-initiatives/health-insurance-market-reforms/state-rating",
+    "used_for": "Why marketplace premiums at 60+ are about twice a 40-year-old's"
+  }
+}

@@ -6,6 +6,7 @@ import { pct } from '../lib/format'
 import { Card, PageHeader, Field, Money, NumberInput, Percent, Select, Button, Toggle, Segmented, Note, Grid } from '../components/ui'
 import { S } from '../components/charts'
 import { lifestyleOptions } from '../lib/spending'
+import { useCites } from '../components/Cite'
 
 export default function Assumptions() {
   const { plan, update, reference } = usePlan()
@@ -14,6 +15,7 @@ export default function Assumptions() {
   const hist = reference?.historical
   const locs = reference?.locations || ['Seattle']
   const asym = plan.mc_use_asymmetric !== false
+  const { Cite, Sources } = useCites(['damodaran_sp500', 'bls_cpi', 'cms_nhe', 'ssa_trustees_2026', 'irs_2024_tax', 'ssa_wage_base', 'irs_401k_2026', 'taxfoundation_state_2025', 'oecd_taxing_wages_2025'])
 
   return (
     <div className="space-y-5">
@@ -28,7 +30,7 @@ export default function Assumptions() {
             <Field label="Borrowing rate if savings go negative"><Percent fraction value={plan.debt_interest_rate} onChange={v => update(d => { d.debt_interest_rate = v })} /></Field>
           </div>
           {hist && <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="text-[12.5px] text-muted w-full">Historical averages (v0.8 “Historical average” option):</span>
+            <span className="text-[12.5px] text-muted w-full">Historical averages (v0.8 “Historical average” option): S&P 500 total returns<Cite id="damodaran_sp500" />, consumer prices since 1913<Cite id="bls_cpi" />, national health spending<Cite id="cms_nhe" />.</span>
             <Button size="sm" onClick={() => update(d => { d.economic_params.investment_return = +hist.mean.toFixed(4); d.economic_params.use_historical_returns = true })}>Return: S&P 500 ({pct(hist.mean)})</Button>
             <Button size="sm" onClick={() => update(d => { d.economic_params.investment_return = 0.06; d.economic_params.use_historical_returns = false })}>Return: balanced 60/40 (~6%)</Button>
             <Button size="sm" onClick={() => update(d => { d.economic_params.inflation_rate = 0.03; d.economic_params.use_historical_inflation = true })}>Inflation: 3.0%</Button>
@@ -55,12 +57,13 @@ export default function Assumptions() {
               <Field label="Benefit cut"><Percent value={plan.ss_shortfall_percentage} decimals={0} onChange={v => update(d => { d.ss_shortfall_percentage = v })} /></Field>
               <Field label="Starting in"><NumberInput value={plan.ss_insolvency_year} step={1} onChange={v => update(d => { d.ss_insolvency_year = Math.round(v) })} /></Field>
             </div>}
+            <p className="text-xs text-muted">The 2026 Trustees Report projects the combined trust funds can pay full benefits until 2034 and about 83% after that (78% for retirement benefits alone from late 2032)<Cite id="ssa_trustees_2026" />. The 30% default cut is deliberately more cautious.</p>
             <p className="text-xs text-muted">Claim ages and benefit amounts are set per person under People & income.</p>
           </div>
         </Card>
-        <Card title="Taxes" subtitle="Federal brackets, standard deduction and FICA are indexed to inflation">
+        <Card title="Taxes" subtitle={<>2024 federal brackets and standard deduction<Cite id="irs_2024_tax" /> and the Social Security wage cap<Cite id="ssa_wage_base" />, indexed to inflation; state rates per location<Cite id="taxfoundation_state_2025" />, rough effective rates abroad<Cite id="oecd_taxing_wages_2025" /></>}>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Pre-tax 401(k) contributions / yr" hint="Household total, today's dollars; stops when each person retires"><Money value={plan.pretax_401k} step={500} onChange={v => update(d => { d.pretax_401k = v })} /></Field>
+            <Field label="Pre-tax 401(k) contributions / yr" hint="Household total, today's dollars; stops when each person retires. 2026 limit: $24,500 per person under 50." cite={<Cite id="irs_401k_2026" />}><Money value={plan.pretax_401k} step={500} onChange={v => update(d => { d.pretax_401k = v })} /></Field>
             <Field label="Filing status"><Select value={plan.tax_filing_status || 'married'} options={[{ value: 'married', label: 'Married filing jointly' }, { value: 'single', label: 'Single' }]} onChange={v => update(d => { d.tax_filing_status = v })} /></Field>
             <Field label="State tax override" hint="Only used for locations the app doesn't know. Leave at 0 to use the location's rate.">
               <Percent fraction value={plan.state_tax_rate || 0} onChange={v => update(d => { d.state_tax_rate = v })} /></Field>
@@ -119,7 +122,7 @@ export default function Assumptions() {
       </Card>
 
       {hist && (
-        <Card title="Historical S&P 500 returns" subtitle={`${hist.start_year}–${hist.start_year + hist.total_years - 1} · average ${pct(hist.mean)} · std dev ${pct(hist.std)} · ${hist.positive_years} up years, ${hist.negative_years} down`}>
+        <Card title={<>Historical S&P 500 returns<Cite id="damodaran_sp500" /></>} subtitle={`${hist.start_year}–${hist.start_year + hist.total_years - 1} · average ${pct(hist.mean)} · std dev ${pct(hist.std)} · ${hist.positive_years} up years, ${hist.negative_years} down · total returns incl. dividends`}>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={hist.returns.map((r: number, i: number) => ({ year: hist.start_year + i, r: r * 100 }))} barCategoryGap={1}>
               <CartesianGrid vertical={false} stroke="var(--grid)" />
@@ -134,6 +137,7 @@ export default function Assumptions() {
           </ResponsiveContainer>
         </Card>
       )}
+      <Sources className="px-1" />
     </div>
   )
 }

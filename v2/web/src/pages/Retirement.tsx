@@ -5,6 +5,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
 import { money, pct, clsx } from '../lib/format'
+import { useCites } from '../components/Cite'
 import { Card, PageHeader, Button, Badge, Note, Percent, Stat } from '../components/ui'
 import { S } from '../components/charts'
 
@@ -30,6 +31,7 @@ export default function Retirement() {
     { k: 'Social Security', v: r.ss }, { k: `Savings (${(wr * 100).toFixed(1)}% draw)`, v: r.portfolio_draw }, { k: 'Rental income', v: r.rent },
   ].filter(b => b.v > 0 || b.k.startsWith('Social')) : []
 
+  const { Cite, Sources } = useCites(['ssa_claiming', 'ssa_trustees_2026'])
   const apply = (row: any) => update(d => { d.parentX_retirement_age = row.age1; if (!single) d.parentY_retirement_age = row.age2 })
 
   return (
@@ -107,7 +109,7 @@ export default function Retirement() {
         </Card>
       </div>
 
-      <Card title="When to claim Social Security" subtitle="Benefit at 67 is from People & income; claiming earlier reduces it for life, waiting to 70 raises it 8% a year">
+      <Card title="When to claim Social Security" subtitle={<>Benefit at 67 is from People & income; claiming at 62 cuts it by 30% for life, waiting to 70 raises it 8% a year<Cite id="ssa_claiming" />. Shortfall from 2034 per the Trustees<Cite id="ssa_trustees_2026" />.</>}>
         {!base ? <Loader2 className="animate-spin text-muted" /> : (
           <div className="grid gap-5 md:grid-cols-2">
             {base.ss.map((p: any) => (
@@ -138,6 +140,7 @@ export default function Retirement() {
           <Button size="sm" onClick={() => nav('/people')}>Edit benefits<ArrowRight size={13} /></Button>
         </div>
       </Card>
+      <Sources className="px-1" />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, CheckCircle2, Info, Sparkles, ArrowRight, TrendingUp, CalendarClock } from 'lucide-react'
+import { useCites } from '../components/Cite'
 import { usePlan } from '../lib/store'
 import { money, pct } from '../lib/format'
 import { Card, Stat, Segmented, Badge, Button, Toggle, Note } from '../components/ui'
@@ -100,24 +101,24 @@ export const SCF_2022 = [
   { max: 54, label: '45–54', median: 247200, mean: 975800 }, { max: 64, label: '55–64', median: 364500, mean: 1570000 },
   { max: 74, label: '65–74', median: 409900, mean: 1790000 }, { max: 200, label: '75+', median: 335600, mean: 1620000 }]
 
-function HealthLights({ r0, nwNow, age }: { r0: any; nwNow: number; age: number }) {
+function HealthLights({ r0, nwNow, age, Cite }: { r0: any; nwNow: number; age: number; Cite: ReturnType<typeof useCites>['Cite'] }) {
   const inc = r0.total_income
   const saveRate = inc > 0 ? (inc - r0.total_expenses - r0.taxes + r0.contrib_pretax) / inc : 0
   const expRatio = inc > 0 ? r0.total_expenses / inc : 0
   const b = SCF_2022.find(x => age <= x.max)!
   const items = [
     { label: 'Savings rate', value: pct(saveRate, 0), tone: saveRate > 0.15 ? 'good' : saveRate > 0.05 ? 'warn' : 'bad',
-      hint: 'Share of gross income saved, including 401(k). Green above 15%, yellow 5–15%. Typical US household: about 5–8%.' },
+      hint: <>Share of gross income saved, including 401(k). Green above 15%, yellow 5–15%. The US personal saving rate is about 3% of after-tax income (2026)<Cite id="bea_saving_rate" />.</> },
     { label: 'Net worth vs peers', value: nwNow >= b.median ? `${(nwNow / b.median).toFixed(1)}× median` : `${pct(nwNow / b.median, 0)} of median`,
       tone: nwNow > b.median * 1.2 ? 'good' : nwNow > b.median * 0.5 ? 'warn' : 'bad',
-      hint: `Households aged ${b.label}: median ${money(b.median)}, mean ${money(b.mean)} (Federal Reserve SCF 2022).` },
+      hint: <>Households aged {b.label}: median {money(b.median)}, mean {money(b.mean)} (Federal Reserve SCF 2022)<Cite id="fed_scf_2022" />.</> },
     { label: 'Spending to income', value: pct(expRatio, 0), tone: expRatio < 0.6 ? 'good' : expRatio < 0.8 ? 'warn' : 'bad',
       hint: 'Spending (excluding taxes) as a share of gross income. Green below 60%, yellow 60–80%.' },
   ] as const
   return (
     <div className="grid sm:grid-cols-3 gap-3">
       {items.map(i => (
-        <div key={i.label} className="rounded-lg border border-line p-3" title={i.hint}>
+        <div key={i.label} className="rounded-lg border border-line p-3">
           <div className="flex items-center gap-2 text-[12.5px] text-muted"><span className={`w-2.5 h-2.5 rounded-full ${i.tone === 'good' ? 'bg-good' : i.tone === 'warn' ? 'bg-warn' : 'bg-bad'}`} />{i.label}</div>
           <div className="text-[20px] font-semibold tnum mt-0.5">{i.value}</div>
           <div className="text-[11.5px] text-muted leading-4 mt-0.5">{i.hint}</div>
@@ -128,6 +129,7 @@ function HealthLights({ r0, nwNow, age }: { r0: any; nwNow: number; age: number 
 
 export default function Dashboard({ isNew }: { isNew: boolean }) {
   const { plan, proj, mc, mcLoading, names, single, ck } = usePlan()
+  const { Cite, Sources } = useCites(['fed_scf_2022', 'bea_saving_rate', ...(plan.mc_use_historical ? ['damodaran_sp500'] : [])])
   const [view, setView] = useState<'projection' | 'range'>('projection')
   const [today, setToday] = useTodayDollars()
   const nav = useNavigate()
@@ -198,7 +200,7 @@ export default function Dashboard({ isNew }: { isNew: boolean }) {
           sub={`${money(retRow?.investable)} investable${today ? ', today’s $' : ''}`} /></Card>
         <Card><Stat label="Plan success" value={mc ? pct(mc.success_rate, 0) : '…'}
           tone={mc ? (mc.success_rate >= 0.8 ? 'good' : mc.success_rate < 0.6 ? 'bad' : undefined) : undefined}
-          sub={mcLoading ? 'Simulating…' : mc ? `${mc.n.toLocaleString()} simulations · ${mc.mode}` : ''} /></Card>
+          sub={mcLoading ? 'Simulating…' : mc ? <>{mc.n.toLocaleString()} simulations · {mc.mode}{plan.mc_use_historical && <Cite id="damodaran_sp500" />}</> : ''} /></Card>
         <Card><Stat label="Savings last" value={s?.depletion_year ? `Until ${s.depletion_year}` : 'For life'}
           tone={s?.depletion_year ? 'bad' : 'good'}
           sub={s?.depletion_year ? `${names[0]} would be ${s.depletion_age1}` : `${money(endRow?.net_worth)} left at the end`} /></Card>
@@ -228,7 +230,7 @@ export default function Dashboard({ isNew }: { isNew: boolean }) {
 
       {r0 && <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Card title="Financial health" subtitle={`${plan.current_year}, compared with common guidelines and US households`}>
-          <HealthLights r0={r0} nwNow={s?.net_worth_now || 0} age={plan.parentX_age} />
+          <HealthLights r0={r0} nwNow={s?.net_worth_now || 0} age={plan.parentX_age} Cite={Cite} />
         </Card>
         <Card title="This year, per month">
           <dl className="grid grid-cols-2 gap-y-2 text-sm">
@@ -276,6 +278,7 @@ export default function Dashboard({ isNew }: { isNew: boolean }) {
           </ul>
         </Card>
       </div>
+      <Sources className="px-1" />
     </div>
   )
 }

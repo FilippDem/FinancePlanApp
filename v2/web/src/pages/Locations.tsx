@@ -8,6 +8,10 @@ import { Card, PageHeader, Button, NumberInput, Money, Select, TextInput, Toggle
 import { S } from '../components/charts'
 import { WorldMap, MapStop } from '../components/WorldMap'
 import { lifestyleOptions, BASE_LIFESTYLES, priceLoc } from '../lib/spending'
+import { useCites } from '../components/Cite'
+
+const LOC_SOURCES = ['bea_rpp_2024', 'worldbank_pli', 'hud_fmr', 'taxfoundation_state_2025', 'oecd_taxing_wages_2025', 'mit_living_wage', 'numbeo', 'bls_cex_2022', 'bls_cex_2024']
+type CiteT = ReturnType<typeof useCites>['Cite']
 
 /** Where a location sits in the Country → State → City catalog. */
 export function locate(catalog: any, custom: Record<string, any> | undefined, v: string) {
@@ -72,6 +76,7 @@ function factorChip(f: number | null | undefined, label: string) {
 
 export default function Locations() {
   const { plan, update, reference, names, single, proj } = usePlan()
+  const { Cite, Sources } = useCites(LOC_SOURCES)
   const [info, setInfo] = useState<any>(null)
   const catalog = reference?.location_catalog
   const custom: Record<string, any> = plan.custom_locations || {}
@@ -120,7 +125,8 @@ export default function Locations() {
         action={<Button size="sm" onClick={() => update(d => { const last = d.state_timeline[d.state_timeline.length - 1]; d.state_timeline.push({ year: Math.max(last.year, cy) + 5, state: last.state, spending_strategy: last.spending_strategy }) })}><Plus size={14} />Add move</Button>}>
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <Toggle checked={plan.move_adjusts_spending !== false} onChange={v => update(d => { d.move_adjusts_spending = v })} label="Moving changes our everyday spending"
-            hint="Everyday spending follows BEA price parities between US states and cities (World Bank price levels abroad); rent follows the BEA rent index. Off = the old app's behaviour, where a move only changes taxes." />
+            hint="Off = the old app's behaviour, where a move only changes taxes." />
+          <p className="text-[12.5px] text-muted">Everyday prices follow BEA price parities between US states and cities<Cite id="bea_rpp_2024" /> (World Bank price levels abroad<Cite id="worldbank_pli" />); rent follows the BEA rents index<Cite id="bea_rpp_2024" />, or HUD Fair Market Rents where BEA has no figure<Cite id="hud_fmr" />.</p>
         </div>
         <div className="space-y-2.5">
           {stl.map((e, i) => {
@@ -138,8 +144,9 @@ export default function Locations() {
                   <div className="flex flex-wrap items-center gap-2 mt-2 text-[12.5px] text-ink2">
                     {plan.move_adjusts_spending !== false && i > 0 && factorChip(inf.spending_factor, 'Everyday spending')}
                     {plan.move_adjusts_spending !== false && i > 0 && inf.rent_factor != null && factorChip(inf.rent_factor, 'Rent')}
-                    <span>{inf.tax.text}</span>
-                    <span className="text-muted">· {({ bea: 'BEA price data', country: 'World Bank price level (rough)', relative: 'audited template', custom: 'your template', us: 'US-average prices (no local data)' } as any)[inf.basis]}</span>
+                    <span>{inf.tax.text}{inf.tax.kind === 'us_state' ? <Cite id="taxfoundation_state_2025" /> : inf.tax.kind === 'country' ? <Cite id="oecd_taxing_wages_2025" /> : null}</span>
+                    <span className="text-muted">· {({ bea: 'BEA price data', country: 'World Bank price level (rough)', relative: 'audited template', custom: 'your template', us: 'US-average prices (no local data)' } as any)[inf.basis]}
+                      {inf.basis === 'bea' ? <Cite id="bea_rpp_2024" /> : inf.basis === 'country' ? <Cite id="worldbank_pli" /> : inf.basis === 'relative' ? <Cite id={['mit_living_wage', 'numbeo']} /> : null}</span>
                   </div>
                 )}
               </div>
@@ -174,14 +181,15 @@ export default function Locations() {
           No map coordinates for {missing.join(', ')}. Add them under My places below.</span></Note></div>}
       </Card>
 
-      <TemplateBrowser />
+      <TemplateBrowser Cite={Cite} />
       <MyPlaces />
+      <Sources className="px-1" />
     </div>
   )
 }
 
 // ── cost-of-living templates ──────────────────────────────────────────────
-function TemplateBrowser() {
+function TemplateBrowser({ Cite }: { Cite: CiteT }) {
   const { plan, update, reference } = usePlan()
   const [loc, setLoc] = useState<string>(plan.state_timeline?.[0]?.state || 'Seattle')
   const [life, setLife] = useState('Average')
@@ -274,8 +282,9 @@ function TemplateBrowser() {
             <div className="mt-4 rounded-lg bg-sunken/70 p-3 text-[12.5px] text-ink2">
               <div className="font-medium mb-1">Data sources</div>
               {source === 'calibrated'
-                ? <p>BLS Consumer Expenditure Survey (2022 income quintiles, grown to 2024 totals) for spending levels; BEA Regional Price Parities 2024 for US states and metros; World Bank price levels (2020) for other countries. See docs/COST_OF_LIVING_AUDIT.md.</p>
-                : src ? <p>{src.source} ({src.year}). {src.notes} <span className="text-muted">{src.url}</span></p> : <p>v0.8 template, corrected by the 2026 audit (location scale, lifestyle ratios, state medical).</p>}
+                ? <p>BLS Consumer Expenditure Survey: 2022 income quintiles<Cite id="bls_cex_2022" />, grown to 2024 totals<Cite id="bls_cex_2024" />, for spending levels; BEA Regional Price Parities 2024 for US states and metros<Cite id="bea_rpp_2024" />; World Bank price levels (2020) for other countries<Cite id="worldbank_pli" />.</p>
+                : src ? <p>{src.source} ({src.year})<Cite id="mit_living_wage" />. {src.notes} Corrected in the 2026 audit against BEA price parities<Cite id="bea_rpp_2024" /> and Numbeo<Cite id="numbeo" />.</p>
+                : <p>v0.8 template<Cite id="mit_living_wage" />, corrected by the 2026 audit (location scale<Cite id="bea_rpp_2024" />, lifestyle ratios<Cite id="bls_cex_2022" />, international cities<Cite id="numbeo" />).</p>}
             </div>
           </div>
         </div>

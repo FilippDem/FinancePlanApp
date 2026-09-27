@@ -1,6 +1,6 @@
 {
  "_about": "Corrections to the v0.8 cost-of-living data, from the 2026-09-26 audit (docs/COST_OF_LIVING_AUDIT.md). Applied on top of reference_data.json by reference.ref(); the raw v0.8 numbers stay available via reference.ref_raw(). Order: location_scale -> strategy_scale -> state Medical override -> state_uniform_scale.",
- "_sources": "BEA Regional Price Parities 2024 (FRED), Numbeo 2025, BLS Consumer Expenditure Survey 2024, Child Care Aware 2024, College Board Trends in College Pricing 2024, HUD FY2024 Fair Market Rents",
+ "_sources": "BEA Regional Price Parities 2024 (FRED), Numbeo 2025, BLS Consumer Expenditure Survey 2024, Child Care Aware 2024, College Board Trends in College Pricing 2024, HUD FY2024 Fair Market Rents, NYU Stern (Damodaran) S&P 500 historical returns",
  "location_scale": {
   "ADULT_EXPENSE_TEMPLATES": {
    "New York": 0.857,
@@ -442,5 +442,15 @@
   "Chicago": 0.74,
   "Miami": 1.028,
   "Columbus": 0.581
+ },
+ "historical_returns": {
+  "_note": "v0.8 list covers 1924-2023 (100 years). Four years differed from NYU Stern (Damodaran) S&P 500 total returns by more than 2 points; replaced with the Damodaran values (rounded like the rest of the list). Checked 2026-09-26.",
+  "first_year": 1924,
+  "fix": {
+   "1928": 0.44,
+   "1929": -0.08,
+   "1933": 0.5,
+   "1936": 0.32
+  }
  }
 }

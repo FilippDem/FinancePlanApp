@@ -754,6 +754,7 @@ def reference():
         'location_catalog': R.location_catalog(),
         'coordinates': R.location_coordinates(),
         'historical': historical_stats(),
+        'sources': R.sources(),
     }
 
 

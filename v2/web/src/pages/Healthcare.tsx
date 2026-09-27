@@ -2,6 +2,7 @@ import React from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { usePlan } from '../lib/store'
 import { money } from '../lib/format'
+import { useCites } from '../components/Cite'
 import { Card, PageHeader, Field, Money, NumberInput, Percent, TextInput, Select, Button, Toggle, Note, Grid } from '../components/ui'
 import { LinesChart } from '../components/charts'
 
@@ -25,9 +26,10 @@ export default function Healthcare() {
   const who = [{ value: 'Parent 1', label: names[0] }, ...(names[1] ? [{ value: 'Parent 2', label: names[1] }] : []), { value: 'Both', label: 'Both' }, { value: 'Family', label: 'Whole family' }]
   const setL = (list: string, i: number, k: string, v: any) => update(d => { d[list][i][k] = v })
   const data = (proj?.rows || []).map((r: any) => ({ year: r.year, hc: r.exp_healthcare }))
+  const { Cite, Sources } = useCites(['kff_ehbs_2025', 'kff_marketplace', 'cms_partb_2026', 'cms_partd_2026', 'irs_hsa_2026', 'cms_nhe'])
   return (
     <div className="space-y-5">
-      <PageHeader title="Healthcare" subtitle="Premiums and care costs grow with healthcare inflation" />
+      <PageHeader title="Healthcare" subtitle={<>Premiums and care costs grow with healthcare inflation{<Cite id="cms_nhe" />}</>} />
       {proj?.rows?.[0] && (() => {
         const items: any[] = proj.rows[0].details?.healthcare || []
         const ins = items.filter(x => !/Medicare|Medigap/.test(x.name) && (plan.health_insurances || []).some((h: any) => h.name === x.name)).reduce((a, b) => a + b.amount, 0)
@@ -41,7 +43,7 @@ export default function Healthcare() {
           <Card><div className="text-[12.5px] text-muted">Total this year · lifetime</div><div className="text-[22px] font-semibold tnum">{money(proj.rows[0].exp_healthcare)} · {money(life)}</div><div className="text-[11.5px] text-muted">lifetime in today's dollars</div></Card>
         </div>
       })()}
-      <Card title="Health insurance" subtitle="Premiums apply while the covered person's age is in range (e.g. until Medicare at 65)">
+      <Card title="Health insurance" subtitle={<>Premiums apply while the covered person's age is in range (e.g. until Medicare at 65). For reference: workers paid $6,850 a year on average toward employer family coverage in 2025<Cite id="kff_ehbs_2025" />; marketplace premiums depend on age, income and state<Cite id="kff_marketplace" />.</>}>
         <Rows items={plan.health_insurances} empty="No insurance plans. Add employer or marketplace coverage, especially for early retirement."
           onAdd={() => update(d => { d.health_insurances.push({ name: 'Marketplace plan', type: 'Marketplace', monthly_premium: 900, annual_deductible: 4000, annual_out_of_pocket_max: 9000, copay_primary: 30, copay_specialist: 60, covered_by: 'Both', start_age: d.parentX_retirement_age, end_age: 64 }) })}
           onRemove={i => update(d => { d.health_insurances.splice(i, 1) })}
@@ -59,14 +61,14 @@ export default function Healthcare() {
           )} />
       </Card>
       <Grid cols={2}>
-        <Card title="Medicare (65+)" subtitle="Per person, monthly, today's dollars">
+        <Card title="Medicare (65+)" subtitle={<>Per person, monthly, today's dollars. 2026 standard Part B: $202.90<Cite id="cms_partb_2026" />; Part D base premium $38.99, plans vary<Cite id="cms_partd_2026" />. Higher incomes pay more (IRMAA).</>}>
           <div className="grid grid-cols-3 gap-3">
             <Field label="Part B"><Money value={plan.medicare_part_b_premium} step={5} onChange={v => update(d => { d.medicare_part_b_premium = v })} /></Field>
             <Field label="Part D"><Money value={plan.medicare_part_d_premium} step={5} onChange={v => update(d => { d.medicare_part_d_premium = v })} /></Field>
             <Field label="Medigap"><Money value={plan.medigap_premium} step={10} onChange={v => update(d => { d.medigap_premium = v })} /></Field>
           </div>
         </Card>
-        <Card title="HSA" subtitle="Treated as a pre-tax account">
+        <Card title="HSA" subtitle={<>Treated as a pre-tax account. 2026 limits: $4,400 self-only, $8,750 family<Cite id="irs_hsa_2026" />.</>}>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Balance"><Money value={plan.hsa_balance} onChange={v => update(d => { d.hsa_balance = v })} /></Field>
             <Field label="Contribution / year"><Money value={plan.hsa_contribution} step={100} onChange={v => update(d => { d.hsa_contribution = v })} /></Field>
@@ -106,6 +108,7 @@ export default function Healthcare() {
           )} />
       </Card>
       {data.length > 0 && <Card title="Healthcare costs over time" subtitle="Nominal dollars"><LinesChart data={data} series={[{ key: 'hc', label: 'Healthcare' }]} height={220} /></Card>}
+      <Sources className="px-1" />
     </div>
   )
 }

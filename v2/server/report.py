@@ -151,6 +151,32 @@ def _charts(ctx, st, today):
     return out
 
 
+class _Cites:
+    """Numbers sources in order of first use; markers link to the Sources list at the end."""
+    def __init__(self, ctx, sections):
+        self.ctx, self.order = ctx, [i for i, _ in RD.sources_for(ctx, sections)]
+        self.data = dict(RD.sources_for(ctx, sections))
+
+    def __call__(self, section: str) -> str:
+        ids = [i for i in RD.section_sources(self.ctx, section) if i in self.data]
+        if not ids:
+            return ''
+        return '<super>' + ''.join(f'<a href="#src_{i}" color="{S[0]}">[{self.order.index(i) + 1}]</a>' for i in ids) + '</super>'
+
+    def story(self, st) -> list:
+        if not self.order:
+            return []
+        from xml.sax.saxutils import escape as x
+        out = [CondPageBreak(1.5 * inch), Paragraph('Sources', st.H2)]
+        for k, i in enumerate(self.order, 1):
+            d = self.data[i]
+            note = f" <i>{x(d['note'])}.</i>" if d.get('note') else ''
+            out.append(Paragraph(f'<a name="src_{i}"/>[{k}] {x(d["publisher"])}, <link href="{x(d["url"])}" color="{S[0]}">{x(d["title"])}</link> '
+                                 f'({x(d["year"])}). Used for: {x(d.get("used_for", ""))}.{note} '
+                                 f'<font color="{MUTED}">{x(d["url"])}</font>', st.Mu))
+        return out
+
+
 def build(plan: dict, household: str, checkins: list | None = None, sections: list | None = None,
           title: str | None = None, today: bool = True, ctx: dict | None = None) -> bytes:
     sections = [s for s in (sections or RD.DEFAULT_SECTIONS) if s in RD.SECTIONS]
@@ -159,6 +185,7 @@ def build(plan: dict, household: str, checkins: list | None = None, sections: li
     rows, s = pr['rows'], pr['summary']
     single, (n1, n2) = ctx['single'], ctx['names']
     st = _Styles()
+    cite = _Cites(ctx, sections)
     dollars = "today's dollars" if today else 'nominal (future) dollars'
     names = n1 + ('' if single else f" & {n2}")
     story = [Paragraph(title or f"Financial plan — {household}", st.H1),
@@ -183,7 +210,7 @@ def build(plan: dict, household: str, checkins: list | None = None, sections: li
     if 'people' in sections:
         hdr, data = RD.people_table(ctx)
         fmt = [[r[0], r[1], _m(r[2], True), f"{r[3]}%", _m(r[4], True), _m(r[5], True), r[6], _m(r[7], True), r[8] or 'at retirement', r[9]] for r in data]
-        story += [CondPageBreak(2.5 * inch), Paragraph('People & income', st.H2), _table([hdr] + fmt, right_from=1)]
+        story += [CondPageBreak(2.5 * inch), Paragraph('People & income' + cite('people'), st.H2), _table([hdr] + fmt, right_from=1)]
         cr = RD.career_rows(ctx)
         if cr:
             story += [Paragraph('Career phases & job changes', st.H3),
@@ -192,11 +219,11 @@ def build(plan: dict, household: str, checkins: list | None = None, sections: li
 
     if 'children' in sections and p['children_list']:
         hdr, data = RD.children_table(ctx)
-        story += [CondPageBreak(1.5 * inch), Paragraph('Children', st.H2), _table([hdr] + data, right_from=1)]
+        story += [CondPageBreak(1.5 * inch), Paragraph('Children' + cite('children'), st.H2), _table([hdr] + data, right_from=1)]
 
     if 'spending' in sections:
         items = RD.spending_inputs(ctx)
-        story += [CondPageBreak(2 * inch), Paragraph("Spending plan (per year, today's dollars, before moves and inflation)", st.H2)]
+        story += [CondPageBreak(2 * inch), Paragraph("Spending plan (per year, today's dollars, before moves and inflation)" + cite('spending'), st.H2)]
         groups = {}
         for g, k, v in items:
             groups.setdefault(g, []).append((k, v))
@@ -214,7 +241,7 @@ def build(plan: dict, household: str, checkins: list | None = None, sections: li
 
     if 'healthcare' in sections:
         hc = RD.healthcare_tables(ctx)
-        story += [CondPageBreak(1.5 * inch), Paragraph('Healthcare & insurance', st.H2)]
+        story += [CondPageBreak(1.5 * inch), Paragraph('Healthcare & insurance' + cite('healthcare'), st.H2)]
         if hc['insurance'][1]:
             h, d = hc['insurance']
             story.append(_table([h] + [[r[0], r[1], _m(r[2], True), _m(r[3], True), _m(r[4], True), r[5], r[6]] for r in d]))
@@ -236,16 +263,16 @@ def build(plan: dict, household: str, checkins: list | None = None, sections: li
 
     if 'locations' in sections:
         h, d = RD.locations_table(ctx)
-        story += [CondPageBreak(1.2 * inch), Paragraph('Where you live', st.H2), _table([h] + d)]
+        story += [CondPageBreak(1.2 * inch), Paragraph('Where you live' + cite('locations'), st.H2), _table([h] + d)]
 
     if 'assumptions' in sections:
-        story += [CondPageBreak(1.2 * inch), Paragraph('Key assumptions', st.H2), _kv_table(RD.assumptions_rows(ctx), st, cols=3)]
+        story += [CondPageBreak(1.2 * inch), Paragraph('Key assumptions' + cite('assumptions'), st.H2), _kv_table(RD.assumptions_rows(ctx), st, cols=3)]
 
     if 'monte_carlo' in sections:
         h, d = RD.mc_percentiles(ctx, today)
         step = 5 if len(d) > 30 else 1
         sel = [r for i, r in enumerate(d) if i % step == 0 or i == len(d) - 1]
-        story += [CondPageBreak(2.5 * inch), Paragraph('Monte Carlo results', st.H2),
+        story += [CondPageBreak(2.5 * inch), Paragraph('Monte Carlo results' + cite('monte_carlo'), st.H2),
                   Paragraph(f"{mc['n']:,} simulations · success rate {mc['success_rate'] * 100:.0f}% · final net worth median "
                             f"{_m(mc['final']['median'] / (rows[-1]['infl_index'] if today else 1))}, 10th percentile {_m(mc['final']['p10'] / (rows[-1]['infl_index'] if today else 1))} "
                             f"({'today' if today else 'nominal'}'s dollars){' · every 5th year shown' if step > 1 else ''}".replace("nominal's", 'nominal'), st.Mu),
@@ -292,6 +319,7 @@ def build(plan: dict, household: str, checkins: list | None = None, sections: li
                        f"{c['percentile']:.0f}" if isinstance(c.get('percentile'), (int, float)) else ''])
         story += [CondPageBreak(1.5 * inch), Paragraph('Check-in history', st.H2), _table(cd)]
 
+    story += cite.story(st)
     buf = io.BytesIO()
 
     def footer(canvas, doc):
@@ -337,6 +365,7 @@ def build_json(plan: dict, today: bool = True, ctx: dict | None = None, checkins
         'monte_carlo': {'n': ctx['mc']['n'], 'success_rate': ctx['mc']['success_rate'], 'final': ctx['mc']['final'],
                         'percentiles_by_year': [dict(zip(mh, r)) for r in md]},
         'events': ctx['proj']['events'], 'checkins': checkins or [],
+        'sources': [{'n': k, 'id': i, **d} for k, (i, d) in enumerate(RD.sources_for(ctx, list(RD.SECTIONS)), 1)],
     }
     return json.dumps(out, indent=1, default=str).encode()
 
@@ -428,6 +457,15 @@ def build_xlsx(plan: dict, household: str, today: bool = True, ctx: dict | None 
         sheet('Check-ins', ['Date', 'Type', 'Savings', 'Expected', 'Net worth', 'Status'],
               [[c.get('date'), c.get('kind'), (c.get('totals') or {}).get('investable'), (c.get('expected') or {}).get('investable'),
                 (c.get('totals') or {}).get('net_worth'), c.get('status')] for c in checkins])
+    srcs = RD.sources_for(ctx, sections)
+    if srcs:
+        ws = sheet('Sources', ['#', 'Publisher', 'Title', 'Year', 'Link', 'Used for'],
+                   [[k, d['publisher'], d['title'], d['year'], d['url'], d.get('used_for', '') + (f" ({d['note']})" if d.get('note') else '')]
+                    for k, (_, d) in enumerate(srcs, 1)], money_from=99, widths={2: 30, 3: 60, 4: 14, 5: 50, 6: 60})
+        for r in range(2, len(srcs) + 2):
+            c = ws.cell(row=r, column=5)
+            c.hyperlink = c.value
+            c.font = Font(color='2A78D6', underline='single')
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()

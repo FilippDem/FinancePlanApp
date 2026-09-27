@@ -111,7 +111,7 @@ export function Chips<T extends string>({ options, values, onToggle }: { options
   )
 }
 
-export function BigField({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+export function BigField({ label, hint, children }: { label: string; hint?: React.ReactNode; children: React.ReactNode }) {
   return (
     <label className="block">
       <span className="block text-[14px] font-medium mb-1.5">{label}</span>

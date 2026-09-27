@@ -68,12 +68,27 @@ def ref() -> dict:
         for table in ('ADULT_EXPENSE_TEMPLATES', 'CHILDREN_EXPENSE_TEMPLATES', 'FAMILY_EXPENSE_TEMPLATES'):
             if target in r.get(table, {}) and alias not in r[table]:
                 r[table][alias] = copy.deepcopy(r[table][target])
+    # historical S&P 500 returns: fix the years that disagree with the published series
+    hr = c.get('historical_returns') or {}
+    if hr.get('fix') and 'HISTORICAL_STOCK_RETURNS' in r:
+        fy = int(hr.get('first_year', 1924))
+        for y, v in hr['fix'].items():
+            i = int(y) - fy
+            if 0 <= i < len(r['HISTORICAL_STOCK_RETURNS']):
+                r['HISTORICAL_STOCK_RETURNS'][i] = float(v)
     # explicit children templates: daycare correction
     for loc, k in ((c.get('children') or {}).get('explicit_daycare_scale') or {}).items():
         for strat, cats in (r['CHILDREN_EXPENSE_TEMPLATES'].get(loc) or {}).items():
             if 'Daycare' in cats:
                 cats['Daycare'] = [_r10(v * k) for v in cats['Daycare']]
     return r
+
+
+@lru_cache(maxsize=1)
+def sources() -> dict:
+    """Cited datasets (data/sources.json): id -> {publisher, title, year, url, used_for, note?}."""
+    with open(DATA_DIR / "sources.json", encoding="utf-8") as f:
+        return {k: v for k, v in json.load(f).items() if not k.startswith('_')}
 
 
 @lru_cache(maxsize=1)

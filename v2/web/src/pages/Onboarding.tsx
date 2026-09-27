@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { User, Users, Home, Key, Building2, Baby, CalendarCheck, Sparkles, Briefcase, Coffee, Armchair, Plus, Trash2, HeartPulse } from 'lucide-react'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
-import { SpendingSlider, useCurve } from '../components/SpendingSlider'
+import { SpendingSlider, useCurve, curveSources } from '../components/SpendingSlider'
+import { useCites } from '../components/Cite'
 import { Curve, rescale, strategyFor, describe } from '../lib/spending'
 import { money, pct } from '../lib/format'
 import { FlowShell, Question, ChoiceCards, Chips, BigField, Slider } from '../components/flow'
@@ -77,10 +78,10 @@ const BIG_PLANS: { value: string; label: string; kind: 'recurring' | 'once'; eve
   { value: 'boat', label: 'Boat / RV', kind: 'once', desc: 'In about 10 years' },
 ]
 
-/** Rough Social Security estimate (2025 bend points, 35 years at today's income). */
+/** Rough Social Security estimate (2026 bend points and wage cap, 35 years at today's income; SSA). */
 export function estimateSS(income: number) {
-  const aime = Math.min(income, 176100) / 12
-  const pia = 0.9 * Math.min(aime, 1226) + 0.32 * Math.max(0, Math.min(aime, 7391) - 1226) + 0.15 * Math.max(0, aime - 7391)
+  const aime = Math.min(income, 184500) / 12
+  const pia = 0.9 * Math.min(aime, 1286) + 0.32 * Math.max(0, Math.min(aime, 7749) - 1286) + 0.15 * Math.max(0, aime - 7749)
   return Math.round(pia / 10) * 10
 }
 
@@ -253,6 +254,13 @@ export default function Onboarding() {
   useEffect(() => { try { sessionStorage.setItem('fp_onboarding', JSON.stringify(A)) } catch { /* */ } }, [A])
   useEffect(() => { api.normalize({}).then(r => setBase(r.plan)) }, [])
   const curve = useCurve(A.location, CY, 0.03)
+  // per-step citations: each wizard screen numbers its own sources
+  const cLoc = useCites(['bea_rpp_2024', 'taxfoundation_state_2025'])
+  const c401 = useCites(['irs_401k_2026'])
+  const cSS = useCites(['ssa_bend_points', 'ssa_wage_base', 'ssa_trustees_2026'])
+  const cKids = useCites(['childcareaware_2024', 'collegeboard', 'mit_living_wage'])
+  const cLife = useCites(curveSources(curve))
+  const cHealth = useCites(['kff_ehbs_2025', 'kff_benchmark_2026', 'cms_age_rating', 'cms_partb_2026', 'irs_hsa_2026'])
 
   const plan = useMemo(() => base && curve ? buildPlan(A, base, curve) : null, [A, base, curve])
   const seq = useRef(0)
@@ -302,7 +310,7 @@ export default function Onboarding() {
         </div>}
       </Question>) },
     { section: 0, body: (
-      <Question title="Where do you live?" subtitle="We use it for local cost-of-living averages and state income tax." why="Living costs vary by 40%+ between cities, and state income tax ranges from 0% to over 10%.">
+      <Question title="Where do you live?" subtitle="We use it for local cost-of-living averages and state income tax." why={<>Price levels differ by about a quarter between the cheapest and most expensive states, and more between cities and for rent<cLoc.Cite id="bea_rpp_2024" />. Top state income-tax rates run from 0% to 13.3%<cLoc.Cite id="taxfoundation_state_2025" />.</>}>
         <BigField label="Country → state → city"><LocationPicker value={A.location} catalog={reference?.location_catalog} onChange={v => set({ location: v })} /></BigField>
         <div className="space-y-2">
           <span className="block text-[14px] font-medium">Planning to move?</span>
@@ -315,6 +323,7 @@ export default function Onboarding() {
           <Button size="sm" onClick={() => set({ moves: [...(A.moves || []), { year: CY + 5, location: A.location }] })}><Plus size={14} />Add a move</Button>
           <p className="text-[13px] text-muted">Taxes and everyday prices follow you when you move. Map and details under Where you live.</p>
         </div>
+        <cLoc.Sources />
       </Question>) },
     ...(['p1', ...(couple ? ['p2'] : [])] as ('p1' | 'p2')[]).map(w => ({ section: 1, body: (
       <Question title={w === 'p1' ? 'Are you working right now?' : `Is ${n2} working right now?`}>
@@ -366,13 +375,14 @@ export default function Onboarding() {
       </Question>) },
     { section: 2, skip: A.p1.work !== 'working' && (!couple || A.p2.work !== 'working'), body: (
       <Question title="How much do you put into retirement accounts each year?" subtitle={couple ? 'Both of you together, including any employer match.' : 'Including any employer match.'}
-        why="Pre-tax contributions lower your taxes today and grow until retirement. The 2025 401(k) employee limit is $23,500 per person.">
-        <ChoiceCards cols={3} value={[0, 10000, 23500].includes(A.contrib) ? A.contrib : -1} onChange={v => v >= 0 && set({ contrib: v })} options={[
-          { value: 0, label: 'Nothing yet' }, { value: 10000, label: 'About $10k' }, { value: 23500, label: 'About $23.5k' }]} />
+        why={<>Pre-tax contributions lower your taxes today and grow until retirement. The 2026 401(k) employee limit is $24,500 per person under 50<c401.Cite id="irs_401k_2026" />.</>}>
+        <ChoiceCards cols={3} value={[0, 10000, 24500].includes(A.contrib) ? A.contrib : -1} onChange={v => v >= 0 && set({ contrib: v })} options={[
+          { value: 0, label: 'Nothing yet' }, { value: 10000, label: 'About $10k' }, { value: 24500, label: 'About $24.5k' }]} />
         <BigField label="Or enter an amount per year"><Money big value={A.contrib} step={1000} onChange={v => set({ contrib: v })} /></BigField>
+        <c401.Sources />
       </Question>) },
     { section: 2, body: (
-      <Question title="Do you know your Social Security estimate?" why="Your statement at ssa.gov/myaccount shows your benefit at full retirement age (67). If you skip it, we estimate it from today's income, assuming a full 35-year career.">
+      <Question title="Do you know your Social Security estimate?" why={<>Your statement at <a className="text-accent" href="https://www.ssa.gov/myaccount/" target="_blank" rel="noreferrer">ssa.gov/myaccount</a> shows your benefit at full retirement age (67). If you skip it, we estimate it from today's income with the 2026 benefit formula<cSS.Cite id={['ssa_bend_points', 'ssa_wage_base']} />, assuming a full 35-year career.</>}>
         <ChoiceCards value={A.ss_mode} onChange={v => set({ ss_mode: v })} options={[
           { value: 'estimate', label: 'Estimate it for me', desc: 'Rough, based on income' }, { value: 'known', label: 'Yes, I have my statement' }]} />
         {(['p1', ...(couple ? ['p2'] : [])] as ('p1' | 'p2')[]).map(w => (
@@ -382,7 +392,8 @@ export default function Onboarding() {
                 <b className="tnum">~{money(estimateSS(A[w].work === 'home' ? 0 : A[w].income), { compact: false })}/mo at 67</b></div>
         ))}
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={A.ssCut} onChange={e => set({ ssCut: e.target.checked })} className="accent-[rgb(var(--accent))]" />
-          Plan for a possible Social Security cut in 2034 (30% shortfall)</label>
+          <span>Plan for a possible Social Security cut in 2034 (30%; the Trustees project about 17%<cSS.Cite id="ssa_trustees_2026" />, so this leaves a cushion)</span></label>
+        <cSS.Sources />
       </Question>) },
     { section: 3, body: (
       <Question title="What's your housing situation?">
@@ -417,7 +428,7 @@ export default function Onboarding() {
         </div>}
       </Question>) },
     { section: 4, body: (
-      <Question title="Do you have kids, or plan to?" why="Children are one of the largest lifetime costs, from daycare to college. We use regional averages by age.">
+      <Question title="Do you have kids, or plan to?" why={<>Children are one of the largest lifetime costs, from daycare (about $13,100 a year on average in 2024<cKids.Cite id="childcareaware_2024" />) to college<cKids.Cite id="collegeboard" />. We use regional averages by age<cKids.Cite id="mit_living_wage" />.</>}>
         <ChoiceCards cols={2} value={A.kids} onChange={v => set({ kids: v, children: v === 'yes' && !A.children.length ? [{ name: '', birth_year: CY - 2, school: 'Public', college: 'Public' }] : A.children })}
           options={[{ value: 'none', label: 'No kids', icon: <User size={20} /> }, { value: 'yes', label: 'Yes / planning to', icon: <Baby size={20} /> }]} />
         {A.kids === 'yes' && <div className="space-y-3">
@@ -433,12 +444,14 @@ export default function Onboarding() {
           <Button size="sm" onClick={() => set({ children: [...A.children, { name: '', birth_year: CY + 1, school: 'Public', college: 'Public' }] })}><Plus size={14} />Add a child</Button>
           <p className="text-[13px] text-muted">Use a future birth year for kids you're planning.</p>
         </div>}
+        <cKids.Sources />
       </Question>) },
     { section: 5, body: (
       <Question title="How much do you spend on yourselves?" subtitle={`Everyday personal spending for ${couple ? 'two adults' : 'one adult'} in ${A.location}: food, transport, clothing, fun. Not housing, kids or healthcare premiums.`}>
-        <SpendingSlider curve={curve} value={A.level ?? 50} adults={couple ? 2 : 1}
+        <SpendingSlider curve={curve} value={A.level ?? 50} adults={couple ? 2 : 1} cite={<cLife.Cite id={curveSources(curve)} />}
           onChange={x => set({ level: x, style: strategyFor(x).replace(' (statistical)', '') as Answers['style'] })} />
         <p className="text-sm text-muted">Tap a label to jump to it. You can fine-tune every category later under Spending.</p>
+        <cLife.Sources />
       </Question>) },
     { section: 5, body: (
       <Question title="What do your household bills look like?" subtitle="Monthly amounts for the whole household. Rough guesses are fine."
@@ -455,17 +468,18 @@ export default function Onboarding() {
         <ChoiceCards value={A.health} onChange={v => set({ health: v })} options={[
           { value: 'employer', label: 'Through work', icon: <Briefcase size={20} /> }, { value: 'marketplace', label: 'I buy my own', icon: <HeartPulse size={20} />, desc: 'Marketplace / ACA' },
           { value: 'medicare', label: 'Medicare', icon: <Armchair size={20} /> }]} />
-        {A.health === 'employer' && <BigField label="Your share of the premium per month" hint="What comes out of your paycheck for health insurance. Typical family share: $200–$600/mo">
+        {A.health === 'employer' && <BigField label="Your share of the premium per month" hint={<>What comes out of your paycheck for health insurance. Workers paid about $570/mo on average toward employer family coverage in 2025<cHealth.Cite id="kff_ehbs_2025" />.</>}>
           <Money big value={A.empPremium ?? 0} step={25} onChange={v => set({ empPremium: v })} /></BigField>}
         {(A.health === 'marketplace' || Math.min(A.p1.retire, couple ? A.p2.retire : 99) < 65) &&
           <BigField label={A.health === 'marketplace' ? 'Monthly premium' : 'Estimated premium between retiring and Medicare (65)'}
-            hint="Marketplace plans for a couple in their 60s are often $1,200–$2,000/mo before subsidies">
+            hint={<>Unsubsidized benchmark plans averaged $625/mo for a 40-year-old in 2026<cHealth.Cite id="kff_benchmark_2026" />; at 60+ they cost roughly twice that per person<cHealth.Cite id="cms_age_rating" />. Subsidies depend on income. Medicare Part B is $202.90/mo from 65<cHealth.Cite id="cms_partb_2026" />.</>}>
             <Money big value={A.bridge} step={100} onChange={v => set({ bridge: v })} /></BigField>}
         <div className="grid sm:grid-cols-3 gap-3">
           <BigField label="Out-of-pocket medical per year" hint="Deductibles, copays, prescriptions"><Money big value={A.oop ?? 0} step={250} onChange={v => set({ oop: v })} /></BigField>
           <BigField label="HSA balance"><Money big value={A.hsa?.balance ?? 0} step={1000} onChange={v => set({ hsa: { ...(A.hsa || { balance: 0, contrib: 0 }), balance: v } })} /></BigField>
-          <BigField label="HSA contribution per year"><Money big value={A.hsa?.contrib ?? 0} step={500} onChange={v => set({ hsa: { ...(A.hsa || { balance: 0, contrib: 0 }), contrib: v } })} /></BigField>
+          <BigField label="HSA contribution per year" hint={<>2026 limit $4,400 self-only, $8,750 family<cHealth.Cite id="irs_hsa_2026" /></>}><Money big value={A.hsa?.contrib ?? 0} step={500} onChange={v => set({ hsa: { ...(A.hsa || { balance: 0, contrib: 0 }), contrib: v } })} /></BigField>
         </div>
+        <cHealth.Sources />
       </Question>) },
     { section: 5, body: (
       <Question title="Any big plans we should include?" subtitle="Tap all that apply. Amounts are in today's dollars.">

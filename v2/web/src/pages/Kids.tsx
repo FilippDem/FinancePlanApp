@@ -3,6 +3,7 @@ import { Plus, Trash2, Baby, Download, Upload, RotateCcw } from 'lucide-react'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
 import { money } from '../lib/format'
+import { useCites } from '../components/Cite'
 import { Card, PageHeader, Field, NumberInput, TextInput, Select, Button, Empty, Badge, Grid, Stat, Note } from '../components/ui'
 import { StackedBars } from '../components/charts'
 import { useTodayDollars } from '../lib/hooks'
@@ -91,6 +92,7 @@ export default function Kids() {
     return { data, perChild }
   }, [proj, today])
 
+  const { Cite, Sources } = useCites(['mit_living_wage', 'childcareaware_2024', 'collegeboard'])
   const add = () => update(d => {
     let name = 'Child', n = 1
     while (d.children_list.some((c: any) => c.name.toLowerCase() === name.toLowerCase())) name = `Child ${++n}`
@@ -100,7 +102,7 @@ export default function Kids() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Kids" subtitle="Costs by age from regional templates, plus private school and college"
+      <PageHeader title="Kids" subtitle={<>Costs by age from regional templates<Cite id="mit_living_wage" />, with daycare<Cite id="childcareaware_2024" />, private school and college<Cite id="collegeboard" /></>}
         actions={<Button variant="primary" onClick={add}><Plus size={15} />Add child</Button>} />
       {kids.length === 0 ? <><Card><Empty icon={<Baby size={20} />} title="No children in the plan" body="Add current or future children to include their costs from birth through age 30." action={<Button variant="primary" onClick={add}><Plus size={15} />Add child</Button>} /></Card><TemplatePreview /></> : <>
         <Card title="Children's costs by year" subtitle={today ? "Today's dollars" : 'Nominal dollars'}>
@@ -133,6 +135,7 @@ export default function Kids() {
         <TemplatePreview />
         <Note>Healthcare categories grow with healthcare inflation; everything else with general inflation. College adds tuition plus room & board for the college location (ages 18–21).</Note>
       </>}
+      <Sources className="px-1" />
     </div>
   )
 }

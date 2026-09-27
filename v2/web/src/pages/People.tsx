@@ -2,6 +2,7 @@ import React from 'react'
 import { Plus, Trash2, Briefcase } from 'lucide-react'
 import { usePlan, pk } from '../lib/store'
 import { money } from '../lib/format'
+import { useCites } from '../components/Cite'
 import { Card, PageHeader, Field, Money, NumberInput, Percent, TextInput, Select, Segmented, Button, Grid, Note, Toggle, Badge } from '../components/ui'
 import { LinesChart } from '../components/charts'
 
@@ -17,8 +18,11 @@ function ssFactor(age: number) {
   return 1 - (Math.min(e, 36) * 5 / 9 + Math.max(e - 36, 0) * 5 / 12) / 100
 }
 
+const PEOPLE_SRC = ['ssa_claiming']
+
 function PersonCard({ who }: { who: 'X' | 'Y' }) {
   const { plan, update } = usePlan()
+  const { Cite } = useCites(PEOPLE_SRC)
   const n = who === 'X' ? '1' : '2'
   const set = (k: string, v: any) => update(d => { d[pk(who, k)] = v })
   const claimDefault = Math.min(Math.max(plan[pk(who, 'retirement_age')], 62), 70)
@@ -39,7 +43,7 @@ function PersonCard({ who }: { who: 'X' | 'Y' }) {
         <Field label="Retirement age"><NumberInput value={plan[pk(who, 'retirement_age')]} min={30} max={85} step={1} onChange={v => set('retirement_age', Math.round(v))} /></Field>
         <Field label="Social Security claim age" hint="62–70. Defaults to your retirement age (at least 62).">
           <NumberInput value={claim} min={62} max={70} step={1} onChange={v => set('ss_claim_age', Math.round(v))} /></Field>
-        <Field label="SS benefit at 67 (monthly)" hint="From your ssa.gov statement, in today's dollars">
+        <Field label="SS benefit at 67 (monthly)" hint="From your ssa.gov statement, in today's dollars" cite={<Cite id="ssa_claiming" />}>
           <Money value={plan[pk(who, 'ss_benefit')]} step={50} onChange={v => set('ss_benefit', v)} /></Field>
         <div className="flex flex-col justify-end pb-1.5">
           <div className="text-[12.5px] text-muted">Claiming at {claim}</div>
@@ -138,6 +142,7 @@ function IncomeCard({ who }: { who: 'X' | 'Y' }) {
 
 export default function People() {
   const { plan, update, proj, single, names } = usePlan()
+  const { Sources } = useCites(PEOPLE_SRC)
   const marriageOpts = ['N/A', ...Array.from({ length: plan.current_year - 1969 }, (_, i) => String(plan.current_year - i))]
   const incomeData = (proj?.rows || []).filter((r: any) => r.wages1 + r.wages2 + r.ss_income > 0).map((r: any) => ({
     year: r.year, w1: r.wages1, w2: r.wages2, ss: r.ss_income }))
@@ -172,6 +177,7 @@ export default function People() {
           <LinesChart data={incomeData} series={[{ key: 'w1', label: names[0] }, ...(single ? [] : [{ key: 'w2', label: names[1] }]), { key: 'ss', label: 'Social Security' }]} />
         </Card>
       )}
+      <Sources className="px-1" />
     </div>
   )
 }

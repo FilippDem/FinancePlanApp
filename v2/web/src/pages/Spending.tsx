@@ -3,7 +3,8 @@ import { Plus, Trash2, Pencil, Wand2, Repeat, ShoppingBag } from 'lucide-react'
 import { usePlan, pk } from '../lib/store'
 import { api } from '../lib/api'
 import { money } from '../lib/format'
-import { SpendingSlider, useCurve } from '../components/SpendingSlider'
+import { SpendingSlider, useCurve, curveSources } from '../components/SpendingSlider'
+import { useCites } from '../components/Cite'
 import { rescale, strategyFor, xForTotal, levelAt, sum as sumCats, lifestyleOptions, BASE_LIFESTYLES, priceLoc } from '../lib/spending'
 
 const SHARED_LIFESTYLE = ['Family Vacations', 'Shared Subscriptions', 'Pet Care', 'Other Family Expenses', 'Home Improvement']
@@ -60,6 +61,8 @@ function PersonalTab() {
   const stratOptions = [...STRATS.map(s => ({ value: s, label: s.replace(' (statistical)', '') })),
     ...lifestyleOptions(plan, loc).filter(s => !BASE_LIFESTYLES.includes(s)).map(s => ({ value: s, label: `${s} · my template` })),
     ...(![...STRATS, ...lifestyleOptions(plan, loc)].includes(strat) ? [{ value: strat, label: strat.replace(' (statistical)', '') }] : [])]
+  const srcIds = [...curveSources(curve), 'mit_living_wage']
+  const { Cite, Sources } = useCites(srcIds)
   const vals = plan[pk(who, 'expenses')] || {}
   const total = Object.values(vals).reduce((a: number, b: any) => a + (+b || 0), 0)
   const stored = plan[pk(who, 'spending_level')]
@@ -110,7 +113,7 @@ function PersonalTab() {
           <Toggle checked={scaleShared} onChange={setScaleShared} label="Shared extras too" hint="Also scale vacations, shared subscriptions, pets, home improvement and other shared lifestyle costs" />
           <div className="w-44"><Select value={loc} options={locOptions} onChange={setLoc} /></div>
         </div>}>
-        <SpendingSlider curve={curve} value={x} onChange={move} />
+        <SpendingSlider curve={curve} value={x} onChange={move} cite={<Cite id={curveSources(curve)} />} />
       </Card>
       <Card title={`${names[who === 'X' ? 0 : 1]}'s personal spending`} subtitle={`${money(total, { compact: false })} per year · ${money(total / 12, { compact: false })} per month, today's dollars`}>
         <details className="mb-6 rounded-lg bg-sunken/70 border border-line">
@@ -121,11 +124,12 @@ function PersonalTab() {
             <Field label="Lifestyle" className="w-56"><Select value={strat} options={stratOptions} onChange={setStrat} /></Field>
             <Field label="Data" className="w-56"><Select value={source} options={[{ value: 'calibrated', label: 'BLS / BEA 2024 (recommended)' }, { value: 'v08', label: 'v0.8 original (about 2x higher)' }]} onChange={setSource} /></Field>
             <Button onClick={apply} disabled={busy}>{busy ? 'Applying…' : 'Apply template'}</Button>
-            <span className="text-xs text-muted mb-2.5 basis-full">Overwrites the amounts below (inflated to {plan.current_year}).</span>
+            <span className="text-xs text-muted mb-2.5 basis-full">Overwrites the amounts below (inflated to {plan.current_year}). BLS / BEA data<Cite id={curveSources(curve)} />; v0.8 original templates<Cite id="mit_living_wage" />.</span>
           </div>
         </details>
         <CategoryEditor values={vals} groups={reference?.adult_categories || {}} onChange={(k, v) => update(d => { d[pk(who, 'expenses')][k] = v })} />
       </Card>
+      <Sources className="px-1" />
     </div>
   )
 }

@@ -28,8 +28,11 @@ export function useCurve(location: string, year: number, inflation: number) {
   return c
 }
 
-export function SpendingSlider({ curve, value, onChange, adults = 1, compact }:
-  { curve: Curve | null; value: number; onChange: (x: number) => void; adults?: number; compact?: boolean }) {
+/** Source ids behind a curve, in citation order: BLS spending always, plus the price data for the place. */
+export const curveSources = (c: Curve | null) => ['bls_cex_2022', 'bls_cex_2024', ...(c?.basis === 'country' ? ['worldbank_pli'] : c?.basis === 'us' ? [] : ['bea_rpp_2024'])]
+
+export function SpendingSlider({ curve, value, onChange, adults = 1, compact, cite }:
+  { curve: Curve | null; value: number; onChange: (x: number) => void; adults?: number; compact?: boolean; cite?: React.ReactNode }) {
   const ms = useMemo(() => (curve ? milestones(curve) : []), [curve])
   const per = curve ? sum(levelAt(curve, value)) : 0
   // stagger labels into rows so they never overlap (greedy, using the measured track width)
@@ -82,7 +85,7 @@ export function SpendingSlider({ curve, value, onChange, adults = 1, compact }:
         </div>
       </div>
       {!compact && <p className="text-[12px] text-muted flex gap-1.5"><Info size={13} className="shrink-0 mt-0.5" />
-        {curve.note}. Personal spending only: housing, kids, healthcare premiums and big purchases are separate. The "Old app" marks are the v0.8 templates, about twice what BLS data shows.</p>}
+        <span>{curve.note}{cite}. Personal spending only: housing, kids, healthcare premiums and big purchases are separate. The "Old app" marks are the v0.8 templates, about twice what BLS data shows.</span></p>}
     </div>
   )
 }

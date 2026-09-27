@@ -5,6 +5,7 @@ from collections import OrderedDict
 
 from finplan.engine import project, monte_carlo
 from finplan.plan import normalize_plan, is_single
+from finplan import reference as _REF
 
 SECTIONS = OrderedDict([
     ('summary', 'Summary & key numbers'),
@@ -279,3 +280,37 @@ def mc_percentiles(ctx: dict, today: bool = True) -> tuple[list[str], list[list]
         d = r['infl_index'] if today else 1.0
         out.append([r['year']] + [mc['net_worth'][q][t] / d for q in qs] + [mc['solvent_by_year'][t]])
     return ['Year'] + [f'{q}th pct NW' for q in qs] + ['Still solvent'], out
+
+
+# ── data citations ─────────────────────────────────────────────────────────
+def _abroad(p: dict) -> bool:
+    return any(_REF.location_tax_info((p.get('custom_locations') or {}).get(e['state'], {}).get('tax_location') or e['state'])[0] == 'country'
+               for e in p['state_timeline'])
+
+
+def section_sources(ctx: dict, section: str) -> list[str]:
+    """Source ids (data/sources.json) behind a report section, in citation order."""
+    p = ctx['plan']
+    abroad = _abroad(p)
+    hist = bool(p.get('mc_use_historical'))
+    m = {
+        'people': ['ssa_claiming'],
+        'children': ['mit_living_wage', 'childcareaware_2024', 'collegeboard'],
+        'spending': ['bls_cex_2022', 'bls_cex_2024', 'bea_rpp_2024'] + (['worldbank_pli'] if abroad else []),
+        'healthcare': ['cms_partb_2026', 'cms_partd_2026', 'cms_nhe'],
+        'locations': ['bea_rpp_2024', 'taxfoundation_state_2025'] + (['worldbank_pli', 'oecd_taxing_wages_2025'] if abroad else []),
+        'assumptions': ['bls_cpi', 'cms_nhe', 'irs_2024_tax', 'ssa_wage_base', 'ssa_trustees_2026'] + (['damodaran_sp500'] if hist else []),
+        'monte_carlo': ['damodaran_sp500'] if hist else [],
+    }
+    return m.get(section, [])
+
+
+def sources_for(ctx: dict, sections: list) -> list[tuple[str, dict]]:
+    """Every cited source for the chosen sections, first-use order, with its data."""
+    src = _REF.sources()
+    order: list[str] = []
+    for sec in sections:
+        for i in section_sources(ctx, sec):
+            if i in src and i not in order:
+                order.append(i)
+    return [(i, src[i]) for i in order]
