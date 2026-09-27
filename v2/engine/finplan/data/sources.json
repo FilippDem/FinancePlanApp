@@ -25,11 +25,11 @@
   "worldbank_pli": {
     "publisher": "World Bank, World Development Indicators",
     "title": "Price level ratio of PPP conversion factor (GDP) to market exchange rate (PA.NUS.PPPC.RF)",
-    "year": "2020 values",
+    "year": "2024 values (WDI 2026 update)",
     "url": "https://data.worldbank.org/indicator/PA.NUS.PPPC.RF",
-    "alt_url": "https://www.indexmundi.com/facts/indicators/PA.NUS.PPPC.RF/rankings",
+    "alt_url": "https://ourworldindata.org/grapher/gdp-price-levels-relative-to-the-us",
     "used_for": "Price levels outside the US (US = 1.00)",
-    "note": "Rough: economy-wide, dated and sensitive to exchange rates"
+    "note": "Rough: economy-wide (a few % below consumer price levels in rich countries) and sensitive to exchange rates"
   },
   "numbeo": {
     "publisher": "Numbeo",

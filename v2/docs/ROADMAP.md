@@ -1,6 +1,6 @@
 # v2: where it stands and what to build next
 
-_Last updated 2026-09-26 (branch `v2-react`)_
+_Last updated 2026-09-27 (branch `v2-react`)_
 
 ## 1. Current state
 
@@ -23,9 +23,13 @@ v2 now covers every v0.8 tab and adds a set of "living plan" features. See `PARI
 | **Data citations**: numbered [n] sources with links in the app and reports | ✅ |
 | **Who owns what**: separate vs marital property by year, homes by contribution, gifts & inheritances, prenup rules | ✅ |
 | **Linked accounts**: Fidelity/any CSV import and optional daily SnapTrade sync feeding check-ins | ✅ |
+| **Roth / per-person pre-tax accounts, RMDs, spousal Social Security** | ✅ |
+| **"What would it take?"** solver on the Dashboard | ✅ |
+| Pages load on first visit (smaller first download) | ✅ |
+| Cost-of-living raw data re-checked against BEA, BLS and World Bank (2026-09-27) | ✅ |
 | Demo households re-tuned for the corrected math | ✅ |
 
-Tests: 56 engine tests, 22 API tests, and a clean `tsc` build. The UI was checked end to end with Playwright.
+Tests: 60 engine tests, 22 API tests, and a clean `tsc` build. The UI was checked end to end with Playwright.
 
 ## 2. What's still missing
 
@@ -37,13 +41,13 @@ The 2026-09-26 audit found only small items left (see `PARITY.md`); their data i
 - Guided walkthroughs and tab visibility are replaced by guided setup and per-page Help on purpose
 
 ### 2a'. Data freshness
-The app cites every major dataset (`engine/finplan/data/sources.json`). Datasets to refresh each year: BEA price parities (February), BLS Consumer Expenditures (September/December), IRS brackets and limits (October/November), SSA wage cap and bend points (October), Medicare premiums (November), Social Security Trustees Report (spring/summer). International prices use 2020 World Bank price levels and should move to a newer ICP round. The federal tax brackets are the 2024 ones indexed with the plan's inflation rate.
+The app cites every major dataset (`engine/finplan/data/sources.json`). Datasets to refresh each year: BEA price parities (February), BLS Consumer Expenditures (September/December), IRS brackets and limits (October/November), SSA wage cap and bend points (October), Medicare premiums (November), Social Security Trustees Report (spring/summer). International prices use 2024 World Bank price levels (updated 2026-09-27; refresh with each WDI update). The federal tax brackets are the 2024 ones indexed with the plan's inflation rate.
 
 ### 2b. Modeling gaps (these affect the numbers)
 | Gap | Why it matters |
 |---|---|
-| **One savings pool** (liquid + pre-tax) with no Roth/taxable split, no RMDs and no capital-gains tax | Taxes in retirement are approximate. Roth conversions and withdrawal order can't be planned |
-| **No survivor or spousal Social Security** | "Early death" and single-earner plans look worse than reality |
+| **No capital-gains tax or Roth conversions** (Roth, per-person pre-tax and RMDs are now modeled) | Taxable-account withdrawals are untaxed and conversion strategies can't be planned |
+| **Social Security from earnings history** (spousal and survivor rules are done) | Benefits are typed in or estimated from today's salary |
 | **No pension/annuity income type** | Teachers, government and military plans have to fake it through the SS field (the Single Mom demo does this) |
 | **Salaries don't respond to inflation** | Inflation stress tests are harsh, because wages stay flat while prices jump |
 | **Fixed spending in Monte Carlo** | Real families cut back in bad years, so success rates are pessimistic for flexible spenders. Guardrails would fix this |
@@ -52,11 +56,10 @@ The app cites every major dataset (`engine/finplan/data/sources.json`). Datasets
 | **No non-mortgage debts** (student loans, car loans as balances), **no 529s**, no emergency-fund rule | Common family situations need workarounds |
 
 ### 2c. Product gaps
-- **"What would it take?"** The app shows success %, but can't answer "save how much more / retire when / spend how much less to reach 85%?"
 - **No goals.** "Retire at 55", "college fully funded" and "pay off the house by 60" aren't first-class items with progress bars.
 - **Spending actuals still come from typing.** Balances can now come from linked accounts (CSV or SnapTrade), but transactions (Monarch Money, bank CSVs) don't fill Actuals yet.
 - **Nothing is live on the NAS yet.** v2 runs only locally, the NAS still serves v0.8, and there's no CI.
-- **Bundle size.** The web bundle is 820 kB (one chunk). Code-splitting per page would halve the first load on phones.
+- **Bundle size.** Pages now load on first visit (main chunk 786 kB, was 1,068 kB). Recharts could still be split out.
 
 ## 3. Plan (in priority order)
 
@@ -68,13 +71,13 @@ The app cites every major dataset (`engine/finplan/data/sources.json`). Datasets
 5. Merge `v2-react` into `main` once a full quarter of check-ins has run on v2.
 
 ### Phase 2: Answer the real questions
-1. **"What would it take?" solver.** A binary search over one lever at a time (extra savings per month, retirement age, spending cut %, home budget) to reach a target success rate. Show it on the Dashboard as 2–3 one-click suggestions.
+1. ✅ **"What would it take?" solver** (done 2026-09-27: retire later, spend less, claim later, or a mix). A binary search over one lever at a time (extra savings per month, retirement age, spending cut %, home budget) to reach a target success rate. Show it on the Dashboard as 2–3 one-click suggestions.
 2. **Plan health checklist**: emergency fund, insurance coverage (from the stress tests), savings rate, housing cost ratio, college funding. Each item gets a status and a link.
 3. **Goals** with progress, shown on the Dashboard and in every check-in result.
 
 ### Phase 3: Make the math trustworthy
-1. **Account types**: taxable, traditional and Roth per person. Withdrawal order (taxable → traditional → Roth), RMDs from 73/75, and capital-gains tax on taxable withdrawals. This is the biggest accuracy gain for retirement years.
-2. **Social Security**: spousal (50%) and survivor (100% of the higher benefit) rules, plus earnings-based estimates.
+1. **Account types** (partly done: per-person pre-tax, Roth and RMDs; still to do: capital-gains tax, Roth conversions): taxable, traditional and Roth per person. Withdrawal order (taxable → traditional → Roth), RMDs from 73/75, and capital-gains tax on taxable withdrawals. This is the biggest accuracy gain for retirement years.
+2. **Social Security** (spousal and survivor done; earnings-based estimates still to do): spousal (50%) and survivor (100% of the higher benefit) rules, plus earnings-based estimates.
 3. **Pensions and annuities** as an income type (start age, COLA, survivor %).
 4. **Guardrail spending in Monte Carlo** (optional): cut discretionary spending by X% when the portfolio falls below its path.
 5. **Glide path** (stock % declines toward retirement) and a wage-inflation link option for stress tests.

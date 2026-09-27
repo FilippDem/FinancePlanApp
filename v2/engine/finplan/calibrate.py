@@ -2,11 +2,13 @@
 
 * Spending levels per adult come from the BLS Consumer Expenditure Survey (2022 income
   quintiles, grown to 2024 with the 2024 all-household category totals).
-    Conservative = 2nd quintile, Average = midpoint of 3rd and 4th quintiles, High-end = top quintile.
+    Conservative = 2nd quintile, Average = average US household, High-end = top quintile
+    (positions 20 / 50 / 78 on the spending slider below).
   Household spending is split per adult as adults + 0.5 x children (children have their own templates).
 * Location differences use BEA Regional Price Parities 2024: goods-type categories scale with the
   goods RPP, service-type categories with the "other services" RPP, and rent with the rents RPP.
-* Locations without an RPP (outside the US) keep v0.8's relative level versus Seattle.
+* Countries use the World Bank 2024 price level; built-in cities outside the US keep v0.8's
+  relative level versus Seattle.
 All amounts are 2024 dollars (the template base year).
 """
 from __future__ import annotations
@@ -38,7 +40,12 @@ def _q(row: str, col: str) -> float:
     q = data()['cex_2022_quintiles']
     vals = list(q[row])
     cols = q['columns']
-    # interpolate suppressed cells between neighbours
+    if row == 'other_entertainment':
+        # BLS suppresses two cells (RSE >= 25%) but publishes the entertainment subtotal, so the
+        # missing part is exact: entertainment - fees/admissions - audio/visual - pets/toys/hobbies
+        parts = ('fees_admissions', 'audio_visual', 'pets_toys_hobbies')
+        vals = [v if v is not None else q['entertainment'][i] - sum(q[r][i] for r in parts) for i, v in enumerate(vals)]
+    # interpolate any other suppressed cells between neighbours
     for i, v in enumerate(vals):
         if v is None:
             lo = next(vals[j] for j in range(i - 1, -1, -1) if vals[j] is not None)
@@ -202,11 +209,18 @@ def spending_curve(location: str, v08_lookup=None) -> dict:
     for x, key, label, desc in ANCHORS:
         if key.startswith('v08'):
             t = v08_lookup(location, 'High-end' if key == 'v08_high' else 'Average') if v08_lookup else None
+            scale = 1.0
             if not t and v08_lookup:
+                # no old-app template here: use Seattle's, moved to local prices the same way as the
+                # top-20% anchor (otherwise e.g. India would jump from ~$7k to Seattle's ~$37k)
                 t = v08_lookup('Seattle', 'High-end' if key == 'v08_high' else 'Average')
+                q5 = next((a for a in anchors if a['key'] == 'q5'), None)
+                sea_q5 = sum(_localize(national_adult_col('q5'), 'Seattle', None)[0].values())
+                if q5 and sea_q5:
+                    scale = q5['total'] / sea_q5
             if not t:
                 continue
-            cats = {k: float(v) for k, v in t.items()}
+            cats = {k: float(v) * scale for k, v in t.items()}
         else:
             cats, basis = _localize(national_adult_col(key), location, v08_lookup)
         cats = {k: round(v / 10) * 10 for k, v in cats.items()}
@@ -219,7 +233,7 @@ def spending_curve(location: str, v08_lookup=None) -> dict:
             anchors[i]['total'] = sum(anchors[i]['cats'].values())
     return {'location': location, 'basis': basis, 'anchors': anchors,
             'note': {'bea': 'BLS spending by income group, adjusted to local prices with BEA 2024 price parities',
-                     'country': 'BLS spending by income group, scaled by the World Bank national price level (2020, rough)',
+                     'country': 'BLS spending by income group, scaled by the World Bank national price level (2024, rough)',
                      'relative': "BLS spending by income group; local prices estimated from the audited templates (no BEA data outside the US)",
                      'us': 'BLS spending by income group at US-average prices (no local price data)'}[basis]}
 

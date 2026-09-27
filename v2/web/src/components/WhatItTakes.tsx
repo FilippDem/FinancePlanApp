@@ -24,7 +24,7 @@ function describe(l: any): string {
   }
 }
 
-/** "What would it take?": the smallest single change (retire later, spend less, save more) that reaches a
+/** "What would it take?": the smallest single change (retire later, spend less, claim Social Security later, or a mix) that reaches a
  *  target chance of success, or the headroom when the plan is already there. One click applies it. */
 export function WhatItTakes() {
   const { plan, update } = usePlan()
@@ -59,7 +59,9 @@ export function WhatItTakes() {
           <div className="text-sm mb-3">
             {res.reached
               ? <span className="flex items-center gap-2"><CheckCircle2 size={16} className="text-good" />You're at <b>{pct(res.success, 0)}</b>, above {pct(res.target, 0)}. Room to spare:</span>
-              : <span>Today: <b>{pct(res.success, 0)}</b>. Any one of these gets you to {pct(res.target, 0)}:</span>}
+              : res.levers.some((l: any) => l.feasible)
+                ? <span>Today: <b>{pct(res.success, 0)}</b>. Any one of these gets you to {pct(res.target, 0)}:</span>
+                : <span>Today: <b>{pct(res.success, 0)}</b>. No single change below reaches {pct(res.target, 0)}. Try a lower target, or combine changes on the Retirement and Spending pages:</span>}
           </div>
           <ul className="divide-y divide-line">
             {res.levers.map((l: any) => (

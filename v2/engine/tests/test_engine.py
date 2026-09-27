@@ -461,3 +461,45 @@ def test_what_would_it_take_solver():
     rich = {**p, 'parentX_net_worth': 5000000}
     h = solve(rich, 0.85, n=300)
     assert h['reached'] and any(l['id'] == 'spend_more' and l['amount'] > 0 for l in h['levers'])
+
+
+def test_cost_data_matches_published_sources():
+    """Spot values re-checked against BEA/FRED 2024 RPPs, BLS CE Table 1101 (2022) and WDI 2024 (2026-09-27)."""
+    from finplan import calibrate as K
+    d = K.data()
+    assert abs(d['rpp_states']['California'][0] - 110.7) < 0.1 and abs(d['rpp_states']['California'][2] - 154.3) < 0.1
+    assert d['rpp_metros']['Honolulu'] == [110.961, 111.562, 135.538, 102.898]
+    assert d['rpp_metros']['Seattle'] == [111.133, 103.972, 151.314, 106.835]
+    assert d['rpp_metros']['San Francisco'][2] == 194.718
+    q = d['cex_2022_quintiles']
+    assert q['total'] == [72967, 32612, 47657, 61950, 81957, 140654]
+    assert q['persons'] == [2.4, 1.6, 2.1, 2.4, 2.9, 3.2] and q['children'] == [0.6, 0.3, 0.4, 0.6, 0.7, 0.8]
+    # the two BLS-suppressed cells come out exactly from the published entertainment subtotal
+    assert K._q('other_entertainment', 'q2') == 258 and K._q('other_entertainment', 'q3') == 712
+    # transportation and entertainment parts add up to their published subtotals
+    for i in range(6):
+        parts = sum(q[r][i] for r in ('vehicle_purchases', 'gasoline', 'vehicle_insurance', 'vehicle_finance', 'maintenance',
+                                      'vehicle_fees', 'public_transport'))
+        assert abs(parts - q['transportation'][i]) <= 2
+    assert d['cex_2024_all']['total'] == 78535
+    assert d['country_price_level']['Japan'] == 0.624 and d['country_price_level']['United States'] == 1.0
+
+
+def test_spending_curves_are_sane_everywhere():
+    """Every location: slider totals rise, lifestyles are ordered, and no jump to Seattle's old templates."""
+    from finplan import reference as R, calibrate as K
+    locs = set(R.all_locations()) | set(K.data()['country_price_level'])
+    for loc in locs:
+        a = R.spending_curve(loc)['anchors']
+        tots = [x['total'] for x in a]
+        assert tots == sorted(tots), loc
+        by = {x['key']: x['total'] for x in a}
+        if 'v08_avg' in by:
+            assert by['v08_avg'] < 2.2 * by['q5'], (loc, by)   # the old-app anchor stays near the top-20% level
+        lv = [sum(R.adult_template_calibrated(loc, s).values()) for s in ('Conservative', 'Average', 'High-end')]
+        assert lv[0] < lv[1] < lv[2], loc
+    # cheaper places are cheaper
+    tot = lambda l: sum(R.adult_template_calibrated(l, 'Average').values())
+    assert tot('Mississippi') < tot('Texas') < tot('Seattle') < tot('San Francisco')
+    assert tot('India') < tot('Mexico') < tot('Portugal') < tot('Seattle')
+    assert K.rent_factor('Seattle', 'San Francisco') > 1.2 and K.rent_factor('Seattle', 'Mississippi') < 0.5

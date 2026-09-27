@@ -112,9 +112,36 @@ The six demo households were tuned against the v0.8 engine, which never charged 
 ### Gifts & inheritances
 `windfalls` (new, additive): cash that arrives in a given year (today's dollars by default), not taxed as income, shown as events and in the cash-flow timeline. Tagged separate (to one person) or joint.
 
+## Round 4 changes (2026-09-27)
+
+### Account types: Roth, per-person pre-tax, RMDs
+- Savings are now split into cash/taxable, each person's pre-tax accounts (401(k)/IRA), HSA and Roth. New inputs: `parentX/Y_roth_balance` and `roth_contribution` (per year, taken from after-tax pay). Plans without them behave as before, because all Roth values default to 0.
+- Withdrawal order in a shortfall: cash first, then pre-tax (grossed up for income tax), then Roth (tax-free).
+- **Required minimum distributions** (`rmd_enabled`, on by default): each year, prior-year pre-tax balance ÷ the Uniform Lifetime Table divisor [10]. RMDs start at 73 if born 1951–1959 and at 75 if born 1960 or later [9][11]. Roth accounts have no RMDs while the owner is alive [9]. The RMD is taxed as ordinary income and lands in cash. A deceased spouse's pre-tax accounts roll over to the survivor.
+- Rows gain `roth`, `rmd`, `withdrawal_roth` and `contrib_roth`. Investable assets and net worth include Roth.
+
+### Spousal Social Security
+- `spousal_ss` (on by default, couples only). Once both partners have claimed, the lower earner gets the larger of their own benefit and up to 50% of the partner's full-retirement-age benefit [12]. Claiming before 67 reduces this by 25/36 of 1% a month for the first 36 months and 5/12 of 1% after that, so 62 gives 32.5% [12][13]. Survivor benefits apply after that, as before.
+
+### "What would it take?" solver (`finplan/solver.py`, `POST /api/solve`)
+- For a target chance of success, it finds the smallest single change that reaches it:
+  - retire later (0–10 years)
+  - spend less (0–40% of everyday, personal and recurring costs; housing, kids and healthcare are untouched)
+  - claim Social Security later (up to 70)
+  - a mix of all three (up to 5 years later, 25% less and 3 years later together)
+- When the plan is already above the target, it reports headroom instead: retire earlier or spend more.
+- Each option is a bisection over the Monte Carlo success rate with a fixed seed, so every candidate sees the same market paths. The answer is a patch the UI applies after saving the old plan as a scenario.
+- There is no "save more" option: money not spent is already saved in this model, so it is the same lever as "spend less".
+
+### Cost-of-living data re-check
+Every table in `data/cost_index.json` was re-checked against its publisher; see `COST_OF_LIVING_AUDIT.md` → *Raw-data re-check*.
+- World Bank country price levels moved from 2020 to 2024 values [2].
+- The two BLS-suppressed cells are now calculated exactly from the published subtotal.
+- For countries without an old-app template, the "Old app" slider marks are now at local prices (they had used Seattle's dollars).
+
 ### Sources
 [1] U.S. Bureau of Economic Analysis, [Regional Price Parities by State and Metro Area, 2024](https://www.bea.gov/data/prices-inflation/regional-price-parities-state-and-metro-area)
-[2] World Bank, [Price level ratio of PPP conversion factor to market exchange rate (PA.NUS.PPPC.RF)](https://data.worldbank.org/indicator/PA.NUS.PPPC.RF)
+[2] World Bank, [Price level ratio of PPP conversion factor to market exchange rate (PA.NUS.PPPC.RF)](https://data.worldbank.org/indicator/PA.NUS.PPPC.RF), 2024 values via [Our World in Data](https://ourworldindata.org/grapher/gdp-price-levels-relative-to-the-us)
 [3] HUD, [Fair Market Rents](https://www.huduser.gov/portal/datasets/fmr.html)
 [4] BLS, [Consumer Expenditure Surveys Table 1101, income quintiles, 2022](https://www.bls.gov/cex/tables/calendar-year/mean-item-share-average-standard-error/cu-income-quintiles-before-taxes-2022.pdf)
 [5] BLS, [Consumer Expenditures — 2024](https://www.bls.gov/news.release/cesan.nr0.htm)
@@ -123,3 +150,8 @@ The six demo households were tuned against the v0.8 engine, which never charged 
 [8] IRS, [Publication 555, Community Property](https://www.irs.gov/publications/p555) (Dec 2024)
 
 The full, numbered list the app cites lives in `engine/finplan/data/sources.json`.
+[9] IRS, [Retirement topics: Required minimum distributions](https://www.irs.gov/retirement-plans/plan-participant-employee/retirement-topics-required-minimum-distributions-rmds)
+[10] 26 CFR 1.401(a)(9)-9, [Uniform Lifetime Table](https://www.law.cornell.edu/cfr/text/26/1.401(a)(9)-9)
+[11] Federal Register, [Required Minimum Distributions final regulations (SECURE 2.0 applicable age)](https://www.federalregister.gov/documents/2024/07/19/2024-14542/required-minimum-distributions)
+[12] SSA, [Benefits for spouses](https://www.ssa.gov/oact/quickcalc/spouse.html)
+[13] SSA, [Retirement age and benefit reduction](https://www.ssa.gov/benefits/retirement/planner/agereduction.html)

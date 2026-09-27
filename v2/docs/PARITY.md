@@ -139,11 +139,15 @@ Data compatibility is ✅ for everything: v2 reads and writes the same household
 | State/country timeline (moves) | ✅ |
 | Monte Carlo: runs, traditional asymmetric / symmetric, historical, today's $ | ✅ (+ allocation, sequential sampling) |
 | Monte Carlo start year / horizon overrides | ➖ v0.8 stored them but the simulation ignored them |
+| Roth balances and yearly Roth contributions per person | ✅ New in v2 |
+| Required minimum distributions (73/75, Uniform Lifetime Table) | ✅ New in v2, toggle in Assumptions |
+| Spousal Social Security (up to 50%, reduced if claimed early) | ✅ New in v2, toggle in Assumptions |
 
 ## Analysis
 | Feature | Status |
 |---|---|
-| Dashboard with key metrics & alerts | ✅ v0.8 alerts ported (separate-finance per person, peak/drawdown, healthcare share, years covered, plan end) plus health lights and peer comparison |
+| Dashboard with key metrics & alerts | ✅ v0.8 alerts ported (separate-finance per person, peak/drawdown, healthcare share, years covered, plan end) plus health lights, peer comparison, RMD / commingling / saving-rate alerts |
+| "What would it take?" (smallest change to reach a target success rate; headroom when already there; one-click apply) | ✅ New in v2 |
 | Deterministic cashflow chart + year-by-year table with drill-down | ✅ |
 | Cashflow explorer: timeline with surplus/deficit and event stars, year drill-down (donuts, Sankey, full expense summary, taxes) | ✅ |
 | Cashflow "critical years" and "life stages" views | ✅ Life stages use planned retirement ages and the youngest living adult |

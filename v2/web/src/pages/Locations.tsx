@@ -282,7 +282,7 @@ function TemplateBrowser({ Cite }: { Cite: CiteT }) {
             <div className="mt-4 rounded-lg bg-sunken/70 p-3 text-[12.5px] text-ink2">
               <div className="font-medium mb-1">Data sources</div>
               {source === 'calibrated'
-                ? <p>BLS Consumer Expenditure Survey: 2022 income quintiles<Cite id="bls_cex_2022" />, grown to 2024 totals<Cite id="bls_cex_2024" />, for spending levels; BEA Regional Price Parities 2024 for US states and metros<Cite id="bea_rpp_2024" />; World Bank price levels (2020) for other countries<Cite id="worldbank_pli" />.</p>
+                ? <p>BLS Consumer Expenditure Survey: 2022 income quintiles<Cite id="bls_cex_2022" />, grown to 2024 totals<Cite id="bls_cex_2024" />, for spending levels; BEA Regional Price Parities 2024 for US states and metros<Cite id="bea_rpp_2024" />; World Bank price levels (2024) for other countries<Cite id="worldbank_pli" />.</p>
                 : src ? <p>{src.source} ({src.year})<Cite id="mit_living_wage" />. {src.notes} Corrected in the 2026 audit against BEA price parities<Cite id="bea_rpp_2024" /> and Numbeo<Cite id="numbeo" />.</p>
                 : <p>v0.8 template<Cite id="mit_living_wage" />, corrected by the 2026 audit (location scale<Cite id="bea_rpp_2024" />, lifestyle ratios<Cite id="bls_cex_2022" />, international cities<Cite id="numbeo" />).</p>}
             </div>
