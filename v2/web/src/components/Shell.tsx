@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { HELP } from '../lib/help'
 import {
   LayoutDashboard, Users, Wallet, Baby, Home, HeartPulse, SlidersHorizontal, LineChart, CalendarRange, Layers,
-  Moon, Sun, LogOut, Check, Loader2, AlertCircle, ArrowLeftRight, Menu, X, ClipboardCheck, Wand2, Receipt, Palmtree, ShieldAlert, MapPin, UserCog, FlaskConical, ChevronDown, ChevronUp, HelpCircle,
+  Moon, Sun, LogOut, Check, Loader2, AlertCircle, ArrowLeftRight, Menu, X, ClipboardCheck, Wand2, Receipt, Palmtree, ShieldAlert, MapPin, UserCog, FlaskConical, Scale, ChevronDown, ChevronUp, HelpCircle,
 } from 'lucide-react'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
@@ -21,6 +21,7 @@ const NAV = [
   { to: '/homes', label: 'Homes', icon: Home },
   { to: '/healthcare', label: 'Healthcare', icon: HeartPulse },
   { to: '/locations', label: 'Where you live', icon: MapPin },
+  { to: '/ownership', label: 'Who owns what', icon: Scale },
   { to: '/assumptions', label: 'Assumptions', icon: SlidersHorizontal },
   { group: 'Analyze' },
   { to: '/projections', label: 'Projections', icon: LineChart },

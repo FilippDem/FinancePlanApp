@@ -19,7 +19,7 @@ const MONEY_KEYS = ['wages1', 'wages2', 'ss_income', 'ss1', 'ss2', 'rent_income'
   'tax_federal', 'tax_state', 'tax_fica', 'tax_foreign', 'contrib_pretax', 'exp_person1', 'exp_person2', 'exp_family',
   'exp_children', 'exp_housing', 'exp_mortgage_pi', 'exp_healthcare', 'exp_recurring', 'exp_purchases', 'down_payment',
   'total_expenses', 'cashflow', 'withdrawal_pretax', 'liquid', 'pretax', 'investable', 'home_value', 'mortgage_balance',
-  'home_equity', 'other_assets', 'consumer_debt', 'net_worth', 'liquid1', 'liquid2', 'investment_growth']
+  'home_equity', 'other_assets', 'consumer_debt', 'net_worth', 'liquid1', 'liquid2', 'investment_growth', 'windfalls']
 
 /** Deflate projection rows to today's dollars. */
 export function deflate(rows: any[], today: boolean): any[] {

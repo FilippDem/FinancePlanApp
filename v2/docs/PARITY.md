@@ -78,6 +78,20 @@ Data compatibility is ✅ for everything: v2 reads and writes the same household
 | Everyday prices and rent follow moves | ✅ New; can be turned off to match v0.8 |
 | Tax rules per location, including countries | ✅ |
 
+## Who owns what (new in v2; v0.8 had only Pooled/Separate finances)
+| Feature | Status | Notes |
+|---|---|---|
+| Separate vs marital property, year by year (cash, retirement accounts, each home) | ✅ | Labels only: totals, taxes and success rates never change |
+| Rules from the state (community property vs equitable distribution), editable for a prenup | ✅ | Pay during marriage marital or separate; growth/rent on separate property per state; marital split % |
+| Separate part of today's balances, with a wedding-day growth helper | ✅ | Couples marrying later: everything stays separate until the wedding year |
+| Homes: separate money put in, equity shared by contributions | ✅ | Pro-rata contribution method (planning estimate) |
+| Gifts & inheritances | ✅ | Cash in that year, not taxed as income; separate or joint |
+| Warning when separate money pays shared costs | ✅ | Page, Dashboard insight |
+| Division snapshot for any year | ✅ | |
+| Check-ins record the separate part of balances | ✅ | Otherwise carried forward from the projection |
+| Guided setup question | ✅ | Separate balances, prenup, expected inheritances |
+| Reports | ✅ | PDF section, Excel sheets, JSON |
+
 ## Kids
 | Feature | Status |
 |---|---|

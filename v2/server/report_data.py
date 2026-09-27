@@ -17,6 +17,7 @@ SECTIONS = OrderedDict([
     ('healthcare', 'Healthcare & insurance'),
     ('purchases', 'One-time purchases & recurring costs'),
     ('locations', 'Where you live (location timeline)'),
+    ('ownership', 'Who owns what (separate vs marital property, gifts & inheritances)'),
     ('assumptions', 'Economic assumptions'),
     ('monte_carlo', 'Monte Carlo results'),
     ('year_by_year', 'Year by year by category'),
@@ -33,6 +34,7 @@ CATEGORY_COLS = [
     ('ss', 'Social Security', lambda r: r['ss_income']),
     ('rent', 'Rent income', lambda r: r['rent_income']),
     ('sales', 'Home sales', lambda r: r['sale_proceeds']),
+    ('gifts', 'Gifts & inheritances', lambda r: r.get('windfalls', 0.0)),
     ('growth', 'Investment growth', lambda r: r.get('investment_growth', 0.0)),
     ('taxes', 'Taxes', lambda r: r['taxes']),
     ('p1', 'Living: %1', lambda r: r['exp_person1']),
@@ -301,6 +303,7 @@ def section_sources(ctx: dict, section: str) -> list[str]:
         'locations': ['bea_rpp_2024', 'taxfoundation_state_2025'] + (['worldbank_pli', 'oecd_taxing_wages_2025'] if abroad else []),
         'assumptions': ['bls_cpi', 'cms_nhe', 'irs_2024_tax', 'ssa_wage_base', 'ssa_trustees_2026'] + (['damodaran_sp500'] if hist else []),
         'monte_carlo': ['damodaran_sp500'] if hist else [],
+        'ownership': ['irs_pub555', 'lii_equitable'] if (p.get('ownership_tracking') or {}).get('enabled') else [],
     }
     return m.get(section, [])
 
@@ -314,3 +317,41 @@ def sources_for(ctx: dict, sections: list) -> list[tuple[str, dict]]:
             if i in src and i not in order:
                 order.append(i)
     return [(i, src[i]) for i in order]
+
+
+# ── who owns what ──────────────────────────────────────────────────────────
+def ownership_enabled(ctx: dict) -> bool:
+    return bool(ctx['proj']['summary'].get('ownership'))
+
+
+def ownership_rules(ctx: dict) -> list[tuple[str, str]]:
+    o = ctx['proj']['summary']['ownership']
+    n1, n2 = ctx['names']
+    reg = {'community': 'Community property', 'equitable': 'Equitable distribution', 'prenup': 'Prenup'}.get(o['regime_resolved'], o['regime_resolved'])
+    return [('Rules', reg + (f" ({o['state']})" if o.get('state') else '')), ('Married', str(o.get('marriage_year') or 'before the plan starts')),
+            ('Pay during marriage', 'marital' if o['earnings'] == 'marital' else "each person's own"),
+            ('Growth/rent on separate property', o['separate_income_resolved']),
+            (f"{n1}'s share of marital property if divided", f"{o['marital_split_pct']:.0f}%"),
+            ('Separate money spent on shared costs', f"${o['commingled_total']:,.0f}" + (f" (from {o['first_commingled_year']})" if o.get('first_commingled_year') else ''))]
+
+
+def ownership_table(ctx: dict, today: bool = True, every: int = 1) -> tuple[list[str], list[list]]:
+    n1, n2 = ctx['names']
+    rows = [r for r in ctx['proj']['rows'] if r.get('ownership')]
+    hdr = ['Year', f'{n1} separate', f'{n2} separate', 'Marital', f'{n1} would get', f'{n2} would get', 'Separate spent on shared']
+    out = []
+    for i, r in enumerate(rows):
+        if every > 1 and i % every and i != len(rows) - 1:
+            continue
+        f = r['infl_index'] if today else 1.0
+        o = r['ownership']
+        out.append([r['year'], o['separate1'] / f, o['separate2'] / f, o['marital'] / f, o['division']['p1'] / f, o['division']['p2'] / f, o['commingled'] / f])
+    return hdr, out
+
+
+def windfalls_table(ctx: dict) -> tuple[list[str], list[list]]:
+    p, (n1, n2) = ctx['plan'], ctx['names']
+    who = {'Parent 1': n1, 'Parent 2': n2, 'Both': 'Both'}
+    return (['Gift / inheritance', 'Year', "Amount (today's $)", 'To', 'Kept separate'],
+            [[w['name'], w['year'], w['amount'], who.get(w['recipient'], w['recipient']), 'yes' if w['separate'] and w['recipient'] != 'Both' else 'no']
+             for w in p.get('windfalls') or []])

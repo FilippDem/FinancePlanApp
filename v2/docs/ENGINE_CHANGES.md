@@ -99,6 +99,19 @@ The six demo households were tuned against the v0.8 engine, which never charged 
 - New plans default the Medicare Part B premium to $202.90/month, the 2026 standard premium [7]. v0.8 used $174.70 (the 2024 figure) and labelled it 2025. Saved plans keep their own value.
 - Stress tests: disabled-child tests can pick the worst child automatically (v0.8 `find_worst_case_disabled_child`), and compound tests can start every event in a chosen year.
 
+### Who owns what (separate vs marital property)
+`finplan/ownership.py`. Off unless `ownership_tracking.enabled`, and couples only. An accounting layer inside `simulate()`: it runs alongside the pooled (or separate-finances) math and is reconciled to the engine's totals every year, so it can never change taxes, spending, net worth or success rates.
+- Three classes: person 1's separate (`s1`), person 2's separate (`s2`) and marital (`m`), each for cash, pre-tax accounts and each home's equity. Other assets and consumer loans count as marital.
+- Phases: *before* the wedding (`marriage_year` in the future) everything is each person's own; *married*; *after* a death, labels are kept.
+- Rules (`ownership_tracking`): state regime (community property in AZ, CA, ID, LA, NV, NM, TX, WA, WI; otherwise equitable distribution) [8]; pay during marriage marital or separate (prenup); growth and rent from separate property stay separate except in ID, LA, TX and WI [8]; person 1's share of marital property on division; how separate money covers a shortfall.
+- Spending order while married: marital money first (including marital retirement money), then separate money. Any separate money spent on shared costs is reported as commingled, per year.
+- Homes: a pro-rata contribution method. Each class's share of equity equals its share of money put in: separate money entered per home (`separate_funds`), the rest of the down payment, and principal paid each year by whoever pays that year. For homes bought before today, money put in so far is price − loan, split by years owned before and after the wedding.
+- Check-ins carry the separate balances forward from the projection unless the check-in states them (`separate_liquid`, `separate_pretax`).
+- Rows gain `ownership` (per class, division, commingled); the summary gains `ownership` (resolved rules, commingled total and years).
+
+### Gifts & inheritances
+`windfalls` (new, additive): cash that arrives in a given year (today's dollars by default), not taxed as income, shown as events and in the cash-flow timeline. Tagged separate (to one person) or joint.
+
 ### Sources
 [1] U.S. Bureau of Economic Analysis, [Regional Price Parities by State and Metro Area, 2024](https://www.bea.gov/data/prices-inflation/regional-price-parities-state-and-metro-area)
 [2] World Bank, [Price level ratio of PPP conversion factor to market exchange rate (PA.NUS.PPPC.RF)](https://data.worldbank.org/indicator/PA.NUS.PPPC.RF)
@@ -107,5 +120,6 @@ The six demo households were tuned against the v0.8 engine, which never charged 
 [5] BLS, [Consumer Expenditures — 2024](https://www.bls.gov/news.release/cesan.nr0.htm)
 [6] NYU Stern (Damodaran), [Historical returns: S&P 500 including dividends](https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html)
 [7] CMS, [2026 Medicare Parts A & B Premiums and Deductibles](https://www.cms.gov/newsroom/fact-sheets/2026-medicare-parts-b-premiums-deductibles)
+[8] IRS, [Publication 555, Community Property](https://www.irs.gov/publications/p555) (Dec 2024)
 
 The full, numbered list the app cites lives in `engine/finplan/data/sources.json`.

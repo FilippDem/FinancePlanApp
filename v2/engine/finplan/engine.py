@@ -32,6 +32,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .plan import normalize_plan, is_single
+from . import ownership
 from .reference import child_expenses_for_age, ref, HEALTH_CATEGORIES, col_factor, rent_factor
 from .taxes import total_taxes, marginal_rate, TAX_BASE_YEAR
 from .mortgage import loan_terms, year_flows
@@ -164,7 +165,7 @@ def build_schedule(p: dict) -> Schedule:
         'mortgage_pi', 'rent_income', 'rent_taxable', 'sale_proceeds', 'sale_p1', 'sale_p2', 'sale_shared',
         'down_payment', 'dp_p1', 'dp_p2', 'dp_shared', 'home_value', 'mortgage_balance', 'home_equity',
         'equity_p1', 'equity_p2', 'equity_shared', 'other_assets', 'consumer_debt', 'infl_index', 'hc_index',
-        'hc_p1', 'hc_p2', 'hc_shared', 'married')}
+        'hc_p1', 'hc_p2', 'hc_shared', 'married', 'windfall')}
     details = [dict() for _ in range(T)]
     events = []
 
@@ -319,6 +320,7 @@ def build_schedule(p: dict) -> Schedule:
                     dp = terms['down'] + h.get('closing_cost_pct', 0.0) / 100 * terms['price']
                     C['down_payment'][t] += dp
                     C[f'dp_{own_key}'][t] += dp
+                    row['down_payment'] = dp
                     events.append({'year': y, 'type': 'house_buy', 'label': f"Buy {h['name']}", 'amount': h['purchase_price']})
                 row.update(value=value, balance=bal_end, equity=eq, mortgage_pi=pi, interest=interest,
                            principal=fl['principal'], pmi=pmi, hoa=hoa, property_tax=ptax, insurance=ins,
@@ -492,6 +494,25 @@ def build_schedule(p: dict) -> Schedule:
         details[t]['recurring'] = rec_det[t]
         details[t]['purchases'] = pur_det[t]
 
+    # gifts & inheritances (cash in, not taxable to the recipient)
+    for w in p.get('windfalls') or []:
+        try:
+            y_w, amt0 = int(w.get('year')), float(w.get('amount') or 0)
+        except (TypeError, ValueError):
+            continue
+        if cy <= y_w <= years[-1] and amt0:
+            t_ = y_w - cy
+            amt = amt0 * (C['infl_index'][t_] if w.get('inflation_adjust', True) else 1.0)
+            C['windfall'][t_] += amt
+            details[t_].setdefault('windfalls', []).append({'name': w.get('name') or 'Gift / inheritance', 'amount': amt,
+                                                           'recipient': w.get('recipient', 'Parent 1'), 'separate': bool(w.get('separate', True))})
+            events.append({'year': y_w, 'type': 'windfall', 'label': w.get('name') or 'Gift / inheritance', 'amount': amt})
+
+    # separate vs marital property ("who owns what"): an accounting layer, totals unchanged
+    own = None
+    if not single and (p.get('ownership_tracking') or {}).get('enabled'):
+        own = ownership.build(p, years, C, details, house_rows, p['shared_expense_split_pct'] / 100)
+
     # tax location per year
     loc = []
     stl = p['state_timeline']
@@ -529,7 +550,7 @@ def build_schedule(p: dict) -> Schedule:
     events.sort(key=lambda e: e['year'])
     return Schedule(years=years, T=T, cols=C, details=details, events=events,
                     meta={'location': loc, 'single': single, 'claim1': claim1, 'claim2': claim2,
-                          'names': (n1, n2), 'end1': end1, 'end2': end2})
+                          'names': (n1, n2), 'end1': end1, 'end2': end2, 'ownership': own})
 
 
 # ─────────────────────────────── simulation ──────────────────────────────
@@ -607,6 +628,8 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
     L1 = np.full(n, p['parentX_net_worth'] - pre1)
     L2 = np.full(n, p['parentY_net_worth'] - pre2)
     P = np.full(n, pre1 + pre2 + p.get('hsa_balance', 0.0))
+    OV = (ownership.Overlay(p, S, L1, L2, pre1, pre2, p.get('hsa_balance', 0.0), n, split)
+          if S.meta.get('ownership') else None)
 
     out = {k: np.zeros((T, n)) for k in ('liquid', 'pretax', 'net_worth', 'investable', 'taxes', 'cashflow',
                                           'wages', 'expenses', 'withdrawal', 'returns', 'liquid1', 'liquid2', 'growth')}
@@ -626,18 +649,20 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
         loc = S.meta['location'][t]
         tx = total_taxes(w1, w2, ss, C['rent_taxable'][t], contrib, y, infl, loc, status, override)
         taxes = tx['total']
-        inflow = w1 + w2 + ss + C['rent_income'][t] + C['sale_proceeds'][t]
+        inflow = w1 + w2 + ss + C['rent_income'][t] + C['sale_proceeds'][t] + C['windfall'][t]
         net = inflow - taxes - contrib - expenses
+        inc_share = np.where((w1 + w2 + ss) > 0, (w1 + C['ss1'][t]) / np.maximum(w1 + w2 + ss, 1), 0.5)
+        if OV is not None:
+            OV.step(t, R[t], debt_rate, C, EM, w1, w2, taxes, expenses, inc_share)
 
         r = R[t]
         if separate:
-            inc_share = np.where((w1 + w2 + ss) > 0, (w1 + C['ss1'][t]) / np.maximum(w1 + w2 + ss, 1), 0.5)
             shared = (C['family_exp'][t] + C['children_exp'][t] + C['recurring_exp'][t]) * EM[t] + \
                 C['purchase_exp'][t] + C['hc_shared'][t] * EM[t]
             e1 = C['p1_exp'][t] * EM[t] + C['hc_p1'][t] * EM[t] + shared * split + C['house_exp_p1'][t] + \
                 C['house_exp_shared'][t] * split + C['dp_p1'][t] + C['dp_shared'][t] * split
             e2 = expenses - e1
-            in1 = w1 + C['ss1'][t] + (C['sale_p1'][t] + C['sale_shared'][t] * split) + C['rent_income'][t] * split
+            in1 = w1 + C['ss1'][t] + (C['sale_p1'][t] + C['sale_shared'][t] * split) + C['rent_income'][t] * split + C['windfall'][t] * split
             in2 = inflow - in1
             net1 = in1 - taxes * inc_share - C['contrib1'][t] - e1
             net2 = in2 - taxes * (1 - inc_share) - C['contrib2'][t] - e2
@@ -675,7 +700,11 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
                 L1 = L1 + add
             taxes = tx2['total']
             tx = tx2
+            if OV is not None:
+                OV.withdraw(t, W, add)
         fac = C['infl_index'][t] if normalized else 1.0
+        if OV is not None:
+            OV.record(t, L1 + L2, P, fac)
         home = C['home_equity'][t] + C['other_assets'][t] - C['consumer_debt'][t]
         out['liquid'][t] = (L1 + L2) / fac
         out['liquid1'][t] = L1 / fac
@@ -693,6 +722,8 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
         for k in tax_parts:
             tax_parts[k][t] = tx[k] / fac
     out.update({f'tax_{k}': v for k, v in tax_parts.items()})
+    if OV is not None:
+        out.update(OV.out)
     return {'p': p, 'schedule': S, 'paths': out}
 
 
@@ -729,6 +760,7 @@ def project(plan: dict) -> dict:
             'wages1': float(C['wages1'][t]), 'wages2': float(C['wages2'][t]),
             'ss_income': float(C['ss1'][t] + C['ss2'][t]), 'ss1': float(C['ss1'][t]), 'ss2': float(C['ss2'][t]),
             'rent_income': float(C['rent_income'][t]), 'sale_proceeds': float(C['sale_proceeds'][t]),
+            'windfalls': float(C['windfall'][t]),
             'total_income': float(C['wages1'][t] + C['wages2'][t] + C['ss1'][t] + C['ss2'][t] + C['rent_income'][t]),
             'taxes': g('taxes'), 'tax_federal': g('tax_federal'), 'tax_state': g('tax_state'),
             'tax_fica': g('tax_fica'), 'tax_foreign': g('tax_foreign'),
@@ -752,8 +784,17 @@ def project(plan: dict) -> dict:
             'location': S.meta['location'][t], 'infl_index': float(C['infl_index'][t]),
             'details': S.details[t],
         })
+        if S.meta.get('ownership'):
+            rows[-1]['ownership'] = ownership.rows(S.meta['ownership'], P, C, S, t, 1.0)
     depleted = next((r['year'] for r in rows if r['investable'] < 0), None)
     summary = _summary(p, S, rows, depleted)
+    if S.meta.get('ownership'):
+        o = S.meta['ownership']
+        comm = [(r['year'], r['ownership']['commingled']) for r in rows if r['ownership']['commingled'] > 1]
+        summary['ownership'] = {k: o[k] for k in ('regime_resolved', 'separate_income_resolved', 'earnings', 'marital_split_pct',
+                                                  'marriage_year', 'state', 'shortfall')}
+        summary['ownership'].update(commingled_total=sum(v for _, v in comm), commingled_years=[y for y, _ in comm],
+                                    first_commingled_year=comm[0][0] if comm else None)
     return {'rows': rows, 'events': S.events, 'summary': summary, 'plan': p}
 
 

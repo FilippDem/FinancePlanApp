@@ -19,6 +19,8 @@ export const HELP: Record<string, { what: string; tips: string[] }> = {
     tips: ['Healthcare is often the largest retirement expense; bridge coverage before 65 matters for early retirees.'] },
   '/locations': { what: 'Where you live over time. Moves change taxes and, if enabled, everyday prices and rent.',
     tips: ['Moving from a high-cost to a low-cost area can change your projection a lot.', 'Add a custom place for a city the app doesn’t know.'] },
+  '/ownership': { what: 'Separate vs marital property: what each of you brought into the marriage, inherited or was given, and what you built together, year by year. Labels only; totals never change.',
+    tips: ['Enter the part of today\'s balances that is still separate; the helper grows a wedding-day balance forward.', 'A warning appears in years when separate money has to pay shared costs.', 'Set the rules to match your prenup; the defaults follow your state.'] },
   '/assumptions': { what: 'Investment return, inflation, healthcare inflation, Social Security cuts, taxes and Monte Carlo settings. These drive every model.',
     tips: ['A 6–7% return and 3% inflation are common baselines; test lower returns in Scenarios or Stress tests.'] },
   '/projections': { what: 'Year-by-year projection with your exact inputs, the Monte Carlo range, taxes, and a cash-flow explorer with every category.',

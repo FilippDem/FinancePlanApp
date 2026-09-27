@@ -334,3 +334,79 @@ def test_stress_worst_child_and_compound_year():
     res = r['results'][0]
     assert res['test']['events'][0]['child'] == 'A'
     assert any(e['type'] == 'market_crash' and e['year'] == 2031 for e in res['events'])
+
+
+def _own_plan(**kw):
+    p = {'parent1_name': 'A', 'parent2_name': 'B', 'parentX_age': 40, 'parentY_age': 38, 'parentX_income': 150000,
+         'parentY_income': 90000, 'parentX_net_worth': 400000, 'parentX_pretax_balance': 150000,
+         'parentY_net_worth': 200000, 'parentY_pretax_balance': 120000, 'marriage_year': 2015, 'current_year': 2026,
+         'state_timeline': [{'year': 2026, 'state': 'Seattle', 'spending_strategy': 'Average'}],
+         'houses': [{'name': 'Home', 'purchase_year': 2018, 'purchase_price': 800000, 'current_value': 1000000,
+                     'mortgage_balance': 500000, 'mortgage_rate': 0.04, 'mortgage_years_left': 22,
+                     'timeline': [{'year': 2018, 'status': 'Own_Live'}], 'separate_funds': {'p1': 100000}}],
+         'windfalls': [{'name': 'Inheritance', 'year': 2030, 'amount': 300000, 'recipient': 'Parent 2', 'separate': True}],
+         'ownership_tracking': {'enabled': True, 'today': {'p1': {'liquid': 200000, 'pretax': 0}, 'p2': {'liquid': 0, 'pretax': 50000}}}}
+    p.update(kw)
+    return p
+
+
+def test_ownership_labels_never_change_totals():
+    import copy
+    p = _own_plan()
+    off = copy.deepcopy(p); off['ownership_tracking'] = {'enabled': False}
+    a, b = project(p), project(off)
+    for x, y in zip(a['rows'], b['rows']):
+        assert abs(x['net_worth'] - y['net_worth']) < 1e-6
+        o = x['ownership']
+        assert abs(o['separate1'] + o['separate2'] + o['marital'] - x['net_worth']) < 1e-3
+    r0 = a['rows'][0]['ownership']
+    # Washington: community property, income from separate property stays separate
+    assert a['summary']['ownership']['regime_resolved'] == 'community'
+    assert a['summary']['ownership']['separate_income_resolved'] == 'separate'
+    # home bought after the wedding with $100k of person 1's separate money: 1/3 separate, 2/3 marital
+    assert abs(r0['homes']['s1'] / (r0['homes']['s1'] + r0['homes']['m']) - 1 / 3) < 0.01
+    # the inheritance lands in person 2's separate property
+    y30 = next(r for r in a['rows'] if r['year'] == 2030)['ownership']
+    y29 = next(r for r in a['rows'] if r['year'] == 2029)['ownership']
+    assert y30['separate2'] - y29['separate2'] > 290000
+    tot = y30['separate1'] + y30['separate2'] + y30['marital']
+    assert abs(y30['division']['p1'] + y30['division']['p2'] - tot) < 1e-3
+    assert abs(y30['division']['p1'] - (y30['separate1'] + y30['marital'] / 2)) < 1e-3
+
+
+def test_ownership_commingling_and_rules():
+    p = _own_plan(parentX_retirement_age=45, parentY_retirement_age=43, parentX_net_worth=300000,
+                  parentY_net_worth=120000, windfalls=[])
+    s = project(p)['summary']['ownership']
+    assert s['commingled_total'] > 0 and s['first_commingled_year'] is not None
+    # Texas: income from separate property is community property
+    tx = project(_own_plan(state_timeline=[{'year': 2026, 'state': 'Houston', 'spending_strategy': 'Average'}]))
+    assert tx['summary']['ownership']['separate_income_resolved'] == 'marital'
+    # prenup keeping earnings separate: marital property doesn't grow from pay
+    pre = _own_plan(ownership_tracking={'enabled': True, 'earnings': 'separate', 'regime': 'prenup'})
+    base = project(_own_plan())
+    assert project(pre)['rows'][10]['ownership']['marital'] < base['rows'][10]['ownership']['marital']
+    # not married yet: everything is separate until the wedding
+    fut = project(_own_plan(marriage_year=2029))['rows']
+    assert fut[0]['ownership']['phase'] == 'before' and abs(fut[0]['ownership']['marital'] - fut[0]['other_assets']) < 1
+    assert fut[3]['ownership']['phase'] == 'married'
+
+
+def test_windfalls_add_cash_untaxed():
+    import copy
+    p = _own_plan(ownership_tracking={'enabled': False})
+    q = copy.deepcopy(p); q['windfalls'] = []
+    a, b = project(p)['rows'], project(q)['rows']
+    t = 2030 - 2026
+    assert a[t]['windfalls'] > 300000 and abs(a[t]['taxes'] - b[t]['taxes']) < 1
+    assert a[t]['investable'] - b[t]['investable'] > 300000
+
+
+def test_checkin_keeps_separate_balances():
+    from datetime import date
+    from finplan.checkin import rebase
+    q = rebase(_own_plan(), {'p1': {'liquid': 300000, 'pretax': 160000},
+                             'p2': {'liquid': 90000, 'pretax': 130000, 'separate_pretax': 60000}}, date(2027, 3, 1))
+    t = q['ownership_tracking']['today']
+    assert t['p1']['liquid'] > 200000          # carried forward from the projection
+    assert t['p2']['pretax'] == 60000          # what the check-in said

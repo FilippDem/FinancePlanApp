@@ -36,6 +36,8 @@ V2_KEYS = {
     'move_adjusts_spending': True,
     'custom_expense_templates': {},  # {location: {strategy: {category: annual $}}}
     'custom_locations': {},          # {name: {country, region, lat, lon, tax_location}}
+    # "Who owns what": see ownership.py. Houses may carry separate_funds {p1, p2}.
+    'windfalls': [],                 # gifts & inheritances [{name, year, amount, recipient, kind, separate, inflation_adjust}]
 }
 
 HOUSE_DEFAULTS = {
@@ -211,7 +213,18 @@ def normalize_plan(raw: dict | None) -> dict:
         p['state_tax_rate'] = _num(p.get('state_tax_rate'))
     for k, v in V2_KEYS.items():
         if k not in p or p[k] is None and v is not None:
-            p[k] = v
+            p[k] = copy.deepcopy(v)   # never share a mutable default between plans
+    # separate vs marital property tracking (off by default) and gifts/inheritances
+    from .ownership import normalize as _own_norm
+    p['ownership_tracking'] = _own_norm(p.get('ownership_tracking'))
+    wl = []
+    for w in p.get('windfalls') or []:
+        if isinstance(w, dict):
+            wl.append({'name': w.get('name') or 'Gift / inheritance', 'year': int(_num(w.get('year'), p.get('current_year') or 2026)),
+                       'amount': _num(w.get('amount')), 'recipient': w.get('recipient') if w.get('recipient') in ('Parent 1', 'Parent 2', 'Both') else 'Parent 1',
+                       'kind': w.get('kind') or 'inheritance', 'separate': bool(w.get('separate', True)),
+                       'inflation_adjust': bool(w.get('inflation_adjust', True))})
+    p['windfalls'] = wl
 
     econ = p.get('economic_params') or {}
     p['economic_params'] = {**ECON_DEFAULTS, **econ}

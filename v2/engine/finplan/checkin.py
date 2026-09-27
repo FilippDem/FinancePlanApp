@@ -73,10 +73,30 @@ def evaluate(plan: dict, on: date, investable: float, net_worth: float | None = 
 def rebase(plan: dict, balances: dict, on: date) -> dict:
     """Roll the plan forward to reality. Returns a new (normalized) plan.
 
-    balances = {'p1': {'liquid', 'pretax'}, 'p2': {...}, 'homes': [{'name','value','mortgage'}], 'other_debts'}
+    balances = {'p1': {'liquid', 'pretax', 'separate_liquid'?, 'separate_pretax'?}, 'p2': {...},
+                'homes': [{'name','value','mortgage'}], 'other_debts'}
     """
     p = normalize_plan(copy.deepcopy(plan))
     delta = max(0, on.year - p['current_year'])
+    own = p.get('ownership_tracking') or {}
+    if own.get('enabled'):
+        # keep "who owns what" when rolling forward: carry the projected separate balances,
+        # unless the check-in says how much of each balance is separate
+        today = copy.deepcopy(own.get('today') or {})
+        if delta:
+            from .engine import project
+            rows = project(plan)['rows']
+            row = next((r for r in rows if r['year'] == on.year - 1), None)
+            if row and row.get('ownership'):
+                o = row['ownership']
+                today = {'p1': {'liquid': max(o['liquid']['s1'], 0), 'pretax': max(o['pretax']['s1'], 0)},
+                         'p2': {'liquid': max(o['liquid']['s2'], 0), 'pretax': max(o['pretax']['s2'], 0)}}
+        for who in ('p1', 'p2'):
+            bx = balances.get(who) or {}
+            for k in ('liquid', 'pretax'):
+                if bx.get(f'separate_{k}') is not None:
+                    today.setdefault(who, {})[k] = float(bx[f'separate_{k}'] or 0)
+        p['ownership_tracking'] = {**own, 'today': today}
     if delta:
         p['current_year'] += delta
         p['parentX_age'] += delta

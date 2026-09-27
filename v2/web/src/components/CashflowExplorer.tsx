@@ -7,7 +7,7 @@ import { money, pct, axisMoney, clsx } from '../lib/format'
 import { Card, Badge, Select } from './ui'
 import { S } from './charts'
 
-const EVENT_TYPES: Record<string, string> = { retire: 'Retirement', job: 'Job change', college: 'College starts', college_end: 'College ends', birth: 'Birth', house_buy: 'Home purchase', house_sell: 'Home sale', move: 'Move' }
+const EVENT_TYPES: Record<string, string> = { windfall: 'Gift / inheritance', retire: 'Retirement', job: 'Job change', college: 'College starts', college_end: 'College ends', birth: 'Birth', house_buy: 'Home purchase', house_sell: 'Home sale', move: 'Move' }
 
 /** Everything v0.8's Analysis → Cashflow tab showed, rebuilt: timeline with surplus/deficit and events,
  *  a year drill-down (pies, Sankey, taxes, complete expense summary), critical years and life stages. */
@@ -23,13 +23,13 @@ export function CashflowExplorer({ rows, rawRows, events, names, single, today }
   const evs = useMemo(() => {
     const out = [...(events || [])]
     for (const e of events || []) if (e.type === 'college') out.push({ ...e, type: 'college_end', year: e.year + 4, label: e.label.replace('starts college', 'finishes college') })
-    return out.filter(e => ['retire', 'job', 'college', 'college_end', 'house_buy', 'house_sell', 'move'].includes(e.type))
+    return out.filter(e => ['retire', 'job', 'college', 'college_end', 'house_buy', 'house_sell', 'move', 'windfall'].includes(e.type))
   }, [events])
   const evByYear = useMemo(() => { const m: Record<number, any[]> = {}; evs.forEach(e => { (m[e.year] = m[e.year] || []).push(e) }); return m }, [evs])
 
   const data = rows.map(x => {
     const out = x.total_expenses + x.taxes
-    const inc = x.total_income + x.sale_proceeds
+    const inc = x.total_income + x.sale_proceeds + (x.windfalls || 0)
     return { year: x.year, income: inc, outflow: out, surplus: inc >= out ? [out, inc] : [inc, inc], deficit: out > inc ? [inc, out] : [out, out],
       marker: evByYear[x.year] ? inc : null, markerLabel: (evByYear[x.year] || []).map(e => e.label).join(' · ') }
   })

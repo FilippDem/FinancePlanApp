@@ -77,8 +77,11 @@ export default function CheckinFlow() {
       setExp(ev.expected)
       const start = (plan.parentX_net_worth || 0) + (single ? 0 : plan.parentY_net_worth || 0) + (plan.hsa_balance || 0)
       const r = start > 0 ? ev.expected.investable / start : 1
+      const ot = plan.ownership_tracking?.enabled && !single ? plan.ownership_tracking.today : null
       const per = (w: 'X' | 'Y') => ({ liquid: round100(((plan[`parent${w}_net_worth`] || 0) - (plan[`parent${w}_pretax_balance`] || 0)) * r),
-        pretax: round100((plan[`parent${w}_pretax_balance`] || 0) * r) })
+        pretax: round100((plan[`parent${w}_pretax_balance`] || 0) * r),
+        // who-owns-what: how much of each balance is still separate property
+        ...(ot ? { separate_liquid: round100((ot[w === 'X' ? 'p1' : 'p2']?.liquid || 0) * r), separate_pretax: round100((ot[w === 'X' ? 'p1' : 'p2']?.pretax || 0) * r) } : {}) })
       const init = { p1: per('X'), ...(single ? {} : { p2: per('Y') }), homes: owned, other_debts: last?.balances?.other_debts ?? 0 }
       setB(init)
       setTotal(round100(ev.expected.investable))
@@ -129,7 +132,7 @@ export default function CheckinFlow() {
     } finally { setBusy(false) }
   }
 
-  const P = (w: 'p1' | 'p2', k: 'liquid' | 'pretax', v: number) => setB((x: any) => ({ ...x, [w]: { ...x[w], [k]: v } }))
+  const P = (w: 'p1' | 'p2', k: 'liquid' | 'pretax' | 'separate_liquid' | 'separate_pretax', v: number) => setB((x: any) => ({ ...x, [w]: { ...x[w], [k]: v } }))
   const sections = quick ? ['Update', 'Result'] : ['Start', 'Savings', 'Homes', 'Life', 'Result']
 
   const steps: { section: number; body: React.ReactNode; next?: string; onNext?: () => void; valid?: boolean }[] = quick ? [
@@ -166,6 +169,10 @@ export default function CheckinFlow() {
               <BigField label="Cash & investments" hint="Checking, savings, brokerage"><Money big value={b[w].liquid} step={1000} onChange={v => P(w, 'liquid', v)} /></BigField>
               <BigField label="Retirement accounts" hint="401(k), IRA, HSA"><Money big value={b[w].pretax} step={1000} onChange={v => P(w, 'pretax', v)} /></BigField>
             </div>
+            {b[w].separate_liquid !== undefined && <div className="grid sm:grid-cols-2 gap-3 mt-2">
+              <BigField label="…of which separate property" hint="Kept apart: premarital money, gifts, inheritances"><Money value={b[w].separate_liquid} step={1000} onChange={v => P(w, 'separate_liquid', Math.min(v, b[w].liquid))} /></BigField>
+              <BigField label="…of which separate property" hint="Usually the wedding-day balance plus its growth"><Money value={b[w].separate_pretax} step={1000} onChange={v => P(w, 'separate_pretax', Math.min(v, b[w].pretax))} /></BigField>
+            </div>}
           </div>
         ))}
         <BigField label="Other debts (household)" hint="Credit cards, car loans, student loans. Not your mortgage.">

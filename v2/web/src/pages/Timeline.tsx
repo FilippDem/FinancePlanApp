@@ -8,7 +8,7 @@ const LANES: { key: string; label: string; types: string[] }[] = [
   { key: 'career', label: 'Career & retirement', types: ['job', 'retire', 'ss'] },
   { key: 'kids', label: 'Kids', types: ['birth', 'college'] },
   { key: 'homes', label: 'Homes & moves', types: ['house_buy', 'house_sell', 'house_status', 'move'] },
-  { key: 'money', label: 'Big purchases', types: ['purchase', 'recurring'] },
+  { key: 'money', label: 'Big purchases, gifts & inheritances', types: ['purchase', 'recurring', 'windfall'] },
 ]
 const YW = 30
 

@@ -47,6 +47,8 @@ interface Answers {
   hsa?: { balance: number; contrib: number }
   oop?: number
   phases?: { p1: Phase[]; p2: Phase[] }
+  sep?: { on: boolean; prenup: boolean; earningsSeparate: boolean; p1: { liquid: number; pretax: number }; p2: { liquid: number; pretax: number } }
+  gifts?: { name: string; year: number; amount: number; who: 'Parent 1' | 'Parent 2' | 'Both' }[]
   filing?: 'married' | 'single'
   empPremium?: number
   ssCut: boolean
@@ -193,6 +195,14 @@ function buildPlan(A: Answers, base: any, curve: Curve) {
   }
   if (A.hsa) { p.hsa_balance = A.hsa.balance; p.hsa_contribution = A.hsa.contrib }
   if (A.oop) p.health_expenses = [{ name: 'Out-of-pocket medical', annual_amount: A.oop, affected_person: 'Both', start_age: 0, end_age: 120 }]
+  if (!single && A.sep?.on) {
+    p.ownership_tracking = { enabled: true, regime: A.sep.prenup ? 'prenup' : 'auto', earnings: A.sep.prenup && A.sep.earningsSeparate ? 'separate' : 'marital',
+      separate_income: 'auto', marital_split_pct: 50, shortfall: 'balances',
+      today: { p1: { liquid: Math.min(A.sep.p1.liquid, A.p1.savings), pretax: Math.min(A.sep.p1.pretax, A.p1.retirement) },
+        p2: { liquid: Math.min(A.sep.p2.liquid, A.p2.savings), pretax: Math.min(A.sep.p2.pretax, A.p2.retirement) } } }
+  }
+  p.windfalls = (A.gifts || []).filter(g => g.amount > 0 && g.year >= CY).map(g => ({ name: g.name || 'Inheritance', year: g.year, amount: g.amount,
+    recipient: single ? 'Parent 1' : g.who, kind: 'inheritance', separate: single ? true : g.who !== 'Both', inflation_adjust: true }))
   p.ss_insolvency_enabled = A.ssCut
   p.mc_simulations = 1000
   return p
@@ -260,6 +270,7 @@ export default function Onboarding() {
   const cSS = useCites(['ssa_bend_points', 'ssa_wage_base', 'ssa_trustees_2026'])
   const cKids = useCites(['childcareaware_2024', 'collegeboard', 'mit_living_wage'])
   const cLife = useCites(curveSources(curve))
+  const cOwn = useCites(['irs_pub555'])
   const cHealth = useCites(['kff_ehbs_2025', 'kff_benchmark_2026', 'cms_age_rating', 'cms_partb_2026', 'irs_hsa_2026'])
 
   const plan = useMemo(() => base && curve ? buildPlan(A, base, curve) : null, [A, base, curve])
@@ -380,6 +391,44 @@ export default function Onboarding() {
           { value: 0, label: 'Nothing yet' }, { value: 10000, label: 'About $10k' }, { value: 24500, label: 'About $24.5k' }]} />
         <BigField label="Or enter an amount per year"><Money big value={A.contrib} step={1000} onChange={v => set({ contrib: v })} /></BigField>
         <c401.Sources />
+      </Question>) },
+    { section: 2, body: (
+      <Question title={couple ? 'Anything kept separate, or coming your way?' : 'Expecting an inheritance or a large gift?'}
+        subtitle={couple ? 'Money one of you had before the marriage, or inherited, can stay separate property. Optional: skip if it doesn\'t apply.' : 'Optional: skip if it doesn\'t apply.'}
+        why={couple ? <>Most states treat what each of you brought in, inherited or was given as that person's own, and pay earned during the marriage as shared<cOwn.Cite id="irs_pub555" />. The plan can track both, year by year, under Who owns what.</> : undefined}>
+        {couple && <>
+          <ChoiceCards cols={2} value={A.sep?.on ? 'yes' : 'no'} onChange={v => set({ sep: { ...(A.sep || { prenup: false, earningsSeparate: false, p1: { liquid: 0, pretax: 0 }, p2: { liquid: 0, pretax: 0 } }), on: v === 'yes' } })}
+            options={[{ value: 'no', label: 'No, it\'s all shared' }, { value: 'yes', label: 'Yes, some is separate' }]} />
+          {A.sep?.on && <div className="space-y-3">
+            {(['p1', 'p2'] as const).map(w => (
+              <div key={w} className="grid sm:grid-cols-2 gap-3">
+                <BigField label={`${w === 'p1' ? n1 : n2}: separate cash & investments`} hint={`Of ${money(A[w].savings, { compact: false })}`}>
+                  <Money big value={A.sep![w].liquid} step={5000} onChange={v => set({ sep: { ...A.sep!, [w]: { ...A.sep![w], liquid: v } } })} /></BigField>
+                <BigField label="Separate retirement money" hint={`Of ${money(A[w].retirement, { compact: false })}; usually the balance at the wedding plus its growth`}>
+                  <Money big value={A.sep![w].pretax} step={5000} onChange={v => set({ sep: { ...A.sep!, [w]: { ...A.sep![w], pretax: v } } })} /></BigField>
+              </div>))}
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={A.sep.prenup} onChange={e => set({ sep: { ...A.sep!, prenup: e.target.checked } })} className="accent-[rgb(var(--accent))]" />
+              We have a prenup</label>
+            {A.sep.prenup && <label className="flex items-center gap-2 text-sm pl-6"><input type="checkbox" checked={A.sep.earningsSeparate} onChange={e => set({ sep: { ...A.sep!, earningsSeparate: e.target.checked } })} className="accent-[rgb(var(--accent))]" />
+              It keeps each person's pay separate</label>}
+            <p className="text-[13px] text-muted">Fine-tune the rules, homes and a year-by-year view under Who owns what. This is a planning estimate, not legal advice.</p>
+          </div>}
+        </>}
+        <div className="space-y-2">
+          <span className="block text-[14px] font-medium">Expected inheritance or large gift (optional)</span>
+          {(A.gifts || []).map((g, j) => (
+            <div key={j} className="flex flex-wrap items-center gap-2">
+              <div className="w-40"><TextInput value={g.name} placeholder="e.g. Inheritance" onChange={v => set({ gifts: A.gifts!.map((x, k) => k === j ? { ...x, name: v } : x) })} /></div>
+              <div className="w-36"><Money value={g.amount} step={5000} onChange={v => set({ gifts: A.gifts!.map((x, k) => k === j ? { ...x, amount: v } : x) })} /></div>
+              <span className="text-sm text-ink2">in</span><div className="w-24"><NumberInput value={g.year} step={1} onChange={v => set({ gifts: A.gifts!.map((x, k) => k === j ? { ...x, year: Math.round(v) } : x) })} /></div>
+              {couple && <div className="w-40"><Select value={g.who} options={[{ value: 'Parent 1', label: `To ${n1}` }, { value: 'Parent 2', label: `To ${n2}` }, { value: 'Both', label: 'To both of us' }]}
+                onChange={v => set({ gifts: A.gifts!.map((x, k) => k === j ? { ...x, who: v as any } : x) })} /></div>}
+              <button className="p-1.5 text-muted hover:text-bad" onClick={() => set({ gifts: A.gifts!.filter((_, k) => k !== j) })}><Trash2 size={15} /></button>
+            </div>))}
+          <Button size="sm" onClick={() => set({ gifts: [...(A.gifts || []), { name: 'Inheritance', year: CY + 15, amount: 100000, who: 'Parent 1' }] })}><Plus size={14} />Add one</Button>
+          <p className="text-[13px] text-muted">In today's dollars. Gifts and inheritances generally aren't taxable income for the person receiving them (a few states have an inheritance tax).</p>
+        </div>
+        {couple && <cOwn.Sources />}
       </Question>) },
     { section: 2, body: (
       <Question title="Do you know your Social Security estimate?" why={<>Your statement at <a className="text-accent" href="https://www.ssa.gov/myaccount/" target="_blank" rel="noreferrer">ssa.gov/myaccount</a> shows your benefit at full retirement age (67). If you skip it, we estimate it from today's income with the 2026 benefit formula<cSS.Cite id={['ssa_bend_points', 'ssa_wage_base']} />, assuming a full 35-year career.</>}>

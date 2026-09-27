@@ -265,6 +265,18 @@ def build(plan: dict, household: str, checkins: list | None = None, sections: li
         h, d = RD.locations_table(ctx)
         story += [CondPageBreak(1.2 * inch), Paragraph('Where you live' + cite('locations'), st.H2), _table([h] + d)]
 
+    if 'ownership' in sections and (RD.ownership_enabled(ctx) or p.get('windfalls')):
+        story += [CondPageBreak(2 * inch), Paragraph('Who owns what' + cite('ownership'), st.H2)]
+        if RD.ownership_enabled(ctx):
+            story += [_kv_table(RD.ownership_rules(ctx), st, cols=3), Spacer(1, 4)]
+            h, d = RD.ownership_table(ctx, today, every=5 if len(rows) > 30 else 1)
+            story += [_table([h] + [[r[0]] + [_m(v) for v in r[1:]] for r in d]),
+                      Paragraph('Separate = what each person brought into the marriage, inherited or was given, plus growth; marital = built together. '
+                                'Homes are shared out in proportion to the money each side put in. A planning estimate, not legal advice.', st.Mu)]
+        wh, wd = RD.windfalls_table(ctx)
+        if wd:
+            story += [Paragraph('Gifts & inheritances', st.H3), _table([wh] + [[r[0], r[1], _m(r[2], True), r[3], r[4]] for r in wd])]
+
     if 'assumptions' in sections:
         story += [CondPageBreak(1.2 * inch), Paragraph('Key assumptions' + cite('assumptions'), st.H2), _kv_table(RD.assumptions_rows(ctx), st, cols=3)]
 
@@ -365,6 +377,8 @@ def build_json(plan: dict, today: bool = True, ctx: dict | None = None, checkins
         'monte_carlo': {'n': ctx['mc']['n'], 'success_rate': ctx['mc']['success_rate'], 'final': ctx['mc']['final'],
                         'percentiles_by_year': [dict(zip(mh, r)) for r in md]},
         'events': ctx['proj']['events'], 'checkins': checkins or [],
+        'ownership': ({'rules': dict(RD.ownership_rules(ctx)), 'by_year': [dict(zip(RD.ownership_table(ctx, today)[0], r)) for r in RD.ownership_table(ctx, today)[1]]}
+                      if RD.ownership_enabled(ctx) else None),
         'sources': [{'n': k, 'id': i, **d} for k, (i, d) in enumerate(RD.sources_for(ctx, list(RD.SECTIONS)), 1)],
     }
     return json.dumps(out, indent=1, default=str).encode()
@@ -448,6 +462,11 @@ def build_xlsx(plan: dict, household: str, today: bool = True, ctx: dict | None 
         sheet('Recurring', *pt['recurring'])
     if 'locations' in sections:
         sheet('Locations', *RD.locations_table(ctx))
+    if 'ownership' in sections and RD.ownership_enabled(ctx):
+        sheet('Who owns what', *RD.ownership_table(ctx, today))
+        sheet('Ownership rules', ['Rule', 'Value'], RD.ownership_rules(ctx), widths={1: 40, 2: 40})
+    if 'ownership' in sections and ctx['plan'].get('windfalls'):
+        sheet('Gifts & inheritances', *RD.windfalls_table(ctx))
     if 'assumptions' in sections:
         sheet('Assumptions', ['Assumption', 'Value'], RD.assumptions_rows(ctx), widths={1: 30, 2: 30})
     if 'monte_carlo' in sections:

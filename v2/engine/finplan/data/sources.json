@@ -210,5 +210,19 @@
     "year": "current rules",
     "url": "https://www.cms.gov/cciio/programs-and-initiatives/health-insurance-market-reforms/state-rating",
     "used_for": "Why marketplace premiums at 60+ are about twice a 40-year-old's"
+  },
+  "irs_pub555": {
+    "publisher": "Internal Revenue Service",
+    "title": "Publication 555, Community Property (community-property states; how income from separate property is treated)",
+    "year": "Dec 2024 revision",
+    "url": "https://www.irs.gov/publications/p555",
+    "used_for": "Default rules for separate vs marital property: the nine community-property states, and the four (ID, LA, TX, WI) where income from separate property is community income"
+  },
+  "lii_equitable": {
+    "publisher": "Cornell Law School, Legal Information Institute",
+    "title": "Equitable distribution",
+    "year": "current",
+    "url": "https://www.law.cornell.edu/wex/equitable_distribution",
+    "used_for": "How non-community-property states divide marital property (by fairness factors, not always 50/50)"
   }
 }

@@ -21,9 +21,10 @@ v2 now covers every v0.8 tab and adds a set of "living plan" features. See `PARI
 | **Where you live**: moves change prices and rent (BEA/World Bank), world map, custom places and templates | ✅ |
 | **Spending slider** calibrated to BLS spending and BEA prices, with milestones | ✅ |
 | **Data citations**: numbered [n] sources with links in the app and reports | ✅ |
+| **Who owns what**: separate vs marital property by year, homes by contribution, gifts & inheritances, prenup rules | ✅ |
 | Demo households re-tuned for the corrected math | ✅ |
 
-Tests: 52 engine tests, 16 API tests, and a clean `tsc` build. The UI was checked end to end with Playwright.
+Tests: 56 engine tests, 17 API tests, and a clean `tsc` build. The UI was checked end to end with Playwright.
 
 ## 2. What's still missing
 
