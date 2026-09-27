@@ -70,7 +70,7 @@ export function CashflowExplorer({ rows, rawRows, events, names, single, today }
       {r && raw && <YearPanel r={r} raw={raw} f={f} names={names} single={single} year={year} setYear={setYear} years={rows.map(x => x.year)} evs={evByYear[year] || []} />}
 
       <CriticalYears rows={rows} rawRows={rawRows} evByYear={evByYear} single={single} onPick={setYear} />
-      <LifeStages rows={rows} />
+      <LifeStages rows={rows} single={single} />
     </div>
   )
 }
@@ -258,8 +258,12 @@ function CriticalYears({ rows, rawRows, evByYear, single, onPick }: any) {
   )
 }
 
-function LifeStages({ rows }: { rows: any[] }) {
-  const stage = (r: any) => (r.wages1 + r.wages2) > 0 ? 'Working years' : r.age1 < 75 ? 'Early retirement (before 75)' : 'Late retirement (75+)'
+function LifeStages({ rows, single }: { rows: any[]; single: boolean }) {
+  // working = anyone still before their planned retirement age (a stay-at-home year or a job gap still counts as working years);
+  // retirement stages follow the youngest living adult
+  const working = (r: any) => r.work1 != null ? (r.work1 || (!single && r.work2)) : (r.wages1 + r.wages2) > 0
+  const youngest = (r: any) => Math.min(r.alive1 === false ? 999 : r.age1, single || r.alive2 === false ? 999 : r.age2)
+  const stage = (r: any) => working(r) ? 'Working years' : youngest(r) < 75 ? 'Early retirement (before 75)' : 'Late retirement (75+)'
   const groups: Record<string, any[]> = {}
   rows.forEach(r => { (groups[stage(r)] = groups[stage(r)] || []).push(r) })
   const avg = (xs: any[], k: string) => xs.reduce((a, r) => a + r[k], 0) / xs.length

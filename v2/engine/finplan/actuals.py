@@ -38,7 +38,19 @@ def planned_for_year(plan: dict, year: int) -> dict:
                 exp['housing'][h['name']] = {'mortgage': h.get('mortgage_pi', 0) + h.get('pmi', 0), 'property_tax': h.get('property_tax', 0),
                                              'home_insurance': h.get('insurance', 0) + h.get('hoa', 0),
                                              'maintenance': h.get('maintenance', 0), 'upkeep': h.get('upkeep', 0)}
-        exp['healthcare'] = {'insurance_premiums': row['exp_healthcare'], 'medicare': 0.0, 'ltc_premiums': 0.0, 'out_of_pocket': 0.0}
+        hcx = {'insurance_premiums': 0.0, 'medicare': 0.0, 'ltc_premiums': 0.0, 'out_of_pocket': 0.0}
+        items = d.get('healthcare') or []
+        for it in items:
+            hcx[it.get('kind') or 'insurance_premiums'] = hcx.get(it.get('kind') or 'insurance_premiums', 0.0) + it['amount']
+        if not items:
+            hcx['insurance_premiums'] = row['exp_healthcare']
+        exp['healthcare'] = hcx
+        # the engine's own per-category living costs (cost-of-living, rent index, deaths and owned homes applied)
+        liv = d.get('living')
+        if liv:
+            exp['parentX'] = {k: liv['p1'].get(k, 0.0) for k in p['parentX_expenses']}
+            exp['parentY'] = {k: liv['p2'].get(k, 0.0) for k in p['parentY_expenses']}
+            exp['family'] = {k: liv['shared'].get(k, 0.0) for k in p['family_shared_expenses']}
         for x in d.get('recurring', []):
             exp['recurring'][x['name']] = exp['recurring'].get(x['name'], 0) + x['amount']
         for x in d.get('purchases', []):

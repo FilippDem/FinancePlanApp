@@ -175,7 +175,7 @@ def build(plan: dict, household: str, checkins: list | None = None, sections: li
                   colWidths=[W / 6] * 6)
         t.setStyle(TableStyle([('BOX', (0, 0), (-1, -1), 0.6, colors.HexColor(GRID)), ('INNERGRID', (0, 0), (-1, -1), 0.6, colors.HexColor(GRID)),
                                ('TOPPADDING', (0, 0), (-1, -1), 7), ('BOTTOMPADDING', (0, 0), (-1, -1), 7)]))
-        story += [t, Paragraph('Lifetime summary', st.H2), _kv_table(RD.lifetime_summary(ctx), st, cols=3)]
+        story += [t, Paragraph('Lifetime summary', st.H2), _kv_table(RD.lifetime_summary(ctx, today), st, cols=3)]
 
     if 'charts' in sections:
         story += _charts(ctx, st, today)
@@ -242,13 +242,13 @@ def build(plan: dict, household: str, checkins: list | None = None, sections: li
         story += [CondPageBreak(1.2 * inch), Paragraph('Key assumptions', st.H2), _kv_table(RD.assumptions_rows(ctx), st, cols=3)]
 
     if 'monte_carlo' in sections:
-        h, d = RD.mc_percentiles(ctx)
+        h, d = RD.mc_percentiles(ctx, today)
         step = 5 if len(d) > 30 else 1
         sel = [r for i, r in enumerate(d) if i % step == 0 or i == len(d) - 1]
         story += [CondPageBreak(2.5 * inch), Paragraph('Monte Carlo results', st.H2),
                   Paragraph(f"{mc['n']:,} simulations · success rate {mc['success_rate'] * 100:.0f}% · final net worth median "
-                            f"{_m(mc['final']['median'] / rows[-1]['infl_index'])}, 10th percentile {_m(mc['final']['p10'] / rows[-1]['infl_index'])} "
-                            f"(today's dollars){' · every 5th year shown' if step > 1 else ''}", st.Mu),
+                            f"{_m(mc['final']['median'] / (rows[-1]['infl_index'] if today else 1))}, 10th percentile {_m(mc['final']['p10'] / (rows[-1]['infl_index'] if today else 1))} "
+                            f"({'today' if today else 'nominal'}'s dollars){' · every 5th year shown' if step > 1 else ''}".replace("nominal's", 'nominal'), st.Mu),
                   _table([h] + [[r[0]] + [_m(v) for v in r[1:-1]] + [f"{r[-1] * 100:.0f}%"] for r in sel])]
 
     if 'year_by_year' in sections:
@@ -328,10 +328,10 @@ def build_json(plan: dict, today: bool = True, ctx: dict | None = None, checkins
     ctx = ctx or RD.compute(plan)
     hdr, data = RD.category_table(ctx, today)
     years, lines = RD.detail_lines(ctx, today)
-    mh, md = RD.mc_percentiles(ctx)
+    mh, md = RD.mc_percentiles(ctx, today)
     out = {
         'generated': date.today().isoformat(), 'dollars': 'today' if today else 'nominal',
-        'plan': ctx['plan'], 'summary': ctx['proj']['summary'], 'lifetime': dict(RD.lifetime_summary(ctx)),
+        'plan': ctx['plan'], 'summary': ctx['proj']['summary'], 'lifetime': dict(RD.lifetime_summary(ctx, today)),
         'year_by_year': [dict(zip(hdr, r)) for r in data],
         'line_items': {'years': years, 'lines': [{'group': g, 'item': l, 'values': v} for g, l, v in lines]},
         'monte_carlo': {'n': ctx['mc']['n'], 'success_rate': ctx['mc']['success_rate'], 'final': ctx['mc']['final'],
@@ -353,7 +353,10 @@ def build_xlsx(plan: dict, household: str, today: bool = True, ctx: dict | None 
     CUR = '"$"#,##0;[Red]-"$"#,##0'
     wb = Workbook()
 
-    def sheet(title, header, rows, money_from=1, widths=None, first=False):
+    import re as _re
+    _NUM = _re.compile(r'\b(age|ages|age now|year|years|born|bought|retire at|claim at|plan until|yrs|days|from|to|every)\b')
+
+    def sheet(title, header, rows, money_from=1, widths=None, first=False, int_money=True):
         ws = wb.active if first else wb.create_sheet(title[:31])
         ws.title = title[:31]
         ws.append(header)
@@ -362,10 +365,24 @@ def build_xlsx(plan: dict, household: str, today: bool = True, ctx: dict | None 
             cell.fill, cell.font, cell.alignment = HDR, Font(bold=True, color='FFFFFF'), Alignment(horizontal='center', wrap_text=True)
         for r in rows:
             ws.append(list(r))
+        # pick a number format from the column header: percents, ages/years/counts, else currency
+        fmts = []
+        for h in header:
+            hl = str(h).lower()
+            if 'solvent' in hl:
+                fmts.append('0%')
+            elif '%' in hl or 'rate' in hl:
+                fmts.append('0.0"%"')
+            elif _NUM.search(hl) and '$' not in hl:
+                fmts.append('0')
+            else:
+                fmts.append(CUR)
         for row in ws.iter_rows(min_row=2):
-            for c in row[money_from:]:
-                if isinstance(c.value, float):
-                    c.number_format = CUR
+            for i, c in enumerate(row):
+                if i < money_from or isinstance(c.value, bool) or not isinstance(c.value, (int, float)):
+                    continue
+                if isinstance(c.value, float) or fmts[i] != CUR or int_money:
+                    c.number_format = fmts[i] if i < len(fmts) else CUR
         for i in range(1, len(header) + 1):
             ws.column_dimensions[get_column_letter(i)].width = (widths or {}).get(i, 14)
         ws.freeze_panes = 'B2'
@@ -374,8 +391,8 @@ def build_xlsx(plan: dict, household: str, today: bool = True, ctx: dict | None 
     s = ctx['proj']['summary']
     summary_rows = [('Household', household), ('Prepared', date.today().isoformat()), ('Dollars', "today's" if today else 'nominal'),
                     ('Plan success (Monte Carlo)', f"{ctx['mc']['success_rate'] * 100:.0f}%"),
-                    ('Net worth today', s['net_worth_now']), ('Retirement year', s['retirement_year'])] + RD.lifetime_summary(ctx)
-    sheet('Summary', ['Item', 'Value'], summary_rows, widths={1: 34, 2: 30}, first=True)
+                    ('Net worth today', s['net_worth_now']), ('Retirement year', s['retirement_year'])] + RD.lifetime_summary(ctx, today)
+    sheet('Summary', ['Item', 'Value'], summary_rows, widths={1: 34, 2: 30}, first=True, int_money=False)
     hdr, data = RD.category_table(ctx, today)
     sheet('Year by year', hdr, data, money_from=2)
     years, lines = RD.detail_lines(ctx, today)
@@ -405,7 +422,7 @@ def build_xlsx(plan: dict, household: str, today: bool = True, ctx: dict | None 
     if 'assumptions' in sections:
         sheet('Assumptions', ['Assumption', 'Value'], RD.assumptions_rows(ctx), widths={1: 30, 2: 30})
     if 'monte_carlo' in sections:
-        h, d = RD.mc_percentiles(ctx)
+        h, d = RD.mc_percentiles(ctx, today)
         sheet('Monte Carlo', h, d)
     if 'checkins' in sections and checkins:
         sheet('Check-ins', ['Date', 'Type', 'Savings', 'Expected', 'Net worth', 'Status'],

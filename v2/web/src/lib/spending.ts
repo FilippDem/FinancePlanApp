@@ -76,3 +76,15 @@ export function describe(c: Curve, x: number) {
   if (!hi) return `Above ${lo.label.toLowerCase()}`
   return `Between ${lo.label} and ${hi.label}`
 }
+
+// ── lifestyles & custom places ─────────────────────────────────────────────
+export const BASE_LIFESTYLES = ['Conservative', 'Average', 'High-end']
+/** Built-in lifestyles plus the user's saved templates for that location (named "… (custom)"). */
+export function lifestyleOptions(plan: any, loc: string): string[] {
+  return [...BASE_LIFESTYLES, ...Object.keys(plan?.custom_expense_templates?.[loc] || {}).filter(k => !BASE_LIFESTYLES.includes(k))]
+}
+/** Where prices come from: a custom place borrows them from its "prices like" place unless it has its own template. */
+export function priceLoc(plan: any, loc: string): string {
+  if (plan?.custom_expense_templates?.[loc]) return loc
+  return plan?.custom_locations?.[loc]?.cost_like || loc
+}

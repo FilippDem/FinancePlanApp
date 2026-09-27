@@ -4,27 +4,45 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
 import { money, clsx } from '../lib/format'
-import { Card, PageHeader, Button, NumberInput, Money, Select, TextInput, Toggle, Badge, Note, Field, Modal, Empty } from '../components/ui'
+import { Card, PageHeader, Button, NumberInput, Money, Select, TextInput, Toggle, Badge, Note, Field, Modal, Empty, Segmented } from '../components/ui'
 import { S } from '../components/charts'
 import { WorldMap, MapStop } from '../components/WorldMap'
+import { lifestyleOptions, BASE_LIFESTYLES, priceLoc } from '../lib/spending'
 
-const LIFESTYLES = ['Conservative', 'Average', 'High-end']
+/** Where a location sits in the Country → State → City catalog. */
+export function locate(catalog: any, custom: Record<string, any> | undefined, v: string) {
+  if (custom && v in custom) return { country: '★ My places', state: '', city: v }
+  for (const [country, c] of Object.entries<any>(catalog || {})) {
+    if (country === v) return { country, state: '', city: '' }
+    if (c.has_states) {
+      for (const [st, sd] of Object.entries<any>(c.states || {}))
+        if ((sd.cities || []).includes(v)) return { country, state: st, city: v }   // a city wins over a same-named state
+      for (const st of Object.keys(c.states || {})) if (st === v) return { country, state: st, city: '' }
+    } else if ((c.cities || []).includes(v)) return { country, state: '', city: v }
+  }
+  return { country: 'United States', state: '', city: '' }
+}
+
+/** Which tax rules a location uses (a state/province or a country name). */
+export function taxLocationOf(reference: any, custom: Record<string, any> | undefined, v: string): string {
+  if (custom?.[v]?.tax_location) return custom[v].tax_location
+  if (reference?.us_state_tax?.[v] || reference?.country_tax?.[v]) return v
+  const l = locate(reference?.location_catalog, custom, v)
+  if (l.state && reference?.us_state_tax?.[l.state]) return l.state
+  if (reference?.country_tax?.[l.country]) return l.country
+  return 'Washington'
+}
+
+/** Lifestyle select options, keeping the current value even if it isn't offered for this place. */
+const lifeOpts = (plan: any, loc: string, cur?: string) => {
+  const o = lifestyleOptions(plan, loc)
+  return cur && !o.includes(cur) ? [...o, cur] : o
+}
 
 /** Country → State/Province → City picker (v0.8 location_picker), plus the user's own places. */
 export function LocationPicker({ value, onChange, catalog, custom, compact }:
   { value: string; onChange: (v: string) => void; catalog: any; custom?: Record<string, any>; compact?: boolean }) {
-  const find = (v: string) => {
-    if (custom && v in custom) return { country: '★ My places', state: '', city: v }
-    for (const [country, c] of Object.entries<any>(catalog || {})) {
-      if (country === v) return { country, state: '', city: '' }
-      if (c.has_states) {
-        for (const [st, sd] of Object.entries<any>(c.states || {}))
-          if ((sd.cities || []).includes(v)) return { country, state: st, city: v }   // a city wins over a same-named state
-        for (const st of Object.keys(c.states || {})) if (st === v) return { country, state: st, city: '' }
-      } else if ((c.cities || []).includes(v)) return { country, state: '', city: v }
-    }
-    return { country: 'United States', state: '', city: '' }
-  }
+  const find = (v: string) => locate(catalog, custom, v)
   const cur = find(value)
   const countries = [...Object.keys(catalog || {}), ...(custom && Object.keys(custom).length ? ['★ My places'] : [])]
   const c = catalog?.[cur.country]
@@ -112,7 +130,7 @@ export default function Locations() {
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="w-24"><NumberInput value={e.year} step={1} onChange={v => update(d => { d.state_timeline[i].year = Math.round(v); d.state_timeline.sort((a: any, b: any) => a.year - b.year) })} /></div>
                   <LocationPicker value={e.state} catalog={catalog} custom={custom} onChange={v => update(d => { d.state_timeline[i].state = v })} />
-                  <div className="w-36"><Select value={String(e.spending_strategy || 'Average').replace(' (statistical)', '')} options={LIFESTYLES} onChange={v => update(d => { d.state_timeline[i].spending_strategy = v })} /></div>
+                  <div className="w-36"><Select value={String(e.spending_strategy || 'Average').replace(' (statistical)', '')} options={lifeOpts(plan, e.state, String(e.spending_strategy || 'Average').replace(' (statistical)', ''))} onChange={v => update(d => { d.state_timeline[i].spending_strategy = v })} /></div>
                   <span className="flex-1" />
                   <button disabled={stl.length === 1} className="p-1.5 rounded text-muted hover:text-bad disabled:opacity-30" onClick={() => update(d => { d.state_timeline.splice(i, 1) })}><Trash2 size={15} /></button>
                 </div>
@@ -170,13 +188,44 @@ function TemplateBrowser() {
   const [source, setSource] = useState<'calibrated' | 'v08'>('calibrated')
   const [vals, setVals] = useState<Record<string, number> | null>(null)
   const [saveAs, setSaveAs] = useState<string | null>(null)
+  const [saveFor, setSaveFor] = useState<'here' | 'new'>('here')
+  const [newPlace, setNewPlace] = useState('')
   const [editing, setEditing] = useState<{ loc: string; name: string; vals: Record<string, number> } | null>(null)
   const [confirmDel, setConfirmDel] = useState<{ loc: string; name: string } | null>(null)
   const infl = plan.economic_params?.inflation_rate ?? 0.03
   const scale = Math.pow(1 + infl, Math.max(0, plan.current_year - 2024))
   const customT: Record<string, Record<string, Record<string, number>>> = plan.custom_expense_templates || {}
+  const customL: Record<string, any> = plan.custom_locations || {}
   const groups: Record<string, string[]> = reference?.adult_categories || {}
-  useEffect(() => { let live = true; setVals(null); api.template('adult', loc, `${life} (statistical)`, plan.current_year, infl, source).then(r => live && setVals(r)).catch(() => {}); return () => { live = false } }, [loc, life, source, plan.current_year, infl])
+  const isMine = !BASE_LIFESTYLES.includes(life)
+  const lifeList = lifeOpts(plan, loc)
+  useEffect(() => { if (!lifeList.includes(life)) setLife('Average') }, [loc])
+  useEffect(() => {
+    let live = true; setVals(null)
+    api.template('adult', loc, isMine ? life : `${life} (statistical)`, plan.current_year, infl, source, plan).then(r => live && setVals(r)).catch(() => {})
+    return () => { live = false }
+  }, [loc, life, source, plan.current_year, infl, JSON.stringify(customT[loc] || {}), JSON.stringify(customL[loc] || {})])
+  const saveTemplate = () => {
+    const name = (saveAs || '').trim() || `${life} (custom)`
+    const nm = name.endsWith('(custom)') ? name : `${name} (custom)`
+    const target = saveFor === 'new' ? newPlace.trim() : loc
+    if (!target) return
+    const coords = reference?.coordinates?.[loc] || customL[loc] || {}
+    const where = locate(reference?.location_catalog, customL, loc)
+    update(d => {
+      if (saveFor === 'new' && !(d.custom_locations || {})[target]) {
+        // "save as a new city": a place of its own, taxed and priced like the one being browsed
+        d.custom_locations = d.custom_locations || {}
+        d.custom_locations[target] = { country: where.country === '★ My places' ? (customL[loc]?.country || '') : where.country,
+          region: where.state || '', lat: coords.lat ?? null, lon: coords.lon ?? null,
+          tax_location: taxLocationOf(reference, customL, loc), cost_like: priceLoc(plan, loc) }
+      }
+      d.custom_expense_templates = d.custom_expense_templates || {}; d.custom_expense_templates[target] = d.custom_expense_templates[target] || {}
+      d.custom_expense_templates[target][nm] = Object.fromEntries(Object.entries(vals || {}).map(([k, v]) => [k, Math.round(v / scale)]))
+    })
+    setSaveAs(null); setNewPlace(''); setSaveFor('here')
+    setEditing({ loc: target, name: nm, vals: { ...(vals || {}) } })
+  }
   const total = vals ? Object.values(vals).reduce((a, b) => a + b, 0) : 0
   const pie = useMemo(() => vals ? Object.entries(groups).map(([g, cats]) => ({ name: g, value: cats.reduce((a, c) => a + (vals[c] || 0), 0) })).filter(x => x.value > 0) : [], [vals, groups])
   const src = reference?.data_sources?.[loc] || reference?.data_sources?.[String(loc).split(',')[0]]
@@ -185,9 +234,11 @@ function TemplateBrowser() {
     <Card title={<span className="flex items-center gap-2"><Database size={16} className="text-accent" />Cost-of-living templates</span>}
       subtitle="Per-adult everyday spending (not housing or kids) behind the spending slider and moves. Browse, then save a copy you can edit.">
       <div className="flex flex-wrap items-end gap-3 mb-4">
-        <Field label="Location"><LocationPicker value={loc} onChange={setLoc} catalog={reference?.location_catalog} compact /></Field>
-        <Field label="Lifestyle" className="w-40"><Select value={life} options={LIFESTYLES} onChange={setLife} /></Field>
-        <Field label="Data" className="w-64"><Select value={source} options={[{ value: 'calibrated', label: 'BLS spending + BEA prices (2024)' }, { value: 'v08', label: 'v0.8 original (audited)' }]} onChange={setSource} /></Field>
+        <Field label="Location"><LocationPicker value={loc} onChange={setLoc} catalog={reference?.location_catalog} custom={customL} compact /></Field>
+        <Field label="Lifestyle" className="w-48"><Select value={life} options={lifeList} onChange={setLife} /></Field>
+        {!isMine && <Field label="Data" className="w-64"><Select value={source} options={[{ value: 'calibrated', label: 'BLS spending + BEA prices (2024)' }, { value: 'v08', label: 'v0.8 original (audited)' }]} onChange={setSource} /></Field>}
+        {isMine && <Badge tone="accent">Your template</Badge>}
+        {!isMine && customL[loc] && !customT[loc] && <span className="text-[12.5px] text-muted mb-2">Prices borrowed from {customL[loc].cost_like}</span>}
       </div>
       {!vals ? <div className="h-40 text-sm text-muted">Loading…</div> : (
         <div className="grid lg:grid-cols-[260px_1fr] gap-5">
@@ -216,7 +267,9 @@ function TemplateBrowser() {
                 </React.Fragment>))}</tbody>
             </table>
             <div className="flex flex-wrap gap-2 mt-4">
-              <Button onClick={() => setSaveAs(`${life} (custom)`)}><Save size={14} />Save as my template</Button>
+              <Button onClick={() => { setSaveFor('here'); setSaveAs(isMine ? `${life.replace(' (custom)', '')} copy` : `${life} (custom)`) }}><Save size={14} />Save as my template</Button>
+              <Button variant="ghost" onClick={() => { setSaveFor('new'); setSaveAs(isMine ? life : `${life} (custom)`) }}><Building2 size={14} />Save as a new city</Button>
+              {isMine && customT[loc]?.[life] && <Button variant="ghost" onClick={() => setEditing({ loc, name: life, vals: Object.fromEntries(Object.entries(customT[loc][life]).map(([k, v]) => [k, Math.round(v * scale)])) })}><Pencil size={13} />Edit</Button>}
             </div>
             <div className="mt-4 rounded-lg bg-sunken/70 p-3 text-[12.5px] text-ink2">
               <div className="font-medium mb-1">Data sources</div>
@@ -239,18 +292,17 @@ function TemplateBrowser() {
                 <button className="p-1 text-muted hover:text-bad" onClick={() => setConfirmDel({ loc: l, name })}><Trash2 size={14} /></button>
               </div>)))}
           </div>
-          <p className="text-[12px] text-muted mt-1.5">Your templates override the built-in data for that location, including when you move there.</p>
+          <p className="text-[12px] text-muted mt-1.5">Pick a template as the lifestyle for that place in Moves (above) or apply it under Spending. A template named after a built-in lifestyle (e.g. "Average (custom)") replaces that lifestyle's data for the place, including when you move there.</p>
         </div>
       )}
-      <Modal open={saveAs !== null} onClose={() => setSaveAs(null)} title={`Save ${loc} template`}
-        footer={<><Button onClick={() => setSaveAs(null)}>Cancel</Button><Button variant="primary" onClick={() => {
-          const name = (saveAs || '').trim() || `${life} (custom)`
-          const nm = name.endsWith('(custom)') ? name : `${name} (custom)`
-          update(d => { d.custom_expense_templates = d.custom_expense_templates || {}; d.custom_expense_templates[loc] = d.custom_expense_templates[loc] || {}
-            d.custom_expense_templates[loc][nm] = Object.fromEntries(Object.entries(vals || {}).map(([k, v]) => [k, Math.round(v / scale)])) })
-          setSaveAs(null); setEditing({ loc, name: nm, vals: { ...(vals || {}) } })
-        }}>Save</Button></>}>
-        <Field label="Template name"><TextInput value={saveAs || ''} onChange={setSaveAs} /></Field>
+      <Modal open={saveAs !== null} onClose={() => setSaveAs(null)} title={saveFor === 'new' ? `New city from ${loc}` : `Save ${loc} template`}
+        footer={<><Button onClick={() => setSaveAs(null)}>Cancel</Button><Button variant="primary" disabled={saveFor === 'new' && !newPlace.trim()} onClick={saveTemplate}>Save</Button></>}>
+        <div className="space-y-3">
+          <Segmented value={saveFor} onChange={v => setSaveFor(v as any)} options={[{ value: 'here', label: `For ${loc}` }, { value: 'new', label: 'As a new city' }]} />
+          {saveFor === 'new' && <Field label="City name" hint={`Added to My places, taxed like ${taxLocationOf(reference, customL, loc)}; edit its map position and tax rules below`}>
+            <TextInput value={newPlace} onChange={setNewPlace} placeholder="e.g. Bend, OR" /></Field>}
+          <Field label="Template name" hint="Shows up as a lifestyle for that place in Moves and Spending"><TextInput value={saveAs || ''} onChange={setSaveAs} /></Field>
+        </div>
       </Modal>
       <Modal open={!!editing} onClose={() => setEditing(null)} title={editing ? `${editing.loc} · ${editing.name}` : ''}
         footer={<><Button onClick={() => setEditing(null)}>Cancel</Button><Button variant="primary" onClick={() => {

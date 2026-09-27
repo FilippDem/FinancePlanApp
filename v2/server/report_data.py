@@ -249,14 +249,15 @@ def assumptions_rows(ctx: dict) -> list[tuple[str, str]]:
             ('Spending follows moves', 'yes' if p.get('move_adjusts_spending', True) else 'no')]
 
 
-def lifetime_summary(ctx: dict) -> list[tuple[str, str]]:
+def lifetime_summary(ctx: dict, today: bool = True) -> list[tuple[str, str]]:
     rows = ctx['proj']['rows']
     s = ctx['proj']['summary']
-    td = lambda r, k: r[k] / r['infl_index']
+    td = (lambda r, k: r[k] / r['infl_index']) if today else (lambda r, k: r[k])
     mx = max(rows, key=lambda r: td(r, 'net_worth'))
     mn = min(rows, key=lambda r: td(r, 'net_worth'))
-    working = [r for r in rows if r['wages1'] + r['wages2'] > 0]
-    retired = [r for r in rows if r['wages1'] + r['wages2'] == 0]
+    is_working = lambda r: r.get('work1') or (not ctx['single'] and r.get('work2')) if 'work1' in r else r['wages1'] + r['wages2'] > 0
+    working = [r for r in rows if is_working(r)]
+    retired = [r for r in rows if not is_working(r)]
     avg = lambda xs, k: sum(td(r, k) for r in xs) / len(xs) if xs else 0.0
     m = lambda v: f"${v:,.0f}"
     return [('Plan horizon', f"{s['current_year']}–{s['end_year']} ({len(rows)} years)"),
@@ -270,10 +271,11 @@ def lifetime_summary(ctx: dict) -> list[tuple[str, str]]:
             ('Savings run out', str(s['depletion_year']) if s['depletion_year'] else 'never (expected path)')]
 
 
-def mc_percentiles(ctx: dict) -> tuple[list[str], list[list]]:
+def mc_percentiles(ctx: dict, today: bool = True) -> tuple[list[str], list[list]]:
     mc, rows = ctx['mc'], ctx['proj']['rows']
     qs = ['10', '25', '50', '75', '90']
     out = []
     for t, r in enumerate(rows):
-        out.append([r['year']] + [mc['net_worth'][q][t] / r['infl_index'] for q in qs] + [mc['solvent_by_year'][t]])
+        d = r['infl_index'] if today else 1.0
+        out.append([r['year']] + [mc['net_worth'][q][t] / d for q in qs] + [mc['solvent_by_year'][t]])
     return ['Year'] + [f'{q}th pct NW' for q in qs] + ['Still solvent'], out

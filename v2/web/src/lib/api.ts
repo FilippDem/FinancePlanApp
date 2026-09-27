@@ -76,6 +76,7 @@ export const api = {
   removeMember: (email: string) => req('DELETE', `/api/household/members/${encodeURIComponent(email)}`),
   cleanupTests: () => req('POST', '/api/households/cleanup-tests'),
   openDemo: (name: string) => req('POST', '/api/demos/open', { name }),
+  exitTest: () => req('POST', '/api/households/exit-test'),
   childPreview: (body: any) => req('POST', '/api/templates/child_preview', body),
   locationsInfo: (plan: any) => req('POST', '/api/locations/info', { plan }),
   reportSections: () => req('GET', '/api/report/sections'),
@@ -86,8 +87,10 @@ export const api = {
     const filename = /filename="([^"]+)"/.exec(cd)?.[1] || `financial-plan.${opts.format}`
     return { blob: await r.blob(), filename }
   },
-  template: (kind: 'adult' | 'family' | 'children', location: string, strategy: string, current_year: number, inflation: number, source: 'calibrated' | 'v08' = 'calibrated') =>
-    req('POST', `/api/templates/${kind}`, { location, strategy, current_year, inflation, source }),
+  template: (kind: 'adult' | 'family' | 'children', location: string, strategy: string, current_year: number, inflation: number, source: 'calibrated' | 'v08' = 'calibrated',
+    plan?: any) =>
+    req('POST', `/api/templates/${kind}`, { location, strategy, current_year, inflation, source,
+      ...(plan ? { custom: plan.custom_expense_templates || {}, custom_locations: plan.custom_locations || {} } : {}) }),
   spendingCurve: (location: string, current_year: number, inflation: number) =>
     req('GET', `/api/spending/curve?location=${encodeURIComponent(location)}&current_year=${current_year}&inflation=${inflation}`),
 }

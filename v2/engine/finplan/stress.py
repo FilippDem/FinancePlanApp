@@ -166,15 +166,44 @@ def find_worst_year(t: dict, p: dict, n: int = 120) -> tuple[int | None, list]:
     return best, curve
 
 
+WORST_CHILD = '__worst__'
+
+
+def worst_child(t: dict, p: dict, n: int = 150) -> str | None:
+    """v0.8 find_worst_case_disabled_child: the child whose disability hurts the plan most."""
+    best, score = None, None
+    for ch in p['children_list']:
+        sp = _with(p, expand({**t, 'child': ch['name']}, p))
+        mc = monte_carlo(sp, n, seed=5, normalized=True)
+        sc = (mc['success_rate'], mc['final']['median'])
+        if score is None or sc < score:
+            best, score = ch['name'], sc
+    return best
+
+
+def resolve_children(t: dict, p: dict) -> dict:
+    """Replace 'worst case' child placeholders (also inside compound tests) with a concrete child."""
+    t = copy.deepcopy(t)
+    if t['type'] == 'disabled_child' and (t.get('child') in (None, '', WORST_CHILD)):
+        t['child'] = worst_child(t, p)
+        t['auto_child'] = True
+    if t['type'] == 'compound':
+        t['events'] = [resolve_children(e, p) for e in t.get('events', [])]
+    return t
+
+
 def run(plan: dict, tests: list[dict] | None = None, n: int = 500) -> dict:
     base_plan = normalize_plan(plan)
     tests = tests if tests is not None else default_tests(base_plan)
     base = {**_det_summary(base_plan), **_mc_summary(base_plan, n)}
     out = []
     for t in tests:
+        t = resolve_children(t, base_plan)
         worst_year, curve = (None, [])
         if t.get('when') == 'worst':
             worst_year, curve = find_worst_year(t, base_plan)
+        elif t['type'] == 'compound' and t.get('start_year'):
+            worst_year = int(t['start_year'])  # "pick the year": every event starts that year
         events = expand(t, base_plan, worst_year)
         sp = _with(base_plan, events)
         r = {**_det_summary(sp), **_mc_summary(sp, n)}

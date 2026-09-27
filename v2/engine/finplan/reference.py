@@ -77,13 +77,23 @@ def ref() -> dict:
 
 
 @lru_cache(maxsize=1)
-def default_plan() -> dict:
+def _default_plan() -> dict:
     with open(DATA_DIR / "default_plan.json", encoding="utf-8") as f:
         return json.load(f)
 
 
-@lru_cache(maxsize=1)
+def default_plan() -> dict:
+    """A fresh copy every call (callers mutate it)."""
+    return copy.deepcopy(_default_plan())
+
+
 def demo_plans(raw: bool = False) -> dict:
+    """Fresh copies of the demo households (callers mutate them)."""
+    return copy.deepcopy(_demo_plans(raw))
+
+
+@lru_cache(maxsize=2)
+def _demo_plans(raw: bool = False) -> dict:
     """Demo households. demo_plans.json is extracted verbatim from v0.8; demo_overrides.json
     re-tunes them for v2's corrected math (real mortgages, taxes in Monte Carlo) so they show a
     realistic spread of outcomes instead of mostly failing. Pass raw=True for the v0.8 originals."""

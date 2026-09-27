@@ -216,6 +216,21 @@ def cleanup_test_households(email: str) -> int:
     return len(gone)
 
 
+def remove_test_household(hid: str, email: str) -> bool:
+    """Delete one _test_ household this user belongs to (never touches real households)."""
+    if not hid.startswith(TEST_PREFIX):
+        return False
+    index = load_index()
+    if email not in index.get(hid, {}).get('members', []):
+        return False
+    index.pop(hid, None)
+    save_index(index)
+    f = hh_dir() / f"{hid}.json"
+    if f.exists():
+        f.unlink()
+    return True
+
+
 def is_member(hid: str, email: str) -> bool:
     return email in load_index().get(hid, {}).get('members', [])
 

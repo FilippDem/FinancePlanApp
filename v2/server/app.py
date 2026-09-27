@@ -239,9 +239,27 @@ def demo_open(body: DemoIn, request: Request, response: Response):
     hid = S.create_test_household(sess['email'])
     S.rename_household(hid, 'Test: ' + body.name.replace('[DEMO] ', '').split(':')[0])
     S.save_plan(hid, normalize_plan(demos[body.name]), sess['email'])
+    # remember the real household so "Exit test mode" can return to it
+    if sess.get('hid') and not sess['hid'].startswith(S.TEST_PREFIX):
+        sess['prev_hid'] = sess['hid']
     sess['hid'] = hid
     _set(response, sess)
     return {'id': hid}
+
+
+@app.post('/api/households/exit-test')
+def exit_test(request: Request, response: Response):
+    """Leave test mode: delete the current test household and return to the previous real one."""
+    sess = _require(request, household=False)
+    hid = sess.get('hid') or ''
+    removed = S.remove_test_household(hid, sess['email']) if hid.startswith(S.TEST_PREFIX) else False
+    prev = sess.pop('prev_hid', None)
+    if prev and S.is_member(prev, sess['email']):
+        sess['hid'] = prev
+    else:
+        sess.pop('hid', None)
+    _set(response, sess)
+    return {'removed': removed, 'id': sess.get('hid')}
 
 
 @app.post('/api/households/join')
@@ -745,12 +763,18 @@ class TemplateIn(BaseModel):
     current_year: int = 2026
     inflation: float = 0.03
     source: str = 'calibrated'    # 'calibrated' (BLS/BEA, default) | 'v08' (original v0.8 amounts, audited)
+    custom: dict[str, Any] | None = None            # plan['custom_expense_templates']
+    custom_locations: dict[str, Any] | None = None  # plan['custom_locations']
 
 
 @app.post('/api/templates/adult')
 def tmpl_adult(body: TemplateIn):
     scale = (1 + body.inflation) ** max(0, body.current_year - 2024)
-    return {k: round(v * scale) for k, v in R.adult_template_for(body.location, body.strategy, body.source).items()}
+    loc = body.location
+    # a custom place without its own template borrows prices from the place it is "like"
+    if body.custom_locations and loc in body.custom_locations and not (body.custom and loc in body.custom):
+        loc = body.custom_locations[loc].get('cost_like') or loc
+    return {k: round(v * scale) for k, v in R.adult_template_for(loc, body.strategy, body.source, body.custom).items()}
 
 
 class LocIn(BaseModel):

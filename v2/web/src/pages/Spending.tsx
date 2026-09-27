@@ -4,7 +4,7 @@ import { usePlan, pk } from '../lib/store'
 import { api } from '../lib/api'
 import { money } from '../lib/format'
 import { SpendingSlider, useCurve } from '../components/SpendingSlider'
-import { rescale, strategyFor, xForTotal, levelAt, sum as sumCats } from '../lib/spending'
+import { rescale, strategyFor, xForTotal, levelAt, sum as sumCats, lifestyleOptions, BASE_LIFESTYLES, priceLoc } from '../lib/spending'
 
 const SHARED_LIFESTYLE = ['Family Vacations', 'Shared Subscriptions', 'Pet Care', 'Other Family Expenses', 'Home Improvement']
 import { Card, PageHeader, Tabs, Field, Money, NumberInput, Percent, TextInput, Select, Button, Drawer, Toggle, Empty, Badge, Note } from '../components/ui'
@@ -54,7 +54,12 @@ function PersonalTab() {
   const [both, setBoth] = useState(!single)
   const [busy, setBusy] = useState(false)
   const infl = plan.economic_params?.inflation_rate ?? 0.03
-  const curve = useCurve(loc, plan.current_year, infl)
+  const curve = useCurve(priceLoc(plan, loc), plan.current_year, infl)
+  const customL: Record<string, any> = plan.custom_locations || {}
+  const locOptions = [...new Set([loc, ...(reference?.locations || []), ...Object.keys(reference?.country_tax || {}), ...Object.keys(customL)])]
+  const stratOptions = [...STRATS.map(s => ({ value: s, label: s.replace(' (statistical)', '') })),
+    ...lifestyleOptions(plan, loc).filter(s => !BASE_LIFESTYLES.includes(s)).map(s => ({ value: s, label: `${s} · my template` })),
+    ...(![...STRATS, ...lifestyleOptions(plan, loc)].includes(strat) ? [{ value: strat, label: strat.replace(' (statistical)', '') }] : [])]
   const vals = plan[pk(who, 'expenses')] || {}
   const total = Object.values(vals).reduce((a: number, b: any) => a + (+b || 0), 0)
   const stored = plan[pk(who, 'spending_level')]
@@ -84,7 +89,7 @@ function PersonalTab() {
   const apply = async () => {
     setBusy(true)
     try {
-      const t = await api.template('adult', loc, strat, plan.current_year, infl, source)
+      const t = await api.template('adult', loc, strat, plan.current_year, infl, source, plan)
       update(d => { d[pk(who, 'expenses')] = t; d[pk(who, 'expense_location')] = loc; d[pk(who, 'expense_strategy')] = strat; d[pk(who, 'use_template')] = true; delete d[pk(who, 'spending_level')] })
     } finally { setBusy(false) }
   }
@@ -103,7 +108,7 @@ function PersonalTab() {
         action={<div className="flex items-center gap-3">
           {!single && <Toggle checked={both} onChange={setBoth} label="Both adults" />}
           <Toggle checked={scaleShared} onChange={setScaleShared} label="Shared extras too" hint="Also scale vacations, shared subscriptions, pets, home improvement and other shared lifestyle costs" />
-          <div className="w-44"><Select value={loc} options={[...new Set([loc, ...(reference?.locations || []), ...Object.keys(reference?.country_tax || {})])]} onChange={setLoc} /></div>
+          <div className="w-44"><Select value={loc} options={locOptions} onChange={setLoc} /></div>
         </div>}>
         <SpendingSlider curve={curve} value={x} onChange={move} />
       </Card>
@@ -112,8 +117,8 @@ function PersonalTab() {
           <summary className="cursor-pointer px-3.5 py-2.5 text-sm text-ink2 flex items-center gap-2"><Wand2 size={15} className="text-accent" />Or fill from a lifestyle template</summary>
           <div className="flex flex-wrap items-end gap-3 px-3.5 pb-3.5">
             <Field label="Location" className="w-52">
-              <Select value={loc} options={(reference?.locations || [loc])} onChange={setLoc} /></Field>
-            <Field label="Lifestyle" className="w-48"><Select value={strat} options={STRATS.map(s => ({ value: s, label: s.replace(' (statistical)', '') }))} onChange={setStrat} /></Field>
+              <Select value={loc} options={locOptions} onChange={setLoc} /></Field>
+            <Field label="Lifestyle" className="w-56"><Select value={strat} options={stratOptions} onChange={setStrat} /></Field>
             <Field label="Data" className="w-56"><Select value={source} options={[{ value: 'calibrated', label: 'BLS / BEA 2024 (recommended)' }, { value: 'v08', label: 'v0.8 original (about 2x higher)' }]} onChange={setSource} /></Field>
             <Button onClick={apply} disabled={busy}>{busy ? 'Applying…' : 'Apply template'}</Button>
             <span className="text-xs text-muted mb-2.5 basis-full">Overwrites the amounts below (inflated to {plan.current_year}).</span>

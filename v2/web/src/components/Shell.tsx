@@ -123,7 +123,8 @@ export function Shell({ me, children }: { me: any; children: React.ReactNode }) 
           <button className="lg:hidden p-2 -ml-2 rounded-md hover:bg-sunken" onClick={() => setOpen(true)}>{open ? <X size={18} /> : <Menu size={18} />}</button>
           <div className="flex-1" />
           {household?.is_test && <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-warn bg-warn/10 rounded-md px-2 h-7">
-            <FlaskConical size={14} />Test mode<button className="underline ml-1" onClick={() => nav('/households')}>Exit</button></span>}
+            <FlaskConical size={14} />Test mode<button className="underline ml-1" title="Delete this test household and go back to your own"
+              onClick={async () => { try { const r = await api.exitTest(); location.href = r.id ? '/' : '/households' } catch { nav('/households') } }}>Exit</button></span>}
           <HelpButton />
           <SaveIndicator />
         </header>
@@ -136,7 +137,7 @@ export function Shell({ me, children }: { me: any; children: React.ReactNode }) 
 
 /** v0.8 sidebar quick summary: key numbers, location and alert counts. */
 function QuickSummary() {
-  const { plan, proj, mc, single } = usePlan()
+  const { plan, proj, mc } = usePlan()
   const [open, setOpen] = useState(() => { try { return localStorage.getItem('fp_qs') !== '0' } catch { return true } })
   useEffect(() => { try { localStorage.setItem('fp_qs', open ? '1' : '0') } catch { /* */ } }, [open])
   if (!proj) return null
@@ -152,7 +153,7 @@ function QuickSummary() {
         <dt className="text-ink2">Net worth</dt><dd className="tnum text-right">{money(proj.summary.net_worth_now)}</dd>
         <dt className="text-ink2">Income</dt><dd className="tnum text-right">{money(r0.total_income)}</dd>
         <dt className="text-ink2">Spending</dt><dd className="tnum text-right">{money(r0.total_expenses)}</dd>
-        <dt className="text-ink2">{single ? 'Kids' : 'Kids · homes'}</dt><dd className="tnum text-right">{(plan.children_list || []).length}{single ? '' : ` · ${(plan.houses || []).length}`}</dd>
+        <dt className="text-ink2">Kids · homes</dt><dd className="tnum text-right">{(plan.children_list || []).length} · {(plan.houses || []).length}</dd>
         <dt className="text-ink2">Where</dt><dd className="text-right truncate max-w-[110px]" title={`${loc?.state} · ${loc?.spending_strategy}`}>{loc?.state}</dd>
         <dt className="text-ink2">Alerts</dt><dd className="text-right">
           {bad > 0 && <span className="text-bad font-medium">{bad} critical</span>}{bad > 0 && warn > 0 && ' · '}

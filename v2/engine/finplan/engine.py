@@ -385,10 +385,10 @@ def build_schedule(p: dict) -> Schedule:
         hc = {'p1': 0.0, 'p2': 0.0, 'shared': 0.0}
         hc_items = []
 
-        def _hc(key, name, amt):
+        def _hc(key, name, amt, kind='insurance_premiums'):
             hc[key] += amt
             if amt:
-                hc_items.append({'name': name, 'who': {'p1': n1, 'p2': n2, 'shared': 'Family'}[key], 'amount': amt})
+                hc_items.append({'name': name, 'who': {'p1': n1, 'p2': n2, 'shared': 'Family'}[key], 'amount': amt, 'kind': kind})
         for ins in p['health_insurances']:
             prem = ins['monthly_premium'] * 12 * hi
             cb = ins['covered_by']
@@ -402,14 +402,14 @@ def build_schedule(p: dict) -> Schedule:
                 _hc('shared', ins.get('name') or 'Health insurance', prem)
         for key, alive_, age_ in (('p1', alive1, age1), ('p2', alive2, age2)):
             if alive_ and age_ >= 65:
-                _hc(key, 'Medicare Part B', p['medicare_part_b_premium'] * 12 * hi)
-                _hc(key, 'Medicare Part D', p['medicare_part_d_premium'] * 12 * hi)
-                _hc(key, 'Medigap', p['medigap_premium'] * 12 * hi)
+                _hc(key, 'Medicare Part B', p['medicare_part_b_premium'] * 12 * hi, 'medicare')
+                _hc(key, 'Medicare Part D', p['medicare_part_d_premium'] * 12 * hi, 'medicare')
+                _hc(key, 'Medigap', p['medigap_premium'] * 12 * hi, 'medicare')
         for ltc in p['ltc_insurances']:
             if ltc['covered_person'] == 'Parent 1' and alive1 and age1 >= ltc['start_age']:
-                _hc('p1', ltc.get('name') or 'Long-term care', ltc['monthly_premium'] * 12)
+                _hc('p1', ltc.get('name') or 'Long-term care', ltc['monthly_premium'] * 12, 'ltc_premiums')
             elif ltc['covered_person'] == 'Parent 2' and alive2 and age2 >= ltc['start_age']:
-                _hc('p2', ltc.get('name') or 'Long-term care', ltc['monthly_premium'] * 12)
+                _hc('p2', ltc.get('name') or 'Long-term care', ltc['monthly_premium'] * 12, 'ltc_premiums')
         for he in p['health_expenses']:
             who = he['affected_person']
             in1 = alive1 and he['start_age'] <= age1 <= he['end_age']
@@ -417,11 +417,11 @@ def build_schedule(p: dict) -> Schedule:
             amt = he['annual_amount'] * hi
             nm = he.get('name') or he.get('category') or 'Health expense'
             if who == 'Parent 1' and in1:
-                _hc('p1', nm, amt)
+                _hc('p1', nm, amt, 'out_of_pocket')
             elif who == 'Parent 2' and in2:
-                _hc('p2', nm, amt)
+                _hc('p2', nm, amt, 'out_of_pocket')
             elif who not in ('Parent 1', 'Parent 2') and (in1 or in2):
-                _hc('shared', nm, amt)
+                _hc('shared', nm, amt, 'out_of_pocket')
         det['healthcare'] = hc_items
         C['hc_p1'][t], C['hc_p2'][t], C['hc_shared'][t] = hc['p1'], hc['p2'], hc['shared']
         C['healthcare_exp'][t] = sum(hc.values())
@@ -435,7 +435,15 @@ def build_schedule(p: dict) -> Schedule:
             events.append({'year': y, 'type': 'ss', 'label': f"{n1} claims Social Security"})
         if alive2 and age2 == math.ceil(claim2):
             events.append({'year': y, 'type': 'ss', 'label': f"{n2} claims Social Security"})
-        for who, jc, nm in (('X', p['parentX_job_changes'], n1), ('Y', p['parentY_job_changes'], n2)):
+        for who, jc, nm, ag, alive in (('X', p['parentX_job_changes'], n1, age1, alive1), ('Y', p['parentY_job_changes'], n2, age2, alive2)):
+            phases = p[f'parent{who}_career_phases']
+            if phases:
+                # career-phase transitions (the first phase in effect today is not an event)
+                for ph in phases:
+                    if alive and ph['start_age'] == ag and y > cy and ph['start_age'] < p[f'parent{who}_retirement_age']:
+                        events.append({'year': y, 'type': 'job', 'label': f"{nm}: {ph.get('label') or 'new career phase'}",
+                                       'amount': ph['base_salary']})
+                continue
             for j in jc:
                 if j['Year'] == y:
                     events.append({'year': y, 'type': 'job', 'label': f"{nm}: new job", 'amount': j['New Income']})
@@ -717,6 +725,7 @@ def project(plan: dict) -> dict:
         rows.append({
             'year': y, 'age1': int(C['age1'][t]), 'age2': int(C['age2'][t]),
             'alive1': bool(C['alive1'][t]), 'alive2': bool(C['alive2'][t]),
+            'work1': bool(C['work1'][t]), 'work2': bool(C['work2'][t]),
             'wages1': float(C['wages1'][t]), 'wages2': float(C['wages2'][t]),
             'ss_income': float(C['ss1'][t] + C['ss2'][t]), 'ss1': float(C['ss1'][t]), 'ss2': float(C['ss2'][t]),
             'rent_income': float(C['rent_income'][t]), 'sale_proceeds': float(C['sale_proceeds'][t]),

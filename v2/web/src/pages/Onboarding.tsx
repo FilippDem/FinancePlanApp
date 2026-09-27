@@ -15,6 +15,7 @@ import { monthlyPayment } from '../lib/mortgage'
 // ── answers model ────────────────────────────────────────────────────────
 type Work = 'working' | 'home' | 'retired'
 interface Kid { name: string; birth_year: number; school: string; college: string }
+interface Phase { label: string; from: number; to: number; salary: number; raise: number }
 interface Answers {
   household: 'single' | 'couple'
   p1: { name: string; age: number; emoji: string; work: Work; income: number; raise: number; retire: number; savings: number; retirement: number; ss: number }
@@ -24,7 +25,7 @@ interface Answers {
   ss_mode: 'estimate' | 'known'
   housing: 'rent' | 'own' | 'family'
   rent: number
-  home: { value: number; balance: number; rate: number; years: number }
+  home: { value: number; balance: number; rate: number; years: number; tax?: number }
   buy: 'no' | 'yes'
   buyPlan: { year: number; price: number; down: number; rate: number; term: number; sellCurrent: boolean }
   kids: 'none' | 'yes'
@@ -44,6 +45,9 @@ interface Answers {
   custom?: { name: string; amount: number; kind: 'once' | 'recurring'; year: number; every: number }[]
   hsa?: { balance: number; contrib: number }
   oop?: number
+  phases?: { p1: Phase[]; p2: Phase[] }
+  filing?: 'married' | 'single'
+  empPremium?: number
   ssCut: boolean
   cadence: 'quarterly' | 'semiannual' | 'annual' | 'off'
 }
@@ -61,12 +65,13 @@ const DEFAULT: Answers = {
   lifeExp: 95, ssCut: true, cadence: 'quarterly',
   moves: [], jobs: { p1: [], p2: [] }, custom: [],
   monthly: { utilities: 180, water: 60, internet: 120, subs: 40, pets: 0, other: 50 }, hsa: { balance: 0, contrib: 0 }, oop: 1500,
+  phases: { p1: [], p2: [] }, empPremium: 250,
 }
 const EMOJIS = ['👨', '👩', '🧑', '👱', '👴', '👵', '🧔', '👩‍🦰', '👨‍🦱', '🧕', '🙂']
 
 const BIG_PLANS: { value: string; label: string; kind: 'recurring' | 'once'; every?: number; desc: string }[] = [
   { value: 'car', label: 'New car every 8 years', kind: 'recurring', every: 8, desc: 'Replacement vehicle' },
-  { value: 'vacation', label: 'Yearly family vacation', kind: 'recurring', every: 1, desc: 'Travel' },
+  { value: 'vacation', label: 'Yearly family vacation', kind: 'recurring', every: 1, desc: 'Added to household spending as Family Vacations' },
   { value: 'renovation', label: 'Home renovation', kind: 'once', desc: 'In about 5 years' },
   { value: 'wedding', label: 'Help with a wedding', kind: 'once', desc: 'In about 20 years' },
   { value: 'boat', label: 'Boat / RV', kind: 'once', desc: 'In about 10 years' },
@@ -96,8 +101,11 @@ function buildPlan(A: Answers, base: any, curve: Curve) {
     p[`parent${who}_net_worth`] = a.savings + a.retirement
     p[`parent${who}_pretax_balance`] = a.retirement
     p[`parent${who}_ss_benefit`] = A.ss_mode === 'known' ? a.ss : estimateSS(a.work === 'home' ? 0 : a.income)
-    p[`parent${who}_career_phases`] = []
-    p[`parent${who}_job_changes`] = ((A.jobs?.[idx === 1 ? 'p1' : 'p2']) || []).filter(j => j.year > CY).map(j => ({ Year: j.year, 'New Income': j.income }))
+    const ph = a.work === 'working' ? (A.phases?.[idx === 1 ? 'p1' : 'p2'] || []) : []
+    // career stages (v0.8 wizard) replace the simple income + job changes when given
+    p[`parent${who}_career_phases`] = ph.map(x => ({ label: x.label, start_age: x.from, end_age: x.to, base_salary: x.salary, annual_raise_pct: x.raise,
+      philosophy: 'Stable', annual_bonus_pct: 0, rsu_annual_grant: 0, rsu_vesting_years: 4, stock_options_grant: 0, stock_options_growth_pct: 0, stock_options_liquidity_year: 0 }))
+    p[`parent${who}_job_changes`] = ph.length ? [] : ((A.jobs?.[idx === 1 ? 'p1' : 'p2']) || []).filter(j => j.year > CY).map(j => ({ Year: j.year, 'New Income': j.income }))
     p[`parent${who}_expense_location`] = A.location
     p[`parent${who}_expense_strategy`] = strat
     p[`parent${who}_expenses`] = rescale({}, curve, null, level)
@@ -113,7 +121,7 @@ function buildPlan(A: Answers, base: any, curve: Curve) {
     p.tax_filing_status = 'single'
   } else {
     person('Y', A.p2, A.p2.name, 2)
-    p.tax_filing_status = 'married'
+    p.tax_filing_status = A.filing || 'married'
   }
   p.pretax_401k = A.contrib
   p.state_timeline = [{ year: CY, state: A.location, spending_strategy: strat.replace(' (statistical)', '') },
@@ -127,14 +135,20 @@ function buildPlan(A: Answers, base: any, curve: Curve) {
   if (mo) {
     fam['Gas & Electric'] = mo.utilities * 12; fam['Water'] = mo.water * 12; fam['Internet & Cable'] = mo.internet * 12
     fam['Shared Subscriptions'] = mo.subs * 12; fam['Pet Care'] = mo.pets * 12; fam['Other Family Expenses'] = mo.other * 12
+    fam['Garbage'] = 0   // asked together with water
   }
+  // the yearly vacation is a household category (v0.8 asked for it with the bills), not a separate recurring cost
+  fam['Family Vacations'] = A.plans.includes('vacation') ? (A.planAmounts.vacation || 0) : 0
+  // home improvement only applies to owners (houses carry their own maintenance too)
+  if (A.housing !== 'own' && A.buy !== 'yes') fam['Home Improvement'] = 0
+  fam['Property Tax'] = 0; fam['Home Insurance'] = 0   // carried by each home
   p.family_shared_expenses = fam
   p.houses = []
   if (A.housing === 'own') {
     const yearsIn = Math.max(0, 30 - A.home.years)
     p.houses.push({ name: 'Our home', mortgage_mode: 'actual', purchase_year: CY - yearsIn, purchase_price: A.home.value, current_value: A.home.value,
       mortgage_balance: A.home.balance, mortgage_rate: A.home.rate, mortgage_years_left: A.home.balance > 0 ? A.home.years : 0,
-      property_tax_rate: 0.01, home_insurance: 1800, maintenance_rate: 0.01, upkeep_costs: 1500, owner: 'Shared', appreciation_rate: 3,
+      property_tax_rate: A.home.value > 0 && A.home.tax != null ? A.home.tax / A.home.value : 0.01, home_insurance: 1800, maintenance_rate: 0.01, upkeep_costs: 1500, owner: 'Shared', appreciation_rate: 3,
       timeline: [{ year: CY - yearsIn, status: 'Own_Live', rental_income: 0 },
         ...(A.buy === 'yes' && A.buyPlan.sellCurrent ? [{ year: A.buyPlan.year, status: 'Sold', rental_income: 0 }] : [])] })
   }
@@ -151,6 +165,10 @@ function buildPlan(A: Answers, base: any, curve: Curve) {
   // healthcare: bridge coverage between early retirement and Medicare
   p.health_insurances = []
   const earliest = Math.min(A.p1.work === 'working' ? A.p1.retire : 99, !single && A.p2.work === 'working' ? A.p2.retire : 99)
+  if (A.health === 'employer' && (A.empPremium || 0) > 0 && earliest < 99) {
+    p.health_insurances.push({ name: 'Employer plan', type: 'Employer', monthly_premium: A.empPremium, annual_deductible: 2000,
+      annual_out_of_pocket_max: 6000, copay_primary: 25, copay_specialist: 50, covered_by: 'Both', start_age: 0, end_age: Math.min(64, earliest - 1) })
+  }
   if (A.health === 'marketplace' || earliest < 65) {
     p.health_insurances.push({ name: 'Marketplace plan', type: 'Marketplace', monthly_premium: A.bridge, annual_deductible: 5000,
       annual_out_of_pocket_max: 10000, copay_primary: 30, copay_specialist: 60, covered_by: 'Both',
@@ -158,7 +176,7 @@ function buildPlan(A: Answers, base: any, curve: Curve) {
   }
   // big plans
   p.recurring_expenses = []; p.major_purchases = []
-  for (const bp of BIG_PLANS.filter(b => A.plans.includes(b.value))) {
+  for (const bp of BIG_PLANS.filter(b => A.plans.includes(b.value) && b.value !== 'vacation')) {
     const amt = A.planAmounts[bp.value] || 0
     if (bp.kind === 'recurring') p.recurring_expenses.push({ name: bp.label.replace(/ every.*| yearly/i, '').replace('Yearly ', ''), category: bp.value === 'car' ? 'Vehicle' : 'Travel',
       amount: amt, frequency_years: bp.every, start_year: CY + (bp.value === 'car' ? 2 : 0), end_year: null, inflation_adjust: true, parent: 'Both',
@@ -177,6 +195,40 @@ function buildPlan(A: Answers, base: any, curve: Curve) {
   p.ss_insolvency_enabled = A.ssCut
   p.mc_simulations = 1000
   return p
+}
+
+function CareerStages({ w, A, set }: { w: 'p1' | 'p2'; A: Answers; set: (p: Partial<Answers>) => void }) {
+  const ph = A.phases?.[w] || []
+  const all = A.phases || { p1: [], p2: [] }
+  const put = (list: Phase[]) => set({ phases: { ...all, [w]: list } })
+  const a = A[w]
+  if (!ph.length) return (
+    <button className="text-[13.5px] text-accent font-medium hover:underline" onClick={() => put([{ label: 'Current job', from: a.age, to: a.retire, salary: a.income, raise: a.raise }])}>
+      Or plan it in career stages (different salary and raise per stage)
+    </button>)
+  return (
+    <div className="space-y-2 rounded-xl border border-line p-3">
+      <div className="flex items-center justify-between"><span className="text-[14px] font-medium">Career stages</span>
+        <button className="text-[12.5px] text-muted hover:text-bad" onClick={() => put([])}>Use a single income instead</button></div>
+      <div className="grid grid-cols-[1fr_70px_70px_130px_80px_28px] gap-2 text-[12px] text-muted"><span>Stage</span><span>From age</span><span>To age</span><span>Salary</span><span>Raise %</span><span /></div>
+      {ph.map((x, k) => {
+        const upd = (patch: Partial<Phase>) => put(ph.map((y, q) => q === k ? { ...y, ...patch } : y))
+        return (
+          <div key={k} className="space-y-1">
+            <div className="grid grid-cols-[1fr_70px_70px_130px_80px_28px] gap-2 items-center">
+              <TextInput value={x.label} placeholder="e.g. Senior role" onChange={v => upd({ label: v })} />
+              <NumberInput value={x.from} step={1} onChange={v => upd({ from: Math.round(v) })} />
+              <NumberInput value={x.to} step={1} onChange={v => upd({ to: Math.round(v) })} />
+              <Money value={x.salary} step={5000} onChange={v => upd({ salary: v })} />
+              <NumberInput value={x.raise} step={0.5} onChange={v => upd({ raise: v })} />
+              <button className="text-muted hover:text-bad" disabled={ph.length < 2} onClick={() => put(ph.filter((_, q) => q !== k))}><Trash2 size={14} /></button>
+            </div>
+            {x.to > a.retire && <p className="text-[12.5px] text-warn">{x.label || 'This stage'} ends at {x.to}, after retirement at {a.retire}. Pay stops at retirement.</p>}
+          </div>)
+      })}
+      <Button size="sm" onClick={() => { const prev = ph[ph.length - 1]; put([...ph, { label: `Stage ${ph.length + 1}`, from: prev.to, to: Math.max(prev.to + 1, Math.min(prev.to + 10, a.retire)), salary: Math.round(prev.salary * 1.2 / 1000) * 1000, raise: prev.raise }]) }}>
+        <Plus size={14} />Add a stage</Button>
+    </div>)
 }
 
 // ── steps ────────────────────────────────────────────────────────────────
@@ -243,7 +295,11 @@ export default function Onboarding() {
               <button key={e} onClick={() => setP(w, { emoji: e })} className={`w-9 h-9 rounded-lg text-lg ${A[w].emoji === e ? 'bg-accentSoft ring-2 ring-accent' : 'hover:bg-sunken'}`}>{e}</button>))}</div>
           </div>
         ))}
-        {couple && <BigField label="Year you married or joined finances (optional)"><NumberInput big value={A.marriage ?? null} placeholder="e.g. 2019" step={1} onChange={v => set({ marriage: Math.round(v) })} /></BigField>}
+        {couple && <div className="grid sm:grid-cols-2 gap-3">
+          <BigField label="Year you married or joined finances (optional)"><NumberInput big value={A.marriage ?? null} placeholder="e.g. 2019" step={1} onChange={v => set({ marriage: Math.round(v) })} /></BigField>
+          <BigField label="How do you file taxes?" hint="Joint filing usually costs less"><Select value={A.filing || 'married'}
+            options={[{ value: 'married', label: 'Married filing jointly' }, { value: 'single', label: 'Separately / not married' }]} onChange={v => set({ filing: v as any })} /></BigField>
+        </div>}
       </Question>) },
     { section: 0, body: (
       <Question title="Where do you live?" subtitle="We use it for local cost-of-living averages and state income tax." why="Living costs vary by 40%+ between cities, and state income tax ranges from 0% to over 10%.">
@@ -273,7 +329,8 @@ export default function Onboarding() {
             <ChoiceCards cols={3} value={A[w].raise} onChange={v => setP(w, { raise: v })} options={[
               { value: 2, label: 'Steady', desc: '~2% a year' }, { value: 3, label: 'Typical', desc: '~3% a year' }, { value: 5, label: 'Fast-growing', desc: '~5% a year' }]} />
           </div>
-          <div className="space-y-2">
+          <CareerStages w={w} A={A} set={set} />
+          {!(A.phases?.[w] || []).length && <div className="space-y-2">
             <span className="block text-[14px] font-medium">Expect a career change? (optional)</span>
             {((A.jobs || { p1: [], p2: [] })[w] || []).map((j, k) => (
               <div key={k} className="flex flex-wrap items-center gap-2">
@@ -283,7 +340,7 @@ export default function Onboarding() {
                 {j.year - CY + A[w].age >= A[w].retire && <span className="text-[12.5px] text-warn">After the planned retirement age — it won't count</span>}
               </div>))}
             <Button size="sm" onClick={() => set({ jobs: { ...(A.jobs || { p1: [], p2: [] }), [w]: [...((A.jobs || { p1: [], p2: [] })[w] || []), { year: CY + 3, income: Math.round(A[w].income * 1.25 / 1000) * 1000 }] } })}><Plus size={14} />Add a change</Button>
-          </div>
+          </div>}
         </>}
       </Question>) })),
     { section: 1, skip: A.p1.work === 'retired' && (!couple || A.p2.work === 'retired'), body: (
@@ -341,6 +398,8 @@ export default function Onboarding() {
             <BigField label="Years left on the loan"><NumberInput big value={A.home.years} min={1} max={40} step={1} onChange={v => set({ home: { ...A.home, years: Math.round(v) } })} /></BigField>
             <p className="sm:col-span-2 text-sm text-muted">Principal & interest ≈ <b className="text-ink tnum">{money(monthlyPayment(A.home.balance, A.home.rate, A.home.years), { compact: false })}/mo</b></p>
           </>}
+          <BigField label="Property tax per year" hint="On your tax bill or mortgage statement; about 1% of value is typical">
+            <Money big value={A.home.tax ?? Math.round(A.home.value * 0.01)} step={250} onChange={v => set({ home: { ...A.home, tax: v } })} /></BigField>
         </div>}
       </Question>) },
     { section: 3, body: (
@@ -396,6 +455,8 @@ export default function Onboarding() {
         <ChoiceCards value={A.health} onChange={v => set({ health: v })} options={[
           { value: 'employer', label: 'Through work', icon: <Briefcase size={20} /> }, { value: 'marketplace', label: 'I buy my own', icon: <HeartPulse size={20} />, desc: 'Marketplace / ACA' },
           { value: 'medicare', label: 'Medicare', icon: <Armchair size={20} /> }]} />
+        {A.health === 'employer' && <BigField label="Your share of the premium per month" hint="What comes out of your paycheck for health insurance. Typical family share: $200–$600/mo">
+          <Money big value={A.empPremium ?? 0} step={25} onChange={v => set({ empPremium: v })} /></BigField>}
         {(A.health === 'marketplace' || Math.min(A.p1.retire, couple ? A.p2.retire : 99) < 65) &&
           <BigField label={A.health === 'marketplace' ? 'Monthly premium' : 'Estimated premium between retiring and Medicare (65)'}
             hint="Marketplace plans for a couple in their 60s are often $1,200–$2,000/mo before subsidies">

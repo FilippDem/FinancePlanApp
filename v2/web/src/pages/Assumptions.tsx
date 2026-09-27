@@ -5,6 +5,7 @@ import { usePlan } from '../lib/store'
 import { pct } from '../lib/format'
 import { Card, PageHeader, Field, Money, NumberInput, Percent, Select, Button, Toggle, Segmented, Note, Grid } from '../components/ui'
 import { S } from '../components/charts'
+import { lifestyleOptions } from '../lib/spending'
 
 export default function Assumptions() {
   const { plan, update, reference } = usePlan()
@@ -73,7 +74,7 @@ export default function Assumptions() {
               <div key={i} className="grid grid-cols-[90px_1fr_150px_28px] gap-2 items-center">
                 <NumberInput value={e.year} step={1} onChange={v => update(d => { d.state_timeline[i].year = Math.round(v); d.state_timeline.sort((a: any, b: any) => a.year - b.year) })} />
                 <Select value={e.state} options={locs.includes(e.state) ? locs : [e.state, ...locs]} onChange={v => update(d => { d.state_timeline[i].state = v })} />
-                <Select value={e.spending_strategy.replace(' (statistical)', '')} options={['Conservative', 'Average', 'High-end']} onChange={v => update(d => { d.state_timeline[i].spending_strategy = v })} />
+                <Select value={e.spending_strategy.replace(' (statistical)', '')} options={[...new Set([...lifestyleOptions(plan, e.state), e.spending_strategy.replace(' (statistical)', '')])]} onChange={v => update(d => { d.state_timeline[i].spending_strategy = v })} />
                 <button disabled={plan.state_timeline.length === 1} className="p-1 rounded text-muted hover:text-bad disabled:opacity-30" onClick={() => update(d => { d.state_timeline.splice(i, 1) })}><Trash2 size={14} /></button>
               </div>
             ))}

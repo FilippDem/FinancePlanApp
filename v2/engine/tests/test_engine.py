@@ -303,3 +303,34 @@ def test_spending_slider_curve():
         assert t >= prev - 20
         prev = t
     assert abs(sum(R.spending_at_level('Seattle', 90).values()) - old) < 50
+
+
+def test_career_phase_events_and_actuals_split():
+    from finplan.actuals import planned_for_year
+    p = {'parentX_age': 40, 'parentX_retirement_age': 60,
+         'parentX_career_phases': [{'start_age': 30, 'end_age': 45, 'base_salary': 100000, 'label': 'Engineer'},
+                                   {'start_age': 45, 'end_age': 60, 'base_salary': 150000, 'label': 'Manager'}],
+         'health_insurances': [{'name': 'Emp', 'monthly_premium': 500, 'start_age': 0, 'end_age': 64}],
+         'health_expenses': [{'name': 'OOP', 'annual_amount': 2000, 'affected_person': 'Both', 'start_age': 0, 'end_age': 120}],
+         'state_timeline': [{'year': 2026, 'state': 'Seattle', 'spending_strategy': 'Average'},
+                            {'year': 2030, 'state': 'Houston', 'spending_strategy': 'Average'}]}
+    pr = project(p)
+    jobs = [e for e in pr['events'] if e['type'] == 'job']
+    assert len(jobs) == 1 and 'Manager' in jobs[0]['label']
+    a = planned_for_year(p, 2031)['expenses']
+    assert a['healthcare']['out_of_pocket'] > 0 and a['healthcare']['insurance_premiums'] > 0
+    b = planned_for_year(p, 2027)['expenses']
+    # Houston is cheaper than Seattle: planned categories follow the engine's cost-of-living and rent factors
+    assert a['family']['Mortgage/Rent'] < b['family']['Mortgage/Rent']
+
+
+def test_stress_worst_child_and_compound_year():
+    from finplan.stress import run
+    p = {'children_list': [{'name': 'A', 'birth_year': 2020}, {'name': 'B', 'birth_year': 2040}],
+         'parentX_age': 35, 'parentY_age': 35, 'current_year': 2026}
+    r = run(p, [{'id': 'c', 'type': 'compound', 'label': 'x', 'start_year': 2031,
+                 'events': [{'type': 'disabled_child', 'child': '__worst__', 'person': 2},
+                            {'type': 'market_crash', 'drop': -0.4, 'year': 2029}]}], n=60)
+    res = r['results'][0]
+    assert res['test']['events'][0]['child'] == 'A'
+    assert any(e['type'] == 'market_crash' and e['year'] == 2031 for e in res['events'])

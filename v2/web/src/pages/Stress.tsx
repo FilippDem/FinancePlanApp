@@ -34,7 +34,7 @@ function newTest(type: string, cy: number, kids: any[]): any {
     case 'income_loss': return { id, type, label: 'Unemployment', person: 1, start_year: cy + 1, years: 3, pct: 100, when: 'worst' }
     case 'extra_cost': return { id, type, label: 'Extra cost', name: 'Extra cost', amount: 25000, start_year: cy + 2, years: 5 }
     case 'inflation_spike': return { id, type, label: 'Hyperinflation', start_year: cy + 1, years: 5, rate: 0.15, wage_passthrough: 50, when: 'worst' }
-    case 'disabled_child': return { id, type, label: `Disabled child${kids[0] ? `: ${kids[0].name}` : ''}`, child: kids[0]?.name, person: 2, extra_cost: 0, years_cost: 30 }
+    case 'disabled_child': return { id, type, label: 'Disabled child (worst case)', child: '__worst__', person: 2, extra_cost: 0, years_cost: 30 }
     case 'compound': return { id, type, label: 'Compound test', events: [], when: 'worst' }
     default: return { id, type, label: 'Early death', person: 1, year: cy + 5, life_insurance: 0 }
   }
@@ -60,7 +60,9 @@ function Editor({ t, upd, cy, people, kids, nested }: { t: any; upd: (patch: any
       options={[{ value: 'worst', label: 'Worst possible year' }, { value: 'year', label: 'Pick the year' }]} />
   )
   const yearKey = t.type === 'market_crash' || t.type === 'early_death' ? 'year' : 'start_year'
-  const yearField = (t.type !== 'disabled_child' && t.type !== 'compound') && (!worst || t.type === 'early_death') && !nested && (
+  const yearField = t.type === 'compound' && !worst && !nested ? (
+    <Lbl l="All events start in"><NumberInput value={t.start_year ?? cy + 1} onChange={v => upd({ start_year: Math.round(v) })} min={cy} /></Lbl>
+  ) : (t.type !== 'disabled_child' && t.type !== 'compound') && (!worst || t.type === 'early_death') && !nested && (
     <Lbl l={t.type === 'market_crash' || t.type === 'early_death' ? 'Year' : 'Starting'}><NumberInput value={t[yearKey]} onChange={v => upd({ [yearKey]: v })} min={cy} /></Lbl>
   )
   return (
@@ -82,7 +84,7 @@ function Editor({ t, upd, cy, people, kids, nested }: { t: any; upd: (patch: any
       {t.type === 'disabled_child' && <>
         {kids.length === 0 ? <p className="text-sm text-muted">Add a child on the Kids page first.</p> : <>
           <div className="grid grid-cols-2 gap-3">
-            <Lbl l="Child"><Select value={t.child || kids[0].name} options={kids.map(k => ({ value: k.name, label: `${k.name} (${k.birth_year})` }))} onChange={v => upd({ child: v })} /></Lbl>
+            <Lbl l="Child"><Select value={t.child || '__worst__'} options={[{ value: '__worst__', label: 'Worst case (picked automatically)' }, ...kids.map(k => ({ value: k.name, label: `${k.name} (${k.birth_year})` }))]} onChange={v => upd({ child: v })} /></Lbl>
             <Lbl l="Stops working"><Select value={t.person} options={people.filter(p => p.value !== 'both')} onChange={v => upd({ person: v })} /></Lbl>
           </div>
           <Lbl l="Extra care cost per year (today's $, optional)"><Money value={t.extra_cost} onChange={v => upd({ extra_cost: v })} /></Lbl>
@@ -114,12 +116,25 @@ export default function Stress() {
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [combine, setCombine] = useState<string[]>([])
 
-  const loadDefaults = async () => { const r = await api.stressDefaults(plan); setTests(r.tests); setOff({}); setRes(null) }
+  // the saved test list is only reused for the same people/children; otherwise defaults are rebuilt
+  // (keeping the user's own tests whose child still exists)
+  const sig = JSON.stringify([single, names, cy, kids.map(k => [k.name, k.birth_year]), plan.parentX_retirement_age, plan.parentY_retirement_age])
+  const loadDefaults = async (keep: any[] = []) => {
+    const r = await api.stressDefaults(plan)
+    const kidNames = new Set(kids.map(k => k.name))
+    const ok = (t: any): boolean => t.type === 'disabled_child' ? (!t.child || t.child === '__worst__' || kidNames.has(t.child))
+      : t.type === 'compound' ? (t.events || []).every(ok) : true
+    setTests([...r.tests, ...keep.filter(t => !t.group && ok(t))]); setOff({}); setRes(null)
+  }
   useEffect(() => {
-    try { const s = sessionStorage.getItem('fp_stress_tests_v2'); if (s) { setTests(JSON.parse(s)); return } } catch { /* */ }
+    try {
+      const s = JSON.parse(sessionStorage.getItem('fp_stress_tests_v3') || 'null')
+      if (s && s.sig === sig) { setTests(s.tests); return }
+      if (s?.tests) { loadDefaults(s.tests); return }
+    } catch { /* */ }
     loadDefaults()
-  }, [])
-  useEffect(() => { if (tests) try { sessionStorage.setItem('fp_stress_tests_v2', JSON.stringify(tests)) } catch { /* */ } }, [tests])
+  }, [sig])
+  useEffect(() => { if (tests) try { sessionStorage.setItem('fp_stress_tests_v3', JSON.stringify({ sig, tests })) } catch { /* */ } }, [tests])
 
   const run = async () => {
     if (!tests) return
@@ -155,7 +170,7 @@ export default function Stress() {
     <div className="space-y-5">
       <PageHeader title="Stress tests" subtitle="Test the plan against rare, severe events. Each test re-runs the plan with 500 market simulations; “worst possible year” searches every start year for the most damaging one."
         actions={<>
-          <Button onClick={loadDefaults}><RotateCcw size={14} />Reset tests</Button>
+          <Button onClick={() => loadDefaults()}><RotateCcw size={14} />Reset tests</Button>
           <Button variant="primary" onClick={run} disabled={busy}>{busy ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />}Run tests</Button>
         </>} />
       {err && <Note tone="warn">{err}</Note>}
@@ -209,6 +224,8 @@ export default function Stress() {
                               <table className="w-full text-[13px]"><thead><tr className="text-muted text-left"><th className="font-medium py-1">Percentile</th><th className="font-medium">Status</th><th className="font-medium text-right">Final net worth</th></tr></thead>
                                 <tbody>{PCTS.map(q => <tr key={q} className="border-t border-line"><td className="py-1">{q}th</td><td>{r.stoplight[q] ? 'Survives' : 'Runs out'}</td><td className="text-right tnum">{money(r.final_nw[q])}</td></tr>)}</tbody></table>
                               <div className="text-[12.5px] text-muted mt-2">Events applied: {r.events.map((e: any) => `${TYPES[e.type]?.label ?? e.type} ${e.year ?? e.start_year ?? ''}`).join(', ') || '—'}</div>
+                              {[r.test, ...(r.test.events || [])].filter((e: any) => e.auto_child).map((e: any, k: number) =>
+                                <div key={k} className="text-[12.5px] text-muted">Worst-case child picked automatically: <b className="text-ink">{e.child}</b></div>)}
                             </div>
                             {r.search?.length > 1 && (
                               <div>
