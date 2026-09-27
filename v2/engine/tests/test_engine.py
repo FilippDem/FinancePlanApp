@@ -437,3 +437,27 @@ def test_rmds_roth_and_spousal_ss():
          'parentX_net_worth': 100000, 'roth_contribution': 7000}
     rw = project(w)['rows']
     assert abs(rw[0]['contrib_roth'] - 7000) < 1 and rw[0]['roth'] >= 7000
+
+
+def test_what_would_it_take_solver():
+    from finplan.solver import solve, apply
+    # a plan short of 85%: each lever that works must actually reach the target, and the patch must match
+    p = {'current_year': 2026, 'parentX_age': 45, 'parentY_age': 45, 'parentX_income': 120000, 'parentY_income': 60000,
+         'parentX_retirement_age': 60, 'parentY_retirement_age': 60, 'parentX_net_worth': 900000, 'parentY_net_worth': 50000,
+         'parentX_ss_benefit': 2200, 'parentY_ss_benefit': 1400}
+    r = solve(p, 0.6, n=300)
+    if not r['reached']:
+        ok = [l for l in r['levers'] if l.get('feasible')]
+        assert ok, r
+        for l in ok:
+            assert l['success_after'] >= 0.6
+            q = apply(normalize_plan(p), l['id'], l['amount'])
+            for k, v in l['patch'].items():
+                assert q[k] == v
+        rl = next(l for l in r['levers'] if l['id'] == 'retire_later')
+        if rl.get('feasible'):
+            assert rl['patch']['parentX_retirement_age'] == 60 + rl['amount']
+    # a comfortable plan reports headroom instead
+    rich = {**p, 'parentX_net_worth': 5000000}
+    h = solve(rich, 0.85, n=300)
+    assert h['reached'] and any(l['id'] == 'spend_more' and l['amount'] > 0 for l in h['levers'])

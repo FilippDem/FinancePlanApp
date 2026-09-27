@@ -74,6 +74,7 @@ export const api = {
   stress: (plan: any, tests: any[], n = 400) => req('POST', '/api/stress', { plan, tests, n }),
   retirement: (plan: any, withdrawal_rate = 0.04) => req('POST', '/api/retirement', { plan, withdrawal_rate }),
   retireWhatif: (plan: any, n = 300) => req('POST', '/api/retirement/whatif', { plan, n }),
+  solve: (plan: any, target = 0.85) => req('POST', '/api/solve', { plan, target }),
   notifyStatus: () => req('GET', '/api/notify/status'),
   testEmail: () => req('POST', '/api/checkins/test-email'),
   downloadReport: async (plan: any) => {

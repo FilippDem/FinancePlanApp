@@ -949,6 +949,19 @@ def retirement_whatif(body: RetireIn):
     return {'rows': RT.retire_whatif(body.plan, n=max(100, min(body.n, 1000)))}
 
 
+class SolveIn(BaseModel):
+    plan: dict[str, Any]
+    target: float = 0.85
+    n: int = 600
+
+
+@app.post('/api/solve')
+def solve_plan(body: SolveIn):
+    """'What would it take?': the smallest change to each lever that reaches the target success rate."""
+    from finplan.solver import solve
+    return solve(body.plan, target=min(max(body.target, 0.5), 0.99), n=max(200, min(body.n, 2000)))
+
+
 @app.post('/api/normalize')
 def api_normalize(body: PlanIn):
     return {'plan': normalize_plan(body.plan)}

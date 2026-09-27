@@ -10,6 +10,7 @@ import { Donut } from '../components/CashflowExplorer'
 import { useTodayDollars, deflate } from '../lib/hooks'
 import { DueBanner, CheckinStrip } from './Checkins'
 import { ReportButton } from '../components/ReportButton'
+import { WhatItTakes } from '../components/WhatItTakes'
 
 export function retirementMarkers(plan: any, names: [string, string], single: boolean): Marker[] {
   const cy = plan.current_year
@@ -222,6 +223,8 @@ export default function Dashboard({ isNew }: { isNew: boolean }) {
           ? <Card><Stat label="Savings by person today" value={`${money(plan.parentX_net_worth)} · ${money(plan.parentY_net_worth)}`} sub={`${names[0]} · ${names[1]} (separate finances)`} /></Card>
           : <Card><Stat label="End of plan" value={money(endRow?.net_worth)} sub={endRow ? `${endRow.year} · ${names[0]} age ${endRow.age1}` : ''} /></Card>}
       </div>
+
+      <WhatItTakes />
 
       <Card title="Net worth" subtitle={view === 'projection' ? 'Expected path with your assumptions' : 'Range of outcomes across simulations'}
         action={<Segmented value={view} onChange={setView} options={[{ value: 'projection', label: 'Projection' }, { value: 'range', label: 'Range' }]} />}>
