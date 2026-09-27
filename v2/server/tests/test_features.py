@@ -159,3 +159,21 @@ def test_household_admin(client):
     assert c.get('/api/plan').json()['plan']['parent1_name'] == demos[name]['parent1_name']
     assert c.post('/api/households/cleanup-tests').json()['removed'] >= 1
     assert hid in json.loads((tmp / 'households_index.json').read_text())
+
+
+def test_cited_sources_exist():
+    """Every source id cited in the web app or reports is in sources.json with a link."""
+    import re
+    from pathlib import Path
+    from finplan.reference import sources
+    from server import report_data as RD
+    src = sources()
+    assert all(v.get('url', '').startswith('https://') and v.get('publisher') and v.get('title') for v in src.values())
+    root = Path(__file__).resolve().parents[2] / 'web' / 'src'
+    text = ''.join(p.read_text(encoding='utf-8') for p in root.rglob('*.tsx'))
+    ids = set(re.findall(r"'([a-z0-9]+_[a-z0-9_]+)'", text)) | set(re.findall(r'id="([a-z0-9_]+)"', text))
+    cited = {i for i in ids if i in src or re.match(r'^(bls|bea|cms|irs|ssa|kff|fed|oecd|hud|mit|worldbank|damodaran|taxfoundation|childcareaware|collegeboard|numbeo)', i)}
+    assert cited and cited <= set(src), sorted(cited - set(src))
+    ctx = {'plan': {'state_timeline': [{'state': 'Portugal'}], 'mc_use_historical': True}}
+    for sec in RD.SECTIONS:
+        assert set(RD.section_sources(ctx, sec)) <= set(src)

@@ -14,7 +14,8 @@ v2/
 ├── web/        React + TypeScript + Vite + Tailwind + Recharts
 ├── tools/      extract_v08_data.py (pulls templates/demos from v0.8)
 └── docs/       ENGINE_CHANGES.md (math changes vs v0.8), PARITY.md (feature checklist),
-                CHECKINS.md (living-plan scheme), ROADMAP.md (gaps + what to build next)
+                CHECKINS.md (living-plan scheme), ROADMAP.md (gaps + what to build next),
+                COST_OF_LIVING_AUDIT.md (spending data audit and sources)
 ```
 
 ## Run locally (development)
@@ -59,3 +60,6 @@ cd v2 && python -m pytest -q server/tests    # API: auth, merge-save, backups, e
 - **Live recalculation.** Every edit updates the plan in the browser. The UI calls `/api/project` (≈20 ms) and a 1,000-path Monte Carlo (≈50 ms) after short debounces, then auto-saves via `PUT /api/plan`.
 - **Data safety.** The server merges incoming keys into the stored plan, so keys it doesn't know are never dropped. It writes a timestamped backup first and writes atomically. `normalize_plan()` migrates V13/V14/partial files on load without mutating the source.
 - **One engine.** The deterministic projection is just the Monte Carlo engine with one path and no randomness, so the two can't drift apart.
+
+## Data sources
+Every major dataset (BLS spending, BEA price parities, World Bank price levels, Federal Reserve SCF, IRS/SSA/CMS figures, S&P 500 history…) is listed with its link in `engine/finplan/data/sources.json`. Pages cite them as small [n] markers with the linked list at the bottom; PDF, Excel and JSON reports include the same list. Add a new dataset there first, then cite it with `useCites([...])` in the page (`web/src/components/Cite.tsx`) or `section_sources()` in `server/report_data.py`.

@@ -17,20 +17,25 @@ v2 now covers every v0.8 tab and adds a set of "living plan" features. See `PARI
 | **Retirement**: SS claim options, retire-age what-if, replacement ratio | ✅ |
 | **Stress tests**: crash, income loss, extra cost, inflation spike, early death | ✅ |
 | **Version history**: 10 recent saves plus 120 daily snapshots, with preview and restore | ✅ |
-| **PDF report** | ✅ |
+| **Reports**: PDF, Excel, CSV and JSON with chosen sections and amounts by category per year | ✅ |
+| **Where you live**: moves change prices and rent (BEA/World Bank), world map, custom places and templates | ✅ |
+| **Spending slider** calibrated to BLS spending and BEA prices, with milestones | ✅ |
+| **Data citations**: numbered [n] sources with links in the app and reports | ✅ |
 | Demo households re-tuned for the corrected math | ✅ |
 
-Tests: 43 engine tests, 15 API tests, and a clean `tsc` build. The UI was checked end to end with Playwright.
+Tests: 52 engine tests, 16 API tests, and a clean `tsc` build. The UI was checked end to end with Playwright.
 
 ## 2. What's still missing
 
 ### 2a. v0.8 features not yet ported
-The data for all of these is preserved, so nothing is lost in the meantime.
-- Custom named expense templates per location, custom locations, and the world map
-- Guided walkthroughs on each page (the "guided mode" tooltips)
-- Cash-flow "critical years" and "life stages" views, and the Sankey diagram
-- "What's new" changelog, and a full Users tab (remove members, rename household)
+The 2026-09-26 audit found only small items left (see `PARITY.md`); their data is preserved.
+- "What's new" changelog and an About panel
+- Excel "include charts" option; median-return statistic in the Monte Carlo summary
 - Long-term-care *benefits* (premiums are modeled, payouts are not)
+- Guided walkthroughs and tab visibility are replaced by guided setup and per-page Help on purpose
+
+### 2a'. Data freshness
+The app cites every major dataset (`engine/finplan/data/sources.json`). Datasets to refresh each year: BEA price parities (February), BLS Consumer Expenditures (September/December), IRS brackets and limits (October/November), SSA wage cap and bend points (October), Medicare premiums (November), Social Security Trustees Report (spring/summer). International prices use 2020 World Bank price levels and should move to a newer ICP round. The federal tax brackets are the 2024 ones indexed with the plan's inflation rate.
 
 ### 2b. Modeling gaps (these affect the numbers)
 | Gap | Why it matters |
@@ -81,7 +86,7 @@ The data for all of these is preserved, so nothing is lost in the meantime.
 4. Household activity feed ("Erin updated Homes") and comments on scenarios.
 
 ### Phase 5: Parity leftovers and polish
-Custom templates and locations, page walkthroughs, the cash-flow Sankey and critical years, What's new, the full Users tab, and LTC benefit payouts.
+What's new, About, LTC benefit payouts, Excel charts. A yearly data refresh script that re-pulls the cited datasets and flags changes.
 
 ## 4. Principles that stay fixed
 - The household file format stays v0.8-compatible, with additive keys only. Every write is backed up and merged. Any v2 build can open any older file.
