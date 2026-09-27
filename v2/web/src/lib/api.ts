@@ -52,6 +52,21 @@ export const api = {
     if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m } catch { /* */ } throw new ApiError(r.status, m) }
     return r.json()
   },
+  // linked accounts (optional SnapTrade + CSV import)
+  linked: () => req('GET', '/api/linked'),
+  linkedSetKeys: (cfg: { client_id: string; consumer_key: string; user_id?: string; user_secret?: string }) => req('PUT', '/api/linked/snaptrade', cfg),
+  linkedRemoveKeys: () => req('DELETE', '/api/linked/snaptrade'),
+  linkedPortal: (opts: { broker?: string | null; reconnect?: string; redirect?: string } = {}) => req('POST', '/api/linked/snaptrade/portal', opts),
+  linkedSync: () => req('POST', '/api/linked/sync'),
+  linkedUpdate: (key: string, patch: any) => req('PATCH', `/api/linked/accounts/${encodeURIComponent(key)}`, patch),
+  linkedDelete: (key: string) => req('DELETE', `/api/linked/accounts/${encodeURIComponent(key)}`),
+  linkedSettings: (s: { covers_all?: boolean }) => req('PUT', '/api/linked/settings', s),
+  linkedCsv: async (file: File, institution: string) => {
+    const r = await fetch(`/api/linked/csv?institution=${encodeURIComponent(institution)}&filename=${encodeURIComponent(file.name)}`,
+      { method: 'POST', body: await file.arrayBuffer(), credentials: 'same-origin', headers: { 'Content-Type': 'text/csv' } })
+    if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m } catch { /* */ } throw new ApiError(r.status, m) }
+    return r.json()
+  },
   history: () => req('GET', '/api/history'),
   previewVersion: (id: string) => req('POST', '/api/history/preview', { id }),
   restoreVersion: (id: string) => req('POST', '/api/history/restore', { id }),

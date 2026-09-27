@@ -92,6 +92,15 @@ Data compatibility is ✅ for everything: v2 reads and writes the same household
 | Guided setup question | ✅ | Separate balances, prenup, expected inheritances |
 | Reports | ✅ | PDF section, Excel sheets, JSON |
 
+## Linked accounts (new in v2)
+| Feature | Status | Notes |
+|---|---|---|
+| CSV import (Fidelity positions export, generic account/balance files) | ✅ | No setup; re-import to update |
+| Optional automatic sync via SnapTrade (read-only, daily) | ✅ | Personal or commercial keys; connect/reconnect portal; background sync |
+| Account mapping: owner, kind, separate property, include | ✅ | Kept across syncs |
+| Check-ins start from linked balances (after you confirm they're complete) | ✅ | Otherwise a "Use these" hint |
+| Broken-connection banners | ✅ | Linked accounts and Check-ins |
+
 ## Kids
 | Feature | Status |
 |---|---|

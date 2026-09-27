@@ -14,7 +14,7 @@ v2/
 ├── web/        React + TypeScript + Vite + Tailwind + Recharts
 ├── tools/      extract_v08_data.py (pulls templates/demos from v0.8)
 └── docs/       ENGINE_CHANGES.md (math changes vs v0.8), PARITY.md (feature checklist),
-                CHECKINS.md (living-plan scheme), ROADMAP.md (gaps + what to build next),
+                CHECKINS.md (living-plan scheme), ROADMAP.md (gaps + what to build next), LINKED_ACCOUNTS.md (Fidelity/SnapTrade),
                 COST_OF_LIVING_AUDIT.md (spending data audit and sources)
 ```
 

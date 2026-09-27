@@ -65,6 +65,9 @@ export default function Checkins() {
   const [notify, setNotify] = useState<any>(null)
   const [mailMsg, setMailMsg] = useState('')
   useEffect(() => { api.notifyStatus().then(setNotify).catch(() => {}) }, [])
+  const [linked, setLinked] = useState<any>(null)
+  useEffect(() => { api.linked().then(setLinked).catch(() => {}) }, [])
+  const brokenLinks = (linked?.connections || []).filter((c: any) => c.disabled)
   const items: any[] = ck?.checkins || []
   const lastScored = [...items].reverse().find(c => c.status !== 'baseline')
   const last = items[items.length - 1]
@@ -85,6 +88,10 @@ export default function Checkins() {
           <Button onClick={() => nav('/checkin?mode=quick')}><Zap size={15} />Quick update</Button>
           <Button variant="primary" onClick={() => nav('/checkin')}><ClipboardCheck size={15} />Start check-in</Button>
         </>} />
+      {brokenLinks.length > 0 && <Note tone="warn"><span className="flex flex-wrap items-center gap-2">{brokenLinks.map((c: any) => c.institution).join(', ')} needs you to sign in again before balances can update.
+        <Button size="sm" onClick={() => nav('/accounts')}>Linked accounts</Button></span></Note>}
+      {linked && linked.totals?.accounts > 0 && !brokenLinks.length && <p className="text-[12.5px] text-muted -mt-2">
+        {linked.totals.accounts} linked account{linked.totals.accounts === 1 ? '' : 's'}{linked.snaptrade?.configured ? `, synced ${new Date(linked.last_sync || Date.now()).toLocaleDateString()}` : ''}: {linked.covers_all ? 'check-ins start from those balances' : 'shown as a hint in check-ins'}. <button className="text-accent hover:underline" onClick={() => nav('/accounts')}>Manage</button></p>}
       {done && (
         <div className="rounded-xl border border-good/30 bg-good/10 px-5 py-3.5">
           <div className="flex items-center gap-2 font-medium"><CheckCircle2 className="text-good" size={18} />Check-in saved</div>

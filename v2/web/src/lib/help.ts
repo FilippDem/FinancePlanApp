@@ -19,6 +19,8 @@ export const HELP: Record<string, { what: string; tips: string[] }> = {
     tips: ['Healthcare is often the largest retirement expense; bridge coverage before 65 matters for early retirees.'] },
   '/locations': { what: 'Where you live over time. Moves change taxes and, if enabled, everyday prices and rent.',
     tips: ['Moving from a high-cost to a low-cost area can change your projection a lot.', 'Add a custom place for a city the app doesn’t know.'] },
+  '/accounts': { what: 'Balances from Fidelity and other brokerages, so check-ins fill themselves in. Import a CSV with no setup, or add free SnapTrade keys for a daily automatic sync. Both are optional.',
+    tips: ['Set who owns each account and whether it is a retirement account once; later syncs keep your choices.', 'If a connection needs you to sign in again, a banner appears here and on Check-ins.'] },
   '/ownership': { what: 'Separate vs marital property: what each of you brought into the marriage, inherited or was given, and what you built together, year by year. Labels only; totals never change.',
     tips: ['Enter the part of today\'s balances that is still separate; the helper grows a wedding-day balance forward.', 'A warning appears in years when separate money has to pay shared costs.', 'Set the rules to match your prenup; the defaults follow your state.'] },
   '/assumptions': { what: 'Investment return, inflation, healthcare inflation, Social Security cuts, taxes and Monte Carlo settings. These drive every model.',

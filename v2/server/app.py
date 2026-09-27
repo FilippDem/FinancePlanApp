@@ -31,6 +31,7 @@ from finplan import reference as R  # noqa: E402
 from server import storage as S  # noqa: E402
 from server import checkins as CK  # noqa: E402
 from server import notify as NT  # noqa: E402
+from server import linked as LK  # noqa: E402
 from finplan import stress as ST  # noqa: E402
 from finplan import retirement as RT  # noqa: E402
 from finplan import actuals as AC  # noqa: E402
@@ -43,6 +44,7 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def _lifespan(_app):
     NT.start_scheduler()   # check-in reminder emails; no-op unless SMTP_HOST is set
+    _start_linked_sync()   # daily SnapTrade pull for households that connected one; no-op otherwise
     yield
 
 
@@ -475,6 +477,226 @@ def history_restore(body: RestoreIn, request: Request):
     except (ValueError, FileNotFoundError) as e:
         raise HTTPException(400, str(e))
     return {'last_saved': saved, 'plan': normalize_plan(S.load_plan(sess['hid'], _pp(sess)) or {})}
+
+
+# ── linked accounts (SnapTrade + CSV import) ─────────────────────────────
+import logging as _logging
+import threading as _threading
+_llog = _logging.getLogger('linked')
+_sync_lock = _threading.Lock()
+
+
+def _linked_load(hid, pp):
+    st = S.load_hh_key(hid, 'linked_accounts', None, pp)
+    return st if isinstance(st, dict) else LK.empty_state()
+
+
+def _snap_cfg(hid, pp):
+    return ((S.load_hh_key(hid, 'integrations', {}, pp) or {}).get('snaptrade')) or None
+
+
+def _linked_sync(hid, pp, transport=None) -> dict:
+    """Pull accounts and balances from SnapTrade into the household's linked accounts."""
+    cfg = _snap_cfg(hid, pp)
+    st = _linked_load(hid, pp)
+    if not cfg:
+        return st
+    with _sync_lock:
+        try:
+            cl = LK.SnapTrade(cfg, transport)
+            conns = cl.connections()
+            LK.apply_snaptrade(st, cl.accounts(), conns)
+        except Exception as e:  # keep the last good balances and report the problem
+            st['last_error'] = str(e)[:300]
+            st['last_attempt'] = _dt.now().isoformat(timespec='seconds')
+        S.save_hh_key(hid, 'linked_accounts', st, pp)
+    return st
+
+
+def _single(hid, pp):
+    from finplan.plan import is_single
+    plan = S.load_plan(hid, pp)
+    return is_single(normalize_plan(plan or {}))
+
+
+def _linked_payload(hid, pp):
+    st = _linked_load(hid, pp)
+    cfg = _snap_cfg(hid, pp)
+    out = LK.public(st)
+    out['snaptrade'] = {'configured': bool(cfg), 'mode': ('commercial' if cfg and cfg.get('user_id') else 'personal') if cfg else None,
+                        'client_id': (cfg.get('client_id')[:6] + '…') if cfg and cfg.get('client_id') else None,
+                        'added_by': cfg.get('added_by') if cfg else None}
+    out['totals'] = LK.totals(st, _single(hid, pp))
+    return out
+
+
+@app.get('/api/linked')
+def linked_get(request: Request):
+    sess = _require(request)
+    return _linked_payload(sess['hid'], _pp(sess))
+
+
+class SnapCfgIn(BaseModel):
+    client_id: str
+    consumer_key: str
+    user_id: Optional[str] = None
+    user_secret: Optional[str] = None
+
+
+@app.put('/api/linked/snaptrade')
+def linked_snap_config(body: SnapCfgIn, request: Request):
+    sess = _require(request)
+    cfg = {'client_id': body.client_id.strip(), 'consumer_key': body.consumer_key.strip(),
+           'user_id': (body.user_id or '').strip() or None, 'user_secret': (body.user_secret or '').strip() or None,
+           'added_by': sess['email'], 'added_at': _dt.now().isoformat(timespec='seconds')}
+    try:
+        LK.SnapTrade(cfg).connections()          # check the keys before saving
+    except LK.SnapTradeError as e:
+        raise HTTPException(400, f'SnapTrade rejected these keys: {e}')
+    except Exception as e:
+        raise HTTPException(502, f"Couldn't reach SnapTrade: {e}")
+    integ = S.load_hh_key(sess['hid'], 'integrations', {}, _pp(sess)) or {}
+    integ['snaptrade'] = cfg
+    S.save_hh_key(sess['hid'], 'integrations', integ, _pp(sess))
+    return _linked_payload(sess['hid'], _pp(sess))
+
+
+@app.delete('/api/linked/snaptrade')
+def linked_snap_remove(request: Request):
+    """Forget the keys. Accounts already imported stay (as last known balances)."""
+    sess = _require(request)
+    integ = S.load_hh_key(sess['hid'], 'integrations', {}, _pp(sess)) or {}
+    integ.pop('snaptrade', None)
+    S.save_hh_key(sess['hid'], 'integrations', integ, _pp(sess))
+    return _linked_payload(sess['hid'], _pp(sess))
+
+
+class PortalIn(BaseModel):
+    broker: Optional[str] = 'FIDELITY'
+    reconnect: Optional[str] = None
+    redirect: Optional[str] = None
+
+
+@app.post('/api/linked/snaptrade/portal')
+def linked_portal(body: PortalIn, request: Request):
+    sess = _require(request)
+    cfg = _snap_cfg(sess['hid'], _pp(sess))
+    if not cfg:
+        raise HTTPException(400, 'Add your SnapTrade keys first')
+    try:
+        return {'url': LK.SnapTrade(cfg).portal_url(body.broker or None, body.reconnect, body.redirect)}
+    except LK.SnapTradeError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(502, f"Couldn't reach SnapTrade: {e}")
+
+
+@app.post('/api/linked/sync')
+def linked_sync(request: Request):
+    sess = _require(request)
+    _linked_sync(sess['hid'], _pp(sess))
+    return _linked_payload(sess['hid'], _pp(sess))
+
+
+@app.post('/api/linked/csv')
+async def linked_csv(request: Request, institution: str = 'Fidelity', filename: str = ''):
+    sess = _require(request)
+    raw = await request.body()
+    try:
+        text = raw.decode('utf-8-sig', errors='replace')
+        parsed = LK.parse_csv(text, institution)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    st = _linked_load(sess['hid'], _pp(sess))
+    added = LK.apply_csv(st, parsed, institution.strip() or 'Imported', filename)
+    S.save_hh_key(sess['hid'], 'linked_accounts', st, _pp(sess))
+    return {**_linked_payload(sess['hid'], _pp(sess)), 'imported': [a['key'] for a in added]}
+
+
+class LinkedAcctIn(BaseModel):
+    owner: Optional[str] = None
+    kind: Optional[str] = None
+    separate: Optional[bool] = None
+    include: Optional[bool] = None
+    name: Optional[str] = None
+
+
+@app.patch('/api/linked/accounts/{key:path}')
+def linked_update(key: str, body: LinkedAcctIn, request: Request):
+    sess = _require(request)
+    st = _linked_load(sess['hid'], _pp(sess))
+    a = st.get('accounts', {}).get(key)
+    if not a:
+        raise HTTPException(404, 'Unknown account')
+    if body.owner in ('p1', 'p2', 'joint'):
+        a['owner'] = body.owner
+    if body.kind in LK.KINDS:
+        a['kind'] = body.kind
+    for k in ('separate', 'include'):
+        if getattr(body, k) is not None:
+            a[k] = bool(getattr(body, k))
+    if body.name:
+        a['name'] = body.name.strip()
+    S.save_hh_key(sess['hid'], 'linked_accounts', st, _pp(sess))
+    return _linked_payload(sess['hid'], _pp(sess))
+
+
+@app.delete('/api/linked/accounts/{key:path}')
+def linked_delete(key: str, request: Request):
+    sess = _require(request)
+    st = _linked_load(sess['hid'], _pp(sess))
+    st.get('accounts', {}).pop(key, None)
+    S.save_hh_key(sess['hid'], 'linked_accounts', st, _pp(sess))
+    return _linked_payload(sess['hid'], _pp(sess))
+
+
+class LinkedSettingsIn(BaseModel):
+    covers_all: Optional[bool] = None
+
+
+@app.put('/api/linked/settings')
+def linked_settings(body: LinkedSettingsIn, request: Request):
+    sess = _require(request)
+    st = _linked_load(sess['hid'], _pp(sess))
+    if body.covers_all is not None:
+        st['covers_all'] = bool(body.covers_all)
+    S.save_hh_key(sess['hid'], 'linked_accounts', st, _pp(sess))
+    return _linked_payload(sess['hid'], _pp(sess))
+
+
+def _linked_sync_all() -> int:
+    """Background: sync every non-encrypted household that has SnapTrade keys and hasn't synced in ~20 hours."""
+    n = 0
+    for hid, info in (S.load_index() or {}).items():
+        try:
+            hh = S.household_info(hid)
+            if hh.get('encrypted') or not ((hh.get('integrations') or {}).get('snaptrade')):
+                continue
+            last = (hh.get('linked_accounts') or {}).get('last_sync')
+            if last and (_dt.now().astimezone() - _dt.fromisoformat(last)).total_seconds() < 20 * 3600:
+                continue
+            _linked_sync(hid, None)
+            n += 1
+        except Exception as e:
+            _llog.warning('linked sync failed for %s: %s', hid, e)
+    return n
+
+
+def _start_linked_sync():
+    import os as _os
+    import time as _time
+    if _os.environ.get('DISABLE_LINKED_SYNC') == '1':
+        return
+
+    def loop():
+        _time.sleep(30)
+        while True:
+            try:
+                _linked_sync_all()
+            except Exception as e:
+                _llog.warning('linked sync loop: %s', e)
+            _time.sleep(3600)
+    _threading.Thread(target=loop, daemon=True, name='linked-sync').start()
 
 
 # ── check-ins (docs/CHECKINS.md) ─────────────────────────────────────────

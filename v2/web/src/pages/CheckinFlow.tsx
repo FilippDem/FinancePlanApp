@@ -6,6 +6,7 @@ import { api } from '../lib/api'
 import { money, pct } from '../lib/format'
 import { FlowShell, Question, Chips, BigField } from '../components/flow'
 import { Money, TextInput, Button, Note } from '../components/ui'
+import { fmtWhen, isStale } from './Linked'
 
 export const STATUS_META: Record<string, { label: string; tone: 'good' | 'warn' | 'bad' | 'accent'; blurb: string }> = {
   ahead: { label: 'Ahead of plan', tone: 'good', blurb: "You're ahead of where the plan expected." },
@@ -55,6 +56,7 @@ export default function CheckinFlow() {
   const [notes, setNotes] = useState('')
   const [result, setResult] = useState<any>(null)
   const [busy, setBusy] = useState(false)
+  const [linked, setLinked] = useState<any>(null)   // linked-account balances (optional)
   const last = (ck?.checkins || []).slice(-1)[0]
 
   // homes owned today (from the projection's current-year row)
@@ -73,8 +75,14 @@ export default function CheckinFlow() {
   // pre-fill with what the plan expects today
   useEffect(() => {
     if (!proj || b) return
-    api.evaluate(plan, today, 0).then(ev => {
+    // linked accounts (optional): refresh if stale, then use them as the starting balances
+    const lk = api.linked().then(async (l: any) => {
+      if (l.snaptrade?.configured && isStale(l.last_sync)) { try { l = await api.linkedSync() } catch { /* keep last */ } }
+      return l.totals?.accounts > 0 ? l : null
+    }).catch(() => null)
+    Promise.all([api.evaluate(plan, today, 0), lk]).then(([ev, l]) => {
       setExp(ev.expected)
+      setLinked(l)
       const start = (plan.parentX_net_worth || 0) + (single ? 0 : plan.parentY_net_worth || 0) + (plan.hsa_balance || 0)
       const r = start > 0 ? ev.expected.investable / start : 1
       const ot = plan.ownership_tracking?.enabled && !single ? plan.ownership_tracking.today : null
@@ -82,9 +90,23 @@ export default function CheckinFlow() {
         pretax: round100((plan[`parent${w}_pretax_balance`] || 0) * r),
         // who-owns-what: how much of each balance is still separate property
         ...(ot ? { separate_liquid: round100((ot[w === 'X' ? 'p1' : 'p2']?.liquid || 0) * r), separate_pretax: round100((ot[w === 'X' ? 'p1' : 'p2']?.pretax || 0) * r) } : {}) })
-      const init = { p1: per('X'), ...(single ? {} : { p2: per('Y') }), homes: owned, other_debts: last?.balances?.other_debts ?? 0 }
+      const init: any = { p1: per('X'), ...(single ? {} : { p2: per('Y') }), homes: owned, other_debts: last?.balances?.other_debts ?? 0 }
+      if (l && l.covers_all) {
+        for (const w of (single ? ['p1'] : ['p1', 'p2']) as ('p1' | 'p2')[]) {
+          const t = l.totals[w]
+          init[w] = { ...init[w], liquid: round100(t.liquid), pretax: round100(t.pretax) }
+          if (ot) {
+            // separate property: from accounts marked separate if any; otherwise keep the plan's estimate (capped)
+            init[w].separate_liquid = t.any_separate ? round100(t.separate_liquid) : Math.min(init[w].separate_liquid || 0, init[w].liquid)
+            init[w].separate_pretax = t.any_separate ? round100(t.separate_pretax) : Math.min(init[w].separate_pretax || 0, init[w].pretax)
+          }
+        }
+        init.from_linked = true
+      }
       setB(init)
-      setTotal(round100(ev.expected.investable))
+      setTotal(round100(init.from_linked
+        ? init.p1.liquid + init.p1.pretax + (init.p2 ? init.p2.liquid + init.p2.pretax : 0) - (init.other_debts || 0)
+        : ev.expected.investable))
     })
   }, [proj])
 
@@ -137,7 +159,8 @@ export default function CheckinFlow() {
 
   const steps: { section: number; body: React.ReactNode; next?: string; onNext?: () => void; valid?: boolean }[] = quick ? [
     { section: 0, next: 'See how I’m doing', onNext: evaluateNow, valid: !!b, body: (
-      <Question title="Quick update" subtitle="Just the big numbers. Pre-filled with what the plan expected today; change what's different.">
+      <Question title="Quick update" subtitle={b?.from_linked ? 'Just the big numbers. Savings are filled in from your linked accounts; change anything that\'s off.' : "Just the big numbers. Pre-filled with what the plan expected today; change what's different."}>
+        {linked && <LinkedNote linked={linked} used={!!b?.from_linked} names={names} single={single} onUse={() => setTotal(round100(['p1', 'p2'].reduce((a, w) => a + (linked.totals[w]?.liquid || 0) + (linked.totals[w]?.pretax || 0), 0)))} />}
         <BigField label="Total savings & investments today" hint="All accounts: cash, brokerage, retirement, HSA. Minus credit card or car debt.">
           <Money big value={total} step={1000} onChange={setTotal} /></BigField>
         {b?.homes.map((h: any, k: number) => (
@@ -162,6 +185,10 @@ export default function CheckinFlow() {
       </Question>) },
     { section: 1, body: b && (
       <Question title="What are your balances today?" why="Separating retirement accounts matters because withdrawals from them are taxed.">
+        {linked && <LinkedNote linked={linked} used={!!b.from_linked} names={names} single={single} onUse={() => setB((x: any) => {
+          const y = { ...x, from_linked: true }
+          for (const w of (single ? ['p1'] : ['p1', 'p2'])) y[w] = { ...x[w], liquid: round100(linked.totals[w].liquid), pretax: round100(linked.totals[w].pretax) }
+          return y })} />}
         {(['p1', ...(single ? [] : ['p2'])] as ('p1' | 'p2')[]).map((w, k) => (
           <div key={w}>
             {!single && <div className="text-sm font-semibold mb-2">{names[k]}</div>}
@@ -241,4 +268,18 @@ export default function CheckinFlow() {
       {onResult ? resultStep : (b ? step.body : <p className="text-muted">Loading your plan…</p>)}
     </FlowShell>
   )
+}
+
+
+function LinkedNote({ linked, used, names, single, onUse }: { linked: any; used: boolean; names: string[]; single: boolean; onUse: () => void }) {
+  const t = linked.totals
+  const disabled = (linked.connections || []).filter((c: any) => c.disabled)
+  return (
+    <div className="rounded-lg border border-accent/25 bg-accentSoft/60 px-4 py-3 text-sm space-y-1">
+      <div className="font-medium">{used ? 'Filled in from your linked accounts' : 'Your linked accounts'} <span className="text-muted font-normal">· {t.accounts} account{t.accounts === 1 ? '' : 's'}, as of {fmtWhen(t.as_of)}</span></div>
+      <div className="text-ink2">{(single ? ['p1'] : ['p1', 'p2']).map((w, i) => `${names[i]}: ${money(t[w].liquid)} cash & investments, ${money(t[w].pretax)} retirement`).join(' · ')}</div>
+      {!used && <div className="flex items-center gap-2"><span className="text-muted">They may not include accounts held elsewhere.</span><Button size="sm" onClick={onUse}>Use these</Button></div>}
+      {used && <div className="text-muted">Add anything held outside the linked accounts.</div>}
+      {disabled.length > 0 && <div className="text-warn">{disabled.map((c: any) => c.institution).join(', ')} needs you to sign in again under Linked accounts; these are the last balances received.</div>}
+    </div>)
 }

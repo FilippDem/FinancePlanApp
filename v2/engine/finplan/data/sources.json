@@ -224,5 +224,26 @@
     "year": "current",
     "url": "https://www.law.cornell.edu/wex/equitable_distribution",
     "used_for": "How non-community-property states divide marital property (by fairness factors, not always 50/50)"
+  },
+  "snaptrade_personal": {
+    "publisher": "SnapTrade",
+    "title": "SnapTrade Personal vs Commercial (free Personal keys for your own accounts)",
+    "year": "current",
+    "url": "https://docs.snaptrade.com/docs/personal-vs-commercial",
+    "used_for": "Optional automatic, read-only balance sync from Fidelity and other brokerages"
+  },
+  "snaptrade_sync": {
+    "publisher": "SnapTrade",
+    "title": "Syncing and Data Freshness (holdings refresh once a day)",
+    "year": "current",
+    "url": "https://docs.snaptrade.com/docs/syncing",
+    "used_for": "How fresh linked balances are"
+  },
+  "snaptrade_fidelity": {
+    "publisher": "SnapTrade",
+    "title": "Fidelity integration (read-only, OAuth sign-in at Fidelity)",
+    "year": "current",
+    "url": "https://snaptrade.com/brokerage-integrations/fidelity-api",
+    "used_for": "What the Fidelity connection can read"
   }
 }

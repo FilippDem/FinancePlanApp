@@ -22,9 +22,10 @@ v2 now covers every v0.8 tab and adds a set of "living plan" features. See `PARI
 | **Spending slider** calibrated to BLS spending and BEA prices, with milestones | ✅ |
 | **Data citations**: numbered [n] sources with links in the app and reports | ✅ |
 | **Who owns what**: separate vs marital property by year, homes by contribution, gifts & inheritances, prenup rules | ✅ |
+| **Linked accounts**: Fidelity/any CSV import and optional daily SnapTrade sync feeding check-ins | ✅ |
 | Demo households re-tuned for the corrected math | ✅ |
 
-Tests: 56 engine tests, 17 API tests, and a clean `tsc` build. The UI was checked end to end with Playwright.
+Tests: 56 engine tests, 22 API tests, and a clean `tsc` build. The UI was checked end to end with Playwright.
 
 ## 2. What's still missing
 
@@ -53,7 +54,7 @@ The app cites every major dataset (`engine/finplan/data/sources.json`). Datasets
 ### 2c. Product gaps
 - **"What would it take?"** The app shows success %, but can't answer "save how much more / retire when / spend how much less to reach 85%?"
 - **No goals.** "Retire at 55", "college fully funded" and "pay off the house by 60" aren't first-class items with progress bars.
-- **Actual data still comes from typing.** Monarch Money, Mint-style CSVs or bank exports can't fill actuals or check-in balances yet.
+- **Spending actuals still come from typing.** Balances can now come from linked accounts (CSV or SnapTrade), but transactions (Monarch Money, bank CSVs) don't fill Actuals yet.
 - **Nothing is live on the NAS yet.** v2 runs only locally, the NAS still serves v0.8, and there's no CI.
 - **Bundle size.** The web bundle is 820 kB (one chunk). Code-splitting per page would halve the first load on phones.
 
@@ -82,7 +83,7 @@ The app cites every major dataset (`engine/finplan/data/sources.json`). Datasets
 
 ### Phase 4: Real data in, less typing
 1. **CSV import for actuals**: Monarch Money transaction export, plus generic bank CSVs with column mapping. Map merchant categories to plan categories once, then remember the mapping.
-2. **Balance import for check-ins** (a Monarch accounts CSV) so a quarterly check-in takes 30 seconds.
+2. ~~Balance import for check-ins~~ ✅ done: Linked accounts (CSV or SnapTrade). Next: Monarch accounts CSV format, Roth vs pre-tax split once the engine has account types.
 3. Check-in insights: explain drift ("spending was $6k over plan, mostly Travel").
 4. Household activity feed ("Erin updated Homes") and comments on scenarios.
 

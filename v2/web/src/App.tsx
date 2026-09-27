@@ -23,6 +23,7 @@ import Retirement from './pages/Retirement'
 import Locations from './pages/Locations'
 import Household from './pages/Household'
 import Ownership from './pages/Ownership'
+import Linked from './pages/Linked'
 
 function skipSetup() {
   try { if (sessionStorage.getItem('fp_setup_seen')) return true; sessionStorage.setItem('fp_setup_seen', '1') } catch { /* */ }
@@ -81,6 +82,7 @@ function Gate() {
               <Route path="/locations" element={<Locations />} />
               <Route path="/household" element={<Household />} />
               <Route path="/ownership" element={<Ownership />} />
+              <Route path="/accounts" element={<Linked />} />
               <Route path="*" element={<Dashboard isNew={false} />} />
             </Routes>
           </Shell>} />
