@@ -34,7 +34,7 @@ def test_parse_fidelity_csv():
     accts = {a['number']: a for a in LK.parse_csv(FIDELITY_CSV)}
     assert abs(accts['Z12345678']['balance'] - 21200.00) < 0.01
     assert accts['238765432']['balance'] == 7500 and accts['238765432']['name'] == 'ROTH IRA'
-    assert LK.guess_kind('ROTH IRA') == 'retirement' and LK.guess_kind('Individual') == 'liquid' and LK.guess_kind('Health Savings Account') == 'hsa'
+    assert LK.guess_kind('ROTH IRA') == 'roth' and LK.guess_kind('Rollover IRA') == 'retirement' and LK.guess_kind('Individual') == 'liquid' and LK.guess_kind('Health Savings Account') == 'hsa'
     gen = LK.parse_csv('Account,Balance\nChecking,"$5,000"\nSavings,12000\n')
     assert {a['name']: a['balance'] for a in gen} == {'Checking': 5000, 'Savings': 12000}
 

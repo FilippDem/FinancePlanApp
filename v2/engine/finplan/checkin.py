@@ -108,12 +108,18 @@ def rebase(plan: dict, balances: dict, on: date) -> dict:
     share1 = liq1 / tot if tot > 0 else (1.0 if not b2 else 0.5)
     if b1:
         pre1 = float(b1.get('pretax') or 0)
-        p['parentX_net_worth'] = liq1 + pre1 - debts * share1
+        ro1 = float(b1.get('roth') or 0) if b1.get('roth') is not None else None
+        p['parentX_net_worth'] = liq1 + pre1 + (ro1 or 0) - debts * share1
         p['parentX_pretax_balance'] = pre1
+        if ro1 is not None:
+            p['parentX_roth_balance'] = ro1
     if b2:
         pre2 = float(b2.get('pretax') or 0)
-        p['parentY_net_worth'] = liq2 + pre2 - debts * (1 - share1)
+        ro2 = float(b2.get('roth') or 0) if b2.get('roth') is not None else None
+        p['parentY_net_worth'] = liq2 + pre2 + (ro2 or 0) - debts * (1 - share1)
         p['parentY_pretax_balance'] = pre2
+        if ro2 is not None:
+            p['parentY_roth_balance'] = ro2
     by_name = {h['name']: h for h in p['houses']}
     for hb in balances.get('homes') or []:
         h = by_name.get(hb.get('name'))

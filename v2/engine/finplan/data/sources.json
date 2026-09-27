@@ -245,5 +245,33 @@
     "year": "current",
     "url": "https://snaptrade.com/brokerage-integrations/fidelity-api",
     "used_for": "What the Fidelity connection can read"
+  },
+  "irs_rmd": {
+    "publisher": "Internal Revenue Service",
+    "title": "Retirement topics — Required minimum distributions (RMDs): start at 73; none for Roth IRAs or designated Roth accounts while the owner is alive",
+    "year": "current",
+    "url": "https://www.irs.gov/retirement-plans/plan-participant-employee/retirement-topics-required-minimum-distributions-rmds",
+    "used_for": "RMDs from pre-tax accounts; Roth accounts exempt"
+  },
+  "cfr_ult": {
+    "publisher": "Cornell LII (26 CFR 1.401(a)(9)-9)",
+    "title": "Uniform Lifetime Table (distribution periods by age)",
+    "year": "2022 table",
+    "url": "https://www.law.cornell.edu/cfr/text/26/1.401(a)(9)-9",
+    "used_for": "RMD amount = prior year-end balance ÷ the table's divisor for your age"
+  },
+  "fr_secure2_rmd": {
+    "publisher": "Federal Register (Treasury/IRS final regulations)",
+    "title": "Required Minimum Distributions: SECURE 2.0 applicable age (73 if born 1951–1959, 75 if born 1960 or later)",
+    "year": "July 2024",
+    "url": "https://www.federalregister.gov/documents/2024/07/19/2024-14542/required-minimum-distributions",
+    "used_for": "The age RMDs start for each person"
+  },
+  "ssa_spousal": {
+    "publisher": "Social Security Administration",
+    "title": "Benefits for Spouses (up to 50% of the worker's benefit; as little as 32.5% if claimed at 62)",
+    "year": "current",
+    "url": "https://www.ssa.gov/oact/quickcalc/spouse.html",
+    "used_for": "Spousal Social Security benefit"
   }
 }

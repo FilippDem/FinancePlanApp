@@ -6,7 +6,7 @@ import { money } from '../lib/format'
 import { useCites } from '../components/Cite'
 import { Card, PageHeader, Field, Select, Toggle, Button, Note, Badge, TextInput, Empty } from '../components/ui'
 
-const KIND_OPTS = [{ value: 'liquid', label: 'Cash & investments' }, { value: 'retirement', label: 'Retirement account' },
+const KIND_OPTS = [{ value: 'liquid', label: 'Cash & investments' }, { value: 'retirement', label: 'Pre-tax retirement' }, { value: 'roth', label: 'Roth' },
   { value: 'hsa', label: 'HSA' }, { value: 'ignore', label: "Don't count" }]
 const STALE_HOURS = 12
 
@@ -86,10 +86,10 @@ export default function Linked() {
               <React.Fragment key={w}>
                 <div className="rounded-lg border border-line p-3"><div className="text-[12.5px] text-muted">{names[i]}: cash & investments</div>
                   <div className="text-[20px] font-semibold tnum">{money(t[w].liquid)}</div>
-                  <div className="text-[11.5px] text-muted">Plan says {money(plan[`parent${w === 'p1' ? 'X' : 'Y'}_net_worth`] - (plan[`parent${w === 'p1' ? 'X' : 'Y'}_pretax_balance`] || 0))}{ownOn && t[w].separate_liquid > 0 ? ` · ${money(t[w].separate_liquid)} separate` : ''}</div></div>
+                  <div className="text-[11.5px] text-muted">Plan says {money(plan[`parent${w === 'p1' ? 'X' : 'Y'}_net_worth`] - (plan[`parent${w === 'p1' ? 'X' : 'Y'}_pretax_balance`] || 0) - (plan[`parent${w === 'p1' ? 'X' : 'Y'}_roth_balance`] || 0))}{ownOn && t[w].separate_liquid > 0 ? ` · ${money(t[w].separate_liquid)} separate` : ''}</div></div>
                 <div className="rounded-lg border border-line p-3"><div className="text-[12.5px] text-muted">{names[i]}: retirement & HSA</div>
-                  <div className="text-[20px] font-semibold tnum">{money(t[w].pretax)}</div>
-                  <div className="text-[11.5px] text-muted">Plan says {money(plan[`parent${w === 'p1' ? 'X' : 'Y'}_pretax_balance`] || 0)}{ownOn && t[w].separate_pretax > 0 ? ` · ${money(t[w].separate_pretax)} separate` : ''}</div></div>
+                  <div className="text-[20px] font-semibold tnum">{money(t[w].pretax + (t[w].roth || 0))}</div>
+                  <div className="text-[11.5px] text-muted">{t[w].roth > 0 ? `${money(t[w].roth)} Roth · ` : ''}Plan says {money((plan[`parent${w === 'p1' ? 'X' : 'Y'}_pretax_balance`] || 0) + (plan[`parent${w === 'p1' ? 'X' : 'Y'}_roth_balance`] || 0))}{ownOn && t[w].separate_pretax > 0 ? ` · ${money(t[w].separate_pretax)} separate` : ''}</div></div>
               </React.Fragment>))}
           </div>
           {st.covers_all == null && (
@@ -184,7 +184,7 @@ export default function Linked() {
                 </tr>))}</tbody>
             </table>
           </div>)}
-        <p className="px-5 pb-4 pt-2 text-[12px] text-muted">Retirement accounts and HSAs count toward the plan's pre-tax balance (Roth accounts too, for now: the plan doesn't separate Roth money yet). Joint accounts are split evenly.</p>
+        <p className="px-5 pb-4 pt-2 text-[12px] text-muted">Pre-tax retirement accounts and HSAs count toward the plan's pre-tax balance (taxed on withdrawal, with required minimum distributions); Roth accounts are tracked separately (tax-free). Joint accounts are split evenly.</p>
       </Card>
       <Sources className="px-1" />
     </div>

@@ -15,7 +15,7 @@ export default function Assumptions() {
   const hist = reference?.historical
   const locs = reference?.locations || ['Seattle']
   const asym = plan.mc_use_asymmetric !== false
-  const { Cite, Sources } = useCites(['damodaran_sp500', 'bls_cpi', 'cms_nhe', 'ssa_trustees_2026', 'irs_2024_tax', 'ssa_wage_base', 'irs_401k_2026', 'taxfoundation_state_2025', 'oecd_taxing_wages_2025'])
+  const { Cite, Sources } = useCites(['damodaran_sp500', 'bls_cpi', 'cms_nhe', 'ssa_spousal', 'ssa_trustees_2026', 'irs_2024_tax', 'ssa_wage_base', 'taxfoundation_state_2025', 'oecd_taxing_wages_2025', 'irs_401k_2026', 'fr_secure2_rmd', 'cfr_ult', 'irs_rmd'])
 
   return (
     <div className="space-y-5">
@@ -52,6 +52,8 @@ export default function Assumptions() {
         <Card title="Social Security">
           <div className="space-y-4">
             <div><Toggle checked={plan.ss_cola !== false} onChange={v => update(d => { d.ss_cola = v })} label="Benefits rise with inflation (COLA)" /></div>
+            <div><Toggle checked={plan.spousal_ss !== false} onChange={v => update(d => { d.spousal_ss = v })} label="Spousal benefit" />
+              <p className="text-xs text-muted mt-1">A spouse can get up to half of the other's benefit at 67 (as little as 32.5% if claimed at 62) when that's more than their own<Cite id="ssa_spousal" />.</p></div>
             <div><Toggle checked={plan.ss_insolvency_enabled} onChange={v => update(d => { d.ss_insolvency_enabled = v })} label="Model trust-fund shortfall" /></div>
             {plan.ss_insolvency_enabled && <div className="grid grid-cols-2 gap-4">
               <Field label="Benefit cut"><Percent value={plan.ss_shortfall_percentage} decimals={0} onChange={v => update(d => { d.ss_shortfall_percentage = v })} /></Field>
@@ -64,10 +66,15 @@ export default function Assumptions() {
         <Card title="Taxes" subtitle={<>2024 federal brackets and standard deduction<Cite id="irs_2024_tax" /> and the Social Security wage cap<Cite id="ssa_wage_base" />, indexed to inflation; state rates per location<Cite id="taxfoundation_state_2025" />, rough effective rates abroad<Cite id="oecd_taxing_wages_2025" /></>}>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Pre-tax 401(k) contributions / yr" hint="Household total, today's dollars; stops when each person retires. 2026 limit: $24,500 per person under 50." cite={<Cite id="irs_401k_2026" />}><Money value={plan.pretax_401k} step={500} onChange={v => update(d => { d.pretax_401k = v })} /></Field>
+            <Field label="Roth contributions / yr" hint="Roth IRA or Roth 401(k), household total in today's dollars, from after-tax pay while working"><Money value={plan.roth_contribution || 0} step={500} onChange={v => update(d => { d.roth_contribution = v })} /></Field>
             <Field label="Filing status"><Select value={plan.tax_filing_status || 'married'} options={[{ value: 'married', label: 'Married filing jointly' }, { value: 'single', label: 'Single' }]} onChange={v => update(d => { d.tax_filing_status = v })} /></Field>
             <Field label="State tax override" hint="Only used for locations the app doesn't know. Leave at 0 to use the location's rate.">
               <Percent fraction value={plan.state_tax_rate || 0} onChange={v => update(d => { d.state_tax_rate = v })} /></Field>
             <Field label="Home selling costs"><Percent value={plan.home_selling_cost_pct} decimals={1} onChange={v => update(d => { d.home_selling_cost_pct = v })} /></Field>
+          </div>
+          <div className="mt-4 space-y-2">
+            <Toggle checked={plan.rmd_enabled !== false} onChange={v => update(d => { d.rmd_enabled = v })} label="Required minimum distributions from pre-tax accounts" />
+            <p className="text-xs text-muted">From 73 (75 if born in 1960 or later)<Cite id="fr_secure2_rmd" />, each year's minimum is last year's balance divided by the IRS life-expectancy factor<Cite id="cfr_ult" />, taxed as income. Roth accounts have none<Cite id="irs_rmd" />. Spending needs above the minimum come from savings, then pre-tax, then Roth money.</p>
           </div>
         </Card>
         <Card title="Where you live" subtitle={<>Sets income tax each year{plan.move_adjusts_spending !== false ? ' and scales everyday spending' : ''}. <a className="text-accent" href="/locations">Map, cost of living and custom places →</a></>}

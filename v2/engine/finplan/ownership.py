@@ -272,7 +272,8 @@ class Overlay:
         self.S1 = self.S1 - C['own_dp_s1'][t]
         self.S2 = self.S2 - C['own_dp_s2'][t]
         # everything else that leaves liquid savings
-        out = taxes + C['contrib'][t] + expenses - C['own_dp_s1'][t] - C['own_dp_s2'][t]
+        roth_c = (C['roth_contrib'][t] if 'roth_contrib' in C else 0.0)
+        out = taxes + C['contrib'][t] + roth_c + expenses - C['own_dp_s1'][t] - C['own_dp_s2'][t]
         split = self.split
         shared = (C['family_exp'][t] + C['children_exp'][t] + C['recurring_exp'][t]) * EM[t] + C['purchase_exp'][t] + C['hc_shared'][t] * EM[t]
         e1 = (C['p1_exp'][t] * EM[t] + C['hc_p1'][t] * EM[t] + shared * split + C['house_exp_p1'][t]
@@ -325,10 +326,19 @@ class Overlay:
             self.QM = self.QM + gqm + gq1 + gq2
         else:
             self.Q1, self.Q2, self.QM = self.Q1 + gq1, self.Q2 + gq2, self.QM + gqm
+        rc1, rc2 = C['roth_c1'][t] if 'roth_c1' in C else 0.0, C['roth_c2'][t] if 'roth_c2' in C else 0.0
         if married and self.earn_marital:
-            self.QM = self.QM + C['contrib'][t]
+            self.QM = self.QM + C['contrib'][t] + rc1 + rc2
         else:
-            self.Q1, self.Q2 = self.Q1 + C['contrib1'][t], self.Q2 + C['contrib2'][t]
+            self.Q1, self.Q2 = self.Q1 + C['contrib1'][t] + rc1, self.Q2 + C['contrib2'][t] + rc2
+
+    def rmd(self, amount, retirement_total):
+        """Required distributions move money from each class's retirement pot to its cash pot."""
+        f = np.where(retirement_total > 0, amount / np.maximum(retirement_total, 1e-9), 0)
+        for q, l in (('Q1', 'S1'), ('Q2', 'S2'), ('QM', 'M')):
+            mv = np.maximum(getattr(self, q), 0) * f
+            setattr(self, q, getattr(self, q) - mv)
+            setattr(self, l, getattr(self, l) + mv)
 
     def withdraw(self, t, W, add):
         """Pre-tax money pulled in to cover a shortfall (W gross, `add` after tax)."""

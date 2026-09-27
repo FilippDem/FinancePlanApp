@@ -74,6 +74,30 @@ def ss_claim_factor(claim_age: float, fra: float = 67.0) -> float:
     return 1 - (min(early, 36) * 5 / 9 + max(early - 36, 0) * 5 / 12) / 100
 
 
+def spousal_factor(claim_age: float, fra: float = 67.0) -> float:
+    """Spousal benefit factor (of 50% of the worker's FRA benefit): 25/36% per month for the first 36 months
+    early, 5/12% after that (62 with FRA 67 -> 65%, i.e. 32.5% of the worker's benefit). No increase after FRA."""
+    early = max(0, round((fra - claim_age) * 12))
+    return 1 - (min(early, 36) * 25 / 36 + max(early - 36, 0) * 5 / 12) / 100
+
+
+# IRS Uniform Lifetime Table, 26 CFR 1.401(a)(9)-9(c)
+ULT = {72: 27.4, 73: 26.5, 74: 25.5, 75: 24.6, 76: 23.7, 77: 22.9, 78: 22.0, 79: 21.1, 80: 20.2, 81: 19.4, 82: 18.5,
+       83: 17.7, 84: 16.8, 85: 16.0, 86: 15.2, 87: 14.4, 88: 13.7, 89: 12.9, 90: 12.2, 91: 11.5, 92: 10.8, 93: 10.1,
+       94: 9.5, 95: 8.9, 96: 8.4, 97: 7.8, 98: 7.3, 99: 6.8, 100: 6.4, 101: 6.0, 102: 5.6, 103: 5.2, 104: 4.9, 105: 4.6,
+       106: 4.3, 107: 4.1, 108: 3.9, 109: 3.7, 110: 3.5, 111: 3.4, 112: 3.3, 113: 3.1, 114: 3.0, 115: 2.9, 116: 2.8,
+       117: 2.7, 118: 2.5, 119: 2.3}
+
+
+def rmd_age(birth_year: int) -> int:
+    """SECURE 2.0 section 107: 73 if born 1951-1959, 75 if born 1960 or later (72 before that)."""
+    return 75 if birth_year >= 1960 else 73 if birth_year >= 1951 else 72
+
+
+def rmd_divisor(age: int) -> float:
+    return ULT.get(int(age), 2.0 if age >= 120 else ULT[72])
+
+
 def career_comp(phases: list, age_now: int, current_year: int, year: int) -> dict:
     age = age_now + (year - current_year)
     z = {'base_salary': 0.0, 'bonus': 0.0, 'rsu_income': 0.0, 'options_income': 0.0, 'total': 0.0}
@@ -165,7 +189,7 @@ def build_schedule(p: dict) -> Schedule:
         'mortgage_pi', 'rent_income', 'rent_taxable', 'sale_proceeds', 'sale_p1', 'sale_p2', 'sale_shared',
         'down_payment', 'dp_p1', 'dp_p2', 'dp_shared', 'home_value', 'mortgage_balance', 'home_equity',
         'equity_p1', 'equity_p2', 'equity_shared', 'other_assets', 'consumer_debt', 'infl_index', 'hc_index',
-        'hc_p1', 'hc_p2', 'hc_shared', 'married', 'windfall')}
+        'hc_p1', 'hc_p2', 'hc_shared', 'married', 'windfall', 'hsa_c1', 'hsa_c2', 'roth_c1', 'roth_c2', 'roth_contrib')}
     details = [dict() for _ in range(T)]
     events = []
 
@@ -260,6 +284,13 @@ def build_schedule(p: dict) -> Schedule:
         cut = (1 - p['ss_shortfall_percentage'] / 100) if (p['ss_insolvency_enabled'] and y >= p.get('ss_insolvency_year', 2034)) else 1.0
         s1 = ben1 if (alive1 and age1 >= claim1) else 0.0
         s2 = ben2 if (alive2 and age2 >= claim2) else 0.0
+        # spousal benefit: up to 50% of the partner's age-67 benefit, once both have claimed
+        if p.get('spousal_ss', True) and not single and alive1 and alive2:
+            pia1, pia2 = p['parentX_ss_benefit'] * 12, p['parentY_ss_benefit'] * 12
+            if s1 and age2 >= claim2:
+                s1 = max(s1, 0.5 * pia2 * spousal_factor(claim1))
+            if s2 and age1 >= claim1:
+                s2 = max(s2, 0.5 * pia1 * spousal_factor(claim2))
         if alive1 and not alive2 and not single and age1 >= 60:
             s1 = max(s1, ben2)  # survivor keeps the larger benefit
         if alive2 and not alive1 and age2 >= 60:
@@ -271,6 +302,13 @@ def build_schedule(p: dict) -> Schedule:
         c2 = (p['pretax_401k'] * (1 - share1) + p.get('hsa_contribution', 0) * (1 - share1)) * ii if work2 else 0.0
         c1, c2 = min(c1, w1), min(c2, w2)
         C['contrib1'][t], C['contrib2'][t], C['contrib'][t] = c1, c2, c1 + c2
+        hs = p.get('hsa_contribution', 0) * ii
+        C['hsa_c1'][t] = min(hs * share1, c1) if work1 else 0.0
+        C['hsa_c2'][t] = min(hs * (1 - share1), c2) if work2 else 0.0
+        rc = p.get('roth_contribution', 0) * ii
+        C['roth_c1'][t] = max(0.0, min(rc * share1, w1 - c1)) if work1 else 0.0
+        C['roth_c2'][t] = max(0.0, min(rc * (1 - share1), w2 - c2)) if work2 else 0.0
+        C['roth_contrib'][t] = C['roth_c1'][t] + C['roth_c2'][t]
 
         # houses
         lives_owned = False
@@ -625,14 +663,24 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
 
     pre1 = min(p.get('parentX_pretax_balance', 0.0), max(p['parentX_net_worth'], 0))
     pre2 = min(p.get('parentY_pretax_balance', 0.0), max(p['parentY_net_worth'], 0))
-    L1 = np.full(n, p['parentX_net_worth'] - pre1)
-    L2 = np.full(n, p['parentY_net_worth'] - pre2)
-    P = np.full(n, pre1 + pre2 + p.get('hsa_balance', 0.0))
-    OV = (ownership.Overlay(p, S, L1, L2, pre1, pre2, p.get('hsa_balance', 0.0), n, split)
+    ro1 = min(p.get('parentX_roth_balance', 0.0), max(p['parentX_net_worth'] - pre1, 0))
+    ro2 = min(p.get('parentY_roth_balance', 0.0), max(p['parentY_net_worth'] - pre2, 0))
+    L1 = np.full(n, p['parentX_net_worth'] - pre1 - ro1)
+    L2 = np.full(n, p['parentY_net_worth'] - pre2 - ro2)
+    # pre-tax accounts per person (RMDs follow each owner's age) + HSA; Roth (tax-free, no lifetime RMDs)
+    P1, P2, H = np.full(n, pre1), np.full(n, pre2), np.full(n, p.get('hsa_balance', 0.0))
+    Ro = np.full(n, ro1 + ro2)
+    P = P1 + P2 + H
+    cy_ = p['current_year']
+    rmd_on = p.get('rmd_enabled', True)
+    rmd_age1 = rmd_age(cy_ - int(p['parentX_age']))
+    rmd_age2 = rmd_age(cy_ - int(p['parentY_age']))
+    OV = (ownership.Overlay(p, S, L1, L2, pre1 + ro1, pre2 + ro2, p.get('hsa_balance', 0.0), n, split)
           if S.meta.get('ownership') else None)
 
     out = {k: np.zeros((T, n)) for k in ('liquid', 'pretax', 'net_worth', 'investable', 'taxes', 'cashflow',
-                                          'wages', 'expenses', 'withdrawal', 'returns', 'liquid1', 'liquid2', 'growth')}
+                                          'wages', 'expenses', 'withdrawal', 'returns', 'liquid1', 'liquid2', 'growth',
+                                          'roth', 'rmd', 'roth_withdrawal')}
     tax_parts = {k: np.zeros((T, n)) for k in ('federal', 'state', 'fica', 'foreign')}
 
     for t in range(T):
@@ -642,15 +690,33 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
         w2 = C['wages2'][t] * IM[t]
         ss = C['ss1'][t] + C['ss2'][t]
         contrib = np.minimum(C['contrib'][t] * np.ones(n), w1 + w2)
+        roth_c = np.minimum(C['roth_contrib'][t] * np.ones(n), np.maximum(w1 + w2 - contrib, 0))
+        # a deceased spouse's pre-tax accounts roll over to the survivor
+        if not C['alive1'][t] and C['alive2'][t]:
+            P2, P1 = P2 + P1, np.zeros(n)
+        elif not C['alive2'][t] and C['alive1'][t]:
+            P1, P2 = P1 + P2, np.zeros(n)
+        # required minimum distributions (prior year-end balance / IRS Uniform Lifetime divisor)
+        rmd1 = rmd2 = np.zeros(n)
+        if rmd_on:
+            a1_, a2_ = int(C['age1'][t]), int(C['age2'][t])
+            if C['alive1'][t] and a1_ >= rmd_age1:
+                rmd1 = np.maximum(P1, 0) / rmd_divisor(a1_)
+            if C['alive2'][t] and a2_ >= rmd_age2:
+                rmd2 = np.maximum(P2, 0) / rmd_divisor(a2_)
+        rmd = rmd1 + rmd2
+        if OV is not None and np.any(rmd > 0):
+            OV.rmd(rmd, P1 + P2 + H + Ro)
+        P1, P2 = P1 - rmd1, P2 - rmd2
         disc = (C['p1_exp'][t] + C['p2_exp'][t] + C['family_exp'][t] + C['children_exp'][t]
                 + C['recurring_exp'][t] + C['healthcare_exp'][t]) * EM[t]
         fixed = C['house_exp'][t] + C['purchase_exp'][t] + C['down_payment'][t]
         expenses = disc + fixed
         loc = S.meta['location'][t]
-        tx = total_taxes(w1, w2, ss, C['rent_taxable'][t], contrib, y, infl, loc, status, override)
+        tx = total_taxes(w1, w2, ss, C['rent_taxable'][t] + rmd, contrib, y, infl, loc, status, override)
         taxes = tx['total']
-        inflow = w1 + w2 + ss + C['rent_income'][t] + C['sale_proceeds'][t] + C['windfall'][t]
-        net = inflow - taxes - contrib - expenses
+        inflow = w1 + w2 + ss + C['rent_income'][t] + C['sale_proceeds'][t] + C['windfall'][t] + rmd
+        net = inflow - taxes - contrib - roth_c - expenses
         inc_share = np.where((w1 + w2 + ss) > 0, (w1 + C['ss1'][t]) / np.maximum(w1 + w2 + ss, 1), 0.5)
         if OV is not None:
             OV.step(t, R[t], debt_rate, C, EM, w1, w2, taxes, expenses, inc_share)
@@ -662,10 +728,10 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
             e1 = C['p1_exp'][t] * EM[t] + C['hc_p1'][t] * EM[t] + shared * split + C['house_exp_p1'][t] + \
                 C['house_exp_shared'][t] * split + C['dp_p1'][t] + C['dp_shared'][t] * split
             e2 = expenses - e1
-            in1 = w1 + C['ss1'][t] + (C['sale_p1'][t] + C['sale_shared'][t] * split) + C['rent_income'][t] * split + C['windfall'][t] * split
+            in1 = w1 + C['ss1'][t] + (C['sale_p1'][t] + C['sale_shared'][t] * split) + C['rent_income'][t] * split + C['windfall'][t] * split + rmd1
             in2 = inflow - in1
-            net1 = in1 - taxes * inc_share - C['contrib1'][t] - e1
-            net2 = in2 - taxes * (1 - inc_share) - C['contrib2'][t] - e2
+            net1 = in1 - taxes * inc_share - C['contrib1'][t] - C['roth_c1'][t] - e1
+            net2 = in2 - taxes * (1 - inc_share) - C['contrib2'][t] - C['roth_c2'][t] - e2
             gain = np.where(L1 >= 0, L1 * r, L1 * debt_rate) + np.where(L2 >= 0, L2 * r, L2 * debt_rate)
             L1 = L1 + np.where(L1 >= 0, L1 * r, L1 * debt_rate) + net1
             L2 = L2 + np.where(L2 >= 0, L2 * r, L2 * debt_rate) + net2
@@ -675,21 +741,30 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
             L = L + gain + net
             L1, L2 = L, np.zeros(n)
 
-        gain = gain + P * r
-        P = P * (1 + r) + contrib
-        # cover a liquid shortfall from pre-tax accounts (grossed up for tax)
+        gain = gain + (P1 + P2 + H + Ro) * r
+        hsa_c = np.minimum((C['hsa_c1'][t] + C['hsa_c2'][t]) * np.ones(n), contrib)
+        k401 = np.where(C['contrib'][t] > 0, (contrib - hsa_c) / max(C['contrib'][t] - C['hsa_c1'][t] - C['hsa_c2'][t], 1e-9), 0)
+        P1 = P1 * (1 + r) + (C['contrib1'][t] - C['hsa_c1'][t]) * k401
+        P2 = P2 * (1 + r) + (C['contrib2'][t] - C['hsa_c2'][t]) * k401
+        H = H * (1 + r) + hsa_c
+        Ro = Ro * (1 + r) + roth_c
+        P = P1 + P2 + H
+        # cover a liquid shortfall from pre-tax accounts (grossed up for tax), then Roth (tax-free)
         Lsum = L1 + L2
         need = np.maximum(-Lsum, 0)
         W = np.zeros(n)
         if np.any((need > 0) & (P > 0)):
-            m = marginal_rate(np.maximum(w1 + w2 - contrib, 0) + C['rent_taxable'][t] + ss * 0.85, status,
+            m = marginal_rate(np.maximum(w1 + w2 - contrib, 0) + C['rent_taxable'][t] + rmd + ss * 0.85, status,
                               (1 + infl) ** max(0, y - TAX_BASE_YEAR))
             state_guess = 0.05
             gross = need / np.maximum(1 - m - state_guess, 0.4)
             W = np.minimum(gross, np.maximum(P, 0))
-            tx2 = total_taxes(w1, w2, ss, C['rent_taxable'][t] + W, contrib, y, infl, loc, status, override)
+            tx2 = total_taxes(w1, w2, ss, C['rent_taxable'][t] + rmd + W, contrib, y, infl, loc, status, override)
             extra_tax = tx2['total'] - taxes
-            P = P - W
+            # take it proportionally from each pre-tax account
+            fw = np.where(P > 0, W / np.maximum(P, 1e-9), 0)
+            P1, P2, H = P1 * (1 - fw), P2 * (1 - fw), H * (1 - fw)
+            P = P1 + P2 + H
             add = W - extra_tax
             if separate:
                 need1 = np.maximum(-L1, 0); need2 = np.maximum(-L2, 0)
@@ -702,16 +777,33 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
             tx = tx2
             if OV is not None:
                 OV.withdraw(t, W, add)
+        # still short: Roth money, no tax
+        Rw = np.zeros(n)
+        short = np.maximum(-(L1 + L2), 0)
+        if np.any((short > 0) & (Ro > 0)):
+            Rw = np.minimum(short, np.maximum(Ro, 0))
+            Ro = Ro - Rw
+            if separate:
+                n1_ = np.maximum(-L1, 0)
+                f1_ = np.where(short > 0, n1_ / np.maximum(short, 1e-9), 0.5)
+                L1, L2 = L1 + Rw * f1_, L2 + Rw * (1 - f1_)
+            else:
+                L1 = L1 + Rw
+            if OV is not None:
+                OV.withdraw(t, Rw, Rw)
         fac = C['infl_index'][t] if normalized else 1.0
         if OV is not None:
-            OV.record(t, L1 + L2, P, fac)
+            OV.record(t, L1 + L2, P + Ro, fac)
         home = C['home_equity'][t] + C['other_assets'][t] - C['consumer_debt'][t]
         out['liquid'][t] = (L1 + L2) / fac
         out['liquid1'][t] = L1 / fac
         out['liquid2'][t] = L2 / fac
         out['pretax'][t] = P / fac
-        out['investable'][t] = (L1 + L2 + P) / fac
-        out['net_worth'][t] = (L1 + L2 + P + home) / fac
+        out['investable'][t] = (L1 + L2 + P + Ro) / fac
+        out['net_worth'][t] = (L1 + L2 + P + Ro + home) / fac
+        out['roth'][t] = Ro / fac
+        out['rmd'][t] = rmd / fac
+        out['roth_withdrawal'][t] = Rw / fac
         out['taxes'][t] = taxes / fac
         out['cashflow'][t] = net / fac
         out['wages'][t] = (w1 + w2) / fac
@@ -773,6 +865,8 @@ def project(plan: dict) -> dict:
             'total_expenses': total_exp,
             'cashflow': g('cashflow'), 'withdrawal_pretax': g('withdrawal'),
             'liquid': g('liquid'), 'pretax': g('pretax'), 'investable': g('investable'),
+            'roth': g('roth'), 'rmd': g('rmd'), 'withdrawal_roth': g('roth_withdrawal'),
+            'contrib_roth': float(C['roth_contrib'][t]),
             'home_value': float(C['home_value'][t]), 'mortgage_balance': float(C['mortgage_balance'][t]),
             'home_equity': float(C['home_equity'][t]), 'other_assets': float(C['other_assets'][t]),
             'consumer_debt': float(C['consumer_debt'][t]), 'net_worth': g('net_worth'),

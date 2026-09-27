@@ -19,8 +19,8 @@ interface Kid { name: string; birth_year: number; school: string; college: strin
 interface Phase { label: string; from: number; to: number; salary: number; raise: number }
 interface Answers {
   household: 'single' | 'couple'
-  p1: { name: string; age: number; emoji: string; work: Work; income: number; raise: number; retire: number; savings: number; retirement: number; ss: number }
-  p2: { name: string; age: number; emoji: string; work: Work; income: number; raise: number; retire: number; savings: number; retirement: number; ss: number }
+  p1: { name: string; age: number; emoji: string; work: Work; income: number; raise: number; retire: number; savings: number; retirement: number; ss: number; roth?: number }
+  p2: { name: string; age: number; emoji: string; work: Work; income: number; raise: number; retire: number; savings: number; retirement: number; ss: number; roth?: number }
   location: string
   contrib: number
   ss_mode: 'estimate' | 'known'
@@ -102,7 +102,9 @@ function buildPlan(A: Answers, base: any, curve: Curve) {
     p[`parent${who}_raise`] = a.raise
     p[`parent${who}_retirement_age`] = a.work === 'retired' ? a.age : a.retire
     p[`parent${who}_net_worth`] = a.savings + a.retirement
-    p[`parent${who}_pretax_balance`] = a.retirement
+    const roth = Math.min(a.roth || 0, a.retirement)
+    p[`parent${who}_pretax_balance`] = a.retirement - roth
+    p[`parent${who}_roth_balance`] = roth
     p[`parent${who}_ss_benefit`] = A.ss_mode === 'known' ? a.ss : estimateSS(a.work === 'home' ? 0 : a.income)
     const ph = a.work === 'working' ? (A.phases?.[idx === 1 ? 'p1' : 'p2'] || []) : []
     // career stages (v0.8 wizard) replace the simple income + job changes when given
@@ -380,6 +382,10 @@ export default function Onboarding() {
             <div className="grid sm:grid-cols-2 gap-3">
               <BigField label="Cash & investments" hint="Checking, savings, brokerage, crypto"><Money big value={A[w].savings} step={5000} onChange={v => setP(w, { savings: v })} /></BigField>
               <BigField label="Retirement accounts" hint="401(k), 403(b), IRA, HSA"><Money big value={A[w].retirement} step={5000} onChange={v => setP(w, { retirement: v })} /></BigField>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <span />
+              <BigField label="…of which Roth (optional)" hint="Roth IRA or Roth 401(k): tax-free withdrawals, no required minimum distributions"><Money value={A[w].roth ?? 0} step={1000} onChange={v => setP(w, { roth: Math.min(v, A[w].retirement) })} /></BigField>
             </div>
           </div>
         ))}

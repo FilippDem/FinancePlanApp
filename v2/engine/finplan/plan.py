@@ -25,6 +25,12 @@ V2_KEYS = {
     # Portion of each person's savings that sits in pre-tax retirement accounts
     'parentX_pretax_balance': 0.0,
     'parentY_pretax_balance': 0.0,
+    # Portion of each person's savings in Roth accounts (tax-free withdrawals, no lifetime RMDs)
+    'parentX_roth_balance': 0.0,
+    'parentY_roth_balance': 0.0,
+    'roth_contribution': 0.0,        # household Roth IRA / Roth 401(k) saving per year (today's $), while working
+    'rmd_enabled': True,             # required minimum distributions from pre-tax accounts (73, or 75 if born 1960+)
+    'spousal_ss': True,              # a spouse may get up to 50% of the other's benefit at 67
     # Portfolio / Monte Carlo
     'mc_stock_allocation': 100.0,    # % stocks in historical mode (rest earns bond_return)
     'bond_return': 0.04,

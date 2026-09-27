@@ -40,6 +40,8 @@ function PersonCard({ who }: { who: 'X' | 'Y' }) {
           <Money value={nw} onChange={v => set('net_worth', v)} /></Field>
         <Field label="…of which pre-tax (401k/IRA)" hint="Withdrawals from pre-tax accounts are taxed as income">
           <Money value={plan[pk(who, 'pretax_balance')]} max={Math.max(nw, 0)} onChange={v => set('pretax_balance', v)} /></Field>
+        <Field label="…of which Roth (IRA / Roth 401k)" hint="Withdrawals are tax-free and there are no required minimum distributions">
+          <Money value={plan[pk(who, 'roth_balance')] || 0} max={Math.max(nw - (plan[pk(who, 'pretax_balance')] || 0), 0)} onChange={v => set('roth_balance', v)} /></Field>
         <Field label="Retirement age"><NumberInput value={plan[pk(who, 'retirement_age')]} min={30} max={85} step={1} onChange={v => set('retirement_age', Math.round(v))} /></Field>
         <Field label="Social Security claim age" hint="62–70. Defaults to your retirement age (at least 62).">
           <NumberInput value={claim} min={62} max={70} step={1} onChange={v => set('ss_claim_age', Math.round(v))} /></Field>

@@ -209,7 +209,7 @@ def build(plan: dict, household: str, checkins: list | None = None, sections: li
 
     if 'people' in sections:
         hdr, data = RD.people_table(ctx)
-        fmt = [[r[0], r[1], _m(r[2], True), f"{r[3]}%", _m(r[4], True), _m(r[5], True), r[6], _m(r[7], True), r[8] or 'at retirement', r[9]] for r in data]
+        fmt = [[r[0], r[1], _m(r[2], True), f"{r[3]}%", _m(r[4], True), _m(r[5], True), _m(r[6], True), r[7], _m(r[8], True), r[9] or 'at retirement', r[10]] for r in data]
         story += [CondPageBreak(2.5 * inch), Paragraph('People & income' + cite('people'), st.H2), _table([hdr] + fmt, right_from=1)]
         cr = RD.career_rows(ctx)
         if cr:

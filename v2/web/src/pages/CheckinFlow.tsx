@@ -86,15 +86,16 @@ export default function CheckinFlow() {
       const start = (plan.parentX_net_worth || 0) + (single ? 0 : plan.parentY_net_worth || 0) + (plan.hsa_balance || 0)
       const r = start > 0 ? ev.expected.investable / start : 1
       const ot = plan.ownership_tracking?.enabled && !single ? plan.ownership_tracking.today : null
-      const per = (w: 'X' | 'Y') => ({ liquid: round100(((plan[`parent${w}_net_worth`] || 0) - (plan[`parent${w}_pretax_balance`] || 0)) * r),
+      const per = (w: 'X' | 'Y') => ({ liquid: round100(((plan[`parent${w}_net_worth`] || 0) - (plan[`parent${w}_pretax_balance`] || 0) - (plan[`parent${w}_roth_balance`] || 0)) * r),
         pretax: round100((plan[`parent${w}_pretax_balance`] || 0) * r),
+        roth: round100((plan[`parent${w}_roth_balance`] || 0) * r),
         // who-owns-what: how much of each balance is still separate property
         ...(ot ? { separate_liquid: round100((ot[w === 'X' ? 'p1' : 'p2']?.liquid || 0) * r), separate_pretax: round100((ot[w === 'X' ? 'p1' : 'p2']?.pretax || 0) * r) } : {}) })
       const init: any = { p1: per('X'), ...(single ? {} : { p2: per('Y') }), homes: owned, other_debts: last?.balances?.other_debts ?? 0 }
       if (l && l.covers_all) {
         for (const w of (single ? ['p1'] : ['p1', 'p2']) as ('p1' | 'p2')[]) {
           const t = l.totals[w]
-          init[w] = { ...init[w], liquid: round100(t.liquid), pretax: round100(t.pretax) }
+          init[w] = { ...init[w], liquid: round100(t.liquid), pretax: round100(t.pretax), roth: round100(t.roth || 0) }
           if (ot) {
             // separate property: from accounts marked separate if any; otherwise keep the plan's estimate (capped)
             init[w].separate_liquid = t.any_separate ? round100(t.separate_liquid) : Math.min(init[w].separate_liquid || 0, init[w].liquid)
@@ -105,12 +106,12 @@ export default function CheckinFlow() {
       }
       setB(init)
       setTotal(round100(init.from_linked
-        ? init.p1.liquid + init.p1.pretax + (init.p2 ? init.p2.liquid + init.p2.pretax : 0) - (init.other_debts || 0)
+        ? init.p1.liquid + init.p1.pretax + (init.p1.roth || 0) + (init.p2 ? init.p2.liquid + init.p2.pretax + (init.p2.roth || 0) : 0) - (init.other_debts || 0)
         : ev.expected.investable))
     })
   }, [proj])
 
-  const investable = quick ? total : (b ? b.p1.liquid + b.p1.pretax + (b.p2 ? b.p2.liquid + b.p2.pretax : 0) - (b.other_debts || 0) : 0)
+  const investable = quick ? total : (b ? b.p1.liquid + b.p1.pretax + (b.p1.roth || 0) + (b.p2 ? b.p2.liquid + b.p2.pretax + (b.p2.roth || 0) : 0) - (b.other_debts || 0) : 0)
   const equity = b ? b.homes.reduce((a: number, h: any) => a + (h.value - h.mortgage), 0) : 0
   const netWorth = investable + equity
 
@@ -120,9 +121,9 @@ export default function CheckinFlow() {
     const s1 = (plan.parentX_net_worth || 0), s2 = single ? 0 : (plan.parentY_net_worth || 0)
     const share = s1 + s2 > 0 ? s1 / (s1 + s2) : 1
     const split = (w: 'X' | 'Y', part: number) => {
-      const nw = plan[`parent${w}_net_worth`] || 0, pre = plan[`parent${w}_pretax_balance`] || 0
-      const preShare = nw > 0 ? pre / nw : 0
-      return { liquid: round100(part * (1 - preShare)), pretax: round100(part * preShare) }
+      const nw = plan[`parent${w}_net_worth`] || 0, pre = plan[`parent${w}_pretax_balance`] || 0, ro = plan[`parent${w}_roth_balance`] || 0
+      const preShare = nw > 0 ? pre / nw : 0, roShare = nw > 0 ? ro / nw : 0
+      return { liquid: round100(part * (1 - preShare - roShare)), pretax: round100(part * preShare), roth: round100(part * roShare) }
     }
     return { p1: split('X', total * share), ...(single ? {} : { p2: split('Y', total * (1 - share)) }), homes: b.homes, other_debts: 0 }
   }
@@ -154,13 +155,13 @@ export default function CheckinFlow() {
     } finally { setBusy(false) }
   }
 
-  const P = (w: 'p1' | 'p2', k: 'liquid' | 'pretax' | 'separate_liquid' | 'separate_pretax', v: number) => setB((x: any) => ({ ...x, [w]: { ...x[w], [k]: v } }))
+  const P = (w: 'p1' | 'p2', k: 'liquid' | 'pretax' | 'roth' | 'separate_liquid' | 'separate_pretax', v: number) => setB((x: any) => ({ ...x, [w]: { ...x[w], [k]: v } }))
   const sections = quick ? ['Update', 'Result'] : ['Start', 'Savings', 'Homes', 'Life', 'Result']
 
   const steps: { section: number; body: React.ReactNode; next?: string; onNext?: () => void; valid?: boolean }[] = quick ? [
     { section: 0, next: 'See how I’m doing', onNext: evaluateNow, valid: !!b, body: (
       <Question title="Quick update" subtitle={b?.from_linked ? 'Just the big numbers. Savings are filled in from your linked accounts; change anything that\'s off.' : "Just the big numbers. Pre-filled with what the plan expected today; change what's different."}>
-        {linked && <LinkedNote linked={linked} used={!!b?.from_linked} names={names} single={single} onUse={() => setTotal(round100(['p1', 'p2'].reduce((a, w) => a + (linked.totals[w]?.liquid || 0) + (linked.totals[w]?.pretax || 0), 0)))} />}
+        {linked && <LinkedNote linked={linked} used={!!b?.from_linked} names={names} single={single} onUse={() => setTotal(round100(['p1', 'p2'].reduce((a, w) => a + (linked.totals[w]?.liquid || 0) + (linked.totals[w]?.pretax || 0) + (linked.totals[w]?.roth || 0), 0)))} />}
         <BigField label="Total savings & investments today" hint="All accounts: cash, brokerage, retirement, HSA. Minus credit card or car debt.">
           <Money big value={total} step={1000} onChange={setTotal} /></BigField>
         {b?.homes.map((h: any, k: number) => (
@@ -187,14 +188,15 @@ export default function CheckinFlow() {
       <Question title="What are your balances today?" why="Separating retirement accounts matters because withdrawals from them are taxed.">
         {linked && <LinkedNote linked={linked} used={!!b.from_linked} names={names} single={single} onUse={() => setB((x: any) => {
           const y = { ...x, from_linked: true }
-          for (const w of (single ? ['p1'] : ['p1', 'p2'])) y[w] = { ...x[w], liquid: round100(linked.totals[w].liquid), pretax: round100(linked.totals[w].pretax) }
+          for (const w of (single ? ['p1'] : ['p1', 'p2'])) y[w] = { ...x[w], liquid: round100(linked.totals[w].liquid), pretax: round100(linked.totals[w].pretax), roth: round100(linked.totals[w].roth || 0) }
           return y })} />}
         {(['p1', ...(single ? [] : ['p2'])] as ('p1' | 'p2')[]).map((w, k) => (
           <div key={w}>
             {!single && <div className="text-sm font-semibold mb-2">{names[k]}</div>}
             <div className="grid sm:grid-cols-2 gap-3">
               <BigField label="Cash & investments" hint="Checking, savings, brokerage"><Money big value={b[w].liquid} step={1000} onChange={v => P(w, 'liquid', v)} /></BigField>
-              <BigField label="Retirement accounts" hint="401(k), IRA, HSA"><Money big value={b[w].pretax} step={1000} onChange={v => P(w, 'pretax', v)} /></BigField>
+              <BigField label="Retirement accounts (pre-tax)" hint="401(k), traditional IRA, HSA"><Money big value={b[w].pretax} step={1000} onChange={v => P(w, 'pretax', v)} /></BigField>
+              <BigField label="Roth accounts" hint="Roth IRA, Roth 401(k)"><Money big value={b[w].roth ?? 0} step={1000} onChange={v => P(w, 'roth', v)} /></BigField>
             </div>
             {b[w].separate_liquid !== undefined && <div className="grid sm:grid-cols-2 gap-3 mt-2">
               <BigField label="…of which separate property" hint="Kept apart: premarital money, gifts, inheritances"><Money value={b[w].separate_liquid} step={1000} onChange={v => P(w, 'separate_liquid', Math.min(v, b[w].liquid))} /></BigField>
@@ -277,7 +279,7 @@ function LinkedNote({ linked, used, names, single, onUse }: { linked: any; used:
   return (
     <div className="rounded-lg border border-accent/25 bg-accentSoft/60 px-4 py-3 text-sm space-y-1">
       <div className="font-medium">{used ? 'Filled in from your linked accounts' : 'Your linked accounts'} <span className="text-muted font-normal">· {t.accounts} account{t.accounts === 1 ? '' : 's'}, as of {fmtWhen(t.as_of)}</span></div>
-      <div className="text-ink2">{(single ? ['p1'] : ['p1', 'p2']).map((w, i) => `${names[i]}: ${money(t[w].liquid)} cash & investments, ${money(t[w].pretax)} retirement`).join(' · ')}</div>
+      <div className="text-ink2">{(single ? ['p1'] : ['p1', 'p2']).map((w, i) => `${names[i]}: ${money(t[w].liquid)} cash & investments, ${money(t[w].pretax + (t[w].roth || 0))} retirement`).join(' · ')}</div>
       {!used && <div className="flex items-center gap-2"><span className="text-muted">They may not include accounts held elsewhere.</span><Button size="sm" onClick={onUse}>Use these</Button></div>}
       {used && <div className="text-muted">Add anything held outside the linked accounts.</div>}
       {disabled.length > 0 && <div className="text-warn">{disabled.map((c: any) => c.institution).join(', ')} needs you to sign in again under Linked accounts; these are the last balances received.</div>}

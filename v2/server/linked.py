@@ -31,7 +31,7 @@ from base64 import b64encode
 from datetime import datetime, timezone
 
 API = 'https://api.snaptrade.com/api/v1'
-KINDS = ('liquid', 'retirement', 'hsa', 'ignore')
+KINDS = ('liquid', 'retirement', 'roth', 'hsa', 'ignore')
 
 
 # ─────────────────────────────── SnapTrade ───────────────────────────────
@@ -123,6 +123,8 @@ def guess_kind(*texts) -> str:
     t = ' '.join(str(x or '') for x in texts).upper()
     if 'HSA' in t or 'HEALTH SAVINGS' in t:
         return 'hsa'
+    if 'ROTH' in t:
+        return 'roth'
     if re.search(r'\b(IRA|ROTH|401\s?\(?K\)?|403\s?\(?B\)?|457|SEP|SIMPLE|RETIREMENT|ROLLOVER|TSP|PENSION|BROKERAGELINK|KEOGH)\b', t):
         return 'retirement'
     return 'liquid'
@@ -259,20 +261,20 @@ def apply_csv(state: dict, parsed: list[dict], institution: str, filename: str =
 def totals(state: dict, single: bool = False) -> dict:
     """Per-person balances in the check-in shape: {p1: {liquid, pretax, separate_liquid, separate_pretax}, p2, hsa}.
     Joint accounts are split evenly; HSA counts toward retirement accounts (the plan treats it as pre-tax)."""
-    out = {w: {'liquid': 0.0, 'pretax': 0.0, 'separate_liquid': 0.0, 'separate_pretax': 0.0, 'any_separate': False} for w in ('p1', 'p2')}
+    out = {w: {'liquid': 0.0, 'pretax': 0.0, 'roth': 0.0, 'separate_liquid': 0.0, 'separate_pretax': 0.0, 'any_separate': False} for w in ('p1', 'p2')}
     oldest = None
     n = 0
     for a in (state.get('accounts') or {}).values():
         if not a.get('include', True) or a.get('kind') == 'ignore' or a.get('missing'):
             continue
         n += 1
-        bucket = 'liquid' if a.get('kind') == 'liquid' else 'pretax'
+        bucket = 'liquid' if a.get('kind') == 'liquid' else 'roth' if a.get('kind') == 'roth' else 'pretax'
         owners = ['p1'] if single else (['p1', 'p2'] if a.get('owner') == 'joint' else [a.get('owner') if a.get('owner') in ('p1', 'p2') else 'p1'])
         share = float(a.get('balance') or 0) / len(owners)
         for w in owners:
             out[w][bucket] += share
             if a.get('separate') and a.get('owner') != 'joint':
-                out[w]['separate_' + bucket] += share
+                out[w]['separate_' + ('liquid' if bucket == 'liquid' else 'pretax')] += share
                 out[w]['any_separate'] = True
         ts = a.get('as_of')
         if ts and (oldest is None or ts < oldest):

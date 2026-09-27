@@ -104,6 +104,7 @@ function YearPanel({ r, raw, f, names, single, year, setYear, years, evs }: any)
   const income = [
     { name: `${names[0]} wages`, value: r.wages1 }, ...(single ? [] : [{ name: `${n2} wages`, value: r.wages2 }]),
     { name: 'Social Security', value: r.ss_income }, { name: 'Rental income', value: r.rent_income }, { name: 'Home sale', value: r.sale_proceeds },
+    { name: 'Required withdrawals (RMDs)', value: r.rmd || 0 }, { name: 'Gifts & inheritances', value: r.windfalls || 0 },
     { name: 'Investment growth', value: Math.max(0, r.investment_growth || 0) },
   ].filter(x => x.value > 0.5)
   const spend = [

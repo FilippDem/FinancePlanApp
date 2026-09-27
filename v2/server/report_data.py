@@ -35,6 +35,7 @@ CATEGORY_COLS = [
     ('rent', 'Rent income', lambda r: r['rent_income']),
     ('sales', 'Home sales', lambda r: r['sale_proceeds']),
     ('gifts', 'Gifts & inheritances', lambda r: r.get('windfalls', 0.0)),
+    ('rmd', 'Required withdrawals', lambda r: r.get('rmd', 0.0)),
     ('growth', 'Investment growth', lambda r: r.get('investment_growth', 0.0)),
     ('taxes', 'Taxes', lambda r: r['taxes']),
     ('p1', 'Living: %1', lambda r: r['exp_person1']),
@@ -150,13 +151,13 @@ def detail_lines(ctx: dict, today: bool = True) -> tuple[list[int], list[tuple[s
 
 def people_table(ctx: dict) -> tuple[list[str], list[list]]:
     p = ctx['plan']
-    hdr = ['', 'Age', 'Income', 'Raise %', 'Savings', 'Of which pre-tax', 'Retire at', 'SS at 67 ($/mo)', 'Claim at', 'Plan until']
+    hdr = ['', 'Age', 'Income', 'Raise %', 'Savings', 'Of which pre-tax', 'Of which Roth', 'Retire at', 'SS at 67 ($/mo)', 'Claim at', 'Plan until']
     out = []
     for who, name in (('X', p['parent1_name']), ('Y', p.get('parent2_name'))):
         if who == 'Y' and ctx['single']:
             continue
         out.append([name, p[f'parent{who}_age'], p[f'parent{who}_income'], p[f'parent{who}_raise'], p[f'parent{who}_net_worth'],
-                    p.get(f'parent{who}_pretax_balance', 0), p[f'parent{who}_retirement_age'], p[f'parent{who}_ss_benefit'],
+                    p.get(f'parent{who}_pretax_balance', 0), p.get(f'parent{who}_roth_balance', 0), p[f'parent{who}_retirement_age'], p[f'parent{who}_ss_benefit'],
                     p.get(f'parent{who}_ss_claim_age') or '', p[f'parent{who}_death_age']])
     return hdr, out
 

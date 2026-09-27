@@ -410,3 +410,30 @@ def test_checkin_keeps_separate_balances():
     t = q['ownership_tracking']['today']
     assert t['p1']['liquid'] > 200000          # carried forward from the projection
     assert t['p2']['pretax'] == 60000          # what the check-in said
+
+
+def test_rmds_roth_and_spousal_ss():
+    from finplan.engine import rmd_age, spousal_factor, ss_claim_factor
+    assert rmd_age(1959) == 73 and rmd_age(1960) == 75 and rmd_age(1950) == 72
+    assert abs(spousal_factor(62) - 0.65) < 1e-9 and spousal_factor(67) == 1 and spousal_factor(70) == 1
+    # a 75-year-old (born 1951) with $1.5M pre-tax must take 1.5M/24.6 this year, taxed as income
+    base = {'current_year': 2026, 'parentX_age': 75, 'parentY_age': 75, 'parentX_retirement_age': 65, 'parentY_retirement_age': 65,
+            'parentX_net_worth': 1800000, 'parentX_pretax_balance': 1500000, 'parentY_net_worth': 0, 'parentX_ss_benefit': 2500,
+            'parentY_ss_benefit': 800, 'parentX_ss_claim_age': 67, 'parentY_ss_claim_age': 67}
+    r = project(base)['rows']
+    assert abs(r[0]['rmd'] - 1500000 / 24.6) < 1
+    off = project({**base, 'rmd_enabled': False})['rows']
+    assert off[0]['rmd'] == 0 and r[0]['taxes'] > off[0]['taxes']
+    # spousal: person 2's own $800 < 50% of $2,500, so they get $1,250/mo (both claimed at 67)
+    assert abs(r[0]['ss2'] / r[0]['infl_index'] - 1250 * 12) < 1
+    nosp = project({**base, 'spousal_ss': False})['rows']
+    assert abs(nosp[0]['ss2'] - 800 * 12) < 1
+    # Roth: part of net worth, grows, no RMD, used after pre-tax money, never taxed
+    roth = project({**base, 'parentX_roth_balance': 200000})['rows']
+    assert roth[0]['roth'] > 200000 and abs(roth[0]['rmd'] - r[0]['rmd']) < 1
+    assert abs(roth[0]['liquid'] + roth[0]['pretax'] + roth[0]['roth'] - roth[0]['investable']) < 1e-6
+    # Roth contributions while working come out of after-tax cash
+    w = {'current_year': 2026, 'parentX_age': 40, 'parentY_age': 40, 'parentX_income': 150000, 'parentY_income': 0,
+         'parentX_net_worth': 100000, 'roth_contribution': 7000}
+    rw = project(w)['rows']
+    assert abs(rw[0]['contrib_roth'] - 7000) < 1 and rw[0]['roth'] >= 7000

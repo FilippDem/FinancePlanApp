@@ -64,6 +64,9 @@ export function buildAlerts(proj: any, mc: any, plan: any) {
   if (!s.depletion_year && last && last.net_worth > 0) out.push({ tone: 'info', title: `Plan ends with ${money(nwT(last))} remaining`, detail: `At age ${last.age1} in ${last.year} (today's dollars).` })
   if (!out.some(o => o.tone === 'bad' || o.tone === 'warn')) out.unshift({ tone: 'good', title: 'On track', detail: 'No cash-flow gaps or depletion in the base projection.' })
   const order = { bad: 0, warn: 1, good: 2, info: 3 }
+  const firstRmd = rows.find((r: any) => r.rmd > 1)
+  if (firstRmd) out.push({ tone: 'info', title: `Required withdrawals start in ${firstRmd.year}`,
+    detail: `About ${money(firstRmd.rmd / firstRmd.infl_index)} that year (today's dollars) must come out of pre-tax accounts and is taxed as income, whether you need it or not.` })
   const own = s.ownership
   if (own && own.commingled_total > 1)
     out.push({ tone: 'warn', title: `Separate money pays shared costs from ${own.first_commingled_year}`,
