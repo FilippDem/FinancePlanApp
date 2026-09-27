@@ -67,7 +67,7 @@ The app cites every major dataset (`engine/finplan/data/sources.json`). Datasets
 1. **Deploy v2 on the NAS next to v0.8.** Use a copy of the real data first, then switch the volume to `../app-data`. Set `ALLOW_DEV_LOGIN=0` behind Cloudflare. Configure SMTP (a Gmail App Password) and `APP_URL`.
 2. **CI on GitHub Actions**: engine and API pytest, `tsc`, and a Playwright smoke test (login → setup → check-in → actuals → PDF).
 3. **Off-NAS backup** of `data/` (nightly copy to a cloud drive). Version history protects against bad edits, not against disk loss.
-4. **Code-split** the pages and lazy-load Recharts. Add a PWA manifest so it installs on phones.
+4. ✅ Pages code-split (2026-09-27). Still to do: lazy-load Recharts. Add a PWA manifest so it installs on phones.
 5. Merge `v2-react` into `main` once a full quarter of check-ins has run on v2.
 
 ### Phase 2: Answer the real questions
@@ -86,7 +86,7 @@ The app cites every major dataset (`engine/finplan/data/sources.json`). Datasets
 
 ### Phase 4: Real data in, less typing
 1. **CSV import for actuals**: Monarch Money transaction export, plus generic bank CSVs with column mapping. Map merchant categories to plan categories once, then remember the mapping.
-2. ~~Balance import for check-ins~~ ✅ done: Linked accounts (CSV or SnapTrade). Next: Monarch accounts CSV format, Roth vs pre-tax split once the engine has account types.
+2. ~~Balance import for check-ins~~ ✅ done: Linked accounts (CSV or SnapTrade), including Roth vs pre-tax per account. Next: Monarch accounts CSV format.
 3. Check-in insights: explain drift ("spending was $6k over plan, mostly Travel").
 4. Household activity feed ("Erin updated Homes") and comments on scenarios.
 
