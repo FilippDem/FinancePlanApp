@@ -22,6 +22,7 @@ ECONOMIES: dict[str, dict] = {
     'crash': {'label': 'Crash at retirement', 'desc': 'Markets fall 35% in the year the first person retires'},
     'seventies': {'label': '1970s-style decade', 'desc': '8% inflation for 6 years from next year (pay catches up halfway) and returns 3 points lower for 10 years'},
     'history': {'label': 'Real market history', 'desc': 'Yearly returns drawn from actual S&P 500 years since 1928, in order'},
+    'rolling': {'label': 'Every historical start', 'desc': 'The plan run once from every start year 1924–2023 with the actual S&P 500 returns in order; the cell shows the share of start years that never ran out'},
 }
 DEFAULT_ECONOMIES = ['plan', 'weak', 'strong', 'inflation', 'crash']
 
@@ -82,6 +83,20 @@ def evaluate(plan: dict, economies: list[str] | None = None, n: int = 300, seed:
     cells = {}
     for e in econs:
         p = apply_economy(plan, e)
+        if e == 'rolling':
+            from .backtest import run as _bt
+            bt = _bt(p)
+            pr = project(p)
+            rows, s = pr['rows'], pr['summary']
+            last = rows[-1]
+            low = min(rows, key=lambda r: r['investable'] / r['infl_index'])
+            cells[e] = {'success': bt['success_rate'], 'ok': bt['success_rate'] >= target,
+                        'final_median': bt['median_final'], 'final_p10': bt['p10_final'],
+                        'depletion_year': s['depletion_year'], 'end_net_worth': last['net_worth'] / last['infl_index'],
+                        'lowest_savings': low['investable'] / low['infl_index'], 'lowest_year': low['year'],
+                        'median_path': bt['median_path'], 'years': bt['years'],
+                        'worst_starts': [w['year'] for w in bt['worst'] if not w['ok']]}
+            continue
         mc = monte_carlo(p, n, seed=seed, normalized=True)
         pr = project(p)
         rows, s = pr['rows'], pr['summary']

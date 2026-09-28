@@ -261,6 +261,11 @@ def build(plan: dict, household: str, checkins: list | None = None, sections: li
             h, d = pt['recurring']
             story += [Spacer(1, 4), _table([h] + [[r[0], r[1], _m(r[2], True), r[3], r[4], r[5], r[6]] for r in d])]
 
+    if 'goals' in sections and p.get('goals'):
+        h, d = RD.goals_table(ctx)
+        story += [CondPageBreak(1.5 * inch), Paragraph('Goals', st.H2),
+                  _table([h[:8]] + [[r[0][:26], r[1], r[2], _m(r[3]), _m(r[4]), r[5], r[6], r[7]] for r in d], right_from=2)]
+
     if 'locations' in sections:
         h, d = RD.locations_table(ctx)
         story += [CondPageBreak(1.2 * inch), Paragraph('Where you live' + cite('locations'), st.H2), _table([h] + d)]
@@ -276,6 +281,29 @@ def build(plan: dict, household: str, checkins: list | None = None, sections: li
         wh, wd = RD.windfalls_table(ctx)
         if wd:
             story += [Paragraph('Gifts & inheritances', st.H3), _table([wh] + [[r[0], r[1], _m(r[2], True), r[3], r[4]] for r in wd])]
+
+    if 'income_debts' in sections and (p.get('pensions') or p.get('debts') or p.get('college_529')):
+        ex = RD.extras_tables(ctx)
+        story += [CondPageBreak(1.5 * inch), Paragraph('Pensions, loans & 529 plans', st.H2)]
+        h, d = ex['pensions']
+        if d:
+            story += [Paragraph('Pensions & annuities', st.H3), _table([h] + [[r[0], r[1], r[2], r[3], _m(r[4], True)] + r[5:] for r in d])]
+        h, d = ex['debts']
+        if d:
+            story += [Paragraph('Loans', st.H3), _table([h] + [[r[0], r[1], _m(r[2], True), r[3], _m(r[4], True), r[5]] for r in d])]
+        h, d = ex['edu']
+        if d:
+            story += [Paragraph('529 college plans', st.H3), _table([h] + [[r[0], _m(r[1], True), _m(r[2], True), r[3], _m(r[4]), _m(r[5]), r[6]] for r in d])]
+
+    if 'tax_planning' in sections:
+        h, d = RD.tax_rows(ctx, today)
+        step = 5 if len(d) > 30 else 1
+        sel = [r for i, r in enumerate(d) if i % step == 0 or i == len(d) - 1]
+        story += [CondPageBreak(2 * inch), Paragraph('Tax planning', st.H2), _kv_table(RD.tax_summary(ctx), st, cols=3), Spacer(1, 4),
+                  _table([h] + [[r[0]] + [_m(v) for v in r[1:]] for r in sel]),
+                  Paragraph('Gains tax includes the 3.8% net investment income tax and state tax on gains. Medicare surcharges use '
+                            'income from two years earlier (CMS 2026 IRMAA table). ACA credits use the 2026 IRS applicable percentages; '
+                            'no credit above 400% of the poverty level.' + (' Every 5th year shown.' if step > 1 else ''), st.Mu)]
 
     if 'assumptions' in sections:
         story += [CondPageBreak(1.2 * inch), Paragraph('Key assumptions' + cite('assumptions'), st.H2), _kv_table(RD.assumptions_rows(ctx), st, cols=3)]
@@ -305,8 +333,8 @@ def build(plan: dict, household: str, checkins: list | None = None, sections: li
         hdr, data = RD.category_table(ctx, today)
         keys = [k for k, _, _ in RD.CATEGORY_COLS if not (single and k == 'p2')]
         pick = lambda wanted: [keys.index(k) for k in wanted if k in keys]
-        a_cols = pick(['year', 'ages', 'wages', 'ss', 'rent', 'sales', 'growth', 'taxes', 'spend', 'cashflow', 'savings', 'equity', 'nw'])
-        b_cols = pick(['year', 'ages', 'p1', 'p2', 'family', 'children', 'housing', 'healthcare', 'recurring', 'onetime', 'down', 'spend'])
+        a_cols = pick(['year', 'ages', 'wages', 'ss', 'pension', 'rent', 'sales', 'growth', 'taxes', 'spend', 'cashflow', 'savings', 'equity', 'nw'])
+        b_cols = pick(['year', 'ages', 'p1', 'p2', 'family', 'children', 'housing', 'healthcare', 'recurring', 'onetime', 'debt', 'down', 'spend'])
         fmt = lambda r, cols: [r[i] if keys[i] in ('year', 'ages') else _m(r[i]) for i in cols]
         neg = lambda cols: [(c, i + 1) for i, r in enumerate(data) for c, ci in enumerate(cols)
                             if isinstance(r[ci], (int, float)) and keys[ci] in ('cashflow', 'savings', 'nw') and r[ci] < 0]
@@ -389,6 +417,8 @@ def build_json(plan: dict, today: bool = True, ctx: dict | None = None, checkins
                         'percentiles_by_year': [dict(zip(mh, r)) for r in md]},
         'events': ctx['proj']['events'], 'checkins': checkins or [],
         'scenario_matrix': ctx.get('matrix'),
+        'goals': (RD.goals_table(ctx)[1] if ctx['plan'].get('goals') else []),
+        'tax_planning': dict(RD.tax_summary(ctx)),
         'ownership': ({'rules': dict(RD.ownership_rules(ctx)), 'by_year': [dict(zip(RD.ownership_table(ctx, today)[0], r)) for r in RD.ownership_table(ctx, today)[1]]}
                       if RD.ownership_enabled(ctx) else None),
         'sources': [{'n': k, 'id': i, **d} for k, (i, d) in enumerate(RD.sources_for(ctx, list(RD.SECTIONS)), 1)],
@@ -479,6 +509,15 @@ def build_xlsx(plan: dict, household: str, today: bool = True, ctx: dict | None 
         sheet('Ownership rules', ['Rule', 'Value'], RD.ownership_rules(ctx), widths={1: 40, 2: 40})
     if 'ownership' in sections and ctx['plan'].get('windfalls'):
         sheet('Gifts & inheritances', *RD.windfalls_table(ctx))
+    if 'goals' in sections and ctx['plan'].get('goals'):
+        sheet('Goals', *RD.goals_table(ctx))
+    if 'income_debts' in sections:
+        ex = RD.extras_tables(ctx)
+        for key, title in (('pensions', 'Pensions'), ('debts', 'Loans'), ('edu', '529 plans')):
+            if ex[key][1]:
+                sheet(title, *ex[key])
+    if 'tax_planning' in sections:
+        sheet('Tax planning', *RD.tax_rows(ctx, today))
     if 'assumptions' in sections:
         sheet('Assumptions', ['Assumption', 'Value'], RD.assumptions_rows(ctx), widths={1: 30, 2: 30})
     if 'monte_carlo' in sections:

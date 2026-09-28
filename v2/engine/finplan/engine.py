@@ -189,7 +189,8 @@ def build_schedule(p: dict) -> Schedule:
         'mortgage_pi', 'rent_income', 'rent_taxable', 'sale_proceeds', 'sale_p1', 'sale_p2', 'sale_shared',
         'down_payment', 'dp_p1', 'dp_p2', 'dp_shared', 'home_value', 'mortgage_balance', 'home_equity',
         'equity_p1', 'equity_p2', 'equity_shared', 'other_assets', 'consumer_debt', 'infl_index', 'hc_index',
-        'hc_p1', 'hc_p2', 'hc_shared', 'married', 'windfall', 'hsa_c1', 'hsa_c2', 'roth_c1', 'roth_c2', 'roth_contrib')}
+        'hc_p1', 'hc_p2', 'hc_shared', 'married', 'windfall', 'hsa_c1', 'hsa_c2', 'roth_c1', 'roth_c2', 'roth_contrib',
+        'pension1', 'pension2', 'pension_taxable', 'debt_pay', 'debt_balance', 'aca_bench', 'hh_size', 'medicare_n')}
     details = [dict() for _ in range(T)]
     events = []
 
@@ -463,6 +464,18 @@ def build_schedule(p: dict) -> Schedule:
             elif who not in ('Parent 1', 'Parent 2') and (in1 or in2):
                 _hc('shared', nm, amt, 'out_of_pocket')
         det['healthcare'] = hc_items
+        # ACA marketplace plans: the entered premium is the full (benchmark) price; the credit comes in simulate()
+        for ins in p['health_insurances']:
+            if not ins.get('marketplace'):
+                continue
+            cb = ins['covered_by']
+            in1 = alive1 and ins['start_age'] <= age1 <= ins['end_age']
+            in2 = alive2 and ins['start_age'] <= age2 <= ins['end_age']
+            if (cb == 'Parent 1' and in1) or (cb == 'Parent 2' and in2) or (cb in ('Both', 'Family') and (in1 or in2)):
+                C['aca_bench'][t] += ins['monthly_premium'] * 12 * hi
+        kids_home = sum(1 for ch in p['children_list'] if 0 <= y - ch['birth_year'] < 22)
+        C['hh_size'][t] = int(alive1) + int(alive2) + kids_home
+        C['medicare_n'][t] = int(alive1 and age1 >= 65) + int(alive2 and age2 >= 65)
         C['hc_p1'][t], C['hc_p2'][t], C['hc_shared'][t] = hc['p1'], hc['p2'], hc['shared']
         C['healthcare_exp'][t] = sum(hc.values())
 
@@ -546,6 +559,10 @@ def build_schedule(p: dict) -> Schedule:
                                                            'recipient': w.get('recipient', 'Parent 1'), 'separate': bool(w.get('separate', True))})
             events.append({'year': y_w, 'type': 'windfall', 'label': w.get('name') or 'Gift / inheritance', 'amount': amt})
 
+    # pensions & annuities, debts, 529 plans (see extras.py)
+    from . import extras
+    edu = extras.schedule_extras(p, years, C, details, events, ii_arr)
+
     # separate vs marital property ("who owns what"): an accounting layer, totals unchanged
     own = None
     if not single and (p.get('ownership_tracking') or {}).get('enabled'):
@@ -588,7 +605,7 @@ def build_schedule(p: dict) -> Schedule:
     events.sort(key=lambda e: e['year'])
     return Schedule(years=years, T=T, cols=C, details=details, events=events,
                     meta={'location': loc, 'single': single, 'claim1': claim1, 'claim2': claim2,
-                          'names': (n1, n2), 'end1': end1, 'end2': end2, 'ownership': own})
+                          'names': (n1, n2), 'end1': end1, 'end2': end2, 'ownership': own, 'edu': edu})
 
 
 # ─────────────────────────────── simulation ──────────────────────────────
@@ -610,7 +627,12 @@ def _returns(p: dict, T: int, n: int, stochastic: bool, rng: np.random.Generator
     if p['mc_use_historical']:
         H = _hist()
         alloc = p.get('mc_stock_allocation', 100.0) / 100
-        if p.get('mc_historical_mode') == 'sequential':
+        if p.get('_backtest_starts') is not None:
+            # rolling backtest: path j starts in historical year j and runs in order (wrapping)
+            start = np.array(p['_backtest_starts'], dtype=int)[:n]
+            idx = (start[None, :] + np.arange(T)[:, None]) % len(H)
+            stock = H[idx]
+        elif p.get('mc_historical_mode') == 'sequential':
             start = rng.integers(0, len(H), size=n)
             idx = (start[None, :] + np.arange(T)[:, None]) % len(H)
             stock = H[idx]
@@ -639,11 +661,28 @@ def _mult(p: dict, kind: str, T: int, n: int, stochastic: bool, rng):
     return 1 + rng.uniform(-v, v, size=(T, n))
 
 
+def _bracket_top(rate: float, status: str, index: float) -> float:
+    """Top of the ordinary bracket with this rate (taxable income), indexed."""
+    from .taxes import MFJ, SINGLE
+    for lim, r in (MFJ if status == 'married' else SINGLE):
+        if abs(r - rate) < 1e-6:
+            return lim * index
+    return 0.0
+
+
 def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int | None = None,
-             normalized: bool = False, _p: dict | None = None, _sched: Schedule | None = None) -> dict:
+             normalized: bool = False, _p: dict | None = None, _sched: Schedule | None = None,
+             _expected: np.ndarray | None = None) -> dict:
+    from .taxes import capital_gains_tax, irmaa_monthly, aca_credit, IRMAA_BASE_YEAR, ACA_BASE_YEAR, STD_DED, location_tax_info
     p = _p or normalize_plan(plan)
     S = _sched or build_schedule(p)
     C, T, n = S.cols, S.T, n_paths
+    # guardrails compare each path with the expected (deterministic) path
+    gr = p.get('guardrails') or {}
+    use_gr = bool(gr.get('enabled')) and stochastic
+    if use_gr and _expected is None:
+        det = simulate(p, 1, False, _p=p, _sched=S)
+        _expected = det['paths']['investable'][:, 0]
     rng = np.random.default_rng(seed)
     R = _returns(p, T, n, stochastic, rng)
     for sx in p.get('_stress') or []:
@@ -672,6 +711,13 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
     status_default = 'single' if (S.meta['single'] or p.get('tax_filing_status') == 'single') else 'married'
     override = p.get('state_tax_rate')
     override = override if (override not in (None, 0, 0.0)) else None
+    cg_on = p.get('capital_gains_enabled', True)
+    irmaa_on = p.get('irmaa_enabled', True)
+    aca_on = p.get('aca_enabled', True)
+    rc = p.get('roth_conversion') or {}
+    conv_mode = rc.get('mode', 'off')
+    conv_start = rc.get('start_age') if rc.get('start_age') is not None else int(p['parentX_retirement_age'])
+    conv_end = rc.get('end_age') if rc.get('end_age') is not None else rmd_age(p['current_year'] - int(p['parentX_age'])) - 1
 
     pre1 = min(p.get('parentX_pretax_balance', 0.0), max(p['parentX_net_worth'], 0))
     pre2 = min(p.get('parentY_pretax_balance', 0.0), max(p['parentY_net_worth'], 0))
@@ -679,10 +725,17 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
     ro2 = min(p.get('parentY_roth_balance', 0.0), max(p['parentY_net_worth'] - pre2, 0))
     L1 = np.full(n, p['parentX_net_worth'] - pre1 - ro1)
     L2 = np.full(n, p['parentY_net_worth'] - pre2 - ro2)
+    # cost basis of cash/taxable savings (the rest is unrealized gain, taxed when sold)
+    bp = p.get('taxable_basis_pct', 80.0) / 100
+    B1, B2 = np.maximum(L1, 0) * bp, np.maximum(L2, 0) * bp
     # pre-tax accounts per person (RMDs follow each owner's age) + HSA; Roth (tax-free, no lifetime RMDs)
     P1, P2, H = np.full(n, pre1), np.full(n, pre2), np.full(n, p.get('hsa_balance', 0.0))
     Ro = np.full(n, ro1 + ro2)
     P = P1 + P2 + H
+    # 529 plans
+    edu = S.meta.get('edu') or []
+    E = [np.full(n, e['balance']) for e in edu]
+    EB = [np.full(n, e['balance']) for e in edu]        # contributed basis (for leftover tax)
     cy_ = p['current_year']
     rmd_on = p.get('rmd_enabled', True)
     rmd_age1 = rmd_age(cy_ - int(p['parentX_age']))
@@ -692,15 +745,26 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
 
     out = {k: np.zeros((T, n)) for k in ('liquid', 'pretax', 'net_worth', 'investable', 'taxes', 'cashflow',
                                           'wages', 'expenses', 'withdrawal', 'returns', 'liquid1', 'liquid2', 'growth',
-                                          'roth', 'rmd', 'roth_withdrawal')}
+                                          'roth', 'rmd', 'roth_withdrawal', 'roth_conversion', 'cap_gains', 'tax_cap_gains',
+                                          'irmaa', 'aca_credit', 'magi', 'taxable_ordinary', 'edu529', 'paid_529',
+                                          'contrib_529', 'guardrail', 'fpl_ratio')}
+    for k in range(len(edu)):
+        out[f'edu_bal_{k}'] = np.zeros((T, n))
+        out[f'edu_paid_{k}'] = np.zeros((T, n))
     tax_parts = {k: np.zeros((T, n)) for k in ('federal', 'state', 'fica', 'foreign')}
+    M = np.zeros((T, n))          # MAGI by year (IRMAA looks back two years)
+    gm = np.ones(n)               # guardrail spending multiplier
 
     for t in range(T):
         y = S.years[t]
         status = 'married' if (C['married'][t] and status_default == 'married') else 'single'
+        idx = (1 + infl) ** max(0, y - TAX_BASE_YEAR)
+        loc = S.meta['location'][t]
+        foreign = location_tax_info(loc)[0] == 'country' and (location_tax_info(loc)[1] or {}).get('type') != 'federal_state'
         w1 = C['wages1'][t] * IM[t]
         w2 = C['wages2'][t] * IM[t]
         ss = C['ss1'][t] + C['ss2'][t]
+        pen = C['pension1'][t] + C['pension2'][t]
         contrib = np.minimum(C['contrib'][t] * np.ones(n), w1 + w2)
         roth_c = np.minimum(C['roth_contrib'][t] * np.ones(n), np.maximum(w1 + w2 - contrib, 0))
         # a deceased spouse's pre-tax accounts roll over to the survivor
@@ -720,38 +784,109 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
         if OV is not None and np.any(rmd > 0):
             OV.rmd(rmd, P1 + P2 + H + Ro)
         P1, P2 = P1 - rmd1, P2 - rmd2
-        disc = (C['p1_exp'][t] + C['p2_exp'][t] + C['family_exp'][t] + C['children_exp'][t]
-                + C['recurring_exp'][t] + C['healthcare_exp'][t]) * EM[t]
-        fixed = C['house_exp'][t] + C['purchase_exp'][t] + C['down_payment'][t]
+
+        # guardrails: cut or raise flexible spending when this path is well below/above the expected path
+        if use_gr and t >= 1 and _expected is not None:
+            retired = not (C['work1'][t] or C['work2'][t])
+            if retired or not gr.get('retired_only', True):
+                expv = _expected[t - 1]
+                if expv > 0:
+                    ratio = out['investable'][t - 1] * (C['infl_index'][t - 1] if normalized else 1.0) / expv
+                    gm = np.where(ratio < 1 - gr['lower'] / 100, 1 - gr['cut'] / 100,
+                                  np.where(ratio > 1 + gr['upper'] / 100, 1 + gr['raise'] / 100, 1.0))
+                else:
+                    gm = np.ones(n)
+            else:
+                gm = np.ones(n)
+        flex = (C['p1_exp'][t] + C['p2_exp'][t] + C['family_exp'][t] + C['recurring_exp'][t]) * EM[t] * gm
+        disc = flex + (C['children_exp'][t] + C['healthcare_exp'][t]) * EM[t]
+        fixed = C['house_exp'][t] + C['purchase_exp'][t] + C['down_payment'][t] + C['debt_pay'][t]
+        # 529s: contributions (out of cash flow) and college costs paid from the account
+        c529 = np.zeros(n)
+        paid529 = np.zeros(n)
+        for k, e in enumerate(edu):
+            if e['contrib'][t]:
+                E[k] = E[k] + e['contrib'][t]
+                EB[k] = EB[k] + e['contrib'][t]
+                c529 = c529 + e['contrib'][t]
+            if e['cost'][t] > 0:
+                pay = np.minimum(np.maximum(E[k], 0), e['cost'][t] * EM[t])
+                frac = np.where(E[k] > 0, pay / np.maximum(E[k], 1e-9), 0)
+                EB[k] = EB[k] * (1 - frac)
+                E[k] = E[k] - pay
+                paid529 = paid529 + pay
+                out[f'edu_paid_{k}'][t] = pay
         expenses = disc + fixed
-        loc = S.meta['location'][t]
-        tx = total_taxes(w1, w2, ss, C['rent_taxable'][t] + rmd, contrib, y, infl, loc, status, override)
+        other_ord = C['rent_taxable'][t] + rmd + C['pension_taxable'][t]
+        tx = total_taxes(w1, w2, ss, other_ord, contrib, y, infl, loc, status, override)
+        # Roth conversions (US only): a fixed amount or filling a tax bracket, inside the age window
+        conv = np.zeros(n)
+        a1n = int(C['age1'][t])
+        if conv_mode != 'off' and not foreign and C['alive1'][t] and conv_start <= a1n <= conv_end:
+            avail = np.maximum(P1 + P2, 0)
+            if conv_mode == 'fixed':
+                conv = np.minimum(rc.get('amount', 0.0) * C['infl_index'][t], avail)
+            else:
+                top = _bracket_top(float(rc.get('bracket', 0.12)), status, idx)
+                # taxable = AGI - standard deduction, so unused deduction is room too
+                conv = np.minimum(np.maximum(top + STD_DED[status] * idx - tx['agi'], 0), avail)
+            if np.any(conv > 0):
+                tx1 = total_taxes(w1, w2, ss, other_ord + conv, contrib, y, infl, loc, status, override)
+                if conv_mode == 'fill_bracket':
+                    over = np.maximum(tx1['taxable'] - _bracket_top(float(rc.get('bracket', 0.12)), status, idx), 0)
+                    conv = np.maximum(conv - over, 0)
+                    tx1 = total_taxes(w1, w2, ss, other_ord + conv, contrib, y, infl, loc, status, override)
+                fc = np.where(avail > 0, conv / np.maximum(avail, 1e-9), 0)
+                P1, P2 = P1 * (1 - fc), P2 * (1 - fc)
+                Ro = Ro + conv
+                tx = tx1
         taxes = tx['total']
-        inflow = w1 + w2 + ss + C['rent_income'][t] + C['sale_proceeds'][t] + C['windfall'][t] + rmd
-        net = inflow - taxes - contrib - roth_c - expenses
+        # Medicare IRMAA: extra premiums from MAGI two years earlier (this year's estimate for the first two years)
+        irm = np.zeros(n)
+        if irmaa_on and not foreign and C['medicare_n'][t] > 0:
+            ref_magi = M[t - 2] if t >= 2 else tx['agi']
+            irm = irmaa_monthly(ref_magi, status, (1 + infl) ** max(0, y - IRMAA_BASE_YEAR)) * 12 * C['medicare_n'][t] * C['hc_index'][t]
+            expenses = expenses + irm
+        inflow = w1 + w2 + ss + pen + C['rent_income'][t] + C['sale_proceeds'][t] + C['windfall'][t] + rmd + paid529
+        net = inflow - taxes - contrib - roth_c - expenses - c529
         inc_share = np.where((w1 + w2 + ss) > 0, (w1 + C['ss1'][t]) / np.maximum(w1 + w2 + ss, 1), 0.5)
         if OV is not None:
             OV.step(t, R[t], debt_rate, C, EM, w1, w2, taxes, expenses, inc_share)
 
         r = R[t]
+        realized = np.zeros(n)
         if separate:
             shared = (C['family_exp'][t] + C['children_exp'][t] + C['recurring_exp'][t]) * EM[t] + \
-                C['purchase_exp'][t] + C['hc_shared'][t] * EM[t]
+                C['purchase_exp'][t] + C['hc_shared'][t] * EM[t] + C['debt_pay'][t] + irm - paid529 + c529
             e1 = C['p1_exp'][t] * EM[t] + C['hc_p1'][t] * EM[t] + shared * split + C['house_exp_p1'][t] + \
                 C['house_exp_shared'][t] * split + C['dp_p1'][t] + C['dp_shared'][t] * split
-            e2 = expenses - e1
-            in1 = w1 + C['ss1'][t] + (C['sale_p1'][t] + C['sale_shared'][t] * split) + C['rent_income'][t] * split + C['windfall'][t] * split + rmd1
-            in2 = inflow - in1
+            e2 = expenses + c529 - paid529 - e1
+            in1 = w1 + C['ss1'][t] + C['pension1'][t] + (C['sale_p1'][t] + C['sale_shared'][t] * split) + C['rent_income'][t] * split + C['windfall'][t] * split + rmd1
+            in2 = inflow - paid529 - in1
             net1 = in1 - taxes * inc_share - C['contrib1'][t] - C['roth_c1'][t] - e1
             net2 = in2 - taxes * (1 - inc_share) - C['contrib2'][t] - C['roth_c2'][t] - e2
-            gain = np.where(L1 >= 0, L1 * r, L1 * debt_rate) + np.where(L2 >= 0, L2 * r, L2 * debt_rate)
-            L1 = L1 + np.where(L1 >= 0, L1 * r, L1 * debt_rate) + net1
-            L2 = L2 + np.where(L2 >= 0, L2 * r, L2 * debt_rate) + net2
+            g1 = np.where(L1 >= 0, L1 * r, L1 * debt_rate)
+            g2 = np.where(L2 >= 0, L2 * r, L2 * debt_rate)
+            gain = g1 + g2
+            L1, B1, rz1 = _move_taxable(L1 + g1, B1, net1, L1)
+            L2, B2, rz2 = _move_taxable(L2 + g2, B2, net2, L2)
+            realized = rz1 + rz2
         else:
             L = L1 + L2
+            B = B1 + B2
             gain = np.where(L >= 0, L * r, L * debt_rate)
-            L = L + gain + net
-            L1, L2 = L, np.zeros(n)
+            L, B, realized = _move_taxable(L + gain, B, net, L)
+            L1, L2, B1, B2 = L, np.zeros(n), B, np.zeros(n)
+        cgt = np.zeros(n)
+        if cg_on and np.any(realized > 0):
+            cgt = capital_gains_tax(realized, tx['taxable'], tx['agi'] + realized, status, idx, loc, override)
+            if separate:
+                tot_rz = np.maximum(realized, 1e-9)
+                L1 = L1 - cgt * np.where(realized > 0, np.maximum(rz1, 0) / tot_rz, 0.5)
+                L2 = L2 - cgt * np.where(realized > 0, np.maximum(rz2, 0) / tot_rz, 0.5)
+            else:
+                L1 = L1 - cgt
+            taxes = taxes + cgt
 
         gain = gain + (P1 + P2 + H + Ro) * r
         hsa_c = np.minimum((C['hsa_c1'][t] + C['hsa_c2'][t]) * np.ones(n), contrib)
@@ -760,19 +895,20 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
         P2 = P2 * (1 + r) + (C['contrib2'][t] - C['hsa_c2'][t]) * k401
         H = H * (1 + r) + hsa_c
         Ro = Ro * (1 + r) + roth_c
+        for k in range(len(E)):
+            E[k] = E[k] * (1 + r)
         P = P1 + P2 + H
         # cover a liquid shortfall from pre-tax accounts (grossed up for tax), then Roth (tax-free)
         Lsum = L1 + L2
         need = np.maximum(-Lsum, 0)
         W = np.zeros(n)
         if np.any((need > 0) & (P > 0)):
-            m = marginal_rate(np.maximum(w1 + w2 - contrib, 0) + C['rent_taxable'][t] + rmd + ss * 0.85, status,
-                              (1 + infl) ** max(0, y - TAX_BASE_YEAR))
+            m = marginal_rate(np.maximum(w1 + w2 - contrib, 0) + other_ord + conv + ss * 0.85, status, idx)
             state_guess = 0.05
             gross = need / np.maximum(1 - m - state_guess, 0.4)
             W = np.minimum(gross, np.maximum(P, 0))
-            tx2 = total_taxes(w1, w2, ss, C['rent_taxable'][t] + rmd + W, contrib, y, infl, loc, status, override)
-            extra_tax = tx2['total'] - taxes
+            tx2 = total_taxes(w1, w2, ss, other_ord + conv + W, contrib, y, infl, loc, status, override)
+            extra_tax = tx2['total'] - tx['total']
             # take it proportionally from each pre-tax account
             fw = np.where(P > 0, W / np.maximum(P, 1e-9), 0)
             P1, P2, H = P1 * (1 - fw), P2 * (1 - fw), H * (1 - fw)
@@ -785,8 +921,8 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
                 L2 = L2 + add * (1 - frac1)
             else:
                 L1 = L1 + add
-            taxes = tx2['total']
-            tx = tx2
+            taxes = taxes + extra_tax
+            tx = {**tx2, 'total': tx2['total']}
             if OV is not None:
                 OV.withdraw(t, W, add)
         # still short: Roth money, no tax
@@ -803,7 +939,33 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
                 L1 = L1 + Rw
             if OV is not None:
                 OV.withdraw(t, Rw, Rw)
+        # modified AGI this year (ordinary AGI incl. conversions and withdrawals, plus realized gains)
+        M[t] = tx['agi'] + realized
+        # ACA premium tax credit (US, marketplace plans), reconciled on this year's MAGI
+        aca = np.zeros(n)
+        fplr = np.zeros(n)
+        if aca_on and not foreign and C['aca_bench'][t] > 0:
+            aca, fplr = aca_credit(M[t], int(C['hh_size'][t]) or 1, C['aca_bench'][t] * EM[t], (1 + infl) ** max(0, y - ACA_BASE_YEAR))
+            L1 = L1 + aca
+            B1 = B1 + aca
+        # 529s close the year the child turns 22: leftover goes to a younger sibling's 529 or back to savings
+        for k, e in enumerate(edu):
+            if e['close_t'] == t and np.any(E[k] != 0):
+                if e.get('next') is not None:
+                    E[e['next']] = E[e['next']] + E[k]
+                    EB[e['next']] = EB[e['next']] + EB[k]
+                else:
+                    gains_ = np.maximum(E[k] - EB[k], 0)
+                    back = E[k] - gains_ * 0.32           # income tax (~22%) + 10% penalty on the earnings
+                    L1 = L1 + back
+                    B1 = B1 + back
+                E[k] = np.zeros(n)
+                EB[k] = np.zeros(n)
+        edu_tot = sum(E) if E else np.zeros(n)
         fac = C['infl_index'][t] if normalized else 1.0
+        for k in range(len(E)):
+            out[f'edu_bal_{k}'][t] = E[k] / fac
+            out[f'edu_paid_{k}'][t] = out[f'edu_paid_{k}'][t] / fac
         if OV is not None:
             OV.record(t, L1 + L2, P + Ro, fac)
         home = C['home_equity'][t] + C['other_assets'][t] - C['consumer_debt'][t]
@@ -812,12 +974,24 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
         out['liquid2'][t] = L2 / fac
         out['pretax'][t] = P / fac
         out['investable'][t] = (L1 + L2 + P + Ro) / fac
-        out['net_worth'][t] = (L1 + L2 + P + Ro + home) / fac
+        out['net_worth'][t] = (L1 + L2 + P + Ro + home + edu_tot) / fac
         out['roth'][t] = Ro / fac
         out['rmd'][t] = rmd / fac
         out['roth_withdrawal'][t] = Rw / fac
+        out['roth_conversion'][t] = conv / fac
+        out['cap_gains'][t] = realized / fac
+        out['tax_cap_gains'][t] = cgt / fac
+        out['irmaa'][t] = irm / fac
+        out['aca_credit'][t] = aca / fac
+        out['fpl_ratio'][t] = fplr
+        out['magi'][t] = M[t] / fac
+        out['taxable_ordinary'][t] = tx['taxable'] / fac
+        out['edu529'][t] = edu_tot / fac
+        out['paid_529'][t] = paid529 / fac
+        out['contrib_529'][t] = c529 / fac
+        out['guardrail'][t] = gm
         out['taxes'][t] = taxes / fac
-        out['cashflow'][t] = net / fac
+        out['cashflow'][t] = (net + aca) / fac
         out['wages'][t] = (w1 + w2) / fac
         out['expenses'][t] = expenses / fac
         out['withdrawal'][t] = W / fac
@@ -825,10 +999,25 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
         out['growth'][t] = gain / fac
         for k in tax_parts:
             tax_parts[k][t] = tx[k] / fac
+        tax_parts['federal'][t] += cgt / fac   # capital-gains tax reported with federal (incl. NIIT and state share)
     out.update({f'tax_{k}': v for k, v in tax_parts.items()})
     if OV is not None:
         out.update(OV.out)
     return {'p': p, 'schedule': S, 'paths': out}
+
+
+def _move_taxable(L, B, net, L0=None):
+    """Apply a year's net cash flow to a taxable account with cost basis B.
+    Selling (net < 0) realizes the gain share of what is sold (share as of the start of the year, since
+    spending happens through the year); saving (net > 0) adds to the basis."""
+    L0 = L if L0 is None else L0
+    sell = np.where((net < 0) & (L > 0), np.minimum(-net, L), 0.0)
+    fb = np.where(L0 > 0, np.clip(B / np.maximum(L0, 1e-9), 0, 1), 1.0)
+    realized = sell * (1 - fb)
+    B = B - sell * fb + np.maximum(net, 0)
+    L = L + net
+    B = np.where(L <= 0, 0.0, np.minimum(B, np.maximum(L, 0)))
+    return L, B, realized
 
 
 # ─────────────────────────────── public API ──────────────────────────────
@@ -888,12 +1077,31 @@ def project(plan: dict) -> dict:
                                    if (C['wages1'][t] + C['wages2'][t] + C['ss1'][t] + C['ss2'][t] + C['rent_income'][t]) > 0 else 0.0),
             'col_factor': float(C['col_factor'][t]),
             'location': S.meta['location'][t], 'infl_index': float(C['infl_index'][t]),
-            'details': S.details[t],
+            'pension_income': float(C['pension1'][t] + C['pension2'][t]),
+            'pension1': float(C['pension1'][t]), 'pension2': float(C['pension2'][t]),
+            'debt_payment': float(C['debt_pay'][t]), 'debt_balance': float(C['debt_balance'][t]),
+            'roth_conversion': g('roth_conversion'), 'cap_gains_realized': g('cap_gains'), 'tax_cap_gains': g('tax_cap_gains'),
+            'irmaa': g('irmaa'), 'aca_credit': g('aca_credit'), 'magi': g('magi'), 'fpl_ratio': g('fpl_ratio'),
+            'taxable_ordinary': g('taxable_ordinary'), 'edu_529': g('edu529'), 'paid_529': g('paid_529'),
+            'contrib_529': g('contrib_529'), 'medicare_people': int(C['medicare_n'][t]),
+            'aca_benchmark': float(C['aca_bench'][t]),
+            'details': {**S.details[t], 'edu529': [{'child': e['child'], 'balance': float(P[f'edu_bal_{k}'][t, 0]),
+                                                    'paid': float(P[f'edu_paid_{k}'][t, 0]), 'contrib': float(e['contrib'][t])}
+                                                   for k, e in enumerate(S.meta.get('edu') or [])]},
         })
+        rows[-1]['total_income'] += rows[-1]['pension_income']
         if S.meta.get('ownership'):
             rows[-1]['ownership'] = ownership.rows(S.meta['ownership'], P, C, S, t, 1.0)
     depleted = next((r['year'] for r in rows if r['investable'] < 0), None)
     summary = _summary(p, S, rows, depleted)
+    summary['lifetime_taxes'] = sum(r['taxes'] / r['infl_index'] for r in rows)
+    summary['lifetime_irmaa'] = sum(r['irmaa'] / r['infl_index'] for r in rows)
+    summary['lifetime_aca_credit'] = sum(r['aca_credit'] / r['infl_index'] for r in rows)
+    summary['lifetime_conversions'] = sum(r['roth_conversion'] / r['infl_index'] for r in rows)
+    summary['lifetime_cap_gains_tax'] = sum(r['tax_cap_gains'] / r['infl_index'] for r in rows)
+    summary['irmaa_years'] = [r['year'] for r in rows if r['irmaa'] > 1]
+    summary['aca_cliff_years'] = [r['year'] for r in rows if r['aca_benchmark'] > 0 and r['fpl_ratio'] > 4.0]
+    summary['debt_free_year'] = next((r['year'] for r in rows if r['debt_balance'] <= 1), None) if p.get('debts') else None
     if S.meta.get('ownership'):
         o = S.meta['ownership']
         comm = [(r['year'], r['ownership']['commingled']) for r in rows if r['ownership']['commingled'] > 1]
@@ -901,7 +1109,11 @@ def project(plan: dict) -> dict:
                                                   'marriage_year', 'state', 'shortfall')}
         summary['ownership'].update(commingled_total=sum(v for _, v in comm), commingled_years=[y for y, _ in comm],
                                     first_commingled_year=comm[0][0] if comm else None)
-    return {'rows': rows, 'events': S.events, 'summary': summary, 'plan': p}
+    res = {'rows': rows, 'events': S.events, 'summary': summary, 'plan': p}
+    if p.get('goals'):
+        from .goals import evaluate as _goals
+        res['goals'] = _goals(p, res)
+    return res
 
 
 def _summary(p, S, rows, depleted):
@@ -968,7 +1180,27 @@ def monte_carlo(plan: dict, n: int | None = None, seed: int | None = 42, normali
         'median_path': {k: X[k][:, mid].round(0).tolist() for k in ('net_worth', 'investable', 'taxes', 'expenses', 'wages', 'cashflow')},
         'avg_return': float(X['returns'].mean()), 'return_std': float(X['returns'].std()),
         'events': S.events,
+        **_mc_extras(p, S, X, norm, ever),
     }
+
+
+def _mc_extras(p, S, X, norm, ever) -> dict:
+    out = {}
+    if p.get('goals'):
+        from .goals import mc_probs
+        # a light deterministic pass gives the rows goals need (targets depend on planned spending)
+        rows = project(p)['rows']
+        out['goal_probs'] = mc_probs(p, rows, X, S.cols['infl_index'], norm)
+    gr = p.get('guardrails') or {}
+    if gr.get('enabled'):
+        G = X['guardrail']
+        retired = ~((S.cols['work1'] + S.cols['work2']) > 0)
+        Gr = G[retired] if retired.any() else G
+        out['guardrails'] = {'share_years_cut': float((Gr < 1).mean()), 'share_years_raised': float((Gr > 1).mean()),
+                             'prob_any_cut': float((G < 1).any(axis=0).mean()),
+                             'cut_by_year': (G < 1).mean(axis=1).round(4).tolist(),
+                             'raise_by_year': (G > 1).mean(axis=1).round(4).tolist()}
+    return out
 
 
 def historical_stats() -> dict:

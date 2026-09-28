@@ -530,3 +530,143 @@ def test_scenario_matrix_economies_and_variants():
     assert [k['name'] for k in fewer['children_list']] == [k['name'] for k in plan['children_list']]
     more_kids = M.evaluate(v, ['plan'], n=200)['cells']['plan']['final_median']
     assert more_kids != c['plan']['final_median']
+
+
+def _rich(**kw):
+    from finplan import reference as R
+    p = R.default_plan()
+    p.update({'parentX_career_phases': [], 'parentY_career_phases': [], 'parent1_name': 'A', 'parent2_name': 'B', 'parentX_age': 55, 'parentY_age': 53, 'parentX_retirement_age': 60,
+              'parentY_retirement_age': 60, 'parentX_income': 150000, 'parentY_income': 90000, 'parentX_net_worth': 900000,
+              'parentY_net_worth': 600000, 'parentX_pretax_balance': 500000, 'parentY_pretax_balance': 300000,
+              'state_timeline': [{'year': p['current_year'], 'state': 'Texas', 'spending_strategy': 'Average'}]})
+    p.update(kw)
+    return p
+
+
+def test_capital_gains_tax_on_selling_taxable_savings():
+    from finplan.engine import project
+    import copy
+    p = _rich()
+    on = project(p)
+    q = copy.deepcopy(p); q['capital_gains_enabled'] = False
+    off = project(q)
+    assert on['summary']['lifetime_cap_gains_tax'] > 0 and off['summary']['lifetime_cap_gains_tax'] == 0
+    assert on['rows'][-1]['net_worth'] < off['rows'][-1]['net_worth']
+    # full basis = no gain to tax
+    z = copy.deepcopy(p); z['taxable_basis_pct'] = 100; z['parentX_income'] = 0; z['parentY_income'] = 0
+    r = project(z)
+    assert r['rows'][0]['cap_gains_realized'] == 0
+    # 0% bracket: small gains on top of low income are untaxed federally (Texas has no income tax)
+    import numpy as np
+    from finplan.taxes import capital_gains_tax
+    assert capital_gains_tax(np.array([20000.]), np.array([30000.]), np.array([50000.]), 'married', 1.0, 'Texas')[0] == 0
+
+
+def test_roth_conversions_fill_bracket_and_compare():
+    from finplan.engine import project
+    from finplan.taxes import MFJ, STD_DED
+    from finplan import taxplan
+    p = _rich(roth_conversion={'mode': 'fill_bracket', 'bracket': 0.12})
+    r = project(p)
+    conv = [x for x in r['rows'] if x['roth_conversion'] > 0]
+    assert conv, 'expected conversions in retirement before RMD age'
+    first = conv[0]
+    assert first['age1'] >= 60
+    # taxable income is filled to about the top of the 12% bracket (indexed)
+    idx = (1 + r['plan']['economic_params']['inflation_rate']) ** (first['year'] - 2024)
+    assert abs(first['taxable_ordinary'] - MFJ[1][0] * idx) < 0.02 * MFJ[1][0] * idx
+    assert max(x['roth'] for x in r['rows']) > 0
+    f = project(_rich(roth_conversion={'mode': 'fixed', 'amount': 30000}))
+    fx = [x for x in f['rows'] if x['roth_conversion'] > 0]
+    assert fx and abs(fx[0]['roth_conversion'] / fx[0]['infl_index'] - 30000) < 1
+    cmp = taxplan.compare(_rich(), n=100)
+    ids = [s['id'] for s in cmp['strategies']]
+    assert {'off', 'fill_12', 'fill_22'} <= set(ids) and cmp['best'] in ids
+    assert next(s for s in cmp['strategies'] if s['id'] == 'off')['lifetime_conversions'] == 0
+
+
+def test_irmaa_and_aca_credit():
+    from finplan.engine import project
+    import copy
+    # high income in Medicare years -> IRMAA surcharge
+    p = _rich(parentX_age=66, parentY_age=66, parentX_retirement_age=75, parentY_retirement_age=75,
+              parentX_income=300000, parentY_income=200000, parentX_career_phases=[], parentY_career_phases=[])
+    r = project(p)
+    assert r['rows'][3]['irmaa'] > 0 and r['summary']['irmaa_years']
+    q = copy.deepcopy(p); q['irmaa_enabled'] = False
+    assert project(q)['rows'][3]['irmaa'] == 0
+    # early retirees on a marketplace plan with modest income get a premium tax credit
+    a = _rich(parentX_age=58, parentY_age=58, parentX_retirement_age=58, parentY_retirement_age=58,
+              parentX_income=0, parentY_income=0,
+              health_insurances=[{'name': 'Marketplace silver', 'monthly_premium': 2000, 'covered_by': 'Both',
+                                  'start_age': 58, 'end_age': 64, 'marketplace': True}])
+    ra = project(a)
+    assert ra['rows'][1]['aca_credit'] > 0 and ra['rows'][1]['aca_credit'] <= ra['rows'][1]['aca_benchmark'] + 1
+    b = copy.deepcopy(a); b['aca_enabled'] = False
+    assert project(b)['rows'][1]['aca_credit'] == 0
+
+
+def test_pensions_debts_and_529():
+    from finplan.engine import project
+    from finplan import reference as R
+    p = _rich(pensions=[{'name': 'State pension', 'person': 'Parent 1', 'start_age': 62, 'monthly': 3000,
+                         'cola_pct': 2, 'survivor_pct': 50}],
+              debts=[{'name': 'Car loan', 'kind': 'auto', 'balance': 20000, 'rate': 6, 'monthly_payment': 600}],
+              parentX_death_age=80)
+    r = project(p)
+    rows = r['rows']
+    by = {x['age1']: x for x in rows}
+    assert by[61]['pension_income'] == 0 and by[62]['pension_income'] > 3000 * 12
+    assert by[64]['pension_income'] > by[63]['pension_income']          # COLA
+    after = [x for x in rows if x['age1'] > 80 and x['alive2']]
+    if after:
+        assert abs(after[0]['pension2'] - by[80]['pension1'] * 0.5 * 1.02) < 50   # survivor share
+    assert rows[0]['debt_payment'] > 0 and r['summary']['debt_free_year'] is not None
+    paid = next(x for x in rows if x['debt_balance'] == 0)
+    assert paid['year'] <= rows[0]['year'] + 4
+    assert any(e['type'] == 'debt_paid' for e in r['events'])
+    # 529 pays college
+    q = R.default_plan()
+    cy = q['current_year']
+    q['children_list'] = [{'name': 'Kid', 'birth_year': cy - 10}]
+    q['college_529'] = [{'child': 'Kid', 'balance': 30000, 'monthly': 400}]
+    rq = project(q)
+    col = [x for x in rq['rows'] if 18 <= x['year'] - (cy - 10) <= 21]
+    assert sum(x['paid_529'] for x in col) > 0
+    assert rq['rows'][0]['edu_529'] > 30000
+    assert all(x['edu_529'] == 0 for x in rq['rows'] if x['year'] - (cy - 10) >= 22)
+
+
+def test_goals_evaluate_and_probabilities():
+    from finplan.engine import project, monte_carlo
+    p = _rich()
+    cy = p['current_year']
+    p['debts'] = [{'name': 'Loan', 'balance': 10000, 'rate': 5, 'monthly_payment': 500}]
+    p['goals'] = [{'type': 'net_worth', 'amount': 100000, 'year': cy + 5}, {'type': 'net_worth', 'amount': 1e9, 'year': cy + 5},
+                  {'type': 'emergency_fund', 'months': 6}, {'type': 'debt_free', 'year': cy + 5}, {'type': 'fi', 'year': cy + 4}]
+    r = project(p)
+    g = {x['id']: x for x in r['goals']}
+    assert g['goal1']['status'] == 'on_track' and g['goal2']['status'] == 'off_track'
+    assert g['goal3']['status'] == 'on_track' and g['goal4']['status'] == 'on_track'
+    assert g['goal5']['target'] > 0
+    m = monte_carlo(p, 200)
+    assert m['goal_probs']['goal1'] > 0.9 and m['goal_probs']['goal2'] == 0
+
+
+def test_safe_spending_guardrails_and_backtest():
+    from finplan import solver, backtest
+    from finplan.engine import monte_carlo
+    import copy
+    p = _rich()
+    s = solver.safe_spending(p, 0.85, n=200)
+    assert s['current'] > 0
+    if s['multiplier'] not in (None, 3.0):
+        assert abs(s['success_at_safe'] - 0.85) < 0.06
+    g = copy.deepcopy(p); g['guardrails'] = {'enabled': True, 'lower': 15, 'cut': 15, 'upper': 25, 'raise': 5}
+    mg = monte_carlo(g, 300, seed=5)
+    m0 = monte_carlo(p, 300, seed=5)
+    assert 'guardrails' in mg and mg['guardrails']['prob_any_cut'] > 0
+    assert mg['success_rate'] >= m0['success_rate'] - 0.02
+    b = backtest.run(p)
+    assert b['n'] == 100 and b['first_year'] == 1924 and len(b['starts']) == 100
+    assert 0 <= b['success_rate'] <= 1 and len(b['median_path']) == b['plan_years']

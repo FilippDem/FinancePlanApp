@@ -163,3 +163,57 @@ def solve(plan: dict, target: float = 0.85, n: int = 600, seed: int = 11) -> dic
                 item['patch'] = patch(p, lev, x)
             out['levers'].append(item)
     return out
+
+
+# ── safe spending (2026-09-28) ─────────────────────────────────────────────
+def _scale_spending(plan: dict, k: float) -> dict:
+    """Everyday, household (not housing) and recurring spending times k."""
+    p = copy.deepcopy(plan)
+    for key in ('parentX_expenses', 'parentY_expenses'):
+        p[key] = {c: v * k for c, v in (p.get(key) or {}).items()}
+    p['family_shared_expenses'] = {c: (v if c in HOUSING else v * k) for c, v in (p.get('family_shared_expenses') or {}).items()}
+    for r in p.get('recurring_expenses') or []:
+        r['amount'] = r['amount'] * k
+    return p
+
+
+def flexible_spending(p: dict) -> float:
+    """This year's flexible spending in today's dollars (what safe spending scales)."""
+    s = sum((p.get('parentX_expenses') or {}).values())
+    if not is_single(p):
+        s += sum((p.get('parentY_expenses') or {}).values())
+    s += sum(v for c, v in (p.get('family_shared_expenses') or {}).items() if c not in HOUSING)
+    cy = p['current_year']
+    s += sum(r['amount'] / max(r['frequency_years'], 1) for r in p.get('recurring_expenses') or []
+             if r['start_year'] <= cy and (r['end_year'] is None or r['end_year'] >= cy))
+    return float(s)
+
+
+def safe_spending(plan: dict, target: float = 0.85, n: int = 500, seed: int = 11) -> dict:
+    """The most you can spend on flexible items (as a multiple of today's plan) and still reach `target`."""
+    p = normalize_plan(plan)
+    base = _succ(p, n, seed)
+    cur = flexible_spending(p)
+    lo, hi = 0.3, 3.0
+    s_lo = _succ(_scale_spending(p, lo), n, seed)
+    if s_lo < target:
+        k, s_k = None, s_lo
+    elif _succ(_scale_spending(p, hi), n, seed) >= target:
+        k, s_k = hi, None
+    else:
+        for _ in range(12):
+            mid = (lo + hi) / 2
+            if _succ(_scale_spending(p, mid), n, seed) >= target:
+                lo = mid
+            else:
+                hi = mid
+        k = lo
+        s_k = _succ(_scale_spending(p, k), n, seed)
+    out = {'target': target, 'success': base, 'current': cur, 'multiplier': k,
+           'safe': cur * k if k is not None else None, 'success_at_safe': s_k}
+    if k is not None:
+        out['delta_year'] = cur * (k - 1)
+        out['delta_month'] = cur * (k - 1) / 12
+        out['patch'] = {kk: v for kk, v in _scale_spending(p, k).items()
+                        if kk in ('parentX_expenses', 'parentY_expenses', 'family_shared_expenses', 'recurring_expenses')}
+    return out

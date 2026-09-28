@@ -923,6 +923,53 @@ def api_mc(body: ProjectIn):
     return monte_carlo(body.plan, body.n, body.seed, body.normalized)
 
 
+class TargetIn(BaseModel):
+    plan: dict[str, Any]
+    target: float = 0.85
+    n: int = 500
+
+
+@app.post('/api/safe-spending')
+def api_safe_spending(body: TargetIn):
+    """The most flexible spending that still reaches the target chance of success."""
+    from finplan.solver import safe_spending
+    return safe_spending(body.plan, target=min(max(body.target, 0.5), 0.99), n=max(200, min(body.n, 2000)))
+
+
+class PlanOnly(BaseModel):
+    plan: dict[str, Any]
+    n: int = 300
+
+
+@app.post('/api/backtest')
+def api_backtest(body: PlanOnly):
+    """The plan run from every historical start year with actual S&P 500 returns in order."""
+    from finplan.backtest import run
+    return run(body.plan)
+
+
+@app.post('/api/taxes/roth-compare')
+def api_roth_compare(body: PlanOnly):
+    """Roth conversion strategies compared: lifetime taxes, after-tax money left, chance of success."""
+    from finplan.taxplan import compare
+    return compare(body.plan, n=max(100, min(body.n, 1000)))
+
+
+@app.post('/api/taxes/brackets')
+def api_brackets(body: PlanOnly):
+    from finplan.taxplan import brackets
+    return brackets(body.plan)
+
+
+@app.post('/api/goals')
+def api_goals(body: PlanOnly):
+    """Goals with progress and Monte Carlo probabilities."""
+    from finplan.goals import evaluate, TYPES
+    pr = project(body.plan)
+    mc = monte_carlo(body.plan, max(100, min(body.n, 2000)), 11, True)
+    return {'goals': evaluate(pr['plan'], pr, mc), 'types': TYPES}
+
+
 class StressIn(BaseModel):
     plan: dict[str, Any]
     tests: Optional[list[dict[str, Any]]] = None

@@ -16,8 +16,11 @@ SECTIONS = OrderedDict([
     ('homes', 'Homes & mortgages'),
     ('healthcare', 'Healthcare & insurance'),
     ('purchases', 'One-time purchases & recurring costs'),
+    ('goals', 'Goals and progress'),
     ('locations', 'Where you live (location timeline)'),
     ('ownership', 'Who owns what (separate vs marital property, gifts & inheritances)'),
+    ('income_debts', 'Pensions, loans & 529 plans'),
+    ('tax_planning', 'Tax planning (conversions, capital gains, Medicare surcharges, ACA credits)'),
     ('assumptions', 'Economic assumptions'),
     ('monte_carlo', 'Monte Carlo results'),
     ('scenario_matrix', 'Scenario matrix (saved scenarios × economies)'),
@@ -33,6 +36,7 @@ CATEGORY_COLS = [
     ('ages', 'Ages', None),
     ('wages', 'Wages', lambda r: r['wages1'] + r['wages2']),
     ('ss', 'Social Security', lambda r: r['ss_income']),
+    ('pension', 'Pensions & annuities', lambda r: r.get('pension_income', 0.0)),
     ('rent', 'Rent income', lambda r: r['rent_income']),
     ('sales', 'Home sales', lambda r: r['sale_proceeds']),
     ('gifts', 'Gifts & inheritances', lambda r: r.get('windfalls', 0.0)),
@@ -47,6 +51,7 @@ CATEGORY_COLS = [
     ('healthcare', 'Healthcare', lambda r: r['exp_healthcare']),
     ('recurring', 'Recurring', lambda r: r['exp_recurring']),
     ('onetime', 'One-time', lambda r: r['exp_purchases']),
+    ('debt', 'Loan payments', lambda r: r.get('debt_payment', 0.0)),
     ('down', 'Down payments', lambda r: r['down_payment']),
     ('spend', 'Total spending', lambda r: r['total_expenses']),
     ('cashflow', 'Cash flow', lambda r: r['cashflow']),
@@ -391,4 +396,62 @@ def scenario_matrix(plan: dict, scenarios: dict | None, economies: list | None =
                      'passed': r['passed'], 'total': r['total'], 'verdict': r['verdict']})
     return {'economies': [ECONOMIES[e]['label'] for e in econs], 'descriptions': [ECONOMIES[e]['desc'] for e in econs],
             'target': target, 'rows': rows}
+
+
+# ── goals, tax planning, pensions / loans / 529s (2026-09-28) ─────────────────
+def goals_table(ctx: dict) -> tuple[list[str], list[list]]:
+    from finplan.goals import evaluate
+    gl = evaluate(ctx['plan'], ctx['proj'], ctx['mc'])
+    lab = {'on_track': 'On track', 'at_risk': 'At risk', 'off_track': 'Off track'}
+    rows = [[g['name'], g['label'], g['year'], g['target'], g['projected'], f"{g['progress'] * 100:.0f}%", lab[g['status']],
+             '' if g.get('probability') is None else f"{g['probability'] * 100:.0f}%", g.get('note') or ''] for g in gl]
+    return ['Goal', 'Kind', 'Year', "Target (today's $)", "Projected (today's $)", 'Progress now', 'Status', 'Chance', 'Note'], rows
+
+
+def tax_rows(ctx: dict, today: bool = True) -> tuple[list[str], list[list]]:
+    out = []
+    for r in ctx['proj']['rows']:
+        f = r['infl_index'] if today else 1.0
+        if r['taxes'] <= 0 and not r.get('roth_conversion') and not r.get('aca_credit'):
+            continue
+        out.append([r['year'], r.get('taxable_ordinary', 0) / f, r['tax_federal'] / f, r['tax_state'] / f, r['tax_fica'] / f,
+                    r.get('cap_gains_realized', 0) / f, r.get('tax_cap_gains', 0) / f, r.get('roth_conversion', 0) / f,
+                    r.get('irmaa', 0) / f, r.get('aca_credit', 0) / f, r.get('magi', 0) / f])
+    return ['Year', 'Taxable income', 'Federal', 'State', 'FICA', 'Gains realized', 'Gains tax', 'Roth conversion',
+            'Medicare surcharge', 'ACA credit', 'MAGI'], out
+
+
+def tax_summary(ctx: dict) -> list[tuple[str, str]]:
+    s = ctx['proj']['summary']
+    p = ctx['plan']
+    rc = p['roth_conversion']
+    mode = {'off': 'none', 'fixed': f"${rc['amount']:,.0f} a year", 'fill_bracket': f"fill the {rc['bracket'] * 100:.0f}% bracket"}[rc['mode']]
+    return [('Lifetime taxes (today\'s $)', f"${s['lifetime_taxes']:,.0f}"),
+            ('Capital-gains tax', f"${s['lifetime_cap_gains_tax']:,.0f}" + ('' if p.get('capital_gains_enabled', True) else ' (off)')),
+            ('Roth conversions', f"${s['lifetime_conversions']:,.0f} ({mode})"),
+            ('Medicare surcharges (IRMAA)', f"${s['lifetime_irmaa']:,.0f} in {len(s['irmaa_years'])} years"),
+            ('ACA premium credits', f"${s['lifetime_aca_credit']:,.0f}"),
+            ('Years over the ACA 400% cliff', ', '.join(map(str, s['aca_cliff_years'][:8])) or 'none'),
+            ('Cost basis of taxable savings today', f"{p['taxable_basis_pct']:.0f}%")]
+
+
+def extras_tables(ctx: dict) -> dict:
+    p = ctx['plan']
+    n1, n2 = ctx['names']
+    who = lambda x: n1 if x == 'Parent 1' else n2
+    pens = [[x['name'], who(x['person']), x['kind'], x['start_age'], x['monthly'], f"{x['cola_pct']:g}%", f"{x['survivor_pct']:g}%",
+             f"{x['taxable_pct']:g}%"] for x in p.get('pensions') or []]
+    ev = ctx['proj']['events']
+    debts = []
+    for d in p.get('debts') or []:
+        paid = next((e['year'] for e in ev if e['type'] == 'debt_paid' and e['label'].startswith(d['name'])), None)
+        debts.append([d['name'], d['kind'], d['balance'], f"{d['rate']:g}%", d['monthly_payment'] + d['extra_monthly'], paid or 'not within plan'])
+    edu = []
+    for e in p.get('college_529') or []:
+        paid = sum(x['paid'] / r['infl_index'] for r in ctx['proj']['rows'] for x in r['details'].get('edu529') or [] if x['child'] == e['child'])
+        cost = sum(c['total'] / r['infl_index'] for r in ctx['proj']['rows'] for c in r['details'].get('children') or [] if c['name'] == e['child'] and c.get('in_college'))
+        edu.append([e['child'], e['balance'], e['monthly'], e['until_age'], paid, cost, f"{(paid / cost * 100) if cost else 100:.0f}%"])
+    return {'pensions': (['Name', 'Who', 'Kind', 'Starts at', 'Per month', 'Yearly increase', 'Survivor', 'Taxable'], pens),
+            'debts': (['Loan', 'Kind', 'Balance', 'Rate', 'Per month', 'Paid off'], debts),
+            'edu': (['Child', '529 balance', 'Per month', 'Saving until age', "Pays (today's $)", "College cost (today's $)", 'Covered'], edu)}
 

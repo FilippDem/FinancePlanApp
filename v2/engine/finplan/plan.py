@@ -44,7 +44,22 @@ V2_KEYS = {
     'custom_locations': {},          # {name: {country, region, lat, lon, tax_location}}
     # "Who owns what": see ownership.py. Houses may carry separate_funds {p1, p2}.
     'windfalls': [],                 # gifts & inheritances [{name, year, amount, recipient, kind, separate, inflation_adjust}]
+    # ---- tax depth (2026-09-28) ----
+    'capital_gains_enabled': True,   # tax realized gains when cash/taxable savings are sold to pay for spending
+    'taxable_basis_pct': 80.0,       # % of today's cash/taxable savings that is original money (the rest is gain)
+    'roth_conversion': None,         # {mode: off|fixed|fill_bracket, amount, bracket, start_age, end_age}
+    'irmaa_enabled': True,           # Medicare income surcharges (MAGI two years earlier)
+    'aca_enabled': True,             # premium tax credit for marketplace plans (health_insurances[].marketplace)
+    # ---- spending ----
+    'guardrails': None,              # {enabled, lower, cut, upper, raise, retired_only}: Monte Carlo spending rules
+    # ---- goals, pensions, debts, 529s ----
+    'goals': [],                     # see goals.py
+    'pensions': [],                  # [{name, person, kind, start_age, monthly, cola_pct, survivor_pct, taxable_pct, todays_dollars, purchase_year, purchase_amount}]
+    'debts': [],                     # [{name, kind, balance, rate, monthly_payment, extra_monthly, start_year}]
+    'college_529': [],               # [{child, balance, monthly, until_age}]
 }
+ROTH_CONV_DEFAULTS = {'mode': 'off', 'amount': 0.0, 'bracket': 0.12, 'start_age': None, 'end_age': None}
+GUARDRAIL_DEFAULTS = {'enabled': False, 'lower': 20.0, 'cut': 10.0, 'upper': 20.0, 'raise': 10.0, 'retired_only': True}
 
 HOUSE_DEFAULTS = {
     'name': 'Home', 'purchase_year': None, 'purchase_price': 0.0, 'current_value': 0.0,
@@ -75,7 +90,7 @@ CAREER_DEFAULTS = {'start_age': 30, 'end_age': 65, 'philosophy': 'Stable', 'base
                    'stock_options_liquidity_year': 0, 'label': ''}
 HEALTH_INS_DEFAULTS = {'name': 'Health plan', 'type': 'Employer', 'monthly_premium': 0.0, 'annual_deductible': 0.0,
                        'annual_out_of_pocket_max': 0.0, 'copay_primary': 0.0, 'copay_specialist': 0.0,
-                       'covered_by': 'Both', 'start_age': 0, 'end_age': 64}
+                       'covered_by': 'Both', 'start_age': 0, 'end_age': 64, 'marketplace': False}
 LTC_DEFAULTS = {'name': 'LTC policy', 'monthly_premium': 0.0, 'daily_benefit': 0.0, 'benefit_period_days': 0,
                 'elimination_period_days': 90, 'covered_person': 'Parent 1', 'start_age': 55,
                 'inflation_protection': 0.03}
@@ -231,6 +246,7 @@ def normalize_plan(raw: dict | None) -> dict:
                        'kind': w.get('kind') or 'inheritance', 'separate': bool(w.get('separate', True)),
                        'inflation_adjust': bool(w.get('inflation_adjust', True))})
     p['windfalls'] = wl
+    _normalize_extras(p)
 
     econ = p.get('economic_params') or {}
     p['economic_params'] = {**ECON_DEFAULTS, **econ}
@@ -331,6 +347,59 @@ def normalize_plan(raw: dict | None) -> dict:
     p['mc_normalize_to_today_dollars'] = bool(p.get('mc_normalize_to_today_dollars', False))
     p['mc_use_asymmetric'] = bool(p.get('mc_use_asymmetric', True))
     return p
+
+
+def _normalize_extras(p: dict) -> None:
+    """Roth conversions, guardrails, goals, pensions, debts, 529s (all additive keys)."""
+    cy = p.get('current_year') or datetime.now().year
+    rc = {**ROTH_CONV_DEFAULTS, **(p.get('roth_conversion') or {})}
+    rc['mode'] = rc['mode'] if rc['mode'] in ('off', 'fixed', 'fill_bracket') else 'off'
+    rc['amount'] = _num(rc['amount'])
+    rc['bracket'] = _num(rc['bracket'], 0.12)
+    for k in ('start_age', 'end_age'):
+        rc[k] = None if rc.get(k) in (None, '') else _int(rc[k])
+    p['roth_conversion'] = rc
+    g = {**GUARDRAIL_DEFAULTS, **(p.get('guardrails') or {})}
+    for k in ('lower', 'cut', 'upper', 'raise'):
+        g[k] = min(max(_num(g[k], GUARDRAIL_DEFAULTS[k]), 0.0), 90.0)
+    g['enabled'], g['retired_only'] = bool(g['enabled']), bool(g['retired_only'])
+    p['guardrails'] = g
+    p['taxable_basis_pct'] = min(max(_num(p.get('taxable_basis_pct'), 80.0), 0.0), 100.0)
+    pens = []
+    for x in p.get('pensions') or []:
+        if not isinstance(x, dict):
+            continue
+        pens.append({'id': x.get('id') or f"pen{len(pens) + 1}", 'name': x.get('name') or 'Pension',
+                     'person': x.get('person') if x.get('person') in ('Parent 1', 'Parent 2') else 'Parent 1',
+                     'kind': x.get('kind') if x.get('kind') in ('pension', 'annuity') else 'pension',
+                     'start_age': _int(x.get('start_age'), 65), 'monthly': _num(x.get('monthly')),
+                     'cola_pct': _num(x.get('cola_pct')), 'survivor_pct': min(max(_num(x.get('survivor_pct'), 50.0), 0.0), 100.0),
+                     'taxable_pct': min(max(_num(x.get('taxable_pct'), 100.0), 0.0), 100.0),
+                     'todays_dollars': bool(x.get('todays_dollars', True)),
+                     'purchase_year': None if x.get('purchase_year') in (None, '') else _int(x.get('purchase_year')),
+                     'purchase_amount': _num(x.get('purchase_amount'))})
+    p['pensions'] = pens
+    debts = []
+    for x in p.get('debts') or []:
+        if not isinstance(x, dict):
+            continue
+        debts.append({'id': x.get('id') or f"debt{len(debts) + 1}", 'name': x.get('name') or 'Loan',
+                      'kind': x.get('kind') if x.get('kind') in ('student', 'auto', 'credit_card', 'personal', 'medical', 'other') else 'other',
+                      'balance': max(_num(x.get('balance')), 0.0), 'rate': max(_num(x.get('rate')), 0.0),
+                      'monthly_payment': max(_num(x.get('monthly_payment')), 0.0), 'extra_monthly': max(_num(x.get('extra_monthly')), 0.0),
+                      'start_year': _int(x.get('start_year'), cy)})
+    p['debts'] = debts
+    kids = {c['name'] for c in p.get('children_list') or []}
+    plans = []
+    for x in p.get('college_529') or []:
+        if not isinstance(x, dict) or not x.get('child'):
+            continue
+        plans.append({'child': str(x['child']), 'balance': max(_num(x.get('balance')), 0.0),
+                      'monthly': max(_num(x.get('monthly')), 0.0), 'until_age': _int(x.get('until_age'), 18),
+                      'orphan': str(x['child']) not in kids})
+    p['college_529'] = plans
+    from .goals import normalize as _goal_norm
+    p['goals'] = _goal_norm(p.get('goals'), p)
 
 
 def is_single(p: dict) -> bool:

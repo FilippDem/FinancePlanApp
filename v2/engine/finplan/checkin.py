@@ -97,6 +97,31 @@ def rebase(plan: dict, balances: dict, on: date) -> dict:
                 if bx.get(f'separate_{k}') is not None:
                     today.setdefault(who, {})[k] = float(bx[f'separate_{k}'] or 0)
         p['ownership_tracking'] = {**own, 'today': today}
+    if delta and (p.get('debts') or p.get('college_529')):
+        # loans and 529s move forward with the projection unless the check-in states them
+        from .engine import project
+        rows_ = project(plan)['rows']
+        row_ = next((r for r in rows_ if r['year'] == on.year - 1), None)
+        if row_:
+            dbal = {}
+            for x in row_['details'].get('debts') or []:
+                dbal[x['name']] = dbal.get(x['name'], 0.0) + x['balance']
+            for d in p.get('debts') or []:
+                if d['start_year'] <= on.year - 1:
+                    d['balance'] = round(dbal.get(d['name'], 0.0), 2)
+                    d['start_year'] = on.year
+            ebal = {e['child']: e['balance'] for e in row_['details'].get('edu529') or []}
+            for e in p.get('college_529') or []:
+                if e['child'] in ebal:
+                    e['balance'] = round(ebal[e['child']], 2)
+    for d in balances.get('debts') or []:
+        tgt = next((x for x in p.get('debts') or [] if x['name'] == d.get('name')), None)
+        if tgt is not None and d.get('balance') is not None:
+            tgt['balance'] = float(d['balance'])
+    for e in balances.get('college_529') or []:
+        tgt = next((x for x in p.get('college_529') or [] if x['child'] == e.get('child')), None)
+        if tgt is not None and e.get('balance') is not None:
+            tgt['balance'] = float(e['balance'])
     if delta:
         p['current_year'] += delta
         p['parentX_age'] += delta

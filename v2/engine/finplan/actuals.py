@@ -55,6 +55,10 @@ def planned_for_year(plan: dict, year: int) -> dict:
             exp['recurring'][x['name']] = exp['recurring'].get(x['name'], 0) + x['amount']
         for x in d.get('purchases', []):
             exp['major_purchases'][x['name']] = exp['major_purchases'].get(x['name'], 0) + x['amount']
+        if d.get('debts'):
+            exp['debts'] = {}
+            for x in d['debts']:
+                exp['debts'][x['name']] = exp['debts'].get(x['name'], 0) + x['payment']
         statuses = [h.get('status') for h in d.get('houses', [])]
         if 'Own_Live' in statuses:
             exp['family']['Mortgage/Rent'] = 0.0
@@ -63,7 +67,8 @@ def planned_for_year(plan: dict, year: int) -> dict:
                 if k in exp['family']:
                     exp['family'][k] = 0.0
         out['income'] = {'parent1_employment': row['wages1'], 'parent2_employment': row['wages2'], 'ss_income': row['ss_income'],
-                         'investment_income': 0.0, 'other_income': row['rent_income'] + row.get('windfalls', 0.0)}
+                         'investment_income': 0.0,
+                         'other_income': row['rent_income'] + row.get('windfalls', 0.0) + row.get('pension_income', 0.0)}
         out['net_worth'] = row['net_worth']
         out['taxes_paid'] = row['taxes']
         out['totals'] = {'income': row['total_income'], 'spending': row['total_expenses'], 'taxes': row['taxes'],
