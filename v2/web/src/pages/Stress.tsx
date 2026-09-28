@@ -4,6 +4,7 @@ import {
   CheckCircle2, XCircle, ChevronDown, ChevronRight,
 } from 'lucide-react'
 import { ResponsiveContainer, ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from 'recharts'
+import { Backtest } from '../components/Backtest'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
 import { money, pct, clsx } from '../lib/format'
@@ -303,6 +304,7 @@ export default function Stress() {
           </div>
         </Card>
       </div>
+      <Backtest />
       <Note><span className="flex gap-2"><ShieldAlert size={15} className="shrink-0 mt-0.5" />Stress tests never change your saved plan. If a scenario hurts a lot, consider an emergency fund, disability or life insurance, or a lower withdrawal rate, then check the effect under Scenarios.</span></Note>
     </div>
   )

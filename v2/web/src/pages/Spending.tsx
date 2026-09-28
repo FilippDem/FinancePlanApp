@@ -3,6 +3,7 @@ import { Plus, Trash2, Pencil, Wand2, Repeat, ShoppingBag } from 'lucide-react'
 import { usePlan, pk } from '../lib/store'
 import { api } from '../lib/api'
 import { money } from '../lib/format'
+import { DebtsCard } from '../components/Extras'
 import { SpendingSlider, useCurve, curveSources } from '../components/SpendingSlider'
 import { useCites } from '../components/Cite'
 import { rescale, strategyFor, xForTotal, levelAt, sum as sumCats, lifestyleOptions, BASE_LIFESTYLES, priceLoc } from '../lib/spending'
@@ -261,16 +262,18 @@ function OneTimeTab() {
 
 export default function Spending() {
   const { plan } = usePlan()
-  const [tab, setTab] = useState<'personal' | 'shared' | 'recurring' | 'onetime'>('personal')
+  const [tab, setTab] = useState<'personal' | 'shared' | 'recurring' | 'onetime' | 'loans'>(() => (location.hash === '#loans' ? 'loans' : 'personal'))
   return (
     <div>
       <PageHeader title="Spending" subtitle="Everything in today's dollars — the projection adds inflation" />
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'personal', label: 'Personal' }, { value: 'shared', label: 'Shared household' },
-        { value: 'recurring', label: 'Recurring', count: plan.recurring_expenses?.length }, { value: 'onetime', label: 'One-time', count: plan.major_purchases?.length }]} />
+        { value: 'recurring', label: 'Recurring', count: plan.recurring_expenses?.length }, { value: 'onetime', label: 'One-time', count: plan.major_purchases?.length },
+        { value: 'loans', label: 'Loans', count: plan.debts?.length }]} />
       {tab === 'personal' && <PersonalTab />}
       {tab === 'shared' && <SharedTab />}
       {tab === 'recurring' && <RecurringTab />}
       {tab === 'onetime' && <OneTimeTab />}
+      {tab === 'loans' && <DebtsCard />}
     </div>
   )
 }

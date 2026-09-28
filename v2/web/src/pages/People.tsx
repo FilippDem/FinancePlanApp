@@ -5,6 +5,7 @@ import { money } from '../lib/format'
 import { useCites } from '../components/Cite'
 import { Card, PageHeader, Field, Money, NumberInput, Percent, TextInput, Select, Segmented, Button, Grid, Note, Toggle, Badge } from '../components/ui'
 import { LinesChart } from '../components/charts'
+import { PensionsCard } from '../components/Extras'
 
 const EMOJIS = ['👨', '👩', '🧑', '👤', '🧔', '👱‍♀️', '⭐', '🎯']
 const STYLE_DEFAULTS: Record<string, { raise: number; bonus: number }> = {
@@ -18,7 +19,7 @@ function ssFactor(age: number) {
   return 1 - (Math.min(e, 36) * 5 / 9 + Math.max(e - 36, 0) * 5 / 12) / 100
 }
 
-const PEOPLE_SRC = ['ssa_claiming']
+const PEOPLE_SRC = ['ssa_claiming', 'irs_tc410']
 
 function PersonCard({ who }: { who: 'X' | 'Y' }) {
   const { plan, update } = usePlan()
@@ -144,10 +145,10 @@ function IncomeCard({ who }: { who: 'X' | 'Y' }) {
 
 export default function People() {
   const { plan, update, proj, single, names } = usePlan()
-  const { Sources } = useCites(PEOPLE_SRC)
+  const { Cite, Sources } = useCites(PEOPLE_SRC)
   const marriageOpts = ['N/A', ...Array.from({ length: plan.current_year - 1969 }, (_, i) => String(plan.current_year - i))]
   const incomeData = (proj?.rows || []).filter((r: any) => r.wages1 + r.wages2 + r.ss_income > 0).map((r: any) => ({
-    year: r.year, w1: r.wages1, w2: r.wages2, ss: r.ss_income }))
+    year: r.year, w1: r.wages1, w2: r.wages2, ss: r.ss_income, pen: r.pension_income || 0 }))
   return (
     <div className="space-y-5">
       <PageHeader title="People & income" subtitle="Who is in the plan, what they earn and when they retire" />
@@ -174,9 +175,10 @@ export default function People() {
         <IncomeCard who="X" />
         {!single && <IncomeCard who="Y" />}
       </Grid>
+      <PensionsCard cite={<Cite id="irs_tc410" />} />
       {incomeData.length > 0 && (
         <Card title="Income over time" subtitle="Salaries and Social Security, nominal dollars">
-          <LinesChart data={incomeData} series={[{ key: 'w1', label: names[0] }, ...(single ? [] : [{ key: 'w2', label: names[1] }]), { key: 'ss', label: 'Social Security' }]} />
+          <LinesChart data={incomeData} series={[{ key: 'w1', label: names[0] }, ...(single ? [] : [{ key: 'w2', label: names[1] }]), { key: 'ss', label: 'Social Security' }, ...((plan.pensions || []).length ? [{ key: 'pen', label: 'Pensions' }] : [])]} />
         </Card>
       )}
       <Sources className="px-1" />

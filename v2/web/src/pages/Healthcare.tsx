@@ -45,7 +45,7 @@ export default function Healthcare() {
       })()}
       <Card title="Health insurance" subtitle={<>Premiums apply while the covered person's age is in range (e.g. until Medicare at 65). For reference: workers paid $6,850 a year on average toward employer family coverage in 2025<Cite id="kff_ehbs_2025" />; marketplace premiums depend on age, income and state<Cite id="kff_marketplace" />.</>}>
         <Rows items={plan.health_insurances} empty="No insurance plans. Add employer or marketplace coverage, especially for early retirement."
-          onAdd={() => update(d => { d.health_insurances.push({ name: 'Marketplace plan', type: 'Marketplace', monthly_premium: 900, annual_deductible: 4000, annual_out_of_pocket_max: 9000, copay_primary: 30, copay_specialist: 60, covered_by: 'Both', start_age: d.parentX_retirement_age, end_age: 64 }) })}
+          onAdd={() => update(d => { d.health_insurances.push({ marketplace: true, name: 'Marketplace plan', type: 'Marketplace', monthly_premium: 900, annual_deductible: 4000, annual_out_of_pocket_max: 9000, copay_primary: 30, copay_specialist: 60, covered_by: 'Both', start_age: d.parentX_retirement_age, end_age: 64 }) })}
           onRemove={i => update(d => { d.health_insurances.splice(i, 1) })}
           render={(x, i) => (
             <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 pr-6">
@@ -57,6 +57,8 @@ export default function Healthcare() {
               <Field label="Premium / month"><Money value={x.monthly_premium} step={50} onChange={v => setL('health_insurances', i, 'monthly_premium', v)} /></Field>
               <Field label="Deductible"><Money value={x.annual_deductible} step={250} onChange={v => setL('health_insurances', i, 'annual_deductible', v)} /></Field>
               <Field label="Out-of-pocket max"><Money value={x.annual_out_of_pocket_max} step={250} onChange={v => setL('health_insurances', i, 'annual_out_of_pocket_max', v)} /></Field>
+              <div className="col-span-2 flex items-end pb-1.5"><Toggle checked={!!x.marketplace} onChange={v => setL('health_insurances', i, 'marketplace', v)}
+                label="Marketplace (ACA) plan" hint="Enter the full premium (benchmark silver price). The ACA tax credit is worked out from your income each year; see Tax planning." /></div>
             </div>
           )} />
       </Card>

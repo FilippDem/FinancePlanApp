@@ -6,6 +6,7 @@ import { pct } from '../lib/format'
 import { Card, PageHeader, Field, Money, NumberInput, Percent, Select, Button, Toggle, Segmented, Note, Grid } from '../components/ui'
 import { S } from '../components/charts'
 import { lifestyleOptions } from '../lib/spending'
+import { GuardrailsCard } from '../components/Guardrails'
 import { useCites } from '../components/Cite'
 
 export default function Assumptions() {
@@ -127,6 +128,8 @@ export default function Assumptions() {
           </div>
         )}
       </Card>
+
+      <GuardrailsCard />
 
       {hist && (
         <Card title={<>Historical S&P 500 returns<Cite id="damodaran_sp500" /></>} subtitle={`${hist.start_year}–${hist.start_year + hist.total_years - 1} · average ${pct(hist.mean)} · std dev ${pct(hist.std)} · ${hist.positive_years} up years, ${hist.negative_years} down · total returns incl. dividends`}>

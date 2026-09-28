@@ -6,9 +6,9 @@ import { axisMoney, money } from '../lib/format'
 
 export const S = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)', 'var(--s5)', 'var(--s6)', 'var(--s7)', 'var(--s8)']
 
-const axisProps = { tickLine: false, axisLine: false, stroke: 'var(--axis)', fontSize: 11 }
+export const axisProps = { tickLine: false, axisLine: false, stroke: 'var(--axis)', fontSize: 11 }
 
-function TipBox({ active, payload, label, title, hide = [] as string[] }: any) {
+export function TipBox({ active, payload, label, title, hide = [] as string[] }: any) {
   if (!active || !payload?.length) return null
   const rows = payload.filter((p: any) => !hide.includes(p.dataKey) && p.value !== undefined && p.value !== null)
   return (
@@ -28,7 +28,7 @@ function TipBox({ active, payload, label, title, hide = [] as string[] }: any) {
   )
 }
 
-function LegendRow({ items }: { items: { label: string; color: string; kind?: 'line' | 'box' | 'band' }[] }) {
+export function LegendRow({ items }: { items: { label: string; color: string; kind?: 'line' | 'box' | 'band' }[] }) {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-ink2 mb-2">
       {items.map(i => (

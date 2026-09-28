@@ -273,5 +273,63 @@
     "year": "current",
     "url": "https://www.ssa.gov/oact/quickcalc/spouse.html",
     "used_for": "Spousal Social Security benefit"
+  },
+  "irs_ltcg_2024": {
+    "publisher": "Internal Revenue Service",
+    "title": "Rev. Proc. 2023-34: 2024 inflation adjustments (0%/15% capital-gains thresholds $94,050 / $583,750 joint)",
+    "year": "2024",
+    "url": "https://www.irs.gov/pub/irs-drop/rp-23-34.pdf",
+    "used_for": "Long-term capital-gains brackets (indexed with inflation like the income brackets)"
+  },
+  "irs_niit": {
+    "publisher": "Internal Revenue Service",
+    "title": "Net Investment Income Tax (3.8% above $250,000 joint / $200,000 single)",
+    "year": "current",
+    "url": "https://www.irs.gov/individuals/net-investment-income-tax",
+    "used_for": "Extra tax on realized gains for high incomes"
+  },
+  "cms_irmaa_2026": {
+    "publisher": "Centers for Medicare & Medicaid Services",
+    "title": "2026 Medicare Parts A & B Premiums and Deductibles (income-related monthly adjustment amounts)",
+    "year": "2026",
+    "url": "https://www.cms.gov/newsroom/fact-sheets/2026-medicare-parts-b-premiums-deductibles",
+    "used_for": "Medicare IRMAA surcharges by income (from two years earlier)",
+    "note": "Part D surcharges from the same CMS release; thresholds indexed with inflation after 2026"
+  },
+  "irs_rp_2025_25": {
+    "publisher": "Internal Revenue Service",
+    "title": "Rev. Proc. 2025-25: 2026 applicable percentage table for the premium tax credit",
+    "year": "2026",
+    "url": "https://www.irs.gov/pub/irs-drop/rp-25-25.pdf",
+    "used_for": "ACA premium tax credit (2.10%–9.96% of income; none above 400% of the poverty level)",
+    "note": "The enhanced 2021–2025 credits expired; no extension had been enacted as of mid-2026"
+  },
+  "hhs_fpl_2025": {
+    "publisher": "U.S. Department of Health & Human Services (ASPE)",
+    "title": "2025 Poverty Guidelines ($15,650 for one person, +$5,500 per additional person, 48 states)",
+    "year": "2025",
+    "url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines",
+    "used_for": "Household income as % of the poverty level for ACA credits"
+  },
+  "irs_p590a": {
+    "publisher": "Internal Revenue Service",
+    "title": "Publication 590-A: Contributions to IRAs (converting a traditional IRA to a Roth IRA)",
+    "year": "current",
+    "url": "https://www.irs.gov/publications/p590a",
+    "used_for": "Roth conversions are taxed as ordinary income in the year converted"
+  },
+  "irs_p970": {
+    "publisher": "Internal Revenue Service",
+    "title": "Publication 970: Tax Benefits for Education (qualified tuition programs / 529 plans)",
+    "year": "current",
+    "url": "https://www.irs.gov/publications/p970",
+    "used_for": "529 plans: tax-free for college costs; earnings on other withdrawals taxed plus 10%"
+  },
+  "irs_tc410": {
+    "publisher": "Internal Revenue Service",
+    "title": "Topic no. 410: Pensions and annuities (fully or partly taxable)",
+    "year": "current",
+    "url": "https://www.irs.gov/taxtopics/tc410",
+    "used_for": "Taxable share of pension and annuity income"
   }
 }

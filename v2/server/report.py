@@ -284,7 +284,7 @@ def build(plan: dict, household: str, checkins: list | None = None, sections: li
 
     if 'income_debts' in sections and (p.get('pensions') or p.get('debts') or p.get('college_529')):
         ex = RD.extras_tables(ctx)
-        story += [CondPageBreak(1.5 * inch), Paragraph('Pensions, loans & 529 plans', st.H2)]
+        story += [CondPageBreak(1.5 * inch), Paragraph('Pensions, loans & 529 plans' + cite('income_debts'), st.H2)]
         h, d = ex['pensions']
         if d:
             story += [Paragraph('Pensions & annuities', st.H3), _table([h] + [[r[0], r[1], r[2], r[3], _m(r[4], True)] + r[5:] for r in d])]
@@ -299,7 +299,7 @@ def build(plan: dict, household: str, checkins: list | None = None, sections: li
         h, d = RD.tax_rows(ctx, today)
         step = 5 if len(d) > 30 else 1
         sel = [r for i, r in enumerate(d) if i % step == 0 or i == len(d) - 1]
-        story += [CondPageBreak(2 * inch), Paragraph('Tax planning', st.H2), _kv_table(RD.tax_summary(ctx), st, cols=3), Spacer(1, 4),
+        story += [CondPageBreak(2 * inch), Paragraph('Tax planning' + cite('tax_planning'), st.H2), _kv_table(RD.tax_summary(ctx), st, cols=3), Spacer(1, 4),
                   _table([h] + [[r[0]] + [_m(v) for v in r[1:]] for r in sel]),
                   Paragraph('Gains tax includes the 3.8% net investment income tax and state tax on gains. Medicare surcharges use '
                             'income from two years earlier (CMS 2026 IRMAA table). ACA credits use the 2026 IRS applicable percentages; '

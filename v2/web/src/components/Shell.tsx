@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { HELP } from '../lib/help'
 import {
   LayoutDashboard, Users, Wallet, Baby, Home, HeartPulse, SlidersHorizontal, LineChart, CalendarRange, Layers,
-  Moon, Sun, LogOut, Check, Loader2, AlertCircle, ArrowLeftRight, Menu, X, ClipboardCheck, Wand2, Receipt, Palmtree, ShieldAlert, MapPin, UserCog, FlaskConical, Scale, Link2, ChevronDown, ChevronUp, HelpCircle,
+  Moon, Sun, LogOut, Check, Loader2, AlertCircle, ArrowLeftRight, Menu, X, ClipboardCheck, Wand2, Receipt, Palmtree, ShieldAlert, MapPin, UserCog, FlaskConical, Scale, Link2, ChevronDown, ChevronUp, HelpCircle, Target, Calculator,
 } from 'lucide-react'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
@@ -12,6 +12,7 @@ import { buildAlerts } from '../pages/Dashboard'
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/goals', label: 'Goals', icon: Target },
   { to: '/checkins', label: 'Check-ins', icon: ClipboardCheck, badge: true },
   { to: '/actuals', label: 'Actuals', icon: Receipt },
   { to: '/accounts', label: 'Linked accounts', icon: Link2 },
@@ -27,8 +28,9 @@ const NAV = [
   { group: 'Analyze' },
   { to: '/projections', label: 'Projections', icon: LineChart },
   { to: '/retirement', label: 'Retirement', icon: Palmtree },
+  { to: '/taxes', label: 'Tax planning', icon: Calculator },
   { to: '/stress', label: 'Stress tests', icon: ShieldAlert },
-  { to: '/timeline', label: 'Life timeline', icon: CalendarRange },
+  { to: '/timeline', label: 'Life timeline & editor', icon: CalendarRange },
   { to: '/scenarios', label: 'Scenarios', icon: Layers },
 ] as const
 

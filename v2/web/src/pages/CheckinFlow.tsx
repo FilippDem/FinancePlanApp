@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { TrendingUp, TrendingDown, CheckCircle2, AlertTriangle, ClipboardList, Landmark, Home, Scale, Sparkles, ArrowRight } from 'lucide-react'
+import { GoalsCard } from '../components/GoalsCard'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
 import { money, pct } from '../lib/format'
@@ -251,6 +252,7 @@ export default function CheckinFlow() {
             <div className={`font-semibold tnum ${dLast !== null && dLast < 0 ? 'text-bad' : ''}`}>{dLast === null ? '—' : money(dLast, { sign: true })}</div></div>
         </div>
         <Note>{hint}</Note>
+        {(plan.goals || []).length > 0 && <GoalsCard compact />}
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
           <button disabled={busy} onClick={() => save(true)} className="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-xl bg-accent text-white font-semibold hover:brightness-110 disabled:opacity-50">
             <Sparkles size={17} />{busy ? 'Updating…' : 'Update my plan with these numbers'}</button>

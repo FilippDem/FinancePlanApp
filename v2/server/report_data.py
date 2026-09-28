@@ -311,6 +311,8 @@ def section_sources(ctx: dict, section: str) -> list[str]:
         'assumptions': ['bls_cpi', 'cms_nhe', 'irs_2024_tax', 'ssa_wage_base', 'ssa_trustees_2026'] + (['damodaran_sp500'] if hist else []),
         'monte_carlo': ['damodaran_sp500'] if hist else [],
         'ownership': ['irs_pub555', 'lii_equitable'] if (p.get('ownership_tracking') or {}).get('enabled') else [],
+        'tax_planning': ['irs_ltcg_2024', 'irs_niit', 'cms_irmaa_2026', 'irs_rp_2025_25', 'hhs_fpl_2025', 'irs_p590a'],
+        'income_debts': ['irs_tc410', 'irs_p970'] if (p.get('pensions') or p.get('college_529')) else [],
     }
     return m.get(section, [])
 

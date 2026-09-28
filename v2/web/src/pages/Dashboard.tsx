@@ -12,6 +12,8 @@ import { DueBanner, CheckinStrip } from './Checkins'
 import { ReportButton } from '../components/ReportButton'
 import { WhatItTakes } from '../components/WhatItTakes'
 import { LivingTimeline } from '../components/LivingTimeline'
+import { SafeSpending } from '../components/SafeSpending'
+import { GoalsCard } from '../components/GoalsCard'
 
 export function retirementMarkers(plan: any, names: [string, string], single: boolean): Marker[] {
   const cy = plan.current_year
@@ -61,6 +63,14 @@ export function buildAlerts(proj: any, mc: any, plan: any) {
     out.push({ tone: yrs < 15 ? 'bad' : yrs < 25 ? 'warn' : 'good', title: yrs < 25 ? `Savings at retirement cover about ${Math.max(0, Math.round(yrs))} years of spending` : `Retirement savings look healthy (${Math.round(yrs)}+ years covered)`,
       detail: `In ${retR.year}: ${money(retR.investable / retR.infl_index)} saved vs ${money(retR.total_expenses / retR.infl_index)}/yr spending (today's dollars).` })
   }
+  // tax planning & loans & goals (2026-09-28)
+  if ((s.irmaa_years || []).length) out.push({ tone: 'warn', title: `Medicare surcharges in ${s.irmaa_years.length} year${s.irmaa_years.length > 1 ? 's' : ''}`,
+    detail: `Income two years earlier is above the IRMAA threshold (first in ${s.irmaa_years[0]}); about ${money(s.lifetime_irmaa)} extra in today's dollars. See Tax planning.` })
+  if ((s.aca_cliff_years || []).length) out.push({ tone: 'warn', title: `Over the ACA subsidy cliff in ${s.aca_cliff_years.length} year${s.aca_cliff_years.length > 1 ? 's' : ''}`,
+    detail: `Income above 400% of the poverty level cancels the marketplace premium credit (${s.aca_cliff_years.slice(0, 4).join(', ')}). See Tax planning.` })
+  for (const e of (proj.events || []).filter((e: any) => e.type === 'warning')) out.push({ tone: 'bad', title: e.label, detail: 'Raise the monthly payment so the loan is paid down (Spending → Loans).' })
+  const offGoals = (proj.goals || []).filter((g: any) => g.status === 'off_track')
+  if (offGoals.length) out.push({ tone: 'warn', title: `${offGoals.length} goal${offGoals.length > 1 ? 's' : ''} off track`, detail: offGoals.slice(0, 3).map((g: any) => g.name).join(', ') + '. See Goals.' })
   if (plan.ss_insolvency_enabled) out.push({ tone: 'info', title: `Social Security cut of ${plan.ss_shortfall_percentage}% from ${plan.ss_insolvency_year}`, detail: 'Modeled as a trust-fund shortfall. Change it under Assumptions.' })
   const last = rows[rows.length - 1]
   if (!s.depletion_year && last && last.net_worth > 0) out.push({ tone: 'info', title: `Plan ends with ${money(nwT(last))} remaining`, detail: `At age ${last.age1} in ${last.year} (today's dollars).` })
@@ -223,6 +233,11 @@ export default function Dashboard({ isNew }: { isNew: boolean }) {
         {plan.finance_mode === 'Separate' && !single
           ? <Card><Stat label="Savings by person today" value={`${money(plan.parentX_net_worth)} · ${money(plan.parentY_net_worth)}`} sub={`${names[0]} · ${names[1]} (separate finances)`} /></Card>
           : <Card><Stat label="End of plan" value={money(endRow?.net_worth)} sub={endRow ? `${endRow.year} · ${names[0]} age ${endRow.age1}` : ''} /></Card>}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <GoalsCard compact />
+        <SafeSpending />
       </div>
 
       <WhatItTakes />

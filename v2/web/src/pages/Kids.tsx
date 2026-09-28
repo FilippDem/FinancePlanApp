@@ -4,6 +4,7 @@ import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
 import { money } from '../lib/format'
 import { useCites } from '../components/Cite'
+import { College529 } from '../components/Extras'
 import { Card, PageHeader, Field, NumberInput, TextInput, Select, Button, Empty, Badge, Grid, Stat, Note } from '../components/ui'
 import { StackedBars } from '../components/charts'
 import { useTodayDollars } from '../lib/hooks'
@@ -17,7 +18,10 @@ function download(name: string, text: string) {
   a.download = name; a.click()
 }
 
+const KID_SRC = ['mit_living_wage', 'childcareaware_2024', 'collegeboard', 'irs_p970']
+
 function ChildCard({ i }: { i: number }) {
+  const { Cite } = useCites(KID_SRC)
   const { plan, update, reference } = usePlan()
   const c = plan.children_list[i]
   const [err, setErr] = useState('')
@@ -28,7 +32,13 @@ function ChildCard({ i }: { i: number }) {
   const rename = (v: string) => {
     const dup = plan.children_list.some((o: any, j: number) => j !== i && o.name.toLowerCase() === v.trim().toLowerCase())
     setErr(dup ? 'Another child already has this name' : '')
-    if (!dup) set('name', v)
+    if (!dup) update(d => {
+      const old = d.children_list[i].name
+      d.children_list[i].name = v
+      // keep the child's 529 plan and goals attached
+      for (const e of d.college_529 || []) if (e.child === old) e.child = v
+      for (const g of d.goals || []) if (g.child === old) g.child = v
+    })
   }
   const exportCsv = async () => {
     const t = c.custom_expenses || await api.template('children', c.template_state, c.template_strategy, plan.current_year, plan.economic_params.inflation_rate)
@@ -60,6 +70,7 @@ function ChildCard({ i }: { i: number }) {
         <Field label="College location" className="col-span-2"><Select value={c.college_location} options={locs.includes(c.college_location) ? locs : [c.college_location, ...locs]} onChange={v => set('college_location', v)} /></Field>
       </div>
       {err && <p className="text-sm text-bad mt-2">{err}</p>}
+      <div className="mt-4"><College529 child={c} cite={<Cite id="irs_p970" />} /></div>
       <div className="flex flex-wrap gap-2 mt-4">
         <Button size="sm" variant="ghost" onClick={exportCsv}><Download size={14} />Export costs CSV</Button>
         <Button size="sm" variant="ghost" onClick={() => fileRef.current?.click()}><Upload size={14} />Import custom CSV</Button>
@@ -92,7 +103,7 @@ export default function Kids() {
     return { data, perChild }
   }, [proj, today])
 
-  const { Cite, Sources } = useCites(['mit_living_wage', 'childcareaware_2024', 'collegeboard'])
+  const { Cite, Sources } = useCites(KID_SRC)
   const add = () => update(d => {
     let name = 'Child', n = 1
     while (d.children_list.some((c: any) => c.name.toLowerCase() === name.toLowerCase())) name = `Child ${++n}`
