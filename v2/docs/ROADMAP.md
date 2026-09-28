@@ -1,6 +1,6 @@
 # v2: where it stands and what to build next
 
-_Last updated 2026-09-27 (branch `v2-react`)_
+_Last updated 2026-09-28 (branch `v2-react`)_
 
 ## 1. Current state
 
@@ -29,9 +29,13 @@ v2 now covers every v0.8 tab and adds a set of "living plan" features. See `PARI
 | Cost-of-living raw data re-checked against BEA, BLS and World Bank (2026-09-27) | ✅ |
 | **Scenario matrix**: every life scenario × every economy, with a builder for kids / moves / retirement / lifestyle variants | ✅ |
 | **Where you'll live** lanes (place, home, kids at home) on the Dashboard and Where you live page | ✅ |
-| Demo households re-tuned for the corrected math | ✅ |
+| **Plan editor on the life timeline**: zoom/pan, drag milestones, drop new ones, edit plan or scenario | ✅ |
+| **Tax planning**: capital gains with cost basis, Roth conversions + comparison, IRMAA, ACA credits | ✅ |
+| **Goals**, **safe spending**, **guardrails**, **every-historical-start backtest** | ✅ |
+| **Pensions & annuities, loans, 529 plans** | ✅ |
+| Demo households re-tuned for the corrected math | ✅ (success rates are a few points lower now that gains are taxed) |
 
-Tests: 61 engine tests, 23 API tests, and a clean `tsc` build. The UI was checked end to end with Playwright.
+Tests: 67 engine tests, 24 API tests, and a clean `tsc` build. The UI was checked end to end with Playwright.
 
 ## 2. What's still missing
 
@@ -48,17 +52,13 @@ The app cites every major dataset (`engine/finplan/data/sources.json`). Datasets
 ### 2b. Modeling gaps (these affect the numbers)
 | Gap | Why it matters |
 |---|---|
-| **No capital-gains tax or Roth conversions** (Roth, per-person pre-tax and RMDs are now modeled) | Taxable-account withdrawals are untaxed and conversion strategies can't be planned |
 | **Social Security from earnings history** (spousal and survivor rules are done) | Benefits are typed in or estimated from today's salary |
-| **No pension/annuity income type** | Teachers, government and military plans have to fake it through the SS field (the Single Mom demo does this) |
 | **Salaries don't respond to inflation** | Inflation stress tests are harsh, because wages stay flat while prices jump |
-| **Fixed spending in Monte Carlo** | Real families cut back in bad years, so success rates are pessimistic for flexible spenders. Guardrails would fix this |
 | **Pre-65 health insurance defaults to $0** unless entered | Early retirees are under-costed (all demos show this) |
 | **Fixed asset allocation** (no glide path) | Sequence risk around retirement isn't reduced the way a real portfolio would reduce it |
-| **No non-mortgage debts** (student loans, car loans as balances), **no 529s**, no emergency-fund rule | Common family situations need workarounds |
+| **Dividend tax drag, state-specific gains rules, itemized deductions** | Taxes on taxable accounts are approximate |
 
 ### 2c. Product gaps
-- **No goals.** "Retire at 55", "college fully funded" and "pay off the house by 60" aren't first-class items with progress bars.
 - **Spending actuals still come from typing.** Balances can now come from linked accounts (CSV or SnapTrade), but transactions (Monarch Money, bank CSVs) don't fill Actuals yet.
 - **Nothing is live on the NAS yet.** v2 runs only locally, the NAS still serves v0.8, and there's no CI.
 - **Bundle size.** Pages now load on first visit (main chunk 786 kB, was 1,068 kB). Recharts could still be split out.
@@ -79,29 +79,27 @@ Compared with ProjectionLab, Boldin, and adviser tools like RightCapital, Pralan
 
 **What they have that v2 doesn't, most valuable first:**
 
-| Gap | Who has it | Why it matters |
+| Gap | Who has it | Status |
 |---|---|---|
-| Roth conversion optimizer + tax-bracket view (fill the 12%/22% bracket) | Boldin (Roth Conversion Explorer), ProjectionLab (premium), Pralana | Usually the single biggest lifetime-tax lever for pre-tax-heavy savers |
-| Capital-gains tax on taxable accounts, cost basis, withdrawal-order options | ProjectionLab, Boldin, Pralana | Retirement taxes are understated today |
-| Medicare IRMAA surcharges and ACA subsidy cliffs | Boldin, Pralana | Big hidden costs for early retirees and high-income retirees |
-| Safe-spending target / guardrails ("you can spend $X and stay at 80%") | Boldin, MaxiFi (consumption smoothing) | Turns success % into a spending number people can act on |
-| Goals and milestones with progress (FI date, college funded, house paid off) | ProjectionLab | Makes the plan motivating and trackable |
-| Historical backtest of every rolling period ("would have survived 1929, 1966, 2000 starts") | ProjectionLab, cFIREsim | More intuitive than random Monte Carlo |
-| Asset classes and a glide path (stocks/bonds/cash by age) | Boldin, ProjectionLab | Sequence risk around retirement |
-| Pensions/annuities, debts (student/auto), 529 plans | Boldin, RightCapital, ProjectionLab | Common situations that need workarounds today |
-| Estate and legacy (what heirs get, estate tax, step-up) | RightCapital, ProjectionLab | Matters with larger estates and for the ownership feature |
-| Insurance needs (life/disability coverage gap) | RightCapital | Complements the early-death and disability stress tests |
-| Bank/brokerage aggregation (Plaid/MX), budgeting import (Monarch/YNAB) | Boldin (Plaid/MX), ProjectionLab (Monarch/YNAB) | v2 has SnapTrade + CSV for balances; transactions still typed |
-| Plan-aware AI assistant | Boldin AI | Could be added with Claude later |
+| Roth conversion optimizer + tax-bracket view | Boldin, ProjectionLab, Pralana | ✅ 2026-09-28: bracket chart, fixed or bracket-fill conversions, strategy comparison |
+| Capital-gains tax on taxable accounts, cost basis | ProjectionLab, Boldin, Pralana | ✅ 2026-09-28 (withdrawal order is fixed: cash → pre-tax → Roth) |
+| Medicare IRMAA surcharges and ACA subsidy cliffs | Boldin, Pralana | ✅ 2026-09-28 |
+| Safe-spending target / guardrails | Boldin, MaxiFi | ✅ 2026-09-28 |
+| Goals and milestones with progress | ProjectionLab | ✅ 2026-09-28 |
+| Historical backtest of every rolling period | ProjectionLab, cFIREsim | ✅ 2026-09-28 (Stress tests + scenario-matrix economy) |
+| Visual timeline you edit by dragging milestones | ProjectionLab | ✅ 2026-09-28: zoomable plan editor, works on scenarios too |
+| Pensions/annuities, debts, 529 plans | Boldin, RightCapital, ProjectionLab | ✅ 2026-09-28 |
+| Asset classes and a glide path (stocks/bonds/cash by age) | Boldin, ProjectionLab | Next: sequence risk around retirement |
+| Estate and legacy (what heirs get, estate tax, step-up) | RightCapital, ProjectionLab | Later |
+| Insurance needs (life/disability coverage gap) | RightCapital | Later |
+| Bank/brokerage aggregation, budgeting import (Monarch/YNAB) | Boldin, ProjectionLab | Later; balances already come from SnapTrade + CSV |
+| Plan-aware AI assistant | Boldin AI | Later |
 
-**Suggested order:**
-1. Tax depth: capital gains, Roth conversions with a bracket-fill optimizer, IRMAA, ACA.
-2. Safe-spending guardrails.
-3. Goals.
-4. Rolling-history backtest (a column in the scenario matrix).
-5. Glide path.
-6. Pensions, debts and 529s.
-7. Estate.
+**Next:**
+1. Glide path.
+2. Estate.
+3. Insurance needs.
+4. Transaction import.
 
 ## 3. Plan (in priority order)
 

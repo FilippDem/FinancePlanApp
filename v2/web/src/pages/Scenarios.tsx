@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Save, Upload, Download, Trash2, Pencil, FolderOpen, Sparkles, GitCompare, RotateCcw, History, Eye } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Save, Upload, Download, Trash2, Pencil, FolderOpen, Sparkles, GitCompare, RotateCcw, History, Eye, CalendarRange } from 'lucide-react'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
 import { money, pct } from '../lib/format'
@@ -10,6 +11,7 @@ import { ScenarioMatrix } from '../components/ScenarioMatrix'
 
 export default function Scenarios() {
   const { plan, replacePlan, household } = usePlan()
+  const nav = useNavigate()
   const [saved, setSaved] = useState<Record<string, any>>({})
   const [demos, setDemos] = useState<Record<string, any>>({})
   const [name, setName] = useState('')
@@ -114,6 +116,7 @@ export default function Scenarios() {
       {demo && household?.is_admin && <Button size="sm" variant="ghost" title="Open in a new isolated test household (admin)"
         onClick={async () => { await api.openDemo(n); location.href = '/' }}>Test household</Button>}
       <Button size="sm" onClick={() => setConfirm({ title: `Load “${n.replace('[DEMO] ', '')}”?`, body: 'This replaces the current plan (it is auto-saved). Save the current plan as a scenario first if you want to keep it.', run: () => replacePlan(p) })}><FolderOpen size={13} />Load</Button>
+      {!demo && <Button size="sm" variant="ghost" title="Edit this scenario on the life timeline" onClick={() => nav(`/timeline?scenario=${encodeURIComponent(n)}`)}><CalendarRange size={13} />Timeline</Button>}
       {!demo && <>
         <button className="p-1.5 rounded-md text-muted hover:bg-sunken" title="Rename" onClick={() => setRename({ from: n, to: n })}><Pencil size={14} /></button>
         <button className="p-1.5 rounded-md text-muted hover:text-bad hover:bg-bad/10" title="Delete" onClick={() => setConfirm({ title: `Delete “${n}”?`, body: 'This cannot be undone.', run: async () => { await api.deleteScenario(n); load() } })}><Trash2 size={14} /></button>

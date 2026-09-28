@@ -201,3 +201,30 @@ def test_scenario_matrix_endpoints_and_report(client):
     assert names[0] == 'Current plan' and 'One more kid, Texas' in names
     pdf = c.post('/api/report', json={'format': 'pdf', 'sections': ['summary', 'scenario_matrix']})
     assert pdf.content[:4] == b'%PDF'
+
+
+def test_tax_goals_safe_spending_backtest_endpoints(client):
+    c, tmp = client
+    _login(c, tmp)
+    plan = c.get('/api/plan').json()['plan']
+    cy = plan['current_year']
+    plan['goals'] = [{'type': 'net_worth', 'amount': 500000, 'year': cy + 10}, {'type': 'emergency_fund', 'months': 6}]
+    plan['pensions'] = [{'name': 'Pension', 'person': 'Parent 1', 'start_age': 62, 'monthly': 1000}]
+    plan['debts'] = [{'name': 'Car', 'balance': 10000, 'rate': 6, 'monthly_payment': 400}]
+    g = c.post('/api/goals', json={'plan': plan, 'n': 100}).json()
+    assert len(g['goals']) == 2 and g['goals'][0]['probability'] is not None and 'fi' in g['types']
+    s = c.post('/api/safe-spending', json={'plan': plan, 'target': 0.8, 'n': 200}).json()
+    assert s['current'] > 0 and 'multiplier' in s
+    b = c.post('/api/backtest', json={'plan': plan}).json()
+    assert b['n'] == 100 and len(b['starts']) == 100
+    r = c.post('/api/taxes/roth-compare', json={'plan': plan, 'n': 100}).json()
+    assert r['strategies'][0]['id'] == 'off' and r['best']
+    br = c.post('/api/taxes/brackets', json={'plan': plan}).json()
+    assert br['tops'][0]['rate'] == 0.10 and br['std_deduction'] > 0
+    pr = c.post('/api/project', json={'plan': plan}).json()
+    assert pr['goals'] and pr['rows'][0]['debt_payment'] > 0 and 'lifetime_taxes' in pr['summary']
+    secs = [x['key'] for x in c.get('/api/report/sections').json()['sections']]
+    assert {'goals', 'tax_planning', 'income_debts'} <= set(secs)
+    c.put('/api/plan', json={'plan': plan})
+    pdf = c.post('/api/report', json={'format': 'pdf', 'sections': ['summary', 'goals', 'income_debts', 'tax_planning']})
+    assert pdf.content[:4] == b'%PDF'

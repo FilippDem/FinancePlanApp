@@ -189,7 +189,9 @@ export function GoalRow({ g, compact }: { g: any; compact?: boolean }) {
         <div className={clsx('h-full', g.status === 'on_track' ? 'bg-good' : g.status === 'at_risk' ? 'bg-warn' : 'bg-bad')} style={{ width: `${Math.max(2, g.progress * 100)}%` }} />
       </div>
       {!compact && <p className="text-[12px] text-muted mt-1">
-        {moneyish && g.target > 0 && <>Now {money(g.now)} of {money(g.target)} · projected {money(g.projected)} by {g.year} (today's $). </>}
+        {moneyish && g.target > 0 && (g.type === 'emergency_fund'
+          ? <>Now {money(g.now)} of {money(g.target)}. </>
+          : <>Now {money(g.now)} of {money(g.target)} · projected {money(g.projected)} by {g.year} (today's $). </>)}
         {g.note}</p>}
     </div>
   )

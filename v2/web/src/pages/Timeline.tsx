@@ -3,6 +3,8 @@ import { usePlan } from '../lib/store'
 import { money } from '../lib/format'
 import { Card, PageHeader, Segmented } from '../components/ui'
 import { S } from '../components/charts'
+import { LifeEditor } from '../components/LifeEditor'
+import { useSearchParams } from 'react-router-dom'
 
 const LANES: { key: string; label: string; types: string[] }[] = [
   { key: 'career', label: 'Career & retirement', types: ['job', 'retire', 'ss'] },
@@ -14,6 +16,7 @@ const YW = 30
 
 export default function Timeline() {
   const { plan, proj, names, single } = usePlan()
+  const [params] = useSearchParams()
   const [range, setRange] = useState<'30' | 'all'>('30')
   const events: any[] = proj?.events || []
   const start = plan.current_year
@@ -46,8 +49,12 @@ export default function Timeline() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Life timeline" subtitle="Every event the plan knows about, from all pages"
-        actions={<Segmented value={range} onChange={setRange} options={[{ value: '30', label: 'Next 30 years' }, { value: 'all', label: 'Whole plan' }]} />} />
+      <PageHeader title="Life timeline" subtitle="Edit your life on one zoomable line, or see every event the plan knows about" />
+      <LifeEditor initialTarget={params.get('scenario') || ''} />
+      <div className="flex items-center justify-between pt-2">
+        <h2 className="text-[16px] font-semibold">All events</h2>
+        <Segmented value={range} onChange={setRange} options={[{ value: '30', label: 'Next 30 years' }, { value: 'all', label: 'Whole plan' }]} />
+      </div>
       <Card pad={false}>
         <div className="flex">
           <div className="w-44 shrink-0 border-r border-line">

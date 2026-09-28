@@ -153,6 +153,61 @@ Every table in `data/cost_index.json` was re-checked against its publisher; see 
 - The two BLS-suppressed cells are now calculated exactly from the published subtotal.
 - For countries without an old-app template, the "Old app" slider marks are now at local prices (they had used Seattle's dollars).
 
+## Round 5 changes (2026-09-28)
+
+### Taxes
+- **Capital gains** (`capital_gains_enabled`, default on; `taxable_basis_pct`, default 80):
+  - Cash and taxable savings carry a cost basis. New savings add to it.
+  - When spending sells investments, the gain share of the sale (as of the start of the year) is realized.
+  - Realized gains are taxed at the 0/15/20% long-term rates stacked on ordinary taxable income [14], plus the 3.8% net investment income tax above $250k joint / $200k single [15], plus state tax (a country's effective rate abroad).
+  - Plans with large taxable savings now show slightly lower success rates. The math is unchanged when this is off (checked against the previous engine on all demos).
+- **Roth conversions** (`roth_conversion`):
+  - Two modes: a fixed amount per year (today's $), or filling the chosen federal bracket (10/12/22/24/32%) using the standard deduction and taxable Social Security.
+  - The window runs from retirement to the year before RMDs by default, on person 1's age.
+  - Conversions come out of each pre-tax account proportionally. The tax is paid from cash [16].
+  - `taxplan.compare()` runs every strategy through the whole plan and compares lifetime taxes, IRMAA, success, and after-tax money left (pre-tax balances counted at 75% for heirs).
+- **IRMAA** (`irmaa_enabled`, default on): Medicare Part B + D surcharges per person on Medicare. They use the 2026 CMS table on MAGI from two years earlier, with thresholds indexed after 2026 [17].
+- **ACA premium tax credit** (`aca_enabled` + `health_insurances[].marketplace`):
+  - The entered premium is treated as the benchmark silver price.
+  - Credit = premium − applicable % × MAGI, using the 2026 IRS table (2.10%–9.96%) [18].
+  - Household income is measured against the 2025 poverty guideline (+$5,500 per extra person) [19].
+  - No credit above 400% of the poverty guideline (the cliff). Below 138% it is treated as Medicaid.
+  - The credit is reconciled on the year's actual MAGI.
+- Rows gain `taxable_ordinary`, `magi`, `cap_gains_realized`, `tax_cap_gains`, `roth_conversion`, `irmaa`, `aca_credit`, `aca_benchmark` and `fpl_ratio`. The summary gains lifetime totals, `irmaa_years` and `aca_cliff_years`.
+
+### Pensions, loans, 529 plans (`extras.py`)
+- **Pensions and annuities:**
+  - Paid from a start age, in today's dollars or as quoted, with a COLA.
+  - A survivor share goes to the spouse after the owner dies. Only the taxable share is taxed [20].
+  - An optional annuity purchase is a one-time cost.
+- **Loans:**
+  - Balance, APR, monthly payment plus extra, and start year.
+  - Payments are fixed nominal amounts. The balance counts in `consumer_debt`, which lowers net worth.
+  - A "paid off" event is added. A warning appears when the payment doesn't cover the interest.
+- **529 plans per child:**
+  - Monthly saving (today's $) until an age. The account earns the portfolio return and pays that child's college-age costs [21].
+  - At 22, leftover money goes to a younger sibling's 529, or back to savings after about 32% tax and penalty on the earnings.
+  - 529 balances count in net worth, not in investable savings.
+- Check-ins roll loan and 529 balances forward with the projection, unless the check-in states them. Actuals gain a `debts` group, and pensions count as other income.
+
+### Goals (`goals.py`)
+- Goal types: work optional (25× the spending not covered by Social Security or pensions), net worth, savings, emergency fund, college funded, house paid off, debt free.
+- Each goal gets progress, the projected value, and a status.
+- `monte_carlo()` adds `goal_probs`: the share of paths meeting each money goal. On track needs at least 75%; 50–75% is at risk.
+
+### Spending
+- **Safe spending** (`solver.safe_spending`): bisection on a multiplier of flexible spending (personal, household excluding housing, recurring) to find the highest level that still reaches the target success rate.
+- **Guardrails** (`guardrails`): in Monte Carlo, each path compares its savings with the expected path. If savings are X% below, flexible spending is cut by Y%; if X% above, it is raised. By default this applies only after retiring. Monte Carlo reports how often each happens.
+
+### Rolling historical backtest (`backtest.py`)
+- The plan runs once from each start year 1924–2023, with S&P 500 returns in order (wrapping for long plans) and no income or spending noise.
+- The result is the share of start years that never ran out, plus the worst starts.
+- It is also the "Every historical start" economy in the scenario matrix.
+
+### Plan editor
+- `web/src/lib/lifeEdit.ts` maps plan items to timeline items and back: set the year from a drag, create from a palette drop, edit, and delete.
+- Everything stays additive to the v0.8 schema.
+
 ### Sources
 [1] U.S. Bureau of Economic Analysis, [Regional Price Parities by State and Metro Area, 2024](https://www.bea.gov/data/prices-inflation/regional-price-parities-state-and-metro-area)
 [2] World Bank, [Price level ratio of PPP conversion factor to market exchange rate (PA.NUS.PPPC.RF)](https://data.worldbank.org/indicator/PA.NUS.PPPC.RF), 2024 values via [Our World in Data](https://ourworldindata.org/grapher/gdp-price-levels-relative-to-the-us)
@@ -169,3 +224,11 @@ The full, numbered list the app cites lives in `engine/finplan/data/sources.json
 [11] Federal Register, [Required Minimum Distributions final regulations (SECURE 2.0 applicable age)](https://www.federalregister.gov/documents/2024/07/19/2024-14542/required-minimum-distributions)
 [12] SSA, [Benefits for spouses](https://www.ssa.gov/oact/quickcalc/spouse.html)
 [13] SSA, [Retirement age and benefit reduction](https://www.ssa.gov/benefits/retirement/planner/agereduction.html)
+[14] IRS, [Rev. Proc. 2023-34 (2024 capital-gains thresholds)](https://www.irs.gov/pub/irs-drop/rp-23-34.pdf)
+[15] IRS, [Net Investment Income Tax](https://www.irs.gov/individuals/net-investment-income-tax)
+[16] IRS, [Publication 590-A (Roth conversions)](https://www.irs.gov/publications/p590a)
+[17] CMS, [2026 Medicare Parts A & B premiums and deductibles (IRMAA)](https://www.cms.gov/newsroom/fact-sheets/2026-medicare-parts-b-premiums-deductibles)
+[18] IRS, [Rev. Proc. 2025-25 (2026 applicable percentage table)](https://www.irs.gov/pub/irs-drop/rp-25-25.pdf)
+[19] HHS ASPE, [Poverty guidelines](https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines)
+[20] IRS, [Topic no. 410, Pensions and annuities](https://www.irs.gov/taxtopics/tc410)
+[21] IRS, [Publication 970 (529 plans)](https://www.irs.gov/publications/p970)

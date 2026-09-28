@@ -57,6 +57,7 @@ Data compatibility is ✅ for everything: v2 reads and writes the same household
 | Career phases (salary, raise, bonus, RSUs with vesting, options) | ✅ Style defaults per phase; RSU income ramps over the vesting period |
 | Pooled / Separate finances with split % | ✅ |
 | Single-person plans | ✅ |
+| Pensions & annuities (start age, COLA, survivor %, taxable share, annuity purchase) | ✅ New in v2 |
 | Guided mode / tab walkthroughs | ➖ The guided setup plus per-page Help replace it |
 | Tab visibility settings | ➖ v2 navigation has no tabs to hide |
 
@@ -68,6 +69,7 @@ Data compatibility is ✅ for everything: v2 reads and writes the same household
 | Shared household categories, add/remove custom | ✅ | |
 | Recurring expenses (frequency, start/end, inflation, financing, owner) | ✅ (financing now actually applied) | |
 | One-time purchases (financing, asset type, appreciation) | ✅ (edit & delete, which V13 lacked) | |
+| Loans & debts (student, car, card: balance, rate, payment, extra; payoff year; counts against net worth) | ✅ | New in v2 (Spending → Loans) |
 | Custom named templates per location | ✅ | Save, edit, delete; offered as a lifestyle for that place in Moves, Assumptions and Spending |
 | Save a template as a new city | ✅ | Creates the place under My places, taxed and priced like the source |
 | Custom locations / world map | ✅ | My places (map position, taxed like, prices like); Where you live page with Equal Earth map and flight paths |
@@ -111,6 +113,7 @@ Data compatibility is ✅ for everything: v2 reads and writes the same household
 | Cost by age range, lifetime and peak | ✅ |
 | CSV export/import of the per-age cost table | ✅ (per child) |
 | Template explorer (costs by age before adding a child) | ✅ |
+| 529 plan per child (balance, monthly saving, pays college costs, leftover to a sibling or back to savings) | ✅ New in v2 |
 
 ## Homes
 | Feature | Status |
@@ -124,7 +127,7 @@ Data compatibility is ✅ for everything: v2 reads and writes the same household
 ## Healthcare
 | Feature | Status |
 |---|---|
-| Health insurance plans by age range | ✅ |
+| Health insurance plans by age range | ✅ (+ Marketplace/ACA flag: premium credit from income, v2) |
 | Medicare B/D/Medigap | ✅ (2026 Part B default) |
 | Long-term care premiums | ✅ (benefits stored, not modeled) |
 | Health expenses | ✅ (now used in projections) |
@@ -144,6 +147,8 @@ Data compatibility is ✅ for everything: v2 reads and writes the same household
 | Roth balances and yearly Roth contributions per person | ✅ New in v2 |
 | Required minimum distributions (73/75, Uniform Lifetime Table) | ✅ New in v2, toggle in Assumptions |
 | Spousal Social Security (up to 50%, reduced if claimed early) | ✅ New in v2, toggle in Assumptions |
+| Spending guardrails in Monte Carlo (cut/raise flexible spending vs the expected path) | ✅ New in v2 |
+| Capital-gains tax, IRMAA and ACA credit toggles, taxable cost basis % | ✅ New in v2 (Tax planning) |
 
 ## Analysis
 | Feature | Status |
@@ -157,6 +162,11 @@ Data compatibility is ✅ for everything: v2 reads and writes the same household
 | Monte Carlo fan chart (10/25/50/75/90), success rate, final stats | ✅ |
 | Median-return statistic in MC summary | ⏳ Minor |
 | Timeline of life events | ✅ (swim lanes + by decade; career-phase changes now included) |
+| **Plan editor on the life timeline** (zoom/pan; drag milestones to change the year; drop moves, kids, homes, sales, jobs, purchases, recurring costs, gifts, pensions, loans, goals from a palette; click to edit or delete; undo; edits the plan or a saved scenario; net-worth strip and change readout) | ✅ New in v2 |
+| Goals & milestones (work optional, net worth, savings, emergency fund, college funded, house paid off, debt free) with progress and Monte Carlo chance; Dashboard card, Goals page, check-in results, reports | ✅ New in v2 |
+| Safe spending (most flexible spending that keeps a target chance) with one-click apply | ✅ New in v2 |
+| Every historical start year (rolling backtest 1924–2023), also a Scenario-matrix economy | ✅ New in v2 |
+| Tax planning page: bracket chart, Roth conversions (fixed / fill a bracket) with strategy comparison, capital-gains tax with cost basis, Medicare IRMAA, ACA premium credits and cliff | ✅ New in v2 |
 | Taxes by year | ✅ |
 | Retirement tab: early/delayed comparison, replacement ratio, 80% target | ✅ |
 | Stress tests: market crash, disabled child, unemployment, hyperinflation | ✅ All v0.8 defaults, "worst possible year" search, stoplight by percentile, verdict. Plus extra cost, early death, compound tests |
