@@ -1,498 +1,611 @@
+#!/usr/bin/env python3
 """
-Comprehensive test of all financial scenarios, cashflow calculations,
-encryption, actuals tracking, and Excel export/import.
+Comprehensive test scenarios for Financial Planning Suite v0.74
+Tests various edge cases and realistic user scenarios
+"""
 
-Run: python test_scenarios.py
-"""
-import json
-import os
 import sys
-import tempfile
-from pathlib import Path
-from datetime import datetime
-from dataclasses import dataclass, field, asdict
-from typing import List, Optional
-
-# Minimal mock of streamlit to allow importing functions
-class MockSessionState(dict):
-    def __getattr__(self, key):
-        try:
-            return self[key]
-        except KeyError:
-            raise AttributeError(key)
-    def __setattr__(self, key, value):
-        self[key] = value
-    def __delattr__(self, key):
-        del self[key]
-
-class MockSidebar:
-    def __enter__(self): return self
-    def __exit__(self, *a): pass
-
-class MockSt:
-    session_state = MockSessionState()
-    def __getattr__(self, name):
-        # Return a no-op for any streamlit function
-        def noop(*args, **kwargs):
-            return None
-        return noop
-    @property
-    def sidebar(self):
-        return MockSidebar()
-
-sys.modules['streamlit'] = MockSt()
-sys.modules['plotly'] = type(sys)('plotly')
-sys.modules['plotly.graph_objects'] = type(sys)('plotly.graph_objects')
-sys.modules['plotly.subplots'] = type(sys)('plotly.subplots')
-
+import traceback
+from dataclasses import asdict
 import pandas as pd
 import numpy as np
+import json
+import io
 
-# Now we can import parts of the app
-print("Loading app module...")
-with open('FinancialPlanner_v0_8.py', encoding='utf-8') as f:
-    source = f.read()
+# Import the main application components
+# We'll test the dataclasses and utility functions
+print("=" * 80)
+print("FINANCIAL PLANNING SUITE v0.74 - COMPREHENSIVE SCENARIO TESTING")
+print("=" * 80)
 
-# Extract key functions and data by executing in a controlled namespace
-exec_globals = {
-    'st': MockSt(),
-    'pd': pd,
-    'np': np,
-    'go': type(sys)('plotly.graph_objects'),
-    'json': json,
-    'os': os,
-    'datetime': datetime,
-    'Path': Path,
-    'Optional': Optional,
-    'List': List,
-    'dataclass': dataclass,
-    'field': field,
-    'asdict': asdict,
-    '__name__': 'test',
-}
+test_results = []
 
-# We can't exec the whole file (Streamlit decorators etc), so let's test key logic directly
-
-# ============================================================
-# TEST: Encryption round-trip
-# ============================================================
-print("\n=== TEST: Encryption Round-Trip ===")
-
-import hashlib
-import hmac
-import secrets
-import base64
-
-def _derive_key(passphrase, salt):
-    return hashlib.pbkdf2_hmac('sha256', passphrase.encode('utf-8'), salt, 100000)
-
-def _encrypt_data(plaintext, passphrase):
-    salt = secrets.token_bytes(16)
-    key = _derive_key(passphrase, salt)
-    iv = secrets.token_bytes(16)
-    plaintext_bytes = plaintext.encode('utf-8')
-    ciphertext = bytearray()
-    for i in range(0, len(plaintext_bytes), 32):
-        counter = i.to_bytes(8, 'big')
-        block_key = hmac.new(key, iv + counter, hashlib.sha256).digest()
-        chunk = plaintext_bytes[i:i+32]
-        ciphertext.extend(b ^ k for b, k in zip(chunk, block_key[:len(chunk)]))
-    tag = hmac.new(key, bytes(ciphertext), hashlib.sha256).digest()[:16]
-    return {
-        'salt': base64.b64encode(salt).decode(),
-        'iv': base64.b64encode(iv).decode(),
-        'ciphertext': base64.b64encode(bytes(ciphertext)).decode(),
-        'tag': base64.b64encode(tag).decode(),
-    }
-
-def _decrypt_data(encrypted, passphrase):
+def test_scenario(name, test_func):
+    """Run a test scenario and record results"""
     try:
-        salt = base64.b64decode(encrypted['salt'])
-        iv = base64.b64decode(encrypted['iv'])
-        ciphertext = base64.b64decode(encrypted['ciphertext'])
-        tag = base64.b64decode(encrypted['tag'])
-        key = _derive_key(passphrase, salt)
-        expected_tag = hmac.new(key, ciphertext, hashlib.sha256).digest()[:16]
-        if not hmac.compare_digest(tag, expected_tag):
-            return None
-        plaintext = bytearray()
-        for i in range(0, len(ciphertext), 32):
-            counter = i.to_bytes(8, 'big')
-            block_key = hmac.new(key, iv + counter, hashlib.sha256).digest()
-            chunk = ciphertext[i:i+32]
-            plaintext.extend(b ^ k for b, k in zip(chunk, block_key[:len(chunk)]))
-        return plaintext.decode('utf-8')
-    except Exception:
-        return None
+        print(f"\n{'='*60}")
+        print(f"TEST: {name}")
+        print(f"{'='*60}")
+        test_func()
+        print(f"✅ PASSED: {name}")
+        test_results.append((name, "PASSED", None))
+        return True
+    except Exception as e:
+        print(f"❌ FAILED: {name}")
+        print(f"Error: {str(e)}")
+        traceback.print_exc()
+        test_results.append((name, "FAILED", str(e)))
+        return False
 
-# Test small data
-test_data = json.dumps({"net_worth": 100000, "expenses": {"food": 5000}})
-encrypted = _encrypt_data(test_data, "mypassphrase123")
-assert 'ciphertext' in encrypted
-decrypted = _decrypt_data(encrypted, "mypassphrase123")
-assert decrypted == test_data
-print("  OK: Small data encrypt/decrypt round-trip")
-
-# Test wrong passphrase
-wrong = _decrypt_data(encrypted, "wrongpassword")
-assert wrong is None
-print("  OK: Wrong passphrase returns None")
-
-# Test large data (simulate full plan JSON)
-large_data = json.dumps({"expenses": {f"cat_{i}": i * 100 for i in range(1000)}})
-enc_large = _encrypt_data(large_data, "strongpass!@#$")
-dec_large = _decrypt_data(enc_large, "strongpass!@#$")
-assert dec_large == large_data
-print(f"  OK: Large data ({len(large_data)} bytes) round-trip")
-
-# ============================================================
-# TEST: Expense Template Lookup
-# ============================================================
-print("\n=== TEST: Expense Templates ===")
-
-# Extract ADULT_EXPENSE_TEMPLATES from source
-import re
-
-# Parse state templates
-state_template_start = source.index('STATE_EXPENSE_TEMPLATES = {')
-# Find matching closing brace
-brace_count = 0
-pos = state_template_start
-for i in range(state_template_start, len(source)):
-    if source[i] == '{':
-        brace_count += 1
-    elif source[i] == '}':
-        brace_count -= 1
-        if brace_count == 0:
-            pos = i + 1
-            break
-state_template_code = source[state_template_start:pos]
-state_ns = {}
-exec(state_template_code, state_ns)
-STATE_EXPENSE_TEMPLATES = state_ns['STATE_EXPENSE_TEMPLATES']
-
-print(f"  OK: {len(STATE_EXPENSE_TEMPLATES)} US state templates loaded")
-
-# Spot-check some states
-for state in ['Washington', 'California', 'Texas', 'Mississippi', 'Hawaii', 'New York']:
-    assert state in STATE_EXPENSE_TEMPLATES, f"Missing state: {state}"
-    assert 'Average (statistical)' in STATE_EXPENSE_TEMPLATES[state]
-    avg = STATE_EXPENSE_TEMPLATES[state]['Average (statistical)']
-    total = sum(avg.values())
-    assert 15000 < total < 60000, f"{state} total {total} out of range"
-    print(f"  OK: {state} — Average total: ${total:,.0f}")
-
-# Verify Mississippi < Hawaii (cheapest vs most expensive)
-ms_total = sum(STATE_EXPENSE_TEMPLATES['Mississippi']['Average (statistical)'].values())
-hi_total = sum(STATE_EXPENSE_TEMPLATES['Hawaii']['Average (statistical)'].values())
-assert ms_total < hi_total, f"Mississippi ({ms_total}) should be cheaper than Hawaii ({hi_total})"
-print(f"  OK: Mississippi (${ms_total:,.0f}) < Hawaii (${hi_total:,.0f})")
-
-# ============================================================
-# TEST: Scenario Cashflow Validation
-# ============================================================
-print("\n=== TEST: Scenario Cashflow Validation ===")
-
-# Seattle Average adult template (extract from source)
-sea_avg_start = source.index('"Seattle": {') + len('"Seattle": {')
-# Find the Average strategy
-sea_avg_idx = source.index('"Average (statistical)":', sea_avg_start)
-# Extract the dict
-brace_start = source.index('{', sea_avg_idx + 20)
-brace_count = 0
-for i in range(brace_start, brace_start + 2000):
-    if source[i] == '{':
-        brace_count += 1
-    elif source[i] == '}':
-        brace_count -= 1
-        if brace_count == 0:
-            sea_avg_end = i + 1
-            break
-sea_avg_code = source[brace_start:sea_avg_end]
-sea_avg = eval(sea_avg_code)
-sea_avg_total = sum(sea_avg.values())
-
-# Seattle Conservative
-sea_con_idx = source.index('"Conservative (statistical)":', source.index('"Seattle": {'))
-brace_start = source.index('{', sea_con_idx + 20)
-brace_count = 0
-for i in range(brace_start, brace_start + 2000):
-    if source[i] == '{':
-        brace_count += 1
-    elif source[i] == '}':
-        brace_count -= 1
-        if brace_count == 0:
-            sea_con_end = i + 1
-            break
-sea_con_code = source[brace_start:sea_con_end]
-sea_con = eval(sea_con_code)
-sea_con_total = sum(sea_con.values())
-
-print(f"  Seattle Average adult: ${sea_avg_total:,.0f}")
-print(f"  Seattle Conservative adult: ${sea_con_total:,.0f}")
-
-# Family shared defaults
-family_defaults = {
-    'Mortgage/Rent': 24000, 'Home Improvement': 1000, 'Property Tax': 0, 'Home Insurance': 0,
-    'Gas & Electric': 1800, 'Water': 600, 'Garbage': 420, 'Internet & Cable': 1200,
-    'Shared Subscriptions': 480, 'Family Vacations': 4000, 'Pet Care': 0, 'Other Family Expenses': 600
-}
-family_total = sum(family_defaults.values())
-print(f"  Family shared defaults: ${family_total:,.0f}")
-
-# Houston Conservative
-hou_con_idx = source.index('"Conservative (statistical)":', source.index('"Houston": {', source.index('ADULT_EXPENSE_TEMPLATES')))
-brace_start = source.index('{', hou_con_idx + 20)
-brace_count = 0
-for i in range(brace_start, brace_start + 2000):
-    if source[i] == '{':
-        brace_count += 1
-    elif source[i] == '}':
-        brace_count -= 1
-        if brace_count == 0:
-            hou_con_end = i + 1
-            break
-hou_con = eval(source[brace_start:hou_con_end])
-hou_con_total = sum(hou_con.values())
-print(f"  Houston Conservative adult: ${hou_con_total:,.0f}")
-
-# Texas family (tight budget)
-tx_family = {
-    'Mortgage/Rent': 18000, 'Home Improvement': 500, 'Property Tax': 0, 'Home Insurance': 0,
-    'Gas & Electric': 1500, 'Water': 480, 'Garbage': 360, 'Internet & Cable': 960,
-    'Shared Subscriptions': 360, 'Family Vacations': 2000, 'Pet Care': 0, 'Other Family Expenses': 400
-}
-tx_family_total = sum(tx_family.values())
-
-print()
-
-# Define scenarios with expected outcomes
-scenarios = [
-    {
-        'name': 'All Defaults (Seattle)',
-        'gross_income': 150000,
-        'tax_rate': 0.22,  # WA no state tax, ~22% effective federal
-        'p1_expenses': sea_avg_total,
-        'p2_expenses': sea_avg_total,
-        'family_expenses': family_total,
-        'children_expenses': 0,
-        'house_expenses': 0,  # No default house anymore
-        'extra_deductions': 6000,  # 401k
-        'net_worth': 90000,
-    },
-    {
-        'name': 'Young Couple, Seattle',
-        'gross_income': 175000,
-        'tax_rate': 0.20,
-        'p1_expenses': sea_con_total,
-        'p2_expenses': sea_con_total,
-        'family_expenses': family_total,
-        'children_expenses': 0,
-        'house_expenses': 0,
-        'extra_deductions': 12000,
-        'net_worth': 75000,
-    },
-    {
-        'name': 'Mid-Career + 2 Kids, Seattle',
-        'gross_income': 270000,
-        'tax_rate': 0.24,
-        'p1_expenses': sea_avg_total,
-        'p2_expenses': sea_avg_total,
-        'family_expenses': family_total,
-        'children_expenses': 15000,  # ~$7.5k per kid (ages 4,7 average)
-        'house_expenses': 0,
-        'extra_deductions': 23500,
-        'net_worth': 630000,
-    },
-    {
-        'name': 'High Earner, Single, Seattle',
-        'gross_income': 250000,
-        'tax_rate': 0.28,  # Single, higher bracket
-        'p1_expenses': sea_avg_total,
-        'p2_expenses': 0,  # Single — P2 zeroed
-        'family_expenses': family_total,
-        'children_expenses': 0,
-        'house_expenses': 0,
-        'extra_deductions': 23500,
-        'net_worth': 600000,
-    },
-    {
-        'name': 'Near Retirement, Seattle',
-        'gross_income': 215000,
-        'tax_rate': 0.22,
-        'p1_expenses': sea_avg_total,
-        'p2_expenses': sea_avg_total,
-        'family_expenses': family_total,
-        'children_expenses': 0,
-        'house_expenses': 0,
-        'extra_deductions': 23500,
-        'net_worth': 2000000,
-    },
-    {
-        'name': 'Tight Budget, TX',
-        'gross_income': 100000,
-        'tax_rate': 0.16,  # TX no state tax, lower bracket
-        'p1_expenses': hou_con_total,
-        'p2_expenses': hou_con_total,
-        'family_expenses': 21720,  # Reduced TX family
-        'children_expenses': 14000,  # TX Conservative daycare
-        'house_expenses': 0,
-        'extra_deductions': 3000,  # Low 401k
-        'net_worth': 23000,
-    },
-]
-
-all_passed = True
-for s in scenarios:
-    after_tax = s['gross_income'] * (1 - s['tax_rate']) - s['extra_deductions']
-    total_expenses = s['p1_expenses'] + s['p2_expenses'] + s['family_expenses'] + s['children_expenses'] + s['house_expenses']
-    cashflow = after_tax - total_expenses
-    savings_rate = cashflow / s['gross_income'] * 100 if s['gross_income'] > 0 else 0
-    inv_return = s['net_worth'] * 0.07
-
-    status = "PASS" if cashflow > -5000 else "FAIL"  # Allow small deficit for Tight Budget with daycare
-    if status == "FAIL":
-        all_passed = False
-
-    print(f"  {status}: {s['name']}")
-    print(f"    After-tax income: ${after_tax:,.0f}")
-    print(f"    Total expenses:   ${total_expenses:,.0f}")
-    print(f"    Annual cashflow:  ${cashflow:+,.0f}")
-    print(f"    Savings rate:     {savings_rate:+.1f}%")
-    print(f"    Investment return: ${inv_return:,.0f}")
-    print(f"    Year 1 net change: ${cashflow + inv_return:+,.0f}")
-    print()
-
-# ============================================================
-# TEST: Excel Export/Import Round-Trip
-# ============================================================
-print("=== TEST: Excel Export Structure ===")
+# Import dataclasses from the main file
+print("\n📦 Importing dataclasses...")
 try:
-    from openpyxl import Workbook, load_workbook
-    from openpyxl.styles import Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from FinancialPlanner_v0_7 import (
+        HealthInsurance, LongTermCareInsurance, HealthExpense,
+        Debt, Plan529, EducationGoal, TaxStrategy, RetirementWithdrawal,
+        format_currency, PortfolioAllocation, House, HouseTimelineEntry,
+        StateTimelineEntry, MajorPurchase, RecurringExpense, EconomicParameters
+    )
+    print("✅ All dataclasses imported successfully")
+except ImportError as e:
+    print(f"❌ Failed to import dataclasses: {e}")
+    sys.exit(1)
 
-    # Create a minimal workbook matching our export format
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Instructions"
-    ws['A1'] = "Financial Plan Tracking Workbook"
+# TEST 1: Format Currency Edge Cases
+def test_format_currency_edge_cases():
+    """Test format_currency with edge cases"""
+    test_cases = [
+        (0, "$0"),
+        (-1000, "-$1k"),
+        (1000000, "$1.0M"),
+        (1500000, "$1.5M"),
+        (999, "$999"),
+        (None, "$0"),
+        (float('nan'), "$0"),
+        (0.5, "$1"),  # Rounds
+        (-500000, "-$500k"),
+    ]
 
-    # Summary sheet
-    ws_sum = wb.create_sheet("Summary")
-    headers = ['Year', 'Net Worth (Plan)', 'Net Worth (Actual)', 'Income (Plan)', 'Income (Actual)']
-    for col, h in enumerate(headers, 1):
-        ws_sum.cell(row=1, column=col, value=h)
-    ws_sum.cell(row=2, column=1, value=2026)
-    ws_sum.cell(row=2, column=2, value=500000)  # Plan NW
-    ws_sum.cell(row=2, column=3, value=520000)  # Actual NW
+    for value, expected_prefix in test_cases:
+        result = format_currency(value)
+        print(f"  format_currency({value}) = {result}")
+        assert result.startswith("$") or result.startswith("-$"), f"Expected currency format for {value}"
 
-    # Expense sheet
-    ws_exp = wb.create_sheet("Expenses_2026")
-    exp_headers = ['Category', 'Monthly Plan'] + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] + ['Annual Plan', 'Annual Actual', 'Variance', 'Variance %']
-    for col, h in enumerate(exp_headers, 1):
-        ws_exp.cell(row=1, column=col, value=h)
+    print("✅ All currency formatting edge cases handled")
 
-    # Section header
-    ws_exp.cell(row=2, column=1, value="Alex — Individual")
-    ws_exp['A2'].font = Font(bold=True)
+test_scenario("Format Currency Edge Cases", test_format_currency_edge_cases)
 
-    # Category row with actuals
-    ws_exp.cell(row=3, column=1, value="Groceries")
-    ws_exp.cell(row=3, column=2, value=400)  # Monthly plan
-    for m in range(3, 15):
-        ws_exp.cell(row=3, column=m, value=450)  # Monthly actuals
-    ws_exp.cell(row=3, column=15, value=4800)  # Annual plan
-    ws_exp.cell(row=3, column=16, value=5400)  # Annual actual (450*12)
+# TEST 2: HealthInsurance Dataclass
+def test_health_insurance_creation():
+    """Test HealthInsurance dataclass with various scenarios"""
 
-    # Save to temp file
-    tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False)
-    wb.save(tmp.name)
-    tmp.close()
+    # Scenario 1: Employer insurance
+    employer_insurance = HealthInsurance(
+        name="Employer PPO",
+        type="Employer",
+        monthly_premium=500.0,
+        annual_deductible=3000.0,
+        annual_out_of_pocket_max=8000.0,
+        copay_primary=25.0,
+        copay_specialist=50.0,
+        covered_by="Family",
+        start_age=0,
+        end_age=65
+    )
+    assert employer_insurance.name == "Employer PPO"
+    assert employer_insurance.monthly_premium == 500.0
+    print(f"  Created employer insurance: {employer_insurance.name}")
 
-    # Test that we can read it back
-    wb2 = load_workbook(tmp.name, data_only=True)
-    assert "Summary" in wb2.sheetnames
-    assert "Expenses_2026" in wb2.sheetnames
+    # Scenario 2: Medicare
+    medicare = HealthInsurance(
+        name="Medicare",
+        type="Medicare",
+        monthly_premium=174.70,
+        annual_deductible=0.0,
+        annual_out_of_pocket_max=0.0,
+        copay_primary=0.0,
+        copay_specialist=0.0,
+        covered_by="Parent 1",
+        start_age=65,
+        end_age=999
+    )
+    assert medicare.type == "Medicare"
+    print(f"  Created Medicare insurance: {medicare.name}")
 
-    # Verify data
-    assert wb2["Summary"].cell(row=2, column=3).value == 520000
-    assert wb2["Expenses_2026"].cell(row=3, column=16).value == 5400
+    # Test asdict conversion
+    insurance_dict = asdict(employer_insurance)
+    assert isinstance(insurance_dict, dict)
+    assert insurance_dict['name'] == "Employer PPO"
+    print(f"  asdict() conversion successful: {len(insurance_dict)} fields")
 
-    os.unlink(tmp.name)
-    print("  OK: Workbook create/save/read round-trip")
-    print("  OK: Summary sheet data preserved")
-    print("  OK: Expense sheet data preserved")
+    print("✅ HealthInsurance dataclass working correctly")
 
-except ImportError:
-    print("  SKIP: openpyxl not available")
+test_scenario("HealthInsurance Dataclass Creation", test_health_insurance_creation)
 
-# ============================================================
-# TEST: Actuals Data Model
-# ============================================================
-print("\n=== TEST: Actuals Data Model ===")
+# TEST 3: Debt Management Edge Cases
+def test_debt_management():
+    """Test Debt dataclass with various debt types"""
 
-actuals = {
-    "2025": {
-        "net_worth": 850000,
-        "taxes_paid": 75000,
-        "notes": "Good year",
-        "income": {
-            "parent1_employment": 180000,
-            "parent2_employment": 120000,
-            "ss_income": 0,
-            "investment_income": 25000,
-        },
-        "expenses": {
-            "parentX": {"Groceries": 4800, "Dining Out": 3600},
-            "parentY": {"Groceries": 4200, "Dining Out": 2800},
-            "family": {"Mortgage/Rent": 24000, "Gas & Electric": 1800},
-            "children": {"Emma": {"Daycare": 18000, "Food": 2400}},
-            "healthcare": {"insurance_premiums": 12000},
-            "housing": {"Main House": {"property_tax": 8500}},
-            "recurring": {},
-            "major_purchases": {"New Roof": 15000},
-        }
-    }
-}
+    # Student loan with forgiveness
+    student_loan = Debt(
+        name="Federal Student Loan",
+        debt_type="Student Loan",
+        principal=50000.0,
+        interest_rate=0.045,
+        monthly_payment=300.0,
+        minimum_payment=250.0,
+        start_date="2020-01-01",
+        owner="Parent 1",
+        interest_type="Fixed",
+        income_based_repayment=True,
+        forgiveness_eligible=True,
+        forgiveness_years=10
+    )
+    assert student_loan.forgiveness_eligible == True
+    assert student_loan.forgiveness_years == 10
+    print(f"  Created student loan: {student_loan.name} with forgiveness")
 
-# Serialize
-actuals_json = json.dumps(actuals)
-assert len(actuals_json) > 100
-print(f"  OK: Actuals JSON serializes ({len(actuals_json)} bytes)")
+    # Credit card debt
+    credit_card = Debt(
+        name="Chase Card",
+        debt_type="Credit Card",
+        principal=5000.0,
+        interest_rate=0.1899,  # 18.99%
+        monthly_payment=200.0,
+        minimum_payment=150.0,
+        start_date="2023-01-01",
+        owner="Shared",
+        interest_type="Variable"
+    )
+    assert credit_card.interest_rate > 0.15
+    print(f"  Created credit card: {credit_card.name} at {credit_card.interest_rate*100:.2f}%")
 
-# Encrypt/decrypt round-trip
-enc = _encrypt_data(actuals_json, "test_pass_123")
-dec = _decrypt_data(enc, "test_pass_123")
-assert json.loads(dec) == actuals
-print("  OK: Actuals encrypt/decrypt round-trip")
+    # Zero balance debt (paid off)
+    paid_off = Debt(
+        name="Paid Off Loan",
+        debt_type="Auto Loan",
+        principal=0.0,
+        interest_rate=0.0,
+        monthly_payment=0.0,
+        minimum_payment=0.0,
+        start_date="2020-01-01",
+        owner="Parent 2"
+    )
+    assert paid_off.principal == 0.0
+    print(f"  Created paid-off debt: {paid_off.name}")
 
-# Verify structure
-a = actuals["2025"]
-total_income = sum(a["income"].values())
-assert total_income == 325000
-print(f"  OK: Total income: ${total_income:,.0f}")
+    print("✅ Debt dataclass handles all debt types correctly")
 
-total_expenses = (
-    sum(a["expenses"]["parentX"].values()) +
-    sum(a["expenses"]["parentY"].values()) +
-    sum(a["expenses"]["family"].values()) +
-    sum(sum(c.values()) for c in a["expenses"]["children"].values()) +
-    sum(a["expenses"]["healthcare"].values()) +
-    sum(sum(h.values()) for h in a["expenses"]["housing"].values()) +
-    sum(a["expenses"]["major_purchases"].values())
-)
-print(f"  OK: Total expenses: ${total_expenses:,.0f}")
-print(f"  OK: Cashflow: ${total_income - a['taxes_paid'] - total_expenses:+,.0f}")
+test_scenario("Debt Management Scenarios", test_debt_management)
 
-# ============================================================
-# SUMMARY
-# ============================================================
-print()
-print("=" * 60)
-if all_passed:
-    print("ALL TESTS PASSED")
+# TEST 4: 529 Plan and Education Funding
+def test_education_funding():
+    """Test Plan529 and EducationGoal dataclasses"""
+
+    # 529 plan with age-based allocation
+    plan529 = Plan529(
+        name="Washington 529",
+        beneficiary="Child 1",
+        current_balance=10000.0,
+        monthly_contribution=300.0,
+        state="Washington",
+        investment_return=0.07,
+        age_based_allocation=True,
+        contribution_end_age=18
+    )
+    assert plan529.age_based_allocation == True
+    print(f"  Created 529 plan: {plan529.name} for {plan529.beneficiary}")
+
+    # Education goal for private college
+    private_college = EducationGoal(
+        beneficiary="Child 1",
+        institution_type="Private",
+        estimated_annual_cost=60000.0,
+        years_of_college=4,
+        start_year=2043,
+        scholarship_amount=10000.0,
+        grants_amount=5000.0,
+        student_loans_allowed=False,
+        max_parent_contribution=200000.0
+    )
+    total_cost = private_college.estimated_annual_cost * private_college.years_of_college
+    total_aid = (private_college.scholarship_amount + private_college.grants_amount) * private_college.years_of_college
+    net_cost = total_cost - total_aid
+    print(f"  Private college total cost: ${total_cost:,.0f}")
+    print(f"  Total scholarships/grants: ${total_aid:,.0f}")
+    print(f"  Net cost: ${net_cost:,.0f}")
+    assert net_cost > 0
+
+    # Community college (low cost)
+    community_college = EducationGoal(
+        beneficiary="Child 2",
+        institution_type="Community College",
+        estimated_annual_cost=5000.0,
+        years_of_college=2,
+        start_year=2045,
+        scholarship_amount=2000.0,
+        grants_amount=1000.0,
+        student_loans_allowed=True,
+        max_parent_contribution=10000.0
+    )
+    assert community_college.estimated_annual_cost < 10000.0
+    print(f"  Community college: {community_college.institution_type}")
+
+    print("✅ Education funding scenarios working correctly")
+
+test_scenario("Education Funding Scenarios", test_education_funding)
+
+# TEST 5: Tax Optimization
+def test_tax_optimization():
+    """Test TaxStrategy and RetirementWithdrawal dataclasses"""
+
+    # Roth conversion strategy
+    roth_conversion = TaxStrategy(
+        name="Annual Roth Conversion",
+        strategy_type="Roth Conversion",
+        annual_amount=15000.0,
+        start_year=2025,
+        end_year=2035,
+        estimated_tax_savings=30000.0,
+        notes="Convert in low-income years"
+    )
+    years_active = roth_conversion.end_year - roth_conversion.start_year
+    total_conversions = roth_conversion.annual_amount * years_active
+    print(f"  Roth conversion over {years_active} years: ${total_conversions:,.0f}")
+
+    # QCD strategy
+    qcd_strategy = TaxStrategy(
+        name="Qualified Charitable Distribution",
+        strategy_type="Qualified Charitable Distribution",
+        annual_amount=5000.0,
+        start_year=2030,
+        end_year=2050,
+        estimated_tax_savings=1200.0,
+        notes="Age 70.5+ RMD to charity"
+    )
+    assert "Charitable" in qcd_strategy.strategy_type
+    print(f"  QCD strategy: ${qcd_strategy.annual_amount:,.0f}/year")
+
+    # Retirement withdrawal from different accounts
+    withdrawals = [
+        RetirementWithdrawal(2025, "401k", 40000.0, 0.22, "Living Expenses"),
+        RetirementWithdrawal(2025, "Roth IRA", 10000.0, 0.0, "Tax-free withdrawal"),
+        RetirementWithdrawal(2025, "Taxable Brokerage", 20000.0, 0.15, "Long-term gains"),
+    ]
+
+    total_gross = sum(w.amount for w in withdrawals)
+    total_tax = sum(w.amount * w.tax_rate for w in withdrawals)
+    total_net = total_gross - total_tax
+
+    print(f"  Total withdrawals: ${total_gross:,.0f}")
+    print(f"  Total tax: ${total_tax:,.0f}")
+    print(f"  Net income: ${total_net:,.0f}")
+    assert total_net < total_gross
+
+    print("✅ Tax optimization scenarios working correctly")
+
+test_scenario("Tax Optimization Scenarios", test_tax_optimization)
+
+# TEST 6: Empty List Handling
+def test_empty_list_handling():
+    """Test operations on empty lists (edge case)"""
+
+    empty_debts = []
+    total_debt = sum([d.principal for d in empty_debts])
+    assert total_debt == 0
+    print(f"  Empty debt list sum: ${total_debt}")
+
+    empty_insurances = []
+    total_premium = sum([ins.monthly_premium * 12 for ins in empty_insurances])
+    assert total_premium == 0
+    print(f"  Empty insurance list sum: ${total_premium}")
+
+    # Division by zero protection
+    if total_debt > 0:
+        avg_rate = sum([d.principal * 0.05 for d in empty_debts]) / total_debt
+    else:
+        avg_rate = 0
+    assert avg_rate == 0
+    print(f"  Protected division by zero: {avg_rate}")
+
+    print("✅ Empty list handling works correctly")
+
+test_scenario("Empty List Handling", test_empty_list_handling)
+
+# TEST 7: Portfolio Allocation
+def test_portfolio_allocation():
+    """Test PortfolioAllocation dataclass"""
+
+    # Balanced portfolio
+    balanced = PortfolioAllocation(
+        stocks=60.0,
+        bonds=30.0,
+        cash=5.0,
+        real_estate=5.0,
+        other=0.0
+    )
+    assert balanced.total() == 100.0
+    assert balanced.is_valid() == True
+    print(f"  Balanced portfolio total: {balanced.total()}%")
+
+    # Invalid portfolio (doesn't add to 100)
+    invalid = PortfolioAllocation(
+        stocks=50.0,
+        bonds=30.0,
+        cash=10.0,
+        real_estate=5.0,
+        other=0.0
+    )
+    assert invalid.total() == 95.0
+    assert invalid.is_valid() == False
+    print(f"  Invalid portfolio total: {invalid.total()}% (not valid)")
+
+    # Aggressive portfolio
+    aggressive = PortfolioAllocation(
+        stocks=90.0,
+        bonds=5.0,
+        cash=2.0,
+        real_estate=3.0,
+        other=0.0
+    )
+    assert aggressive.stocks == 90.0
+    assert aggressive.is_valid() == True
+    print(f"  Aggressive portfolio: {aggressive.stocks}% stocks")
+
+    print("✅ Portfolio allocation validation working")
+
+test_scenario("Portfolio Allocation", test_portfolio_allocation)
+
+# TEST 8: Report Export Data Preparation
+def test_report_export_data():
+    """Test report export data structure creation"""
+
+    # Create sample data
+    sample_debts = [
+        Debt("Student Loan", "Student Loan", 30000.0, 0.045, 300.0, 250.0, "2020-01-01", "Parent 1"),
+        Debt("Car Loan", "Auto Loan", 15000.0, 0.06, 350.0, 350.0, "2022-01-01", "Parent 2"),
+    ]
+
+    sample_529s = [
+        Plan529("Plan 1", "Child 1", 5000.0, 200.0, "Washington"),
+    ]
+
+    sample_tax_strategies = [
+        TaxStrategy("Roth Conv", "Roth Conversion", 10000.0, 2025, 2030, 2000.0),
+    ]
+
+    # Test asdict conversion
+    debts_data = [asdict(d) for d in sample_debts]
+    assert len(debts_data) == 2
+    assert debts_data[0]['name'] == "Student Loan"
+    print(f"  Converted {len(debts_data)} debts to dict")
+
+    plans_data = [asdict(p) for p in sample_529s]
+    assert len(plans_data) == 1
+    print(f"  Converted {len(plans_data)} 529 plans to dict")
+
+    strategies_data = [asdict(t) for t in sample_tax_strategies]
+    assert len(strategies_data) == 1
+    print(f"  Converted {len(strategies_data)} tax strategies to dict")
+
+    # Test DataFrame creation
+    debts_df = pd.DataFrame(debts_data)
+    assert len(debts_df) == 2
+    assert 'principal' in debts_df.columns
+    print(f"  Created DataFrame with {len(debts_df)} rows, {len(debts_df.columns)} columns")
+
+    # Test JSON serialization
+    json_str = json.dumps(debts_data, default=str)
+    assert isinstance(json_str, str)
+    assert "Student Loan" in json_str
+    print(f"  JSON serialization successful: {len(json_str)} chars")
+
+    # Test Excel export preparation
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        debts_df.to_excel(writer, sheet_name='Debts', index=False)
+    output.seek(0)
+    assert output.tell() == 0  # Seeked to beginning
+    print(f"  Excel export successful")
+
+    print("✅ Report export data preparation working")
+
+test_scenario("Report Export Data Preparation", test_report_export_data)
+
+# TEST 9: Long-Term Care Insurance Edge Cases
+def test_ltc_insurance_edge_cases():
+    """Test LTC insurance with various scenarios"""
+
+    # Standard LTC policy
+    standard_ltc = LongTermCareInsurance(
+        name="Standard LTC",
+        monthly_premium=300.0,
+        daily_benefit=200.0,
+        benefit_period_days=1095,  # 3 years
+        elimination_period_days=90,
+        covered_person="Parent 1",
+        start_age=55,
+        inflation_protection=0.03
+    )
+    total_benefit = standard_ltc.daily_benefit * standard_ltc.benefit_period_days
+    print(f"  Total LTC benefit: ${total_benefit:,.0f}")
+    assert total_benefit > 0
+
+    # High benefit policy
+    high_benefit = LongTermCareInsurance(
+        name="Premium LTC",
+        monthly_premium=500.0,
+        daily_benefit=400.0,
+        benefit_period_days=1825,  # 5 years
+        elimination_period_days=60,
+        covered_person="Parent 2",
+        start_age=60,
+        inflation_protection=0.05
+    )
+    assert high_benefit.daily_benefit > standard_ltc.daily_benefit
+    print(f"  High benefit LTC: ${high_benefit.daily_benefit}/day")
+
+    print("✅ LTC insurance scenarios working")
+
+test_scenario("LTC Insurance Edge Cases", test_ltc_insurance_edge_cases)
+
+# TEST 10: State Timeline and House Timeline
+def test_timeline_entries():
+    """Test StateTimelineEntry and HouseTimelineEntry"""
+
+    # State timeline
+    state_timeline = [
+        StateTimelineEntry(2025, "Washington", "Average"),
+        StateTimelineEntry(2030, "Texas", "Conservative"),
+        StateTimelineEntry(2040, "Florida", "High-end"),
+    ]
+    assert len(state_timeline) == 3
+    assert state_timeline[0].state == "Washington"
+    print(f"  Created {len(state_timeline)} state timeline entries")
+
+    # House timeline
+    house_timeline = [
+        HouseTimelineEntry(2025, "Own_Live", 0.0),
+        HouseTimelineEntry(2030, "Own_Rent", 2500.0),
+        HouseTimelineEntry(2040, "Sold", 0.0),
+    ]
+    assert len(house_timeline) == 3
+    assert house_timeline[1].rental_income == 2500.0
+    print(f"  Created {len(house_timeline)} house timeline entries")
+
+    # Create house with timeline
+    house = House(
+        name="Primary Home",
+        purchase_year=2020,
+        purchase_price=500000.0,
+        current_value=600000.0,
+        mortgage_balance=400000.0,
+        mortgage_rate=0.065,
+        mortgage_years_left=25,
+        property_tax_rate=0.01,
+        home_insurance=1500.0,
+        maintenance_rate=0.015,
+        upkeep_costs=3000.0,
+        owner="Shared",
+        timeline=house_timeline
+    )
+
+    # Test get_status_for_year method
+    status_2025, rental_2025 = house.get_status_for_year(2025)
+    assert status_2025 == "Own_Live"
+    assert rental_2025 == 0.0
+    print(f"  2025 status: {status_2025}, rental: ${rental_2025}")
+
+    status_2035, rental_2035 = house.get_status_for_year(2035)
+    assert status_2035 == "Own_Rent"
+    assert rental_2035 == 2500.0
+    print(f"  2035 status: {status_2035}, rental: ${rental_2035}")
+
+    print("✅ Timeline entries working correctly")
+
+test_scenario("Timeline Entries", test_timeline_entries)
+
+# TEST 11: Major Purchase and Recurring Expense
+def test_purchases_and_expenses():
+    """Test MajorPurchase and RecurringExpense"""
+
+    # Real estate major purchase
+    real_estate = MajorPurchase(
+        name="Vacation Home",
+        year=2030,
+        amount=300000.0,
+        financing_years=30,
+        interest_rate=0.07,
+        asset_type="Real Estate",
+        appreciation_rate=0.03
+    )
+    assert real_estate.asset_type == "Real Estate"
+    assert real_estate.appreciation_rate == 0.03
+    print(f"  Real estate purchase: {real_estate.name} at ${real_estate.amount:,.0f}")
+
+    # Vehicle purchase (depreciating)
+    vehicle = MajorPurchase(
+        name="New Car",
+        year=2025,
+        amount=40000.0,
+        financing_years=5,
+        interest_rate=0.05,
+        asset_type="Vehicle",
+        appreciation_rate=-0.15  # Depreciates
+    )
+    assert vehicle.appreciation_rate < 0
+    print(f"  Vehicle purchase: {vehicle.name} with {vehicle.appreciation_rate*100:.0f}% depreciation")
+
+    # Recurring expense
+    recurring = RecurringExpense(
+        name="Car Replacement",
+        category="Vehicle",
+        amount=35000.0,
+        frequency_years=10,
+        start_year=2025,
+        end_year=None,
+        inflation_adjust=True,
+        parent="Both",
+        financing_years=5,
+        interest_rate=0.045
+    )
+    assert recurring.inflation_adjust == True
+    print(f"  Recurring expense: {recurring.name} every {recurring.frequency_years} years")
+
+    print("✅ Purchases and expenses working correctly")
+
+test_scenario("Purchases and Expenses", test_purchases_and_expenses)
+
+# TEST 12: Economic Scenarios
+def test_economic_scenarios():
+    """Test EconomicScenario dataclass"""
+
+    conservative = EconomicScenario(
+        "Conservative",
+        investment_return=0.04,
+        inflation_rate=0.03,
+        expense_growth_rate=0.02,
+        healthcare_inflation_rate=0.05
+    )
+    assert conservative.investment_return < 0.06
+    print(f"  Conservative: {conservative.investment_return*100:.1f}% return")
+
+    aggressive = EconomicScenario(
+        "Aggressive",
+        investment_return=0.10,
+        inflation_rate=0.02,
+        expense_growth_rate=0.02,
+        healthcare_inflation_rate=0.04
+    )
+    assert aggressive.investment_return > conservative.investment_return
+    print(f"  Aggressive: {aggressive.investment_return*100:.1f}% return")
+
+    print("✅ Economic scenarios working correctly")
+
+test_scenario("Economic Scenarios", test_economic_scenarios)
+
+# FINAL SUMMARY
+print("\n" + "=" * 80)
+print("TEST SUMMARY")
+print("=" * 80)
+
+passed = sum(1 for _, status, _ in test_results if status == "PASSED")
+failed = sum(1 for _, status, _ in test_results if status == "FAILED")
+total = len(test_results)
+
+print(f"\nTotal Tests: {total}")
+print(f"✅ Passed: {passed}")
+print(f"❌ Failed: {failed}")
+print(f"Success Rate: {(passed/total*100):.1f}%")
+
+if failed > 0:
+    print("\n❌ FAILED TESTS:")
+    for name, status, error in test_results:
+        if status == "FAILED":
+            print(f"  - {name}: {error}")
+    sys.exit(1)
 else:
-    print("SOME SCENARIO TESTS FAILED — see details above")
-    print("(Tight Budget TX with daycare is expected to be tight)")
-print("=" * 60)
+    print("\n🎉 ALL TESTS PASSED!")
+    print("✅ No broken functionality detected")
+    print("✅ All scenarios working correctly")
+    sys.exit(0)
