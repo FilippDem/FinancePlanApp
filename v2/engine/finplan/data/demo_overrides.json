@@ -1,7 +1,7 @@
 {
-  "_about": "Re-tunes the v0.8 demo households for v2's corrected math (real mortgage payments, purchase prices, taxes inside Monte Carlo). Applied by reference.demo_plans(); demo_plans.json stays a verbatim extract of v0.8.",
+  "_about": "Re-tunes the v0.8 demo households for v2's corrected math (real mortgage payments, purchase prices, taxes inside Monte Carlo). Applied by reference.demo_plans(); demo_plans.json stays a verbatim extract of v0.8. Each demo enters its own health plans (employer worker share from KFF EHBS 2025; marketplace from the KFF 2026 benchmark, age-rated on the CMS curve) instead of the automatic estimate.",
   "[DEMO] Tech Couple: SF→Austin→Seattle, Early Retirement @50": {
-    "_note": "Retires at 50/51 as planned; moves SF → Austin → Seattle with spending adjusting to each city; public K-12 with private college; EVs every 8 years from 2031.",
+    "_note": "Retires at 50/51 as planned; moves SF → Austin → Seattle with spending adjusting to each city; public K-12 with private college; EVs every 8 years from 2031. Health: employer plan while working, then age-rated marketplace plans until Medicare at 65.",
     "set": {
       "parentX_retirement_age": 50,
       "parentY_retirement_age": 51,
@@ -27,7 +27,70 @@
           "spending_strategy": "Average"
         }
       ],
-      "auto_health_coverage": false
+      "health_insurances": [
+        {
+          "name": "Employer family plan",
+          "type": "Employer",
+          "monthly_premium": 571,
+          "covered_by": "Both",
+          "start_age": 0,
+          "end_age": 49
+        },
+        {
+          "name": "Marketplace silver, age 51–54",
+          "type": "Marketplace",
+          "monthly_premium": 980,
+          "covered_by": "Parent 1",
+          "start_age": 51,
+          "end_age": 54,
+          "marketplace": true
+        },
+        {
+          "name": "Marketplace silver, age 55–59",
+          "type": "Marketplace",
+          "monthly_premium": 1205,
+          "covered_by": "Parent 1",
+          "start_age": 55,
+          "end_age": 59,
+          "marketplace": true
+        },
+        {
+          "name": "Marketplace silver, age 60–64",
+          "type": "Marketplace",
+          "monthly_premium": 1410,
+          "covered_by": "Parent 1",
+          "start_age": 60,
+          "end_age": 64,
+          "marketplace": true
+        },
+        {
+          "name": "Marketplace silver, age 50–54",
+          "type": "Marketplace",
+          "monthly_premium": 980,
+          "covered_by": "Parent 2",
+          "start_age": 50,
+          "end_age": 54,
+          "marketplace": true
+        },
+        {
+          "name": "Marketplace silver, age 55–59",
+          "type": "Marketplace",
+          "monthly_premium": 1205,
+          "covered_by": "Parent 2",
+          "start_age": 55,
+          "end_age": 59,
+          "marketplace": true
+        },
+        {
+          "name": "Marketplace silver, age 60–64",
+          "type": "Marketplace",
+          "monthly_premium": 1410,
+          "covered_by": "Parent 2",
+          "start_age": 60,
+          "end_age": 64,
+          "marketplace": true
+        }
+      ]
     },
     "children_list": {
       "Emma": {
@@ -46,7 +109,7 @@
     }
   },
   "[DEMO] 3-Kid Family: Seattle→Portland→Denver, Career Change, 4 Properties": {
-    "_note": "Seattle → Portland → Denver with cost of living adjusting; both work to 63; cabin bought in 2044 after the kids leave and becomes home when the Denver house is sold in 2058; 401(k) savings counted in net worth.",
+    "_note": "Seattle → Portland → Denver with cost of living adjusting; both work to 63; cabin bought in 2044 after the kids leave and becomes home when the Denver house is sold in 2058; 401(k) savings counted in net worth. Health: employer plan while working, then age-rated marketplace plans until Medicare at 65.",
     "set": {
       "parentX_retirement_age": 63,
       "parentY_retirement_age": 63,
@@ -77,7 +140,36 @@
           "spending_strategy": "Average"
         }
       ],
-      "auto_health_coverage": false
+      "health_insurances": [
+        {
+          "name": "Employer family plan",
+          "type": "Employer",
+          "monthly_premium": 571,
+          "covered_by": "Both",
+          "start_age": 0,
+          "end_age": 62
+        },
+        {
+          "name": "Marketplace silver, age 64–64",
+          "type": "Marketplace",
+          "monthly_premium": 1410,
+          "covered_by": "Parent 1",
+          "start_age": 64,
+          "end_age": 64,
+          "marketplace": true
+        },
+        {
+          "name": "Marketplace silver, age 63–64",
+          "type": "Marketplace",
+          "monthly_premium": 1410,
+          "covered_by": "Parent 2",
+          "start_age": 63,
+          "end_age": 64,
+          "marketplace": true
+        }
+      ],
+      "parentX_income": 125000,
+      "parentY_income": 102000
     },
     "houses": {
       "Colorado Mountain Cabin": {
@@ -115,7 +207,7 @@
     }
   },
   "[DEMO] Executives: NYC→Miami→Portugal, Early Retire @55, 5 Properties": {
-    "_note": "NYC → Miami → Portugal (spending drops abroad); Aspen chalet financed (25% down) and sold in 2045; yacht dropped; retire at 55. Big lifestyle, still well funded.",
+    "_note": "NYC → Miami → Portugal (spending drops abroad); Aspen chalet financed (25% down) and sold in 2045; yacht dropped; retire at 55. Big lifestyle, still well funded. Health: employer plan while working, then age-rated marketplace-priced cover until Medicare (also used as a stand-in for private cover in Portugal).",
     "set": {
       "parentX_retirement_age": 55,
       "parentY_retirement_age": 55,
@@ -124,8 +216,8 @@
       "mc_return_variability": 12.0,
       "mc_return_variability_positive": 12.0,
       "mc_return_variability_negative": 12.0,
-      "parentX_net_worth": 3000000,
-      "parentY_net_worth": 2600000,
+      "parentX_net_worth": 3300000,
+      "parentY_net_worth": 2900000,
       "state_timeline": [
         {
           "year": 2026,
@@ -143,7 +235,52 @@
           "spending_strategy": "Average"
         }
       ],
-      "auto_health_coverage": false
+      "health_insurances": [
+        {
+          "name": "Employer family plan",
+          "type": "Employer",
+          "monthly_premium": 571,
+          "covered_by": "Both",
+          "start_age": 0,
+          "end_age": 54
+        },
+        {
+          "name": "Marketplace silver, age 57–59",
+          "type": "Marketplace",
+          "monthly_premium": 1205,
+          "covered_by": "Parent 1",
+          "start_age": 57,
+          "end_age": 59,
+          "marketplace": true
+        },
+        {
+          "name": "Marketplace silver, age 60–64",
+          "type": "Marketplace",
+          "monthly_premium": 1410,
+          "covered_by": "Parent 1",
+          "start_age": 60,
+          "end_age": 64,
+          "marketplace": true
+        },
+        {
+          "name": "Marketplace silver, age 55–59",
+          "type": "Marketplace",
+          "monthly_premium": 1205,
+          "covered_by": "Parent 2",
+          "start_age": 55,
+          "end_age": 59,
+          "marketplace": true
+        },
+        {
+          "name": "Marketplace silver, age 60–64",
+          "type": "Marketplace",
+          "monthly_premium": 1410,
+          "covered_by": "Parent 2",
+          "start_age": 60,
+          "end_age": 64,
+          "marketplace": true
+        }
+      ]
     },
     "houses": {
       "Aspen Ski Chalet": {
@@ -187,7 +324,7 @@
     }
   },
   "[DEMO] Single Mom: Sacramento→San Diego, Teacher→Principal, 3 Properties": {
-    "_note": "Sells the Sacramento townhouse to buy in San Diego in 2034 and keeps a careful budget; raises slightly above inflation; works to 67; teacher pension modeled as the retirement benefit (so no Social Security cut). Tight but workable, a good plan to stress-test.",
+    "_note": "Sells the Sacramento townhouse to buy in San Diego in 2034 and keeps a careful budget; raises slightly above inflation; works to 67; teacher pension modeled as the retirement benefit (so no Social Security cut). Tight but workable, a good plan to stress-test. Health: employer plan for her and Diego, then single coverage from 53 until Medicare.",
     "set": {
       "parentX_retirement_age": 67,
       "parentX_pretax_balance": 40000,
@@ -195,7 +332,7 @@
       "mc_return_variability_positive": 8.0,
       "mc_return_variability_negative": 8.0,
       "parentX_raise": 3.5,
-      "parentX_income": 118000,
+      "parentX_income": 115000,
       "parentX_ss_benefit": 3400,
       "ss_insolvency_enabled": false,
       "state_timeline": [
@@ -210,7 +347,24 @@
           "spending_strategy": "Conservative"
         }
       ],
-      "auto_health_coverage": false
+      "health_insurances": [
+        {
+          "name": "Employer plan (parent + child)",
+          "type": "Employer",
+          "monthly_premium": 571,
+          "covered_by": "Parent 1",
+          "start_age": 0,
+          "end_age": 52
+        },
+        {
+          "name": "Employer plan (single)",
+          "type": "Employer",
+          "monthly_premium": 120,
+          "covered_by": "Parent 1",
+          "start_age": 53,
+          "end_age": 64
+        }
+      ]
     },
     "houses": {
       "Sacramento Townhouse": {
@@ -246,7 +400,7 @@
     }
   },
   "[DEMO] Empty Nesters: Early Retire @60, Portland→Arizona→RV, 4 Properties": {
-    "_note": "Retire at 60, downsize, snowbird in Arizona, then a Montana cabin; balanced portfolio (5.5%); help for adult children ends 2036; RV bought used.",
+    "_note": "Retire at 60, downsize, snowbird in Arizona, then a Montana cabin; balanced portfolio (5.5%); help for adult children ends 2036; RV bought used. Health: employer plan while working, then age-rated marketplace plans until Medicare at 65.",
     "set": {
       "parentX_retirement_age": 60,
       "parentY_retirement_age": 60,
@@ -280,7 +434,34 @@
           "spending_strategy": "Conservative"
         }
       ],
-      "auto_health_coverage": false
+      "health_insurances": [
+        {
+          "name": "Employer plan (couple)",
+          "type": "Employer",
+          "monthly_premium": 571,
+          "covered_by": "Both",
+          "start_age": 0,
+          "end_age": 59
+        },
+        {
+          "name": "Marketplace silver, age 61–64",
+          "type": "Marketplace",
+          "monthly_premium": 1410,
+          "covered_by": "Parent 1",
+          "start_age": 61,
+          "end_age": 64,
+          "marketplace": true
+        },
+        {
+          "name": "Marketplace silver, age 60–64",
+          "type": "Marketplace",
+          "monthly_premium": 1410,
+          "covered_by": "Parent 2",
+          "start_age": 60,
+          "end_age": 64,
+          "marketplace": true
+        }
+      ]
     },
     "major_purchases": {
       "Luxury RV Purchase": {
@@ -294,10 +475,10 @@
     }
   },
   "[DEMO] Budget Family: Houston→Austin, Careful Savers": {
-    "_note": "Careful budget in Houston, then Austin in 2036; slightly higher pay with 401(k) balances. Modest but steady.",
+    "_note": "Careful budget in Houston, then Austin in 2036; slightly higher pay with 401(k) balances. Modest but steady. Health: employer family plan until Medicare.",
     "set": {
-      "parentX_income": 66000,
-      "parentY_income": 55000,
+      "parentX_income": 72000,
+      "parentY_income": 60000,
       "parentX_pretax_balance": 25000,
       "parentY_pretax_balance": 12000,
       "mc_return_variability": 12.0,
@@ -317,7 +498,24 @@
           "spending_strategy": "Conservative"
         }
       ],
-      "auto_health_coverage": false
+      "health_insurances": [
+        {
+          "name": "Employer family plan",
+          "type": "Employer",
+          "monthly_premium": 571,
+          "covered_by": "Both",
+          "start_age": 0,
+          "end_age": 62
+        },
+        {
+          "name": "Employer plan (single)",
+          "type": "Employer",
+          "monthly_premium": 120,
+          "covered_by": "Parent 2",
+          "start_age": 63,
+          "end_age": 64
+        }
+      ]
     },
     "houses": {
       "Houston Starter Home": {
@@ -348,6 +546,5 @@
         ]
       }
     }
-  },
-  "_health_note": "auto_health_coverage is off for the demos (2026-10-12) so their tuned numbers are unchanged; re-tune them with real health plans, then remove it."
+  }
 }
