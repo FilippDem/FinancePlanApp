@@ -6,9 +6,9 @@
 
 Layout of the result (what launcher/start.ps1 and launcher/desktop.py expect):
     FinancialPlanner/
-      Start Financial Planner.bat   Open in Browser.bat   Stop Financial Planner.bat   README.txt
+      Start Financial Planner.bat   Open in Browser.bat   Stop Financial Planner.bat   Back Up Plans Now.bat   README.txt
       app/        engine/ server/ requirements.txt web/dist/      (the v2 app, tests left out)
-      launcher/   desktop.py start.ps1 stop.ps1 run_server.py requirements-desktop.txt planner.ico wheels/
+      launcher/   desktop.py start.ps1 stop.ps1 backup.ps1 run_server.py requirements-desktop.txt planner.ico wheels/
 To update an installed copy, replace its app/ and launcher/ folders (and the .bat files); keep data/,
 settings.json, webview-data/ (sign-in), .venv/ and logs/. The next start installs any new packages.
 """

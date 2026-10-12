@@ -29,6 +29,13 @@ IN A BROWSER INSTEAD: double-click "Open in Browser". It runs in the background 
 double-click "Stop Financial Planner" (or restart the PC).
 
 YOUR DATA lives in the "data" folder here. Every save makes a backup in data\backups.
+That only helps with bad edits. To keep copies OFF this computer, double-click
+"Back Up Plans Now": it zips the data folder into OneDrive\FinancialPlanner-backups,
+checks that the zip opens and every plan in it reads back, and keeps the last 30.
+(For another folder, add "backup_dir": "D:\\Backups" to settings.json.)
+To back up every day automatically, run this once in PowerShell:
+  powershell -NoProfile -ExecutionPolicy Bypass -File ".\launcher\backup.ps1" -Register
+(from this folder). What happened is in logs\backup.log.
 To move to a newer build later, replace only the "app" and "launcher" folders;
 keep "data", "settings.json" and "webview-data" (your sign-in).
 
