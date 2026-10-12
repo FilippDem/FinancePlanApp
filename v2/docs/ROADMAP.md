@@ -1,6 +1,6 @@
 # v2: where it stands and what to build next
 
-_Last updated 2026-09-28 (branch `v2-react`)_
+_Last updated 2026-10-12 (branch `v2-react`)_
 
 ## 1. Current state
 
@@ -34,6 +34,8 @@ v2 now covers every v0.8 tab and adds a set of "living plan" features. See `PARI
 | **Goals**, **safe spending**, **guardrails**, **every-historical-start backtest** | ✅ |
 | **Pensions & annuities, loans, 529 plans** | ✅ |
 | Demo households re-tuned for the corrected math | ✅ (success rates are a few points lower now that gains are taxed) |
+| **2026-10-12:** hidden career-phase fix, automatic pre-65 health coverage, WA capital-gains tax, "Top 10%" spending milestone | ✅ |
+| **2026-10-12:** "What your plan can afford" headline, plan score + one-page PDF, Need/Want spending with guardrails, glide path, Roth surplus sweep, Monarch CSV import, MCP server for Claude | ✅ |
 
 Tests: 67 engine tests, 24 API tests, and a clean `tsc` build. The UI was checked end to end with Playwright.
 
@@ -54,16 +56,29 @@ The app cites every major dataset (`engine/finplan/data/sources.json`). Datasets
 |---|---|
 | **Social Security from earnings history** (spousal and survivor rules are done) | Benefits are typed in or estimated from today's salary |
 | **Salaries don't respond to inflation** | Inflation stress tests are harsh, because wages stay flat while prices jump |
-| **Pre-65 health insurance defaults to $0** unless entered | Early retirees are under-costed (all demos show this) |
-| **Fixed asset allocation** (no glide path) | Sequence risk around retirement isn't reduced the way a real portfolio would reduce it |
-| **Dividend tax drag, state-specific gains rules, itemized deductions** | Taxes on taxable accounts are approximate |
+| ~~Pre-65 health insurance defaults to $0~~ | ✅ 2026-10-12: automatic employer/marketplace estimate. **Demos still have it off**; re-tune them with real health plans |
+| ~~Fixed asset allocation~~ | ✅ 2026-10-12: optional glide path |
+| **Dividend tax drag**, state gains rules beyond WA, itemized deductions | Taxes on taxable accounts are approximate, and the Roth surplus sweep's benefit is understated |
+| **Extra mortgage payments as a surplus priority** | The surplus sweep only targets Roth; prepaying a mortgage needs the loan schedule inside the simulation |
 
 ### 2c. Product gaps
-- **Spending actuals still come from typing.** Balances can now come from linked accounts (CSV or SnapTrade), but transactions (Monarch Money, bank CSVs) don't fill Actuals yet.
+- ~~Spending actuals still come from typing~~ ✅ 2026-10-12: Monarch transactions CSV import. Other bank CSVs with column mapping are still to do.
 - **Nothing is live on the NAS yet.** v2 runs only locally, the NAS still serves v0.8, and there's no CI.
 - **Bundle size.** Pages now load on first visit (main chunk 786 kB, was 1,068 kB). Recharts could still be split out.
 
-## 2d. Compared with other planners (checked 2026-09-27)
+## 2d. Compared with other planners (checked 2026-09-27; updated 2026-10-12)
+
+**2026-10-12 update:** competitors shipped:
+- Boldin: AI that edits the plan with a confirm step, plus an MCP server (Aug 2026); Planner Score and Investments (Sep 2026).
+- ProjectionLab 4.5/4.6: flexible essential/discretionary spending, tax-strategy targets, transfers.
+- Monarch: Forecasting in the Plus tier.
+
+v2's answers are listed in §1 (2026-10-12 rows). Still open:
+- IRMAA/ACA-cliff targets for Roth conversions.
+- Extra mortgage payments as a surplus priority.
+- Estate and insurance needs.
+- MaxiFi-style consumption smoothing.
+- Longevity (one partner to 95–100) view.
 
 Compared with ProjectionLab, Boldin, and adviser tools like RightCapital, Pralana and MaxiFi.
 

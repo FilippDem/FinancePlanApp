@@ -29,7 +29,7 @@ export function useCurve(location: string, year: number, inflation: number) {
 }
 
 /** Source ids behind a curve, in citation order: BLS spending always, plus the price data for the place. */
-export const curveSources = (c: Curve | null) => ['bls_cex_2022', 'bls_cex_2024', ...(c?.basis === 'country' ? ['worldbank_pli'] : c?.basis === 'us' ? [] : ['bea_rpp_2024'])]
+export const curveSources = (c: Curve | null) => ['bls_cex_2022', 'bls_cex_2022_deciles', 'bls_cex_2024', ...(c?.basis === 'country' ? ['worldbank_pli'] : c?.basis === 'us' ? [] : ['bea_rpp_2024'])]
 
 export function SpendingSlider({ curve, value, onChange, adults = 1, compact, cite }:
   { curve: Curve | null; value: number; onChange: (x: number) => void; adults?: number; compact?: boolean; cite?: React.ReactNode }) {

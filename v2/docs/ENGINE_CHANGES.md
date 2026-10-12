@@ -208,6 +208,34 @@ Every table in `data/cost_index.json` was re-checked against its publisher; see 
 - `web/src/lib/lifeEdit.ts` maps plan items to timeline items and back: set the year from a drag, create from a palette drop, edit, and delete.
 - Everything stays additive to the v0.8 schema.
 
+### 2026-10-12: fixes from a real household, plus competitor-review features
+**Fixes:**
+- **Hidden career phase.** The template's untouched 75k "Current Job" phase (30-65) silently overrode the simple income model. `normalize_plan` now drops it when the plan clearly uses income + job changes (an income other than 75k, or job changes). Edited or real phases are never touched.
+- **Health coverage before 65.** `auto_health_coverage` is on by default and applies only when no health plan is entered:
+  - **Years with wages:** the worker's share of an employer plan, $1,440 single or $6,850 family (KFF EHBS 2025).
+  - **Years with no wages under 65:** a marketplace benchmark plan, $625/mo at 40 in 2026 (KFF), age-rated on the federal default curve (CMS). Children are rated 0.6. It feeds the ACA credit like an entered marketplace plan.
+  - Grown with healthcare inflation.
+  - **Demos:** the estimate is off in the six demos (`demo_overrides.json`) so their tuned results are unchanged. Turning it on would cost them 1–46 points of success. They should be re-tuned with real health plans.
+- **Washington capital-gains tax:** 7% on long-term gains above the standard deduction ($262k in 2024, indexed; $278k in 2025) and 9.9% above $1M (not indexed), once per household. It applies only to sales from taxable savings, matching the law's real-estate and retirement-account exemptions.
+- **Spending slider:** new "Top 10%" milestone at x=85 from BLS CE Table 1110 (highest decile, 2022), parsed and checked against Table 1101's all-units column. Existing positions are unchanged.
+
+**New:**
+- **Essential vs discretionary spending.** `essential_categories` (default: groceries, transport basics, medical, phone, housing and utilities) and `recurring_expenses[].essential`. Guardrails cut only the discretionary part.
+- **Glide path.** `glide_path {enabled, at_retirement, years_before}` with `allocation_path()`. Stocks move linearly from `mc_stock_allocation` to the target over the years before the first retirement.
+  - **Historical mode:** applied directly to the stock/bond mix.
+  - **Statistical mode:** `investment_return` is read as today's mix, the stock part is backed out, and returns and spread scale with the stock share.
+- **Surplus sweep.** `surplus_sweep {enabled, roth_per_person}`: while working, each earner's leftover cash goes to Roth up to the limit (IRS 2026 IRA $7,500, inflation-adjusted).
+  - It is not applied with ownership tracking on.
+  - There is no yearly dividend drag on taxable savings yet, so its benefit shows only as capital-gains tax avoided.
+- **Plan score.** `finplan/health.py` is a weighted checklist (success, emergency fund, savings rate, housing, withdrawal rate, college, debt, health coverage) producing a 0–100 score.
+  - Used by `/api/plan-health`, the Dashboard and the `plan_health` report section.
+  - The "One-page summary" PDF preset uses it.
+- **Monarch import.** `server/monarch.py` and `/api/actuals/monarch` read a Monarch transactions CSV and produce yearly actuals.
+  - Personal categories are split between the two adults; transfers and card payments are skipped.
+  - Unrecognized categories are counted as Other Family Expenses and reported back.
+  - Re-importing replaces rather than adds.
+- **MCP server.** `server/mcp_server.py` lets Claude read and edit plans over stdio (see `desktop/README.md`). Edits are propose → confirm → apply, with a backup.
+
 ### Sources
 [1] U.S. Bureau of Economic Analysis, [Regional Price Parities by State and Metro Area, 2024](https://www.bea.gov/data/prices-inflation/regional-price-parities-state-and-metro-area)
 [2] World Bank, [Price level ratio of PPP conversion factor to market exchange rate (PA.NUS.PPPC.RF)](https://data.worldbank.org/indicator/PA.NUS.PPPC.RF), 2024 values via [Our World in Data](https://ourworldindata.org/grapher/gdp-price-levels-relative-to-the-us)
@@ -232,3 +260,8 @@ The full, numbered list the app cites lives in `engine/finplan/data/sources.json
 [19] HHS ASPE, [Poverty guidelines](https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines)
 [20] IRS, [Topic no. 410, Pensions and annuities](https://www.irs.gov/taxtopics/tc410)
 [21] IRS, [Publication 970 (529 plans)](https://www.irs.gov/publications/p970)
+[22] KFF, [2025 Employer Health Benefits Survey](https://www.kff.org/health-costs/2025-employer-health-benefits-survey/)
+[23] KFF, [Marketplace average benchmark premiums](https://www.kff.org/affordable-care-act/state-indicator/marketplace-average-benchmark-premiums/)
+[24] CMS, [Market rating reforms (age curve)](https://www.cms.gov/cciio/programs-and-initiatives/health-insurance-market-reforms/state-rating)
+[25] Washington DOR, [Capital gains tax](https://dor.wa.gov/taxes-rates/other-taxes/capital-gains-tax)
+[26] BLS, [Consumer Expenditure Surveys Table 1110, income deciles, 2022](https://www.bls.gov/cex/tables/calendar-year/mean-item-share-average-standard-error/cu-income-deciles-before-taxes-2022.pdf)

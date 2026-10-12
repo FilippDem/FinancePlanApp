@@ -26,7 +26,7 @@ export default function Healthcare() {
   const who = [{ value: 'Parent 1', label: names[0] }, ...(names[1] ? [{ value: 'Parent 2', label: names[1] }] : []), { value: 'Both', label: 'Both' }, { value: 'Family', label: 'Whole family' }]
   const setL = (list: string, i: number, k: string, v: any) => update(d => { d[list][i][k] = v })
   const data = (proj?.rows || []).map((r: any) => ({ year: r.year, hc: r.exp_healthcare }))
-  const { Cite, Sources } = useCites(['kff_ehbs_2025', 'kff_marketplace', 'cms_partb_2026', 'cms_partd_2026', 'irs_hsa_2026', 'cms_nhe'])
+  const { Cite, Sources } = useCites(['kff_ehbs_2025', 'kff_benchmark_2026', 'cms_age_rating', 'kff_marketplace', 'cms_partb_2026', 'cms_partd_2026', 'irs_hsa_2026', 'cms_nhe'])
   return (
     <div className="space-y-5">
       <PageHeader title="Healthcare" subtitle={<>Premiums and care costs grow with healthcare inflation{<Cite id="cms_nhe" />}</>} />
@@ -44,7 +44,14 @@ export default function Healthcare() {
         </div>
       })()}
       <Card title="Health insurance" subtitle={<>Premiums apply while the covered person's age is in range (e.g. until Medicare at 65). For reference: workers paid $6,850 a year on average toward employer family coverage in 2025<Cite id="kff_ehbs_2025" />; marketplace premiums depend on age, income and state<Cite id="kff_marketplace" />.</>}>
-        <Rows items={plan.health_insurances} empty="No insurance plans. Add employer or marketplace coverage, especially for early retirement."
+        {!plan.health_insurances?.length && (
+          <div className="mb-4 rounded-lg border border-line bg-sunken/50 px-4 py-3 text-[13px] text-ink2 space-y-2">
+            <Toggle checked={plan.auto_health_coverage !== false} onChange={v => update(d => { d.auto_health_coverage = v })} label="Estimate coverage until you add your own plans" />
+            <p>{plan.auto_health_coverage !== false
+              ? <>Before 65, years where someone earns wages use the average worker share of an employer plan ($1,440 single, $6,850 family a year<Cite id="kff_ehbs_2025" />). Years with no wages (a career break or early retirement) use a marketplace benchmark plan ($625/month for a 40-year-old in 2026<Cite id="kff_benchmark_2026" />, rising with age<Cite id="cms_age_rating" />), with the premium tax credit applied. Adding any plan below replaces the estimate.</>
+              : <>Off: health insurance before 65 costs nothing in the plan unless you add plans below. That under-states costs, especially in career breaks and early retirement.</>}</p>
+          </div>)}
+        <Rows items={plan.health_insurances} empty="No insurance plans entered yet. Add employer or marketplace coverage for exact numbers."
           onAdd={() => update(d => { d.health_insurances.push({ marketplace: true, name: 'Marketplace plan', type: 'Marketplace', monthly_premium: 900, annual_deductible: 4000, annual_out_of_pocket_max: 9000, copay_primary: 30, copay_specialist: 60, covered_by: 'Both', start_age: d.parentX_retirement_age, end_age: 64 }) })}
           onRemove={i => update(d => { d.health_insurances.splice(i, 1) })}
           render={(x, i) => (

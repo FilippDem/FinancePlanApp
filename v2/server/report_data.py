@@ -9,6 +9,7 @@ from finplan import reference as _REF
 
 SECTIONS = OrderedDict([
     ('summary', 'Summary & key numbers'),
+    ('plan_health', 'Plan score & checklist'),
     ('charts', 'Charts (net worth range, income & spending)'),
     ('people', 'People & income'),
     ('children', 'Children'),

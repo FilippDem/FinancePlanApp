@@ -32,7 +32,8 @@ V2_KEYS = {
     'rmd_enabled': True,             # required minimum distributions from pre-tax accounts (73, or 75 if born 1960+)
     'spousal_ss': True,              # a spouse may get up to 50% of the other's benefit at 67
     # Portfolio / Monte Carlo
-    'mc_stock_allocation': 100.0,    # % stocks in historical mode (rest earns bond_return)
+    'mc_stock_allocation': 100.0,    # % stocks today (rest earns bond_return)
+    'glide_path': None,              # {enabled, at_retirement: % stocks, years_before}: shift to bonds into retirement
     'bond_return': 0.04,
     'mc_historical_mode': 'random',  # 'random' (iid bootstrap) | 'sequential' (historical sequences)
     'debt_interest_rate': 0.07,      # interest charged when liquid savings go negative
@@ -50,14 +51,21 @@ V2_KEYS = {
     'roth_conversion': None,         # {mode: off|fixed|fill_bracket, amount, bracket, start_age, end_age}
     'irmaa_enabled': True,           # Medicare income surcharges (MAGI two years earlier)
     'aca_enabled': True,             # premium tax credit for marketplace plans (health_insurances[].marketplace)
+    'auto_health_coverage': True,    # no health plan entered: estimate employer/marketplace premiums before 65
     # ---- spending ----
     'guardrails': None,              # {enabled, lower, cut, upper, raise, retired_only}: Monte Carlo spending rules
+    'surplus_sweep': None,           # {enabled, roth_per_person}: leftover cash while working goes to Roth (backdoor IRA)
+    'essential_categories': None,    # spending categories guardrails never cut (None = DEFAULT_ESSENTIAL)
     # ---- goals, pensions, debts, 529s ----
     'goals': [],                     # see goals.py
     'pensions': [],                  # [{name, person, kind, start_age, monthly, cola_pct, survivor_pct, taxable_pct, todays_dollars, purchase_year, purchase_amount}]
     'debts': [],                     # [{name, kind, balance, rate, monthly_payment, extra_monthly, start_year}]
     'college_529': [],               # [{child, balance, monthly, until_age}]
 }
+# Needs rather than wants: guardrail cuts in bad markets only touch the other (discretionary) categories.
+DEFAULT_ESSENTIAL = ['Groceries', 'Auto Payment', 'Gas & Fuel', 'Auto Maintenance', 'Auto Insurance', 'Public Transit',
+                     'Medical', 'Dental', 'Vision', 'Mental Health', 'Phone', 'Mortgage/Rent', 'Property Tax',
+                     'Home Insurance', 'Gas & Electric', 'Water', 'Garbage', 'Internet & Cable']
 ROTH_CONV_DEFAULTS = {'mode': 'off', 'amount': 0.0, 'bracket': 0.12, 'start_age': None, 'end_age': None}
 GUARDRAIL_DEFAULTS = {'enabled': False, 'lower': 20.0, 'cut': 10.0, 'upper': 20.0, 'raise': 10.0, 'retired_only': True}
 
@@ -78,7 +86,7 @@ HOUSE_DEFAULTS = {
 }
 RECURRING_DEFAULTS = {'name': 'Expense', 'category': 'Other', 'amount': 0.0, 'frequency_years': 1,
                       'start_year': None, 'end_year': None, 'inflation_adjust': True, 'parent': 'Both',
-                      'financing_years': 0, 'interest_rate': 0.0}
+                      'financing_years': 0, 'interest_rate': 0.0, 'essential': False}
 PURCHASE_DEFAULTS = {'name': 'Purchase', 'year': None, 'amount': 0.0, 'financing_years': 0,
                      'interest_rate': 0.0, 'asset_type': 'Expense', 'appreciation_rate': 0.0}
 CHILD_DEFAULTS = {'name': 'Child', 'birth_year': None, 'use_template': True, 'template_state': 'Seattle',
@@ -100,6 +108,14 @@ ECON_DEFAULTS = {'investment_return': 0.06, 'inflation_rate': 0.03, 'expense_gro
                  'healthcare_inflation_rate': 0.045, 'use_historical_returns': False,
                  'use_historical_inflation': False, 'use_historical_expense_growth': False,
                  'use_historical_healthcare_inflation': False}
+
+
+TEMPLATE_PHASE = {**CAREER_DEFAULTS, 'base_salary': 75000.0, 'label': 'Current Job'}
+
+
+def _is_template_phase(phases: list) -> bool:
+    """True for the default plan's single, unedited career phase."""
+    return len(phases) == 1 and all(phases[0].get(k) == v for k, v in TEMPLATE_PHASE.items())
 
 
 def _num(v, default=0.0):
@@ -220,6 +236,11 @@ def normalize_plan(raw: dict | None) -> dict:
         if f'parent{who}_career_phases' not in raw:
             p[f'parent{who}_career_phases'] = []
         p[f'parent{who}_career_phases'] = [_fill(c, CAREER_DEFAULTS) for c in (p.get(f'parent{who}_career_phases') or [])]
+        # The template's untouched "Current Job" phase (75k, 30-65) silently overrides the simple income
+        # model. When the plan clearly uses that model instead (a different income or job changes), drop it.
+        if _is_template_phase(p[f'parent{who}_career_phases']) and (
+                p[f'parent{who}_income'] != TEMPLATE_PHASE['base_salary'] or p[f'parent{who}_job_changes']):
+            p[f'parent{who}_career_phases'] = []
         if f'parent{who}_expenses' not in raw and not p.get('_migrated_legacy_expenses'):
             loc = p.get(f'parent{who}_expense_location') or 'Seattle'
             p[f'parent{who}_expenses'] = adult_template(loc, p.get(f'parent{who}_expense_strategy') or 'Average')
@@ -352,6 +373,13 @@ def normalize_plan(raw: dict | None) -> dict:
 def _normalize_extras(p: dict) -> None:
     """Roth conversions, guardrails, goals, pensions, debts, 529s (all additive keys)."""
     cy = p.get('current_year') or datetime.now().year
+    gp = p.get('glide_path') if isinstance(p.get('glide_path'), dict) else {}
+    p['glide_path'] = {'enabled': bool(gp.get('enabled', False)), 'at_retirement': _num(gp.get('at_retirement'), 60.0),
+                       'years_before': max(1, _int(gp.get('years_before'), 10))}
+    sw = p.get('surplus_sweep') if isinstance(p.get('surplus_sweep'), dict) else {}
+    p['surplus_sweep'] = {'enabled': bool(sw.get('enabled', False)), 'roth_per_person': _num(sw.get('roth_per_person'), 7500.0)}
+    ec = p.get('essential_categories')
+    p['essential_categories'] = [str(c) for c in ec] if isinstance(ec, list) else list(DEFAULT_ESSENTIAL)
     rc = {**ROTH_CONV_DEFAULTS, **(p.get('roth_conversion') or {})}
     rc['mode'] = rc['mode'] if rc['mode'] in ('off', 'fixed', 'fill_bracket') else 'off'
     rc['amount'] = _num(rc['amount'])

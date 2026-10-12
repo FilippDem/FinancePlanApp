@@ -39,6 +39,25 @@ from .mortgage import loan_terms, year_flows
 
 TEMPLATE_BASE_YEAR = 2024
 
+# Automatic pre-Medicare coverage (plan.auto_health_coverage, used only when no health plan is entered).
+# Today's $ in the plan's start year, grown with healthcare inflation.
+AUTO_HC_EMPLOYER_SINGLE = 1440.0    # worker share per year, single coverage (KFF EHBS 2025)
+AUTO_HC_EMPLOYER_FAMILY = 6850.0    # worker share per year, family coverage (KFF EHBS 2025)
+AUTO_HC_MARKETPLACE_40 = 625.0      # benchmark silver premium per month, 40-year-old, 2026 (KFF)
+AUTO_HC_CHILD_FACTOR = 0.6          # child rate vs a 40-year-old on the federal default age curve (0.765 / 1.278)
+# federal default age curve relative to age 40 (CMS market rating reforms; 3:1 band)
+_AGE_CURVE = ((21, 0.79), (30, 0.89), (40, 1.0), (50, 1.43), (60, 2.14), (64, 2.38))
+
+
+def _age_rating(age: int) -> float:
+    pts = _AGE_CURVE
+    if age <= pts[0][0]:
+        return pts[0][1]
+    for (a0, f0), (a1, f1) in zip(pts, pts[1:]):
+        if age <= a1:
+            return f0 + (f1 - f0) * (age - a0) / (a1 - a0)
+    return pts[-1][1]
+
 
 # ─────────────────────────────── helpers ────────────────────────────────
 
@@ -157,6 +176,7 @@ def build_schedule(p: dict) -> Schedule:
     infl = econ['inflation_rate']
     hc_infl = econ['healthcare_inflation_rate']
     single = is_single(p)
+    essential = set(p.get('essential_categories') or [])
     n1, n2 = p.get('parent1_name', 'Parent 1'), p.get('parent2_name', 'Parent 2')
 
     a1, a2 = p['parentX_age'], p['parentY_age']
@@ -184,7 +204,7 @@ def build_schedule(p: dict) -> Schedule:
 
     C = {k: np.zeros(T) for k in (
         'age1', 'age2', 'alive1', 'alive2', 'work1', 'work2', 'wages1', 'wages2', 'ss1', 'ss2',
-        'contrib', 'contrib1', 'contrib2', 'p1_exp', 'p2_exp', 'family_exp', 'children_exp', 'recurring_exp',
+        'contrib', 'contrib1', 'contrib2', 'p1_exp', 'p2_exp', 'family_exp', 'children_exp', 'recurring_exp', 'essential_exp',
         'purchase_exp', 'healthcare_exp', 'house_exp', 'house_exp_p1', 'house_exp_p2', 'house_exp_shared',
         'mortgage_pi', 'rent_income', 'rent_taxable', 'sale_proceeds', 'sale_p1', 'sale_p2', 'sale_shared',
         'down_payment', 'dp_p1', 'dp_p2', 'dp_shared', 'home_value', 'mortgage_balance', 'home_equity',
@@ -392,6 +412,8 @@ def build_schedule(p: dict) -> Schedule:
         livf = {k: v * (ii * rentf[t] if k == 'Mortgage/Rent' else f) for k, v in fam.items()} if (alive1 or alive2) else {}
         e1, e2, famtot = sum(liv1.values()), sum(liv2.values()), sum(livf.values())
         C['p1_exp'][t], C['p2_exp'][t], C['family_exp'][t] = e1, e2, famtot
+        # essentials are never cut by guardrails (the rest of everyday spending is discretionary)
+        C['essential_exp'][t] = sum(v for d_ in (liv1, liv2, livf) for k, v in d_.items() if k in essential)
         det['living'] = {'p1': {k: v for k, v in liv1.items() if v}, 'p2': {k: v for k, v in liv2.items() if v},
                          'shared': {k: v for k, v in livf.items() if v}}
         det['col_factor'] = col[t]
@@ -463,6 +485,23 @@ def build_schedule(p: dict) -> Schedule:
                 _hc('p2', nm, amt, 'out_of_pocket')
             elif who not in ('Parent 1', 'Parent 2') and (in1 or in2):
                 _hc('shared', nm, amt, 'out_of_pocket')
+        # Automatic coverage before Medicare when no health plan is entered: the worker's share of an
+        # employer plan while someone under 65 earns wages, otherwise a marketplace plan (benchmark price,
+        # age-rated; the ACA credit is applied in simulate()). [kff_ehbs_2025, kff_benchmark_2026, cms_age_rating]
+        if p.get('auto_health_coverage', True) and not p['health_insurances']:
+            adults = [a for a, al in ((age1, alive1), (age2, alive2)) if al and a < 65]
+            kids_cov = sum(1 for ch in p['children_list'] if 0 <= y - ch['birth_year'] < 26)
+            covered = len(adults) + kids_cov
+            if covered:
+                earning = (w1 > 0 and age1 < 65) or (w2 > 0 and age2 < 65)
+                if earning:
+                    _hc('shared', 'Health insurance (estimated, employer plan)',
+                        (AUTO_HC_EMPLOYER_FAMILY if covered > 1 else AUTO_HC_EMPLOYER_SINGLE) * hi)
+                else:
+                    bench = sum(AUTO_HC_MARKETPLACE_40 * 12 * _age_rating(a) for a in adults) \
+                        + AUTO_HC_MARKETPLACE_40 * 12 * AUTO_HC_CHILD_FACTOR * kids_cov
+                    _hc('shared', 'Health insurance (estimated, marketplace)', bench * hi)
+                    C['aca_bench'][t] += bench * hi
         det['healthcare'] = hc_items
         # ACA marketplace plans: the entered premium is the full (benchmark) price; the credit comes in simulate()
         for ins in p['health_insurances']:
@@ -505,16 +544,20 @@ def build_schedule(p: dict) -> Schedule:
     rec_det = [[] for _ in range(T)]
     pur_det = [[] for _ in range(T)]
 
-    def add_financed(t0, cost, rate, n_years, target, det_list, name):
+    def add_financed(t0, cost, rate, n_years, target, det_list, name, also=None):
         if n_years and n_years > 0:
             pay = _amort_payment(cost, rate, n_years)
             for j in range(n_years):
                 if t0 + j < T:
                     C[target][t0 + j] += pay
+                    if also:
+                        C[also][t0 + j] += pay
                     det_list[t0 + j].append({'name': name + (' (payment)' if j else ''), 'amount': pay})
                     C['consumer_debt'][t0 + j] += _amort_balance(cost, rate, n_years, 12 * (j + 1))
         else:
             C[target][t0] += cost
+            if also:
+                C[also][t0] += cost
             det_list[t0].append({'name': name, 'amount': cost})
 
     for m in p['major_purchases']:
@@ -537,7 +580,8 @@ def build_schedule(p: dict) -> Schedule:
             if (y - r['start_year']) % r['frequency_years'] != 0:
                 continue
             cost = r['amount'] * (C['infl_index'][t] if r['inflation_adjust'] else 1.0)
-            add_financed(t, cost, r['interest_rate'], r['financing_years'], 'recurring_exp', rec_det, r['name'])
+            add_financed(t, cost, r['interest_rate'], r['financing_years'], 'recurring_exp', rec_det, r['name'],
+                         also='essential_exp' if r.get('essential') else None)
             if r['frequency_years'] > 1:
                 events.append({'year': y, 'type': 'recurring', 'label': r['name'], 'amount': cost})
 
@@ -599,6 +643,7 @@ def build_schedule(p: dict) -> Schedule:
                 if sx['start_year'] <= y < sx['start_year'] + sx.get('years', 1):
                     amt = sx.get('amount', 0) * C['infl_index'][t_]
                     C['family_exp'][t_] += amt
+                    C['essential_exp'][t_] += amt
                     details[t_].setdefault('recurring', [])
             events.append({'year': sx['start_year'], 'type': 'stress', 'label': sx.get('name', 'Extra cost')})
 
@@ -620,13 +665,43 @@ def _hist():
     return HIST
 
 
+def allocation_path(p: dict, T: int) -> np.ndarray:
+    """Stock share (0-1) per plan year. Without a glide path it is mc_stock_allocation every year; with one it holds
+    that share, then moves linearly over `years_before` years to `at_retirement` % in the first retirement year and
+    stays there."""
+    a0 = p.get('mc_stock_allocation', 100.0) / 100
+    gp = p.get('glide_path') or {}
+    if not gp.get('enabled'):
+        return np.full(T, a0)
+    cy = p['current_year']
+    ret = cy + max(0, p['parentX_retirement_age'] - p['parentX_age'])
+    if not is_single(p):
+        ret = min(ret, cy + max(0, p['parentY_retirement_age'] - p['parentY_age']))
+    a1 = float(gp.get('at_retirement', 60.0)) / 100
+    span = max(1, int(gp.get('years_before', 10)))
+    out = np.empty(T)
+    for t in range(T):
+        y = cy + t
+        k = min(1.0, max(0.0, (y - (ret - span)) / span))
+        out[t] = a0 + (a1 - a0) * k
+    return out
+
+
 def _returns(p: dict, T: int, n: int, stochastic: bool, rng: np.random.Generator):
     r = p['economic_params']['investment_return']
+    bond = p.get('bond_return', 0.04)
+    a0 = p.get('mc_stock_allocation', 100.0) / 100
+    A = allocation_path(p, T)[:, None]
+    glide = bool((p.get('glide_path') or {}).get('enabled'))
+    # 'investment_return' is the expected return of today's mix; its stock part is backed out so a glide path
+    # moves the expected return (and the spread) with the stock share
+    rs = (r - (1 - a0) * bond) / a0 if a0 > 0 else r
+    r_t = A * rs + (1 - A) * bond if glide else np.full((T, 1), r)
+    scale = (A / a0 if a0 > 0 else np.ones_like(A)) if glide else np.ones_like(A)
     if not stochastic:
-        return np.full((T, n), r)
+        return np.repeat(r_t, n, axis=1)
     if p['mc_use_historical']:
         H = _hist()
-        alloc = p.get('mc_stock_allocation', 100.0) / 100
         if p.get('_backtest_starts') is not None:
             # rolling backtest: path j starts in historical year j and runs in order (wrapping)
             start = np.array(p['_backtest_starts'], dtype=int)[:n]
@@ -638,13 +713,13 @@ def _returns(p: dict, T: int, n: int, stochastic: bool, rng: np.random.Generator
             stock = H[idx]
         else:
             stock = rng.choice(H, size=(T, n))
-        return alloc * stock + (1 - alloc) * p.get('bond_return', 0.04)
+        return A * stock + (1 - A) * bond
     z = rng.standard_normal((T, n))
     if p.get('mc_use_asymmetric', True):
         sp = p['mc_return_variability_positive'] / 100
         sn = p['mc_return_variability_negative'] / 100
-        return r + np.where(z >= 0, z * sp, z * sn)
-    return r + z * p['mc_return_variability'] / 100
+        return r_t + np.where(z >= 0, z * sp, z * sn) * scale
+    return r_t + z * p['mc_return_variability'] / 100 * scale
 
 
 def _mult(p: dict, kind: str, T: int, n: int, stochastic: bool, rng):
@@ -715,6 +790,8 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
     irmaa_on = p.get('irmaa_enabled', True)
     aca_on = p.get('aca_enabled', True)
     rc = p.get('roth_conversion') or {}
+    sp_ = p.get('surplus_sweep') or {}
+    sweep_on, sweep_lim = bool(sp_.get('enabled')), float(sp_.get('roth_per_person', 7500.0))
     conv_mode = rc.get('mode', 'off')
     conv_start = rc.get('start_age') if rc.get('start_age') is not None else int(p['parentX_retirement_age'])
     conv_end = rc.get('end_age') if rc.get('end_age') is not None else rmd_age(p['current_year'] - int(p['parentX_age'])) - 1
@@ -798,7 +875,9 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
                     gm = np.ones(n)
             else:
                 gm = np.ones(n)
-        flex = (C['p1_exp'][t] + C['p2_exp'][t] + C['family_exp'][t] + C['recurring_exp'][t]) * EM[t] * gm
+        everyday = C['p1_exp'][t] + C['p2_exp'][t] + C['family_exp'][t] + C['recurring_exp'][t]
+        ess = min(C['essential_exp'][t], everyday)
+        flex = ((everyday - ess) * gm + ess) * EM[t]
         disc = flex + (C['children_exp'][t] + C['healthcare_exp'][t]) * EM[t]
         fixed = C['house_exp'][t] + C['purchase_exp'][t] + C['down_payment'][t] + C['debt_pay'][t]
         # 529s: contributions (out of cash flow) and college costs paid from the account
@@ -850,6 +929,12 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
         inflow = w1 + w2 + ss + pen + C['rent_income'][t] + C['sale_proceeds'][t] + C['windfall'][t] + rmd + paid529
         net = inflow - taxes - contrib - roth_c - expenses - c529
         inc_share = np.where((w1 + w2 + ss) > 0, (w1 + C['ss1'][t]) / np.maximum(w1 + w2 + ss, 1), 0.5)
+        # surplus sweep: leftover cash of each working adult goes to Roth (backdoor IRA) up to the yearly limit
+        sweep1 = sweep2 = np.zeros(n)
+        if sweep_on and OV is None and not separate:      # (separate finances: per person, below)
+            k_ = int(bool(C['work1'][t] and C['wages1'][t] > 0)) + int(bool(C['work2'][t] and C['wages2'][t] > 0))
+            sweep1 = np.clip(net, 0, sweep_lim * C['infl_index'][t] * k_)
+            net = net - sweep1
         if OV is not None:
             OV.step(t, R[t], debt_rate, C, EM, w1, w2, taxes, expenses, inc_share)
 
@@ -865,6 +950,11 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
             in2 = inflow - paid529 - in1
             net1 = in1 - taxes * inc_share - C['contrib1'][t] - C['roth_c1'][t] - e1
             net2 = in2 - taxes * (1 - inc_share) - C['contrib2'][t] - C['roth_c2'][t] - e2
+            if sweep_on and OV is None:
+                lim = sweep_lim * C['infl_index'][t]
+                sweep1 = np.clip(net1, 0, lim) if (C['work1'][t] and C['wages1'][t] > 0) else np.zeros(n)
+                sweep2 = np.clip(net2, 0, lim) if (C['work2'][t] and C['wages2'][t] > 0) else np.zeros(n)
+                net1, net2 = net1 - sweep1, net2 - sweep2
             g1 = np.where(L1 >= 0, L1 * r, L1 * debt_rate)
             g2 = np.where(L2 >= 0, L2 * r, L2 * debt_rate)
             gain = g1 + g2
@@ -894,7 +984,7 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
         P1 = P1 * (1 + r) + (C['contrib1'][t] - C['hsa_c1'][t]) * k401
         P2 = P2 * (1 + r) + (C['contrib2'][t] - C['hsa_c2'][t]) * k401
         H = H * (1 + r) + hsa_c
-        Ro = Ro * (1 + r) + roth_c
+        Ro = Ro * (1 + r) + roth_c + sweep1 + sweep2
         for k in range(len(E)):
             E[k] = E[k] * (1 + r)
         P = P1 + P2 + H

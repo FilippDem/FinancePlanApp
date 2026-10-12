@@ -23,6 +23,8 @@ interface Answers {
   p2: { name: string; age: number; emoji: string; work: Work; income: number; raise: number; retire: number; savings: number; retirement: number; ss: number; roth?: number }
   location: string
   contrib: number
+  stocks?: number          // % of investments in stocks (rest bonds/cash)
+  basis?: number           // % of taxable savings that is original money (the rest is gain, taxed when sold)
   ss_mode: 'estimate' | 'known'
   housing: 'rent' | 'own' | 'family'
   rent: number
@@ -129,6 +131,8 @@ function buildPlan(A: Answers, base: any, curve: Curve) {
     p.tax_filing_status = A.filing || 'married'
   }
   p.pretax_401k = A.contrib
+  p.mc_stock_allocation = A.stocks ?? 100
+  p.taxable_basis_pct = A.basis ?? 80
   p.state_timeline = [{ year: CY, state: A.location, spending_strategy: strat.replace(' (statistical)', '') },
     ...(A.moves || []).filter(m => m.year > CY && m.location).sort((a, b) => a.year - b.year)
       .map(m => ({ year: m.year, state: m.location, spending_strategy: strat.replace(' (statistical)', '') }))]
@@ -389,6 +393,16 @@ export default function Onboarding() {
             </div>
           </div>
         ))}
+      </Question>) },
+    { section: 2, skip: !(A.p1.savings + A.p1.retirement + (couple ? A.p2.savings + A.p2.retirement : 0)), body: (
+      <Question title="How is it invested?" subtitle="Two rough answers make the taxes and the range of outcomes much more realistic."
+        why="More stocks means higher expected growth and bigger swings. In regular (taxable) accounts, only the growth is taxed when you sell, so we need a rough idea of how much is growth.">
+        <BigField label="Share in stocks (the rest in bonds and cash)">
+          <ChoiceCards cols={2} value={A.stocks ?? 100} onChange={v => set({ stocks: v })} options={[
+            { value: 100, label: 'All stocks' }, { value: 80, label: 'About 80%' }, { value: 60, label: 'About 60%' }, { value: 40, label: '40% or less' }]} /></BigField>
+        <BigField label="Cash & investments outside retirement accounts: how much is growth?">
+          <ChoiceCards cols={3} value={A.basis ?? 80} onChange={v => set({ basis: v })} options={[
+            { value: 90, label: 'Little (mostly money I put in)' }, { value: 70, label: 'Some' }, { value: 40, label: 'A lot (bought long ago)' }]} /></BigField>
       </Question>) },
     { section: 2, skip: A.p1.work !== 'working' && (!couple || A.p2.work !== 'working'), body: (
       <Question title="How much do you put into retirement accounts each year?" subtitle={couple ? 'Both of you together, including any employer match.' : 'Including any employer match.'}

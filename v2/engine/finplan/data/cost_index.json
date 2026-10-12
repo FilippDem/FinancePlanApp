@@ -5,7 +5,8 @@
   "rpp_2024_metros": "BEA Regional Price Parities by MSA, 2024, via FRED https://fred.stlouisfed.org/release/tables?eid=233895&rid=403 and series RPPALL/RPPGOOD/RPPSERVERENT/RPPSERVEOTH + MSA code",
   "cex_2022_quintiles": "BLS CE Table 1101, quintiles of income before taxes, 2022 https://www.bls.gov/cex/tables/calendar-year/mean-item-share-average-standard-error/cu-income-quintiles-before-taxes-2022.pdf",
   "cex_2024_all": "BLS Consumer Expenditures 2024 news release (2025-12-19) https://www.bls.gov/news.release/cesan.nr0.htm",
-  "country_price_level": "World Bank WDI PA.NUS.PPPC.RF, price level ratio of PPP conversion factor (GDP) to market exchange rate, 2024 (US = 1.00), via Our World in Data https://ourworldindata.org/grapher/gdp-price-levels-relative-to-the-us (WDI 2026 update). Cayman Islands has no 2024 value and keeps the older (2020) 1.19. Rough: GDP-wide (runs a few % below household-consumption price levels in rich countries) and exchange-rate sensitive. Re-checked 2026-09-27; replaced 2020 values (e.g. Japan 0.95 -> 0.62, Norway 1.07 -> 0.85, Mexico 0.45 -> 0.54)."
+  "country_price_level": "World Bank WDI PA.NUS.PPPC.RF, price level ratio of PPP conversion factor (GDP) to market exchange rate, 2024 (US = 1.00), via Our World in Data https://ourworldindata.org/grapher/gdp-price-levels-relative-to-the-us (WDI 2026 update). Cayman Islands has no 2024 value and keeps the older (2020) 1.19. Rough: GDP-wide (runs a few % below household-consumption price levels in rich countries) and exchange-rate sensitive. Re-checked 2026-09-27; replaced 2020 values (e.g. Japan 0.95 -> 0.62, Norway 1.07 -> 0.85, Mexico 0.45 -> 0.54).",
+  "cex_2022_d10": "BLS CE Table 1110, deciles of income before taxes, 2022 https://www.bls.gov/cex/tables/calendar-year/mean-item-share-average-standard-error/cu-income-deciles-before-taxes-2022.pdf"
  },
  "rpp_year": 2024,
  "rpp_states": {
@@ -692,6 +693,99 @@
    1843
   ],
   "_note": "Suppressed cells (None) are interpolated in calibrate.py"
+ },
+ "cex_2022_d10": {
+  "columns": [
+   "d10"
+  ],
+  "income": [
+   322973.0
+  ],
+  "persons": [
+   3.2
+  ],
+  "children": [
+   0.9
+  ],
+  "vehicles": [
+   2.7
+  ],
+  "total": [
+   167200.0
+  ],
+  "food_home": [
+   9160.0
+  ],
+  "food_away": [
+   8610.0
+  ],
+  "apparel": [
+   4415.0
+  ],
+  "vehicle_purchases": [
+   9740.0
+  ],
+  "gasoline": [
+   4689.0
+  ],
+  "vehicle_insurance": [
+   2360.0
+  ],
+  "transportation": [
+   24574.0
+  ],
+  "healthcare": [
+   9960.0
+  ],
+  "health_insurance": [
+   6210.0
+  ],
+  "entertainment": [
+   8840.0
+  ],
+  "personal_care": [
+   1679.0
+  ],
+  "telephone": [
+   2013.0
+  ],
+  "maintenance": [
+   2254.0
+  ],
+  "vehicle_finance": [
+   551.0
+  ],
+  "vehicle_fees": [
+   2057.0
+  ],
+  "public_transport": [
+   2923.0
+  ],
+  "alcohol": [
+   1436.0
+  ],
+  "tobacco": [
+   237.0
+  ],
+  "reading": [
+   235.0
+  ],
+  "misc": [
+   2355.0
+  ],
+  "fees_admissions": [
+   2943.0
+  ],
+  "audio_visual": [
+   1704.0
+  ],
+  "pets_toys_hobbies": [
+   1773.0
+  ],
+  "other_entertainment": [
+   2421.0
+  ],
+  "_note": "Highest 10 percent column of BLS CE Table 1110 (deciles of income before taxes), 2022, same rows as cex_2022_quintiles. Parsed 2026-10-12; the All-consumer-units column matched Table 1101 for every row."
  },
  "cex_2024_all": {
   "total": 78535,

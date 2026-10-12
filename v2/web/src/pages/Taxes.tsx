@@ -8,7 +8,7 @@ import { useCites } from '../components/Cite'
 import { Card, PageHeader, Field, Money, NumberInput, Percent, Select, Segmented, Toggle, Button, Badge, Note, Stat } from '../components/ui'
 import { S, axisProps, TipBox, LegendRow } from '../components/charts'
 
-const SRC = ['irs_2024_tax', 'irs_ltcg_2024', 'irs_niit', 'irs_p590a', 'cms_irmaa_2026', 'irs_rp_2025_25', 'hhs_fpl_2025', 'irs_rmd']
+const SRC = ['irs_2024_tax', 'irs_ltcg_2024', 'irs_niit', 'irs_p590a', 'cms_irmaa_2026', 'irs_rp_2025_25', 'hhs_fpl_2025', 'irs_rmd', 'wa_dor_cg']
 
 function RothSettings() {
   const { plan, update } = usePlan()
@@ -150,7 +150,7 @@ export default function Taxes() {
           <Toggle checked={plan.capital_gains_enabled !== false} onChange={v => update(d => { d.capital_gains_enabled = v })} label="Tax realized gains" />
           <Field label="Original money in taxable savings today" hint="Cost basis as a share of your cash and brokerage balance. Cash is 100%; long-held index funds are often 40–60%.">
             <Percent value={plan.taxable_basis_pct ?? 80} decimals={0} min={0} max={100} onChange={v => update(d => { d.taxable_basis_pct = v })} /></Field>
-          <p className="text-[12.5px] text-muted">0%, 15% or 20% federal depending on income, plus 3.8% above $250,000 joint and state tax. New savings add to the original money.</p>
+          <p className="text-[12.5px] text-muted">0%, 15% or 20% federal depending on income, plus 3.8% above $250,000 joint and state tax. Washington, which has no income tax, charges 7% on gains above about $278,000 a year and 9.9% on the part above $1 million<Cite id="wa_dor_cg" />. New savings add to the original money.</p>
         </div>
       </Card>
 

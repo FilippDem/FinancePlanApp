@@ -204,6 +204,15 @@ def build(plan: dict, household: str, checkins: list | None = None, sections: li
                                ('TOPPADDING', (0, 0), (-1, -1), 7), ('BOTTOMPADDING', (0, 0), (-1, -1), 7)]))
         story += [t, Paragraph('Lifetime summary', st.H2), _kv_table(RD.lifetime_summary(ctx, today), st, cols=3)]
 
+    if 'plan_health' in sections:
+        from finplan.health import plan_health
+        h = plan_health(p, pr, mc)
+        mark = {'good': 'Good', 'ok': 'OK', 'bad': 'Needs attention'}
+        story += [Paragraph(f"Plan score: {h['score']}/100 ({h['grade']})", st.H2),
+                  _table([['Check', 'Now', 'Rating', 'What it means']] +
+                         [[i['label'], i['value'], mark[i['status']], Paragraph(i['detail'], st.B)] for i in h['items']],
+                         widths=[W * 0.24, W * 0.14, W * 0.12, W * 0.50], right_from=99)]
+
     if 'charts' in sections:
         story += _charts(ctx, st, today)
 

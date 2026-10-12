@@ -78,6 +78,7 @@ export default function Actuals() {
   const [xlYears, setXlYears] = useState(1)
   const [addBuy, setAddBuy] = useState<{ name: string; amount: number } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const monarchRef = useRef<HTMLInputElement>(null)
 
   const load = async () => { const r = await api.getActuals(); setAll(r.actuals || {}); return r.actuals || {} }
   useEffect(() => { load() }, [])
@@ -115,6 +116,17 @@ export default function Actuals() {
       const r = await api.importWorkbook(f)
       setAll(r.actuals || {})
       flash('good', r.years.length ? `Imported ${r.years.join(', ')}` : 'No filled-in values found in that workbook')
+    } catch (e: any) { flash('bad', e.message) }
+  }
+
+  const importMonarch = async (f: File) => {
+    try {
+      const r = await api.importMonarch(f)
+      setAll(r.actuals || {})
+      const un = Object.keys(r.unmapped || {})
+      flash('good', `Imported ${r.transactions} Monarch transactions for ${r.imported_years.join(', ')}` +
+        (r.skipped_transfers ? ` (${r.skipped_transfers} transfers and card payments skipped)` : '') +
+        (un.length ? `. Not recognized, counted as Other Family Expenses: ${un.slice(0, 4).join(', ')}${un.length > 4 ? '…' : ''}` : ''))
     } catch (e: any) { flash('bad', e.message) }
   }
 
@@ -247,7 +259,10 @@ export default function Actuals() {
               href={`/api/actuals/workbook.xlsx?start=${year}&end=${year + xlYears - 1}`}><Download size={15} />Download workbook</a>
             <Button onClick={() => fileRef.current?.click()}><Upload size={15} />Import filled workbook</Button>
             <input ref={fileRef} type="file" accept=".xlsx" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) importXl(f); e.target.value = '' }} />
+            <Button onClick={() => monarchRef.current?.click()}><Upload size={15} />Import Monarch CSV</Button>
+            <input ref={monarchRef} type="file" accept=".csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) importMonarch(f); e.target.value = '' }} />
           </div>
+          <p className="text-[12.5px] text-muted mt-2">Monarch: Transactions → Download CSV. Spending is totaled per year and category (personal categories split between the two of you); transfers and card payments are skipped, and re-importing replaces rather than adds.</p>
           <p className="text-[12.5px] text-muted mt-3 flex gap-1.5"><FileSpreadsheet size={14} className="shrink-0 mt-0.5" />Importing merges into what's here; nothing you've entered is erased.</p>
           {history.length > 0 && (
             <div className="mt-4 border-t border-line pt-3">

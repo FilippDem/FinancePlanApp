@@ -14,6 +14,8 @@ import { WhatItTakes } from '../components/WhatItTakes'
 import { LivingTimeline } from '../components/LivingTimeline'
 import { SafeSpending } from '../components/SafeSpending'
 import { GoalsCard } from '../components/GoalsCard'
+import { SpendingPower } from '../components/SpendingPower'
+import { PlanScore } from '../components/PlanScore'
 
 export function retirementMarkers(plan: any, names: [string, string], single: boolean): Marker[] {
   const cy = plan.current_year
@@ -212,6 +214,8 @@ export default function Dashboard({ isNew }: { isNew: boolean }) {
         </div>
       )}
 
+      <SpendingPower />
+
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Card><Stat label="Net worth today" value={money(s?.net_worth_now)}
           sub={`${money(s?.investable_now)} savings · ${money(r0?.home_equity)} home equity`} /></Card>
@@ -239,6 +243,8 @@ export default function Dashboard({ isNew }: { isNew: boolean }) {
         <GoalsCard compact />
         <SafeSpending />
       </div>
+
+      <PlanScore />
 
       <WhatItTakes />
 

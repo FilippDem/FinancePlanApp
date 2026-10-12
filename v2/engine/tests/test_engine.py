@@ -546,7 +546,7 @@ def _rich(**kw):
 def test_capital_gains_tax_on_selling_taxable_savings():
     from finplan.engine import project
     import copy
-    p = _rich()
+    p = _rich(taxable_basis_pct=20, parentX_net_worth=3000000)   # big embedded gains, savings that last
     on = project(p)
     q = copy.deepcopy(p); q['capital_gains_enabled'] = False
     off = project(q)
@@ -670,3 +670,113 @@ def test_safe_spending_guardrails_and_backtest():
     b = backtest.run(p)
     assert b['n'] == 100 and b['first_year'] == 1924 and len(b['starts']) == 100
     assert 0 <= b['success_rate'] <= 1 and len(b['median_path']) == b['plan_years']
+
+
+# ── 2026-10-12: fixes found by running a real household plan ──────────────────────────────────
+def test_template_career_phase_does_not_override_simple_income():
+    from finplan import reference as R
+    from finplan.engine import project
+    p = R.default_plan()
+    p.update({'parentX_income': 300000, 'parentY_income': 0,
+              'parentX_job_changes': [{'Year': p['current_year'] + 1, 'New Income': 0}]})
+    rows = project(p)['rows']
+    assert rows[0]['wages1'] == 300000 and rows[0]['wages2'] == 0 and rows[1]['wages1'] == 0
+    # an untouched default plan keeps its 75k phase; real phases are never dropped
+    assert normalize_plan(R.default_plan())['parentX_career_phases']
+    q = R.default_plan(); q['parentX_income'] = 1; q['parentX_career_phases'][0]['base_salary'] = 120000
+    assert normalize_plan(q)['parentX_career_phases'][0]['base_salary'] == 120000
+
+
+def test_auto_health_coverage_employer_then_marketplace():
+    from finplan import reference as R
+    from finplan.engine import project
+    cy = R.default_plan()['current_year']
+    p = _rich(parentX_age=40, parentY_age=40, parentX_retirement_age=65, parentY_retirement_age=65,
+              parentX_job_changes=[{'Year': cy + 1, 'New Income': 0}, {'Year': cy + 2, 'New Income': 150000}],
+              parentY_job_changes=[{'Year': cy + 1, 'New Income': 0}, {'Year': cy + 2, 'New Income': 90000}])
+    rows = project(p)['rows']
+    assert abs(rows[0]['exp_healthcare'] - 6850) < 1                 # family share of an employer plan
+    assert rows[1]['exp_healthcare'] > 12 * 625 * 2 * 0.99            # career break: marketplace for two 41-year-olds
+    assert rows[1]['aca_benchmark'] > 0 and rows[0]['aca_benchmark'] == 0
+    off = project({**p, 'auto_health_coverage': False})['rows']
+    assert off[0]['exp_healthcare'] == 0
+    own = project({**p, 'health_insurances': [{'name': 'Mine', 'monthly_premium': 100, 'covered_by': 'Both'}]})['rows']
+    assert abs(own[0]['exp_healthcare'] - 1200) < 1                   # an entered plan replaces the estimate
+
+
+def test_washington_capital_gains_tax():
+    import numpy as np
+    from finplan.taxes import capital_gains_tax, WA_CG_DEDUCTION
+    g = np.array([WA_CG_DEDUCTION + 100000.0, WA_CG_DEDUCTION + 1_500_000.0])
+    wa = capital_gains_tax(g, 0, g, 'married', 1.0, 'Seattle')
+    tx = capital_gains_tax(g, 0, g, 'married', 1.0, 'Texas')
+    assert np.allclose(wa - tx, [7000.0, 70000.0 + 500000 * 0.099])
+    small = np.array([100000.0])
+    assert np.allclose(capital_gains_tax(small, 0, small, 'married', 1.0, 'Washington'),
+                       capital_gains_tax(small, 0, small, 'married', 1.0, 'Texas'))
+
+
+def test_top10_spending_milestone():
+    from finplan import reference as R
+    a = {x['key']: x for x in R.spending_curve('Seattle')['anchors']}
+    assert a['q5']['total'] < a['d10']['total'] < a['v08_avg']['total'] and a['d10']['x'] == 85
+
+
+def test_guardrails_cut_only_discretionary_spending():
+    from finplan.engine import monte_carlo, build_schedule
+    from finplan.plan import DEFAULT_ESSENTIAL
+    p = normalize_plan(_rich(guardrails={'enabled': True, 'lower': 5, 'cut': 50, 'upper': 99, 'raise': 0, 'retired_only': False}))
+    S = build_schedule(p)
+    assert 0 < S.cols['essential_exp'][0] < S.cols['p1_exp'][0] + S.cols['p2_exp'][0] + S.cols['family_exp'][0]
+    assert p['essential_categories'] == DEFAULT_ESSENTIAL
+    all_flex = monte_carlo({**p, 'essential_categories': []}, 300, seed=3)
+    some_ess = monte_carlo(p, 300, seed=3)
+    # protecting essentials means smaller cuts in bad paths, so savings end lower than when everything is cut
+    assert some_ess['final']['p10'] <= all_flex['final']['p10']
+    q = normalize_plan({**p, 'recurring_expenses': [{'name': 'Car', 'amount': 10000, 'essential': True}]})
+    assert build_schedule(q).cols['essential_exp'][0] - S.cols['essential_exp'][0] > 9999
+
+
+def test_glide_path_moves_toward_bonds_before_retirement():
+    from finplan.engine import allocation_path, project, monte_carlo
+    p = normalize_plan(_rich(parentX_age=50, parentY_age=50, parentX_retirement_age=60, parentY_retirement_age=60,
+                             mc_stock_allocation=90, glide_path={'enabled': True, 'at_retirement': 50, 'years_before': 5}))
+    A = allocation_path(p, 20)
+    assert A[0] == 0.9 and A[5] == 0.9 and abs(A[10] - 0.5) < 1e-9 and A[15] == A[10] and A[7] < A[6]
+    assert (allocation_path({**p, 'glide_path': {'enabled': False}}, 5) == 0.9).all()
+    base = project({**p, 'glide_path': {'enabled': False}})
+    gl = project(p)
+    # same expected return until the glide starts, lower after (more bonds)
+    assert gl['rows'][3]['investment_growth'] == base['rows'][3]['investment_growth']
+    assert gl['rows'][12]['investment_growth'] < base['rows'][12]['investment_growth']
+    # and a narrower range of outcomes
+    m0, m1 = monte_carlo({**p, 'glide_path': {'enabled': False}}, 400, seed=5), monte_carlo(p, 400, seed=5)
+    assert (m1['final']['p90'] - m1['final']['p10']) < (m0['final']['p90'] - m0['final']['p10'])
+
+
+def test_surplus_sweep_moves_savings_into_roth():
+    from finplan.engine import project
+    p = normalize_plan(_rich(parentX_age=40, parentY_age=40, parentX_retirement_age=65, parentY_retirement_age=65))
+    off = project(p)['rows']
+    on = project({**p, 'surplus_sweep': {'enabled': True, 'roth_per_person': 7500}})['rows']
+    assert off[0]['cashflow'] > 15000
+    assert abs((on[0]['roth'] - off[0]['roth']) - 15000) < 1                      # two earners x 7,500
+    assert abs(on[0]['net_worth'] - off[0]['net_worth']) < 1                       # money moved, not created
+    assert on[-1]['roth'] > off[-1]['roth']
+    # (no yearly dividend drag on taxable savings yet, so the gain shows up only as capital-gains tax avoided)
+    assert abs(on[-1]['net_worth'] / off[-1]['net_worth'] - 1) < 0.01
+    assert normalize_plan({})['surplus_sweep'] == {'enabled': False, 'roth_per_person': 7500.0}
+
+
+def test_plan_health_score():
+    from finplan.engine import project, monte_carlo
+    from finplan.health import plan_health
+    p = normalize_plan(_rich(parentX_age=40, parentY_age=40, parentX_retirement_age=65, parentY_retirement_age=65))
+    h = plan_health(p, project(p), monte_carlo(p, 200, seed=1))
+    ids = {i['id']: i for i in h['items']}
+    assert {'success', 'emergency', 'savings_rate', 'housing', 'withdrawal', 'debt', 'health'} <= set(ids)
+    assert 0 <= h['score'] <= 100 and h['grade'] in ('Strong', 'Solid', 'Needs work', 'At risk')
+    assert ids['health']['status'] == 'ok' and ids['debt']['status'] == 'good'
+    worse = normalize_plan({**p, 'auto_health_coverage': False, 'debts': [{'name': 'Card', 'balance': 500000, 'rate': 0.2, 'monthly_payment': 100}]})
+    h2 = plan_health(worse, project(worse), monte_carlo(worse, 200, seed=1))
+    assert h2['score'] < h['score']

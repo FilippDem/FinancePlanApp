@@ -51,6 +51,27 @@ Unzip anywhere (the installed copy lives in `C:\Users\filip\Documents\FinancialP
 To update an installed copy, replace `app/`, `launcher/` and the `.bat` files. Keep `data/`, `settings.json`,
 `webview-data/`, `.venv/` and `logs/`.
 
+## Claude connection (MCP)
+`app/server/mcp_server.py` lets Claude Desktop or Claude Code read your plans, run the analysis and scenario matrix, and
+edit the plan. Nothing extra needs installing: it speaks MCP over stdio with the planner's own Python.
+
+- **Tools:**
+  - `list_households`, `get_plan`, `run_analysis` (success, headroom, safe spending), `run_scenarios`
+  - `propose_changes` (a JSON merge patch; returns every changed field and the before/after results, writes nothing)
+  - `apply_changes` (saves a confirmed proposal with a backup; refused if the plan was saved since)
+  - `save_scenario`
+- **Data:** uses `data/` next to `app/`. Reload the planner window after Claude applies a change.
+
+Claude Code:
+```
+claude mcp add financial-planner -- "C:\Users\filip\Documents\FinancialPlanner\.venv\Scripts\python.exe" "C:\Users\filip\Documents\FinancialPlanner\app\server\mcp_server.py"
+```
+Claude Desktop (`%APPDATA%\Claude\claude_desktop_config.json`):
+```json
+{"mcpServers": {"financial-planner": {"command": "C:\\Users\\filip\\Documents\\FinancialPlanner\\.venv\\Scripts\\python.exe",
+  "args": ["C:\\Users\\filip\\Documents\\FinancialPlanner\\app\\server\\mcp_server.py"]}}}
+```
+
 ## Known limits
 - Windows only for the window itself. On other systems pywebview would need GTK or Qt; the browser mode works anywhere.
 - NAS mode needs v2 deployed on the NAS (`v2/docker-compose.yml`, port 8502). Until then the NAS serves v0.8 on

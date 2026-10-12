@@ -52,6 +52,12 @@ export const api = {
     if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m } catch { /* */ } throw new ApiError(r.status, m) }
     return r.json()
   },
+  importMonarch: async (file: File) => {
+    const r = await fetch('/api/actuals/monarch', { method: 'POST', body: await file.arrayBuffer(), credentials: 'same-origin',
+      headers: { 'Content-Type': 'text/csv' } })
+    if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m } catch { /* */ } throw new ApiError(r.status, m) }
+    return r.json()
+  },
   // linked accounts (optional SnapTrade + CSV import)
   linked: () => req('GET', '/api/linked'),
   linkedSetKeys: (cfg: { client_id: string; consumer_key: string; user_id?: string; user_secret?: string }) => req('PUT', '/api/linked/snaptrade', cfg),
@@ -77,6 +83,7 @@ export const api = {
   solve: (plan: any, target = 0.85) => req('POST', '/api/solve', { plan, target }),
   economies: () => req('GET', '/api/scenarios/economies'),
   safeSpending: (plan: any, target = 0.85) => req('POST', '/api/safe-spending', { plan, target }),
+  planHealth: (plan: any, n = 300) => req('POST', '/api/plan-health', { plan, n }),
   backtest: (plan: any) => req('POST', '/api/backtest', { plan }),
   rothCompare: (plan: any) => req('POST', '/api/taxes/roth-compare', { plan }),
   brackets: (plan: any) => req('POST', '/api/taxes/brackets', { plan }),

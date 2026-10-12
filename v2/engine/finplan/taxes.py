@@ -128,6 +128,25 @@ def state_rate(location: str | None, override: float | None = None) -> tuple[str
     return 'us', override if override is not None else 0.05
 
 
+# Washington taxes long-term capital gains although it has no income tax (RCW 82.87): 7% above a standard
+# deduction ($262,000 in 2024, indexed; $278,000 in 2025) and 9.9% on taxable gains above $1M (not indexed).
+# Real estate and retirement accounts are exempt; v2 only realizes gains from taxable savings. [wa_dor_cg]
+WA_CG_DEDUCTION = 262000.0   # TAX_BASE_YEAR value, indexed like the federal brackets
+WA_CG_TIER = 1_000_000.0
+
+
+def _us_state(location: str | None) -> str | None:
+    from .reference import ref, CITY_TO_STATE
+    if location in ref()["US_STATE_TAX_INFO"]:
+        return location
+    return CITY_TO_STATE.get(location)
+
+
+def wa_capital_gains_tax(gains, index: float):
+    taxable = np.maximum(np.asarray(gains, dtype=float) - WA_CG_DEDUCTION * index, 0.0)
+    return np.minimum(taxable, WA_CG_TIER) * 0.07 + np.maximum(taxable - WA_CG_TIER, 0.0) * 0.099
+
+
 def capital_gains_tax(gains, ordinary_taxable, magi, status: str, index: float, location: str | None,
                       override: float | None = None):
     """Tax on realized long-term gains stacked on top of ordinary taxable income (0/15/20%), plus NIIT and state."""
@@ -135,6 +154,11 @@ def capital_gains_tax(gains, ordinary_taxable, magi, status: str, index: float, 
     kind, srate = state_rate(location, override)
     if kind == 'foreign':
         return g * srate
+    if _us_state(location) == 'Washington':
+        srate = 0.0
+        state_part = wa_capital_gains_tax(g, index)
+    else:
+        state_part = g * srate
     lo, hi = LTCG[status]
     lo, hi = lo * index, hi * index
     base = np.maximum(np.asarray(ordinary_taxable, dtype=float), 0.0)
@@ -144,7 +168,7 @@ def capital_gains_tax(gains, ordinary_taxable, magi, status: str, index: float, 
     in20 = g - in0 - in15
     fed = in15 * 0.15 + np.maximum(in20, 0) * 0.20
     niit = np.minimum(g, np.maximum(np.asarray(magi, dtype=float) - NIIT_THRESHOLD[status], 0)) * 0.038
-    return fed + niit + g * srate
+    return fed + niit + state_part
 
 
 # Medicare IRMAA 2026 (CMS): MAGI from two years earlier. (threshold, Part B extra, Part D extra) per person per month.

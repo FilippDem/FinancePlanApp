@@ -7,6 +7,13 @@
     "url": "https://www.bls.gov/cex/tables/calendar-year/mean-item-share-average-standard-error/cu-income-quintiles-before-taxes-2022.pdf",
     "used_for": "Spending-level slider: category mix and the income-group milestones (lowest to highest 20%)"
   },
+  "bls_cex_2022_deciles": {
+    "publisher": "U.S. Bureau of Labor Statistics",
+    "title": "Consumer Expenditure Surveys, Table 1110: Deciles of income before taxes, 2022 (highest 10 percent column)",
+    "year": "2022 (published Sept 2023)",
+    "url": "https://www.bls.gov/cex/tables/calendar-year/mean-item-share-average-standard-error/cu-income-deciles-before-taxes-2022.pdf",
+    "used_for": "The 'Top 10%' spending-slider milestone"
+  },
   "bls_cex_2024": {
     "publisher": "U.S. Bureau of Labor Statistics",
     "title": "Consumer Expenditures — 2024 (news release)",
@@ -169,10 +176,10 @@
   },
   "kff_ehbs_2025": {
     "publisher": "KFF",
-    "title": "2025 Employer Health Benefits Survey (workers pay $6,850 a year toward family coverage)",
+    "title": "2025 Employer Health Benefits Survey (workers pay $1,440 a year for single and $6,850 for family coverage)",
     "year": "2025",
     "url": "https://www.kff.org/health-costs/2025-employer-health-benefits-survey/",
-    "used_for": "Employer premium share guidance"
+    "used_for": "Employer premium share guidance; automatic employer-plan estimate before 65"
   },
   "kff_marketplace": {
     "publisher": "KFF",
@@ -202,7 +209,7 @@
     "title": "Marketplace Average Benchmark Premiums (40-year-old: $625/month in 2026, $497 in 2025)",
     "year": "2026",
     "url": "https://www.kff.org/affordable-care-act/state-indicator/marketplace-average-benchmark-premiums/",
-    "used_for": "Marketplace premium guidance before Medicare"
+    "used_for": "Marketplace premium guidance before Medicare; automatic marketplace estimate in no-wage years"
   },
   "cms_age_rating": {
     "publisher": "Centers for Medicare & Medicaid Services",
@@ -331,5 +338,12 @@
     "year": "current",
     "url": "https://www.irs.gov/taxtopics/tc410",
     "used_for": "Taxable share of pension and annuity income"
+  },
+  "wa_dor_cg": {
+    "publisher": "Washington State Department of Revenue",
+    "title": "Capital gains tax (7% above the standard deduction: $262,000 in 2024, $278,000 in 2025; 9.9% on taxable gains above $1 million from 2025)",
+    "year": "2025",
+    "url": "https://dor.wa.gov/taxes-rates/other-taxes/capital-gains-tax",
+    "used_for": "Washington capital-gains tax on sales from taxable savings"
   }
 }

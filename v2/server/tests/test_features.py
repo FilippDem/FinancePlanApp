@@ -228,3 +228,42 @@ def test_tax_goals_safe_spending_backtest_endpoints(client):
     c.put('/api/plan', json={'plan': plan})
     pdf = c.post('/api/report', json={'format': 'pdf', 'sections': ['summary', 'goals', 'income_debts', 'tax_planning']})
     assert pdf.content[:4] == b'%PDF'
+
+
+def test_plan_health_endpoint(client):
+    c, _ = client
+    from finplan.reference import demo_plans
+    r = c.post('/api/plan-health', json={'plan': list(demo_plans().values())[0], 'n': 100})
+    assert r.status_code == 200 and 0 <= r.json()['score'] <= 100 and r.json()['items']
+    assert any(s['key'] == 'plan_health' for s in c.get('/api/report/sections').json()['sections'])
+
+
+MONARCH_CSV = '''Date,Merchant,Category,Account,Original Statement,Notes,Amount,Tags
+2025-01-05,Safeway,Groceries,Chase,SAFEWAY,,-200.00,
+2025-02-05,Safeway,Groceries,Chase,SAFEWAY,,-100.00,
+2025-02-06,Refund,Groceries,Chase,SAFEWAY,,20.00,
+2025-03-01,PSE,Gas & Electric,Chase,PSE,,-150.00,
+2025-03-02,Chase,Credit Card Payment,Checking,PAYMENT,,-5000.00,
+2025-03-03,Employer,Paychecks,Checking,PAY,,9000.00,
+2025-03-04,Daycare,Child Care,Chase,KIDS,,-1200.00,
+2025-04-01,Cool Shop,My Custom Thing,Chase,X,,-75.00,
+2026-01-02,Starbucks,Coffee Shops,Chase,SBUX,,-6.50,
+'''
+
+
+def test_monarch_import(client):
+    c, _ = client
+    c.post('/api/login', json={'email': 'm@x.com'})
+    c.post('/api/households', json={'name': 'M'})
+    c.put('/api/plan', json={'plan': {'parent1_name': 'A', 'parent2_name': 'B'}})
+    r = c.post('/api/actuals/monarch', content=MONARCH_CSV.encode())
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j['imported_years'] == ['2025', '2026'] and j['skipped_transfers'] == 1 and j['unmapped'] == {'My Custom Thing': 75.0}
+    e = j['actuals']['2025']['expenses']
+    assert e['parentX']['Groceries'] == 140 and e['parentY']['Groceries'] == 140       # 280 net, split between two adults
+    assert e['family']['Gas & Electric'] == 150 and e['family']['Other Family Expenses'] == 75
+    assert e['children']['All children (Monarch)']['Total'] == 1200
+    again = c.post('/api/actuals/monarch', content=MONARCH_CSV.encode()).json()
+    assert again['actuals']['2025']['expenses']['parentX']['Groceries'] == 140         # re-import replaces, no double count
+    assert c.post('/api/actuals/monarch', content=b'a,b\n1,2\n').status_code == 400

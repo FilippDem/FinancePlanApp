@@ -37,6 +37,8 @@ def data() -> dict:
 
 
 def _q(row: str, col: str) -> float:
+    if col == 'd10':      # top 10% of households (BLS Table 1110, same rows; no suppressed cells)
+        return float(data()['cex_2022_d10'][row][0])
     q = data()['cex_2022_quintiles']
     vals = list(q[row])
     cols = q['columns']
@@ -147,6 +149,7 @@ ANCHORS = [
     (50, 'all', 'US average', 'Average US household'),
     (60, 'q4', 'Upper-middle', 'US 4th 20% of households'),
     (78, 'q5', 'Top 20%', 'US top 20% of households'),
+    (85, 'd10', 'Top 10%', 'US top 10% of households'),
     (90, 'v08_avg', "Old app 'Average'", "v0.8 template 'Average'"),
     (100, 'v08_high', "Old app 'High-end'", "v0.8 template 'High-end'"),
 ]

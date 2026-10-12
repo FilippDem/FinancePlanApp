@@ -73,6 +73,16 @@ export default function Assumptions() {
               <Percent fraction value={plan.state_tax_rate || 0} onChange={v => update(d => { d.state_tax_rate = v })} /></Field>
             <Field label="Home selling costs"><Percent value={plan.home_selling_cost_pct} decimals={1} onChange={v => update(d => { d.home_selling_cost_pct = v })} /></Field>
           </div>
+          <div className="mt-4 rounded-lg border border-line px-4 py-3 space-y-2">
+            <Toggle checked={!!plan.surplus_sweep?.enabled} onChange={v => update(d => { d.surplus_sweep = { ...(d.surplus_sweep || {}), enabled: v } })}
+              label="Put leftover cash into Roth first" hint="While working, each earner's spare cash goes to a Roth IRA (backdoor Roth at high incomes) up to the yearly limit; the rest stays in taxable savings." />
+            {plan.surplus_sweep?.enabled && (
+              <div className="flex flex-wrap items-end gap-3">
+                <Field label="Roth limit per earner / yr" hint="Today's dollars, grows with inflation" cite={<Cite id="irs_401k_2026" />} className="w-56">
+                  <Money value={plan.surplus_sweep.roth_per_person} step={500} onChange={v => update(d => { d.surplus_sweep.roth_per_person = v })} /></Field>
+                <p className="text-xs text-muted flex-1 min-w-[220px]">Roth growth is never taxed. The plan doesn't yet charge yearly tax on dividends in taxable savings, so this shows only the capital-gains tax avoided and understates the benefit.</p>
+              </div>)}
+          </div>
           <div className="mt-4 space-y-2">
             <Toggle checked={plan.rmd_enabled !== false} onChange={v => update(d => { d.rmd_enabled = v })} label="Required minimum distributions from pre-tax accounts" />
             <p className="text-xs text-muted">From 73 (75 if born in 1960 or later)<Cite id="fr_secure2_rmd" />, each year's minimum is last year's balance divided by the IRS life-expectancy factor<Cite id="cfr_ult" />, taxed as income. Roth accounts have none<Cite id="irs_rmd" />. Spending needs above the minimum come from savings, then pre-tax, then Roth money.</p>
@@ -100,6 +110,18 @@ export default function Assumptions() {
           <Field label="" className="w-40"><div className="flex items-center gap-2"><span className="text-sm text-ink2">Runs</span>
             <NumberInput value={plan.mc_simulations} step={100} min={100} max={20000} onChange={v => update(d => { d.mc_simulations = Math.round(v) })} /></div></Field>
           <Toggle checked={plan.mc_normalize_to_today_dollars} onChange={v => update(d => { d.mc_normalize_to_today_dollars = v })} label="Report in today's dollars" />
+        </div>
+        <div className="rounded-lg border border-line px-4 py-3 space-y-3">
+          <Toggle checked={!!plan.glide_path?.enabled} onChange={v => update(d => { d.glide_path = { ...(d.glide_path || {}), enabled: v } })}
+            label="Glide path: shift from stocks to bonds as retirement nears" hint="Lowers the expected return and the swings around retirement, when a crash hurts most." />
+          {plan.glide_path?.enabled && (
+            <div className="grid sm:grid-cols-4 gap-4">
+              <Field label="Stocks today"><Percent value={plan.mc_stock_allocation} decimals={0} onChange={v => update(d => { d.mc_stock_allocation = v })} /></Field>
+              <Field label="Stocks at retirement"><Percent value={plan.glide_path.at_retirement} decimals={0} onChange={v => update(d => { d.glide_path.at_retirement = v })} /></Field>
+              <Field label="Start shifting (years before)"><NumberInput value={plan.glide_path.years_before} step={1} min={1} max={40} onChange={v => update(d => { d.glide_path.years_before = Math.round(v) })} /></Field>
+              <Field label="Bond return"><Percent fraction value={plan.bond_return} onChange={v => update(d => { d.bond_return = v })} /></Field>
+            </div>)}
+          {plan.glide_path?.enabled && !plan.mc_use_historical && <p className="text-[12px] text-muted">With statistical returns, the investment return above is read as the return of today's mix; less in stocks earns proportionally more of the bond return, with smaller swings.</p>}
         </div>
         {plan.mc_use_historical ? (
           <div className="grid sm:grid-cols-4 gap-4">

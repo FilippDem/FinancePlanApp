@@ -6,7 +6,7 @@ import { Button, Toggle, TextInput, Segmented } from './ui'
 import { clsx } from '../lib/format'
 
 const FORMATS = [{ value: 'pdf', label: 'PDF' }, { value: 'xlsx', label: 'Excel' }, { value: 'csv', label: 'CSV' }, { value: 'json', label: 'JSON' }] as const
-const ALL_DEFAULT = ['summary', 'charts', 'people', 'children', 'spending', 'homes', 'healthcare', 'purchases', 'locations', 'assumptions',
+const ALL_DEFAULT = ['summary', 'plan_health', 'charts', 'people', 'children', 'spending', 'homes', 'healthcare', 'purchases', 'locations', 'assumptions',
   'monte_carlo', 'year_by_year', 'category_detail', 'checkins']
 
 function save(blob: Blob, filename: string) {
@@ -69,7 +69,8 @@ export function ReportButton({ size = 'sm' as 'sm' | 'md' }) {
                   <div>
                     <div className="flex items-baseline justify-between mb-1.5"><span className="text-[12.5px] font-medium text-ink2">Include</span>
                       <span className="text-[12px] space-x-2"><button className="text-accent" onClick={() => setSel(sections.map(x => x.key))}>All</button>
-                        <button className="text-accent" onClick={() => setSel(['summary', 'charts'])}>Summary only</button></span></div>
+                        <button className="text-accent" onClick={() => setSel(['summary', 'charts'])}>Summary only</button>
+                        <button className="text-accent" onClick={() => { setSel(['summary', 'plan_health']); setFormat('pdf') }}>One-page summary</button></span></div>
                     <div className="grid gap-1">
                       {sections.map(x => (
                         <label key={x.key} className="flex items-center gap-2 text-sm cursor-pointer">

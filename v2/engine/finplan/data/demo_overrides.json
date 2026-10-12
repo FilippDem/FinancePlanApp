@@ -26,7 +26,8 @@
           "state": "Seattle",
           "spending_strategy": "Average"
         }
-      ]
+      ],
+      "auto_health_coverage": false
     },
     "children_list": {
       "Emma": {
@@ -75,7 +76,8 @@
           "state": "Denver",
           "spending_strategy": "Average"
         }
-      ]
+      ],
+      "auto_health_coverage": false
     },
     "houses": {
       "Colorado Mountain Cabin": {
@@ -140,7 +142,8 @@
           "state": "Portugal",
           "spending_strategy": "Average"
         }
-      ]
+      ],
+      "auto_health_coverage": false
     },
     "houses": {
       "Aspen Ski Chalet": {
@@ -206,7 +209,8 @@
           "state": "San Diego",
           "spending_strategy": "Conservative"
         }
-      ]
+      ],
+      "auto_health_coverage": false
     },
     "houses": {
       "Sacramento Townhouse": {
@@ -275,7 +279,8 @@
           "state": "Montana",
           "spending_strategy": "Conservative"
         }
-      ]
+      ],
+      "auto_health_coverage": false
     },
     "major_purchases": {
       "Luxury RV Purchase": {
@@ -311,7 +316,8 @@
           "state": "Austin",
           "spending_strategy": "Conservative"
         }
-      ]
+      ],
+      "auto_health_coverage": false
     },
     "houses": {
       "Houston Starter Home": {
@@ -342,5 +348,6 @@
         ]
       }
     }
-  }
+  },
+  "_health_note": "auto_health_coverage is off for the demos (2026-10-12) so their tuned numbers are unchanged; re-tune them with real health plans, then remove it."
 }

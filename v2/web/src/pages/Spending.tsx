@@ -13,8 +13,20 @@ import { Card, PageHeader, Tabs, Field, Money, NumberInput, Percent, TextInput, 
 
 const STRATS = ['Conservative (statistical)', 'Average (statistical)', 'High-end (statistical)']
 
-function CategoryEditor({ values, groups, onChange, onRemove }:
-  { values: Record<string, number>; groups: Record<string, string[]>; onChange: (k: string, v: number) => void; onRemove?: (k: string) => void }) {
+function useEssential() {
+  const { plan, update } = usePlan()
+  const essential = new Set<string>(plan.essential_categories || [])
+  const toggle = (c: string) => update(d => {
+    const s = new Set<string>(d.essential_categories || [])
+    if (s.has(c)) s.delete(c); else s.add(c)
+    d.essential_categories = [...s]
+  })
+  return { essential, toggle }
+}
+
+function CategoryEditor({ values, groups, onChange, onRemove, essential, onToggleEssential }:
+  { values: Record<string, number>; groups: Record<string, string[]>; onChange: (k: string, v: number) => void; onRemove?: (k: string) => void
+    essential?: Set<string>; onToggleEssential?: (k: string) => void }) {
   const known = new Set(Object.values(groups).flat())
   const extra = Object.keys(values).filter(k => !known.has(k))
   const all = { ...groups, ...(extra.length ? { 'Other / custom': extra } : {}) }
@@ -31,8 +43,13 @@ function CategoryEditor({ values, groups, onChange, onRemove }:
             </div>
             <div className="space-y-1.5">
               {present.map(c => (
-                <div key={c} className="grid grid-cols-[1fr_130px_28px] items-center gap-2">
+                <div key={c} className="grid grid-cols-[1fr_auto_130px_28px] items-center gap-2">
                   <span className="text-sm text-ink truncate">{c}</span>
+                  {essential && onToggleEssential
+                    ? <button onClick={() => onToggleEssential(c)} title={essential.has(c) ? 'Essential: guardrails never cut it. Click to make it discretionary.' : 'Discretionary: guardrails may cut it in bad markets. Click to mark essential.'}
+                        className={`text-[10.5px] px-1.5 h-5 rounded border ${essential.has(c) ? 'border-accent/40 bg-accentSoft text-accent' : 'border-line text-muted hover:bg-sunken'}`}>
+                        {essential.has(c) ? 'Need' : 'Want'}</button>
+                    : <span />}
                   <Money value={values[c] ?? 0} step={100} onChange={v => onChange(c, v)} />
                   {onRemove && extra.includes(c)
                     ? <button className="p-1 rounded text-muted hover:text-bad" onClick={() => onRemove(c)}><Trash2 size={14} /></button>
@@ -49,6 +66,7 @@ function CategoryEditor({ values, groups, onChange, onRemove }:
 
 function PersonalTab() {
   const { plan, update, reference, names, single } = usePlan()
+  const ess = useEssential()
   const [who, setWho] = useState<'X' | 'Y'>('X')
   const [loc, setLoc] = useState<string>(plan[pk(who, 'expense_location')] || plan.state_timeline?.[0]?.state || 'Seattle')
   const [strat, setStrat] = useState<string>(plan[pk(who, 'expense_strategy')] || 'Average (statistical)')
@@ -128,7 +146,9 @@ function PersonalTab() {
             <span className="text-xs text-muted mb-2.5 basis-full">Overwrites the amounts below (inflated to {plan.current_year}). BLS / BEA data<Cite id={curveSources(curve)} />; v0.8 original templates<Cite id="mit_living_wage" />.</span>
           </div>
         </details>
-        <CategoryEditor values={vals} groups={reference?.adult_categories || {}} onChange={(k, v) => update(d => { d[pk(who, 'expenses')][k] = v })} />
+        <CategoryEditor values={vals} groups={reference?.adult_categories || {}} onChange={(k, v) => update(d => { d[pk(who, 'expenses')][k] = v })}
+          essential={ess.essential} onToggleEssential={ess.toggle} />
+        <p className="text-[12px] text-muted mt-3">Need / Want: in bad markets, spending guardrails (Projections → Monte Carlo) only cut the "Want" categories.</p>
       </Card>
       <Sources className="px-1" />
     </div>
@@ -137,6 +157,7 @@ function PersonalTab() {
 
 function SharedTab() {
   const { plan, update, reference } = usePlan()
+  const ess = useEssential()
   const [newCat, setNewCat] = useState('')
   const vals = plan.family_shared_expenses || {}
   const total = Object.values(vals).reduce((a: number, b: any) => a + (+b || 0), 0)
@@ -144,7 +165,7 @@ function SharedTab() {
     <Card title="Shared household spending" subtitle={`${money(total, { compact: false })} per year · ${money(total / 12, { compact: false })} per month, today's dollars`}>
       <Note>Mortgage/Rent, Property Tax and Home Insurance here are skipped automatically in years you own a home — those costs come from the Homes page.</Note>
       <div className="mt-5">
-        <CategoryEditor values={vals} groups={reference?.family_categories || {}}
+        <CategoryEditor values={vals} groups={reference?.family_categories || {}} essential={ess.essential} onToggleEssential={ess.toggle}
           onChange={(k, v) => update(d => { d.family_shared_expenses[k] = v })}
           onRemove={k => update(d => { delete d.family_shared_expenses[k] })} />
       </div>
@@ -204,6 +225,7 @@ function RecurringTab() {
             <Field label="Loan rate"><Percent fraction value={item.interest_rate} onChange={v => set('interest_rate', v)} /></Field>
           </div>
           <Toggle checked={item.inflation_adjust} onChange={v => set('inflation_adjust', v)} label="Grows with inflation" />
+          <Toggle checked={!!item.essential} onChange={v => set('essential', v)} label="Essential" hint="Guardrails never cut it in bad markets (e.g. replacing the family car). Leave off for wants like travel." />
           {item.end_year !== null && <Button size="sm" variant="ghost" onClick={() => set('end_year', null)}>Make it open-ended</Button>}
         </>}
       </Drawer>

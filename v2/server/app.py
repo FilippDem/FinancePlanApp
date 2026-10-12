@@ -446,6 +446,28 @@ async def actuals_import(request: Request):
     return {'years': sorted(parsed.keys()), 'actuals': act}
 
 
+@app.post('/api/actuals/monarch')
+async def actuals_monarch(request: Request):
+    """Monarch Money transactions CSV -> spending actuals per year (merged; re-importing replaces those categories)."""
+    from server import monarch as MO
+    from server import workbook as WB
+    sess = _require(request)
+    pp = _pp(sess)
+    raw = await request.body()
+    if not raw:
+        raise HTTPException(400, 'Empty file')
+    plan = normalize_plan(S.load_plan(sess['hid'], pp) or R.default_plan())
+    try:
+        res = MO.parse(raw, plan, S.load_hh_key(sess['hid'], 'monarch_map', {}, pp))
+    except Exception as e:
+        raise HTTPException(400, f'Could not read the Monarch file: {e}')
+    if not res['years']:
+        raise HTTPException(400, 'No spending transactions found in the file')
+    act = WB.merge(S.load_actuals(sess['hid'], pp), res['years'], sess['email'])
+    S.save_actuals(sess['hid'], act, pp)
+    return {**{k: v for k, v in res.items() if k != 'years'}, 'imported_years': sorted(res['years']), 'actuals': act}
+
+
 # ── version history ─────────────────────────────────────────────────────
 @app.get('/api/history')
 def history(request: Request):
@@ -939,6 +961,14 @@ def api_safe_spending(body: TargetIn):
 class PlanOnly(BaseModel):
     plan: dict[str, Any]
     n: int = 300
+
+
+@app.post('/api/plan-health')
+def api_plan_health(body: PlanOnly):
+    """Plan score: checklist (success, emergency fund, savings rate, housing, withdrawal rate, college, debt, health)."""
+    from finplan.health import plan_health
+    p = normalize_plan(body.plan)
+    return plan_health(p, project(p), monte_carlo(p, max(100, min(body.n, 2000)), seed=3, normalized=False))
 
 
 @app.post('/api/backtest')

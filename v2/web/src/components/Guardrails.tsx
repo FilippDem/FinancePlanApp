@@ -12,7 +12,7 @@ export function GuardrailsCard() {
   const set = (k: string, v: any) => update(d => { d.guardrails = { ...DEF, ...(d.guardrails || {}), [k]: v } })
   const st = mc?.guardrails
   return (
-    <Card title="Spending guardrails" subtitle="Real families spend less when markets fall. With guardrails, each simulation cuts flexible spending (personal, household and recurring, not housing, kids or healthcare) while its savings are well below the expected path, and allows a raise while they are well above.">
+    <Card title="Spending guardrails" subtitle="Real families spend less when markets fall. With guardrails, each simulation cuts discretionary spending (the “Want” categories on the Spending page and recurring costs not marked essential; never housing, kids, healthcare or your “Need” categories) while its savings are well below the expected path, and allows a raise while they are well above.">
       <div className="space-y-4">
         <Toggle checked={g.enabled} onChange={v => set('enabled', v)} label="Use guardrails in Monte Carlo" hint="The expected-path projection is unchanged; only the simulations adapt." />
         {g.enabled && <>
