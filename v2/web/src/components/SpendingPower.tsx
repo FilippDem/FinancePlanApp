@@ -28,6 +28,9 @@ export function SpendingPower() {
   const more = res?.levers?.find((l: any) => l.id === 'spend_more')
   const earlier = res?.levers?.find((l: any) => l.id === 'retire_earlier')
   const extra = more?.feasible ? everyday * more.amount / 100 : 0
+  // the solver searches up to max_tried; hitting it means the real room is larger than shown
+  const moreCap = more?.feasible && more.amount >= more.max_tried
+  const earlierCap = earlier?.feasible && earlier.amount >= earlier.max_tried
   const retireAt = earlier?.feasible ? `${names[0]} at ${plan.parentX_retirement_age - earlier.amount}${single ? '' : `, ${names[1]} at ${plan.parentY_retirement_age - earlier.amount}`}` : ''
   return (
     <Card title="What your plan can afford" subtitle={`Your money lasts in ${pct(mc.success_rate, 0)} of simulations, so the success rate alone says little. This is the room you have while keeping at least a ${pct(BAR, 0)} chance.`}>
@@ -37,7 +40,7 @@ export function SpendingPower() {
             <Wallet className="text-accent shrink-0 mt-1" size={20} />
             <div>
               <div className="text-[12.5px] text-muted">Extra everyday spending, every year</div>
-              <div className="text-2xl font-semibold tnum">{more?.feasible ? `+${money(extra)}` : 'Little room'}</div>
+              <div className="text-2xl font-semibold tnum">{more?.feasible ? `+${money(extra)}${moreCap ? ' or more' : ''}` : 'Little room'}</div>
               <div className="text-[12.5px] text-ink2">{more?.feasible ? `${more.amount}% more than today's ${money(everyday)} a year, for life` : 'Spending more would drop below the bar'}</div>
             </div>
           </div>
@@ -45,12 +48,12 @@ export function SpendingPower() {
             <CalendarClock className="text-accent shrink-0 mt-1" size={20} />
             <div>
               <div className="text-[12.5px] text-muted">Or retire earlier</div>
-              <div className="text-2xl font-semibold tnum">{earlier?.feasible ? `${earlier.amount} year${earlier.amount === 1 ? '' : 's'} sooner` : 'No earlier'}</div>
+              <div className="text-2xl font-semibold tnum">{earlier?.feasible ? `${earlier.amount}${earlierCap ? '+' : ''} year${earlier.amount === 1 ? '' : 's'} sooner` : 'No earlier'}</div>
               <div className="text-[12.5px] text-ink2">{earlier?.feasible ? retireAt : earlier?.note || 'Retiring earlier would drop below the bar'}</div>
             </div>
           </div>
         </div>)}
-      <p className="text-[12px] text-muted mt-3">Each option on its own, tested on the same market simulations. Apply one from "What would it take?" below.</p>
+      <p className="text-[12px] text-muted mt-3">Each option on its own, tested on the same market simulations.{(moreCap || earlierCap) ? ' "Or more" / "+": the search stops there, and your real room is larger.' : ''} Apply one from "What would it take?" below.</p>
     </Card>
   )
 }
