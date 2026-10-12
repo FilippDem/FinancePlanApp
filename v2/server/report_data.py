@@ -309,10 +309,10 @@ def section_sources(ctx: dict, section: str) -> list[str]:
         'spending': ['bls_cex_2022', 'bls_cex_2024', 'bea_rpp_2024'] + (['worldbank_pli'] if abroad else []),
         'healthcare': ['cms_partb_2026', 'cms_partd_2026', 'cms_nhe'],
         'locations': ['bea_rpp_2024', 'taxfoundation_state_2025'] + (['worldbank_pli', 'oecd_taxing_wages_2025'] if abroad else []),
-        'assumptions': ['bls_cpi', 'cms_nhe', 'irs_2024_tax', 'ssa_wage_base', 'ssa_trustees_2026'] + (['damodaran_sp500'] if hist else []),
+        'assumptions': ['bls_cpi', 'cms_nhe', 'irs_2026_tax', 'ssa_wage_base', 'ssa_trustees_2026'] + (['damodaran_sp500'] if hist else []),
         'monte_carlo': ['damodaran_sp500'] if hist else [],
         'ownership': ['irs_pub555', 'lii_equitable'] if (p.get('ownership_tracking') or {}).get('enabled') else [],
-        'tax_planning': ['irs_ltcg_2024', 'irs_niit', 'cms_irmaa_2026', 'irs_rp_2025_25', 'hhs_fpl_2025', 'irs_p590a'],
+        'tax_planning': ['irs_ltcg_2026', 'irs_niit', 'cms_irmaa_2026', 'irs_rp_2025_25', 'hhs_fpl_2025', 'irs_p590a'],
         'income_debts': ['irs_tc410', 'irs_p970'] if (p.get('pensions') or p.get('college_529')) else [],
     }
     return m.get(section, [])

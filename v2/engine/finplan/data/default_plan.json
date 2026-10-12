@@ -159,7 +159,7 @@
   "use_historical_healthcare_inflation": true
  },
  "ss_insolvency_enabled": true,
- "ss_shortfall_percentage": 30.0,
+ "ss_shortfall_percentage": 17.0,
  "health_insurances": [],
  "ltc_insurances": [],
  "health_expenses": [],

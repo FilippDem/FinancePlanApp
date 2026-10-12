@@ -87,16 +87,20 @@ def test_sell_alias_and_dataframe_shapes():
 
 
 # ── taxes ────────────────────────────────────────────────────────────────
-def test_federal_brackets_2024():
-    assert float(federal_income_tax(100000, 'married', 1.0)) == pytest.approx(12106)
+def test_federal_brackets_2026():
+    # IRS Rev. Proc. 2025-32: 10% to $24,800, 12% to $100,800 (joint) -> 2,480 + 12% x 75,200
+    assert float(federal_income_tax(100000, 'married', 1.0)) == pytest.approx(11504)
     assert float(federal_income_tax(0, 'married', 1.0)) == 0
     # indexing doubles all thresholds -> tax on doubled income doubles
-    assert float(federal_income_tax(200000, 'married', 2.0)) == pytest.approx(2 * 12106)
+    assert float(federal_income_tax(200000, 'married', 2.0)) == pytest.approx(2 * 11504)
 
 
 def test_fica_per_earner():
     two = float(fica(95000, 'married', 1) + fica(85000, 'married', 1))
     assert two == pytest.approx(180000 * 0.0765)
+    # Additional Medicare Tax: 0.9% on a couple's combined wages above $250,000 (2 x 200k -> 150k x 0.9%)
+    both = float(fica(200000, 'married', 1, 200000) + fica(200000, 'married', 1, 200000))
+    assert both == pytest.approx(2 * (184500 * 0.062 + 200000 * 0.0145) + 150000 * 0.009)
 
 
 def test_ss_taxation_caps_at_85pct():
@@ -573,7 +577,8 @@ def test_roth_conversions_fill_bracket_and_compare():
     first = conv[0]
     assert first['age1'] >= 60
     # taxable income is filled to about the top of the 12% bracket (indexed)
-    idx = (1 + r['plan']['economic_params']['inflation_rate']) ** (first['year'] - 2024)
+    from finplan.taxes import TAX_BASE_YEAR
+    idx = (1 + r['plan']['economic_params']['inflation_rate']) ** (first['year'] - TAX_BASE_YEAR)
     assert abs(first['taxable_ordinary'] - MFJ[1][0] * idx) < 0.02 * MFJ[1][0] * idx
     assert max(x['roth'] for x in r['rows']) > 0
     f = project(_rich(roth_conversion={'mode': 'fixed', 'amount': 30000}))

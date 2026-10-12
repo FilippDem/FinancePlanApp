@@ -58,7 +58,9 @@ The app cites every major dataset (`engine/finplan/data/sources.json`). Datasets
 | **Salaries don't respond to inflation** | Inflation stress tests are harsh, because wages stay flat while prices jump |
 | ~~Pre-65 health insurance defaults to $0~~ | ✅ 2026-10-12: automatic employer/marketplace estimate. **Demos still have it off**; re-tune them with real health plans |
 | ~~Fixed asset allocation~~ | ✅ 2026-10-12: optional glide path |
-| **Dividend tax drag**, state gains rules beyond WA, itemized deductions | Taxes on taxable accounts are approximate, and the Roth surplus sweep's benefit is understated |
+| **Historical bonds and CPI** in historical mode (bonds are a fixed 4%) | The 4% rule comes out 1–4 points too optimistic (see VALIDATION.md) |
+| **Local income taxes** (NYC, Portland Metro/Multnomah), SS taxed by a few states | State tax uses state brackets only (2026-10-12) |
+| **Dividend tax drag**, itemized deductions | Taxes on taxable accounts are approximate, and the Roth surplus sweep's benefit is understated |
 | **Extra mortgage payments as a surplus priority** | The surplus sweep only targets Roth; prepaying a mortgage needs the loan schedule inside the simulation |
 
 ### 2c. Product gaps

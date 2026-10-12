@@ -16,7 +16,7 @@ export default function Assumptions() {
   const hist = reference?.historical
   const locs = reference?.locations || ['Seattle']
   const asym = plan.mc_use_asymmetric !== false
-  const { Cite, Sources } = useCites(['damodaran_sp500', 'bls_cpi', 'cms_nhe', 'ssa_spousal', 'ssa_trustees_2026', 'irs_2024_tax', 'ssa_wage_base', 'taxfoundation_state_2025', 'oecd_taxing_wages_2025', 'irs_401k_2026', 'fr_secure2_rmd', 'cfr_ult', 'irs_rmd'])
+  const { Cite, Sources } = useCites(['damodaran_sp500', 'bls_cpi', 'cms_nhe', 'ssa_spousal', 'ssa_trustees_2026', 'irs_2026_tax', 'ssa_wage_base', 'taxfoundation_state_2025', 'oecd_taxing_wages_2025', 'irs_401k_2026', 'fr_secure2_rmd', 'cfr_ult', 'irs_rmd'])
 
   return (
     <div className="space-y-5">
@@ -64,7 +64,7 @@ export default function Assumptions() {
             <p className="text-xs text-muted">Claim ages and benefit amounts are set per person under People & income.</p>
           </div>
         </Card>
-        <Card title="Taxes" subtitle={<>2024 federal brackets and standard deduction<Cite id="irs_2024_tax" /> and the Social Security wage cap<Cite id="ssa_wage_base" />, indexed to inflation; state rates per location<Cite id="taxfoundation_state_2025" />, rough effective rates abroad<Cite id="oecd_taxing_wages_2025" /></>}>
+        <Card title="Taxes" subtitle={<>2026 federal brackets and standard deduction<Cite id="irs_2026_tax" /> and the Social Security wage cap<Cite id="ssa_wage_base" />, indexed to inflation; state rates per location<Cite id="taxfoundation_state_2025" />, rough effective rates abroad<Cite id="oecd_taxing_wages_2025" /></>}>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Pre-tax 401(k) contributions / yr" hint="Household total, today's dollars; stops when each person retires. 2026 limit: $24,500 per person under 50." cite={<Cite id="irs_401k_2026" />}><Money value={plan.pretax_401k} step={500} onChange={v => update(d => { d.pretax_401k = v })} /></Field>
             <Field label="Roth contributions / yr" hint="Roth IRA or Roth 401(k), household total in today's dollars, from after-tax pay while working"><Money value={plan.roth_contribution || 0} step={500} onChange={v => update(d => { d.roth_contribution = v })} /></Field>

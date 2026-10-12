@@ -797,11 +797,13 @@ def simulate(plan: dict, n_paths: int = 1, stochastic: bool = False, seed: int |
     conv_end = rc.get('end_age') if rc.get('end_age') is not None else rmd_age(p['current_year'] - int(p['parentX_age'])) - 1
 
     pre1 = min(p.get('parentX_pretax_balance', 0.0), max(p['parentX_net_worth'], 0))
-    pre2 = min(p.get('parentY_pretax_balance', 0.0), max(p['parentY_net_worth'], 0))
+    # a single person's plan ignores the (kept, but inactive) partner balances
+    nw2 = 0.0 if S.meta['single'] else p['parentY_net_worth']
+    pre2 = 0.0 if S.meta['single'] else min(p.get('parentY_pretax_balance', 0.0), max(nw2, 0))
     ro1 = min(p.get('parentX_roth_balance', 0.0), max(p['parentX_net_worth'] - pre1, 0))
-    ro2 = min(p.get('parentY_roth_balance', 0.0), max(p['parentY_net_worth'] - pre2, 0))
+    ro2 = 0.0 if S.meta['single'] else min(p.get('parentY_roth_balance', 0.0), max(nw2 - pre2, 0))
     L1 = np.full(n, p['parentX_net_worth'] - pre1 - ro1)
-    L2 = np.full(n, p['parentY_net_worth'] - pre2 - ro2)
+    L2 = np.full(n, nw2 - pre2 - ro2)
     # cost basis of cash/taxable savings (the rest is unrealized gain, taxed when sold)
     bp = p.get('taxable_basis_pct', 80.0) / 100
     B1, B2 = np.maximum(L1, 0) * bp, np.maximum(L2, 0) * bp
@@ -1219,8 +1221,8 @@ def _summary(p, S, rows, depleted):
     savings_rate = (income0 - r0['taxes'] - spend0) / income0 if income0 > 0 else 0.0
     return {
         'current_year': cy, 'end_year': S.years[-1],
-        'net_worth_now': p['parentX_net_worth'] + p['parentY_net_worth'] + r0['home_equity'] + r0['other_assets'],
-        'investable_now': p['parentX_net_worth'] + p['parentY_net_worth'],
+        'net_worth_now': p['parentX_net_worth'] + (0.0 if S.meta['single'] else p['parentY_net_worth']) + r0['home_equity'] + r0['other_assets'],
+        'investable_now': p['parentX_net_worth'] + (0.0 if S.meta['single'] else p['parentY_net_worth']),
         'net_worth_at_retirement': at_ret['net_worth'], 'retirement_year': first_ret,
         'retirement_year1': ret_year1, 'retirement_year2': ret_year2,
         'net_worth_end': rows[-1]['net_worth'], 'investable_end': rows[-1]['investable'],

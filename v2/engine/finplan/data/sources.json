@@ -117,6 +117,13 @@
     "url": "https://www.irs.gov/newsroom/irs-provides-tax-inflation-adjustments-for-tax-year-2024",
     "used_for": "Federal brackets and standard deduction (indexed to inflation after 2024)"
   },
+  "irs_2026_tax": {
+    "publisher": "Internal Revenue Service",
+    "title": "Rev. Proc. 2025-32: 2026 inflation adjustments (standard deduction $32,200 joint / $16,100 single; brackets 10%-37%)",
+    "year": "2026",
+    "url": "https://www.irs.gov/newsroom/irs-releases-tax-inflation-adjustments-for-tax-year-2026-including-amendments-from-the-one-big-beautiful-bill",
+    "used_for": "Federal brackets and standard deduction (indexed to inflation after 2026)"
+  },
   "irs_401k_2026": {
     "publisher": "Internal Revenue Service",
     "title": "401(k) limit increases to $24,500 for 2026, IRA limit increases to $7,500",
@@ -133,7 +140,7 @@
   },
   "ssa_wage_base": {
     "publisher": "Social Security Administration",
-    "title": "Contribution and Benefit Base",
+    "title": "Contribution and Benefit Base ($184,500 in 2026)",
     "year": "2024–2026",
     "url": "https://www.ssa.gov/oact/cola/cbb.html",
     "used_for": "Social Security tax wage cap (FICA) and benefit estimates"
@@ -158,7 +165,7 @@
     "year": "2026",
     "url": "https://www.ssa.gov/news/en/press/releases/2026-06-09.html",
     "alt_url": "https://www.ssa.gov/OACT/TR/2026/",
-    "used_for": "Social Security shortfall year and size (default cut of 30% is more cautious than the Trustees' 17–22%)"
+    "used_for": "Social Security shortfall year and size (default: 17% cut from 2034, the combined-fund figure; the retirement fund alone would mean 22% from 2033)"
   },
   "cms_partb_2026": {
     "publisher": "Centers for Medicare & Medicaid Services",
@@ -286,6 +293,13 @@
     "title": "Rev. Proc. 2023-34: 2024 inflation adjustments (0%/15% capital-gains thresholds $94,050 / $583,750 joint)",
     "year": "2024",
     "url": "https://www.irs.gov/pub/irs-drop/rp-23-34.pdf",
+    "used_for": "Long-term capital-gains brackets (indexed with inflation like the income brackets)"
+  },
+  "irs_ltcg_2026": {
+    "publisher": "Internal Revenue Service",
+    "title": "Rev. Proc. 2025-32: 2026 capital-gains thresholds (0% up to $98,900 / 15% up to $613,700 joint)",
+    "year": "2026",
+    "url": "https://www.irs.gov/newsroom/irs-releases-tax-inflation-adjustments-for-tax-year-2026-including-amendments-from-the-one-big-beautiful-bill",
     "used_for": "Long-term capital-gains brackets (indexed with inflation like the income brackets)"
   },
   "irs_niit": {

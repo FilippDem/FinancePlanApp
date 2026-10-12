@@ -12,11 +12,13 @@ import numpy as np
 
 from .reference import location_tax_info
 
-TAX_BASE_YEAR = 2024
-MFJ = [(23200, .10), (94300, .12), (201050, .22), (383900, .24), (487450, .32), (731200, .35), (np.inf, .37)]
-SINGLE = [(11600, .10), (47150, .12), (100525, .22), (191950, .24), (243725, .32), (609350, .35), (np.inf, .37)]
-STD_DED = {'married': 29200.0, 'single': 14600.0}
-SS_WAGE_BASE = 168600.0
+TAX_BASE_YEAR = 2026
+# 2026 brackets and standard deduction (IRS Rev. Proc. 2025-32, after the 2025 tax law); later years are
+# indexed with the plan's inflation rate. [irs_2026_tax]
+MFJ = [(24800, .10), (100800, .12), (211400, .22), (403550, .24), (512450, .32), (768700, .35), (np.inf, .37)]
+SINGLE = [(12400, .10), (50400, .12), (105700, .22), (201775, .24), (256225, .32), (640600, .35), (np.inf, .37)]
+STD_DED = {'married': 32200.0, 'single': 16100.0}
+SS_WAGE_BASE = 184500.0     # 2026 (SSA) [ssa_wage_base]
 
 
 def federal_income_tax(taxable, status: str, index: float):
@@ -45,12 +47,51 @@ def marginal_rate(taxable, status: str, index: float):
     return rate
 
 
-def fica(wages, status: str, index: float):
+def fica(wages, status: str, index: float, other_wages=0.0):
+    """Social Security (per person, up to the wage base) + Medicare. The 0.9% Additional Medicare Tax applies to
+    a couple's combined wages above $250,000 (not indexed, by law); pass the spouse's wages as other_wages and
+    this person's share of it is returned."""
     wages = np.maximum(np.asarray(wages, dtype=float), 0.0)
+    other = np.maximum(np.asarray(other_wages, dtype=float), 0.0)
     ss = np.minimum(wages, SS_WAGE_BASE * index) * 0.062
-    thr = 250000.0 if status == 'married' else 200000.0  # not indexed (by law)
-    medicare = wages * 0.0145 + np.maximum(wages - thr, 0) * 0.009
-    return ss + medicare
+    thr = 250000.0 if status == 'married' else 200000.0
+    both = wages + other
+    extra = np.maximum(both - thr, 0) * 0.009 * np.where(both > 0, wages / np.maximum(both, 1e-9), 0)
+    return ss + wages * 0.0145 + extra
+
+
+# State income tax: 2025 brackets, standard deductions and personal exemptions for the 41 states (+ DC) with a wage
+# income tax (Tax Foundation). Thresholds are indexed with the plan's inflation like the federal ones (the one-year
+# difference in base year is ignored). Social Security is left out of state income, as most states do. [taxfoundation_state_2025]
+_STATE = None
+
+
+def _state_table() -> dict:
+    global _STATE
+    if _STATE is None:
+        import json
+        from pathlib import Path
+        with open(Path(__file__).parent / 'data' / 'state_income_tax_2025.json', encoding='utf-8') as f:
+            _STATE = json.load(f)['states']
+    return _STATE
+
+
+def state_income_tax(income, status: str, index: float, state: str | None):
+    """State tax on state income (AGI without Social Security), or None when the state isn't in the table."""
+    st = _state_table().get(state or '')
+    if st is None:
+        return None
+    inc = np.maximum(np.asarray(income, dtype=float), 0.0)
+    ded = st['std'][status] + (0.0 if st['exemption_is_credit'] else st['exemption'][status])
+    taxable = np.maximum(inc - ded * index, 0.0)
+    tax = np.zeros_like(taxable)
+    br = st[status]
+    for i, (lo, rate) in enumerate(br):
+        hi = br[i + 1][0] * index if i + 1 < len(br) else np.inf
+        tax = tax + np.clip(taxable - lo * index, 0, hi - lo * index) * rate
+    if st['exemption_is_credit']:
+        tax = np.maximum(tax - st['exemption'][status] * index, 0.0)
+    return tax
 
 
 def taxable_ss(ss_income, other_income, status: str):
@@ -81,9 +122,11 @@ def total_taxes(wages1, wages2, ss_income, other_ordinary, pretax_deduction, yea
     fed = zeros.copy(); state = zeros.copy(); fic = zeros.copy(); foreign = zeros.copy()
 
     agi = [None]
+    state_inc = [None]
 
     def us_federal():
         agi_wo_ss = np.maximum(wages - pretax_deduction, 0) + other
+        state_inc[0] = agi_wo_ss
         tss = taxable_ss(ss_income, agi_wo_ss, status)
         agi[0] = agi_wo_ss + tss
         taxable = np.maximum(agi_wo_ss + tss - STD_DED[status] * index, 0)
@@ -95,12 +138,13 @@ def total_taxes(wages1, wages2, ss_income, other_ordinary, pretax_deduction, yea
         foreign = (wages + other + np.asarray(ss_income, dtype=float)) * rate
         agi[0] = wages + other + np.asarray(ss_income, dtype=float)
         if info.get('has_fica', False):
-            fic = fica(w1, status, index) + fica(w2, status, index)
+            fic = fica(w1, status, index, w2) + fica(w2, status, index, w1)
     else:
         fed, taxable = us_federal()
-        fic = fica(w1, status, index) + fica(w2, status, index)
+        fic = fica(w1, status, index, w2) + fica(w2, status, index, w1)
         if ltype == 'us_state':
-            state = taxable * float(info.get('rate', 0.0))
+            st_tax = state_income_tax(state_inc[0], status, index, _us_state(location))
+            state = st_tax if st_tax is not None else taxable * float(info.get('rate', 0.0))
         elif ltype == 'country':  # "United States" without a state
             state = zeros
         else:
@@ -111,8 +155,8 @@ def total_taxes(wages1, wages2, ss_income, other_ordinary, pretax_deduction, yea
 
 
 # ── capital gains, IRMAA, ACA (added 2026-09-28; see data/sources.json) ─────────────────────
-# Long-term capital-gains brackets, 2024 (IRS Rev. Proc. 2023-34), indexed like the ordinary brackets.
-LTCG = {'married': (94050.0, 583750.0), 'single': (47025.0, 518900.0)}
+# Long-term capital-gains brackets, 2026 (IRS Rev. Proc. 2025-32), indexed like the ordinary brackets.
+LTCG = {'married': (98900.0, 613700.0), 'single': (49450.0, 545500.0)}
 NIIT_THRESHOLD = {'married': 250000.0, 'single': 200000.0}   # 3.8% net investment income tax; not indexed by law
 
 
@@ -131,7 +175,7 @@ def state_rate(location: str | None, override: float | None = None) -> tuple[str
 # Washington taxes long-term capital gains although it has no income tax (RCW 82.87): 7% above a standard
 # deduction ($262,000 in 2024, indexed; $278,000 in 2025) and 9.9% on taxable gains above $1M (not indexed).
 # Real estate and retirement accounts are exempt; v2 only realizes gains from taxable savings. [wa_dor_cg]
-WA_CG_DEDUCTION = 262000.0   # TAX_BASE_YEAR value, indexed like the federal brackets
+WA_CG_DEDUCTION = 278000.0   # 2025 value (2026 not published yet), indexed from TAX_BASE_YEAR
 WA_CG_TIER = 1_000_000.0
 
 
@@ -154,9 +198,15 @@ def capital_gains_tax(gains, ordinary_taxable, magi, status: str, index: float, 
     kind, srate = state_rate(location, override)
     if kind == 'foreign':
         return g * srate
-    if _us_state(location) == 'Washington':
+    st_name = _us_state(location)
+    if st_name == 'Washington':
         srate = 0.0
         state_part = wa_capital_gains_tax(g, index)
+    elif st_name in _state_table():
+        # gains stacked on top of other income in the state's own brackets (most states tax gains as income)
+        base_inc = np.maximum(np.asarray(magi, dtype=float) - g, 0.0)
+        state_part = (state_income_tax(base_inc + g, status, index, st_name)
+                      - state_income_tax(base_inc, status, index, st_name))
     else:
         state_part = g * srate
     lo, hi = LTCG[status]

@@ -236,6 +236,14 @@ Every table in `data/cost_index.json` was re-checked against its publisher; see 
   - Re-importing replaces rather than adds.
 - **MCP server.** `server/mcp_server.py` lets Claude read and edit plans over stdio (see `desktop/README.md`). Edits are propose → confirm → apply, with a backup.
 
+### 2026-10-12 (later): validation against published figures
+See `VALIDATION.md`: 33 of 33 benchmark checks pass, and 300 fuzzed plans run without failures.
+- **State income tax:** real 2025 brackets, deductions and exemptions for all 41 income-tax states + DC, replacing "top rate × all taxable income" (California $200k couple: $22.6k → $10.3k). Gains are stacked in the state brackets. Demo results move: Single Mom 50→88%, Tech Couple 85→92%, Executives 65→69%.
+- **Federal tables:** 2026 values (Rev. Proc. 2025-32) with `TAX_BASE_YEAR` 2026; SS wage base $184,500; 2026 capital-gains thresholds.
+- **Additional Medicare Tax:** on a couple's combined wages.
+- **Single-person plans:** the inactive partner's balances are ignored, so the $40k template value no longer counts.
+- **Social Security default cut:** 17% from 2034 (2026 Trustees), was 30%.
+
 ### Sources
 [1] U.S. Bureau of Economic Analysis, [Regional Price Parities by State and Metro Area, 2024](https://www.bea.gov/data/prices-inflation/regional-price-parities-state-and-metro-area)
 [2] World Bank, [Price level ratio of PPP conversion factor to market exchange rate (PA.NUS.PPPC.RF)](https://data.worldbank.org/indicator/PA.NUS.PPPC.RF), 2024 values via [Our World in Data](https://ourworldindata.org/grapher/gdp-price-levels-relative-to-the-us)

@@ -8,7 +8,7 @@ import { useCites } from '../components/Cite'
 import { Card, PageHeader, Field, Money, NumberInput, Percent, Select, Segmented, Toggle, Button, Badge, Note, Stat } from '../components/ui'
 import { S, axisProps, TipBox, LegendRow } from '../components/charts'
 
-const SRC = ['irs_2024_tax', 'irs_ltcg_2024', 'irs_niit', 'irs_p590a', 'cms_irmaa_2026', 'irs_rp_2025_25', 'hhs_fpl_2025', 'irs_rmd', 'wa_dor_cg']
+const SRC = ['irs_2026_tax', 'irs_ltcg_2026', 'irs_niit', 'irs_p590a', 'cms_irmaa_2026', 'irs_rp_2025_25', 'hhs_fpl_2025', 'irs_rmd', 'wa_dor_cg']
 
 function RothSettings() {
   const { plan, update } = usePlan()
@@ -103,7 +103,7 @@ export default function Taxes() {
         <Card><Stat label="ACA premium credits" value={money(s.lifetime_aca_credit)} sub={hasMarket ? (cliff.length ? `over the 400% cliff in ${cliff.length} years` : 'marketplace plan') : 'no marketplace plan'} tone={cliff.length ? 'warn' : undefined} /></Card>
       </div>
 
-      <Card title={<span className="flex items-center gap-2"><Scale size={16} className="text-accent" />Taxable income and the brackets<Cite id="irs_2024_tax" /></span>}
+      <Card title={<span className="flex items-center gap-2"><Scale size={16} className="text-accent" />Taxable income and the brackets<Cite id="irs_2026_tax" /></span>}
         subtitle="Ordinary taxable income each year (today's $) against the federal bracket tops. Room under a line is income you could add, for example a Roth conversion, at that rate."
         action={<Segmented value={range} onChange={setRange} options={[{ value: 'work', label: 'Working years' }, { value: 'retire', label: 'Retirement' }, { value: 'all', label: 'All' }]} />}>
         <LegendRow items={[{ label: 'Taxable income', color: S[0] }, { label: 'Roth conversion', color: S[2] }, { label: 'Investment gains realized', color: S[4] }]} />
@@ -120,7 +120,7 @@ export default function Taxes() {
               label={{ value: `${Math.round(t.rate * 100)}% top`, position: 'right', fill: 'var(--axis)', fontSize: 11 }} />)}
           </ComposedChart>
         </ResponsiveContainer>
-        {br && <p className="text-[12px] text-muted mt-1">Filing {br.status === 'married' ? 'jointly' : 'single'}; standard deduction {money(br.std_deduction, { compact: false })} (today's $, before this line). Investment gains stack on top and use the 0/15/20% gains rates<Cite id="irs_ltcg_2024" />.</p>}
+        {br && <p className="text-[12px] text-muted mt-1">Filing {br.status === 'married' ? 'jointly' : 'single'}; standard deduction {money(br.std_deduction, { compact: false })} (today's $, before this line). Investment gains stack on top and use the 0/15/20% gains rates<Cite id="irs_ltcg_2026" />.</p>}
       </Card>
 
       <Card title={<span>Roth conversions<Cite id="irs_p590a" /></span>} subtitle="Move pre-tax money to Roth in low-income years (after retiring, before Social Security and required withdrawals)">
@@ -145,7 +145,7 @@ export default function Taxes() {
         </Card>
       </div>
 
-      <Card title={<span>Taxes on investment gains<Cite id="irs_ltcg_2024" /><Cite id="irs_niit" /></span>} subtitle="When you sell investments outside retirement accounts to pay for spending, the growth part is taxed">
+      <Card title={<span>Taxes on investment gains<Cite id="irs_ltcg_2026" /><Cite id="irs_niit" /></span>} subtitle="When you sell investments outside retirement accounts to pay for spending, the growth part is taxed">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
           <Toggle checked={plan.capital_gains_enabled !== false} onChange={v => update(d => { d.capital_gains_enabled = v })} label="Tax realized gains" />
           <Field label="Original money in taxable savings today" hint="Cost basis as a share of your cash and brokerage balance. Cash is 100%; long-held index funds are often 40–60%.">

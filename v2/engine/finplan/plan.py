@@ -249,7 +249,7 @@ def normalize_plan(raw: dict | None) -> dict:
     p['finance_mode'] = p.get('finance_mode') if p.get('finance_mode') in ('Pooled', 'Separate') else 'Pooled'
     p['shared_expense_split_pct'] = _num(p.get('shared_expense_split_pct'), 50)
     p['ss_insolvency_enabled'] = bool(p.get('ss_insolvency_enabled', True))
-    p['ss_shortfall_percentage'] = _num(p.get('ss_shortfall_percentage'), 30.0)
+    p['ss_shortfall_percentage'] = _num(p.get('ss_shortfall_percentage'), 17.0)
     p['pretax_401k'] = _num(p.get('pretax_401k'), 0.0)
     if p.get('state_tax_rate') is not None:
         p['state_tax_rate'] = _num(p.get('state_tax_rate'))
