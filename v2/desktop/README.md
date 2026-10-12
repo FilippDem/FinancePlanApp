@@ -10,6 +10,7 @@ v2/desktop/
 │   ├── desktop.py               the window: splash, local server inside the process, This computer / NAS, problem page
 │   ├── start.ps1                first-run setup (Python, .venv, packages, shortcuts), then opens the window; -Browser = old way
 │   ├── run_server.py / stop.ps1 browser mode: background server and how to stop it
+│   ├── backup.ps1               zips data\ to OneDrive (or another folder), keeps 30, checks each zip restores
 │   ├── requirements-desktop.txt pywebview (+ pythonnet on Windows)
 │   ├── planner.ico
 │   └── wheels/                  proxy_tools wheel (pywebview dependency that is only published as source)
@@ -49,7 +50,44 @@ Unzip anywhere (the installed copy lives in `C:\Users\filip\Documents\FinancialP
 **Start Financial Planner**. After that, use the **Financial Planner** shortcut on the desktop or in the Start menu.
 
 To update an installed copy, replace `app/`, `launcher/` and the `.bat` files. Keep `data/`, `settings.json`,
-`webview-data/`, `.venv/` and `logs/`.
+`webview-data/`, `.venv/` and `logs/`. A daily backup task (below) points at `launcherackup.ps1`, so it keeps working.
+
+## Backups off this computer
+The planner's own `data/backups/` protects against bad edits, not against losing the disk. `launcher/backup.ps1`
+zips the whole `data/` folder to a folder that syncs somewhere else.
+
+- **Where**: `-Target <folder>`, else `"backup_dir"` in `settings.json` (environment variables like `%OneDrive%` work;
+  `desktop.py` keeps keys it doesn't know), else `%OneDrive%\FinancialPlanner-backups`. With none of them it logs
+  `FAIL: no backup folder` and exits 1.
+- **What**: `FinancialPlanner-data-<yyyyMMdd-HHmmss>-<fingerprint>.zip` holding `data/...` (forward-slash names, opens
+  anywhere). `data/` is copied to a temp folder first and the copy is zipped, so a save during the backup can't produce a
+  half-old, half-new zip. `data/.session_secret` is left out (the server makes a new one; you sign in again).
+  Nothing in `data/` is changed.
+- **Idempotent**: the fingerprint is a SHA-256 over every file's path and hash. If the newest zip has the same one, no new
+  zip is made (`unchanged since ...`). `-Force` makes one anyway.
+- **Restore test on every backup**: the new zip is unzipped to a temp folder; `households_index.json` and each
+  `households/*.json` must parse as JSON objects, every household in the index must have its file, and every file must
+  match the copy byte for byte. Only then is it moved into the target. A failing zip is never saved.
+- **Keeps the newest 30** (`-Keep N`). Only `FinancialPlanner-data-*.zip` files in the target folder are ever removed.
+- **Log**: `logs/backup.log`.
+
+Run it now: double-click **Back Up Plans Now** in the installed folder, or
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\filip\Documents\FinancialPlanner\launcher\backup.ps1"
+```
+Check the newest backup (or `-Zip <file>`) without making a new one:
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\filip\Documents\FinancialPlanner\launcher\backup.ps1" -Check
+```
+**Daily backup** (run once; adds a Task Scheduler task "Financial Planner backup" for your user at 12:30, no admin needed;
+if the PC is asleep then it runs at the next chance; `-At 21:00` picks another time):
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\filip\Documents\FinancialPlanner\launcher\backup.ps1" -Register
+```
+Remove it with `-Unregister`. The task runs only while you're signed in (it needs your OneDrive).
+
+**Restoring**: close the planner, rename `data` to `data-before-restore` (don't delete it), unzip the backup into the
+installed folder so it makes a new `data\`, and start the planner. Sign in again.
 
 ## Claude connection (MCP)
 `app/server/mcp_server.py` lets Claude Desktop or Claude Code read your plans, run the analysis and scenario matrix, and
