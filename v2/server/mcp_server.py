@@ -150,7 +150,7 @@ def t_run_analysis(a):
     res['what_would_it_take'] = {'target': target, 'success': sol['success'], 'reached': sol['reached'],
                                  'levers': [{k: v for k, v in l.items() if k != 'patch'} for l in sol.get('levers', [])]}
     ss = safe_spending(p, target=target, n=300)
-    res['safe_spending'] = {k: v for k, v in ss.items() if not isinstance(v, list)}
+    res['safe_spending'] = {k: v for k, v in ss.items() if not isinstance(v, (list, dict))}
     return res
 
 
