@@ -29,6 +29,10 @@ V2_KEYS = {
     'parentX_roth_balance': 0.0,
     'parentY_roth_balance': 0.0,
     'roth_contribution': 0.0,        # household Roth IRA / Roth 401(k) saving per year (today's $), while working
+    # optional per-person yearly contributions (today's $, while that person has wages); when any is set they replace
+    # the household totals above, which are split by today's pay (wrong when someone earns nothing right now)
+    'parentX_pretax_401k': None, 'parentY_pretax_401k': None,
+    'parentX_roth_contribution': None, 'parentY_roth_contribution': None,
     'rmd_enabled': True,             # required minimum distributions from pre-tax accounts (73, or 75 if born 1960+)
     'spousal_ss': True,              # a spouse may get up to 50% of the other's benefit at 67
     # Portfolio / Monte Carlo

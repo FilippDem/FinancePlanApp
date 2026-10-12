@@ -319,16 +319,22 @@ def build_schedule(p: dict) -> Schedule:
         C['ss1'][t], C['ss2'][t] = s1 * cola * cut, s2 * cola * cut
 
         # pre-tax contributions (401k + HSA), today's $
-        c1 = (p['pretax_401k'] * share1 + p.get('hsa_contribution', 0) * share1) * ii if work1 else 0.0
-        c2 = (p['pretax_401k'] * (1 - share1) + p.get('hsa_contribution', 0) * (1 - share1)) * ii if work2 else 0.0
+        # per-person amounts (parentX_/parentY_pretax_401k) win over the household total split by today's pay
+        pk1, pk2 = p.get('parentX_pretax_401k'), p.get('parentY_pretax_401k')
+        k1, k2 = (pk1 or 0.0, pk2 or 0.0) if (pk1 is not None or pk2 is not None) else (p['pretax_401k'] * share1, p['pretax_401k'] * (1 - share1))
+        c1 = (k1 + p.get('hsa_contribution', 0) * share1) * ii if work1 else 0.0
+        c2 = (k2 + p.get('hsa_contribution', 0) * (1 - share1)) * ii if work2 else 0.0
+        if pk1 is not None or pk2 is not None:      # a person can only defer from their own pay
+            c1, c2 = min(c1, w1), min(c2, w2)
         c1, c2 = min(c1, w1), min(c2, w2)
         C['contrib1'][t], C['contrib2'][t], C['contrib'][t] = c1, c2, c1 + c2
         hs = p.get('hsa_contribution', 0) * ii
         C['hsa_c1'][t] = min(hs * share1, c1) if work1 else 0.0
         C['hsa_c2'][t] = min(hs * (1 - share1), c2) if work2 else 0.0
-        rc = p.get('roth_contribution', 0) * ii
-        C['roth_c1'][t] = max(0.0, min(rc * share1, w1 - c1)) if work1 else 0.0
-        C['roth_c2'][t] = max(0.0, min(rc * (1 - share1), w2 - c2)) if work2 else 0.0
+        rx, ry = p.get('parentX_roth_contribution'), p.get('parentY_roth_contribution')
+        r1, r2 = ((rx or 0.0) * ii, (ry or 0.0) * ii) if (rx is not None or ry is not None) else             (p.get('roth_contribution', 0) * ii * share1, p.get('roth_contribution', 0) * ii * (1 - share1))
+        C['roth_c1'][t] = max(0.0, min(r1, w1 - c1)) if work1 else 0.0
+        C['roth_c2'][t] = max(0.0, min(r2, w2 - c2)) if work2 else 0.0
         C['roth_contrib'][t] = C['roth_c1'][t] + C['roth_c2'][t]
 
         # houses

@@ -785,3 +785,18 @@ def test_plan_health_score():
     worse = normalize_plan({**p, 'auto_health_coverage': False, 'debts': [{'name': 'Card', 'balance': 500000, 'rate': 0.2, 'monthly_payment': 100}]})
     h2 = plan_health(worse, project(worse), monte_carlo(worse, 200, seed=1))
     assert h2['score'] < h['score']
+
+
+def test_per_person_contributions():
+    from finplan.engine import project
+    cy = normalize_plan({})['current_year']
+    p = _rich(parentX_age=35, parentY_age=32, parentX_retirement_age=65, parentY_retirement_age=65,
+              parentX_income=300000, parentY_income=0, parentY_job_changes=[{'Year': cy + 2, 'New Income': 200000}],
+              parentX_pretax_balance=0, parentY_pretax_balance=0,
+              parentX_pretax_401k=0, parentY_pretax_401k=24500, parentX_roth_contribution=40000, parentY_roth_contribution=0)
+    rows = project(p)['rows']
+    assert rows[0]['contrib_pretax'] == 0                                    # Erin has no pay yet: nothing deferred
+    assert rows[2]['contrib_pretax'] == pytest.approx(24500 * rows[2]['infl_index'])
+    assert rows[0]['roth'] > 39000 and rows[0]['pretax'] == pytest.approx(0, abs=1)
+    old = project(_rich(pretax_401k=10000))['rows']                          # household total still works
+    assert old[0]['contrib_pretax'] > 0

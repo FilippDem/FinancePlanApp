@@ -10,7 +10,8 @@ import { GuardrailsCard } from '../components/Guardrails'
 import { useCites } from '../components/Cite'
 
 export default function Assumptions() {
-  const { plan, update, reference } = usePlan()
+  const { plan, update, reference, names, single } = usePlan()
+  const perPerson = ['parentX_pretax_401k', 'parentY_pretax_401k', 'parentX_roth_contribution', 'parentY_roth_contribution'].some(k => plan[k] != null)
   const ep = plan.economic_params
   const setE = (k: string, v: any) => update(d => { d.economic_params[k] = v })
   const hist = reference?.historical
@@ -72,6 +73,23 @@ export default function Assumptions() {
             <Field label="State tax override" hint="Only used for locations the app doesn't know. Leave at 0 to use the location's rate.">
               <Percent fraction value={plan.state_tax_rate || 0} onChange={v => update(d => { d.state_tax_rate = v })} /></Field>
             <Field label="Home selling costs"><Percent value={plan.home_selling_cost_pct} decimals={1} onChange={v => update(d => { d.home_selling_cost_pct = v })} /></Field>
+          </div>
+          <div className="mt-4 rounded-lg border border-line px-4 py-3 space-y-3">
+            <Toggle checked={perPerson} label="Set contributions per person"
+              hint="Use this when one of you earns nothing right now, or you save differently (e.g. a mega backdoor Roth). Each amount is today's dollars per year, taken only from that person's own pay and replacing the household totals above."
+              onChange={v => update(d => {
+                const ks = ['parentX_pretax_401k', 'parentY_pretax_401k', 'parentX_roth_contribution', 'parentY_roth_contribution']
+                if (v) { d.parentX_pretax_401k = d.pretax_401k || 0; d.parentY_pretax_401k = 0; d.parentX_roth_contribution = d.roth_contribution || 0; d.parentY_roth_contribution = 0 }
+                else ks.forEach(k => { d[k] = null })
+              })} />
+            {perPerson && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {(['X', ...(single ? [] : ['Y'])] as ('X' | 'Y')[]).map((w, i) => (
+                  <React.Fragment key={w}>
+                    <Field label={`${names[i]}: pre-tax 401(k) / yr`}><Money value={plan[`parent${w}_pretax_401k`] || 0} step={500} onChange={v => update(d => { d[`parent${w}_pretax_401k`] = v })} /></Field>
+                    <Field label={`${names[i]}: Roth / yr`} hint="Roth 401(k), Roth IRA, backdoor or mega backdoor"><Money value={plan[`parent${w}_roth_contribution`] || 0} step={500} onChange={v => update(d => { d[`parent${w}_roth_contribution`] = v })} /></Field>
+                  </React.Fragment>))}
+              </div>)}
           </div>
           <div className="mt-4 rounded-lg border border-line px-4 py-3 space-y-2">
             <Toggle checked={!!plan.surplus_sweep?.enabled} onChange={v => update(d => { d.surplus_sweep = { ...(d.surplus_sweep || {}), enabled: v } })}
