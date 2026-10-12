@@ -14,7 +14,7 @@ function save(blob: Blob, filename: string) {
   a.href = URL.createObjectURL(blob)
   a.download = filename
   a.click()
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000)
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000)  // long enough for a desktop Save dialog
 }
 
 /** Export the plan on screen: choose sections, name, format and dollars; preview PDFs in place. */

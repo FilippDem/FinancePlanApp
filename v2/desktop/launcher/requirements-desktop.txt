@@ -1,0 +1,3 @@
+# The desktop window (Windows: uses the Edge WebView2 engine that ships with Windows 11)
+pywebview==6.2.1
+pythonnet>=3.0.5

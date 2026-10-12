@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { HELP } from '../lib/help'
 import {
   LayoutDashboard, Users, Wallet, Baby, Home, HeartPulse, SlidersHorizontal, LineChart, CalendarRange, Layers,
-  Moon, Sun, LogOut, Check, Loader2, AlertCircle, ArrowLeftRight, Menu, X, ClipboardCheck, Wand2, Receipt, Palmtree, ShieldAlert, MapPin, UserCog, FlaskConical, Scale, Link2, ChevronDown, ChevronUp, HelpCircle, Target, Calculator,
+  Moon, Sun, LogOut, Check, Loader2, AlertCircle, ArrowLeftRight, Menu, X, ClipboardCheck, Wand2, Receipt, Palmtree, ShieldAlert, MapPin, UserCog, FlaskConical, Scale, Link2, ChevronDown, ChevronUp, HelpCircle, Target, Calculator, Monitor, Server,
 } from 'lucide-react'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
@@ -58,6 +58,37 @@ function SaveIndicator() {
   )
 }
 
+/** When the planner runs inside the desktop window (launcher/desktop.py), pywebview exposes a small API:
+ *  where the window is connected (this computer or the NAS) and a way to change it. Absent in a normal browser. */
+export function useDesktop(): { mode: 'local' | 'nas'; nas_url: string; url: string } | null {
+  const [d, setD] = useState<any>(null)
+  useEffect(() => {
+    const w = window as any
+    const load = () => { try { w.pywebview?.api?.get_state?.().then(setD).catch(() => {}) } catch { /* */ } }
+    if (w.pywebview?.api) load()
+    window.addEventListener('pywebviewready', load)
+    return () => window.removeEventListener('pywebviewready', load)
+  }, [])
+  return d
+}
+
+function DesktopConnection() {
+  const d = useDesktop()
+  if (!d) return null
+  const nas = d.mode === 'nas'
+  let host = ''
+  try { host = nas ? new URL(d.nas_url).host : '' } catch { /* */ }
+  return (
+    <button onClick={() => (window as any).pywebview?.api?.choose_connection()}
+      title={nas ? `Shared plan on ${host || 'the NAS'}. Click to change where this window gets your plan from.` : 'Plans on this computer. Click to change where this window gets your plan from.'}
+      className="w-full flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[14px] text-ink2 hover:bg-sunken">
+      {nas ? <Server size={17} /> : <Monitor size={17} />}
+      <span className="truncate">{nas ? 'Shared plan (NAS)' : 'This computer'}</span>
+      <span className="ml-auto text-[11.5px] text-muted">Change</span>
+    </button>
+  )
+}
+
 export function Shell({ me, children }: { me: any; children: React.ReactNode }) {
   const [dark, setDark] = useDarkMode()
   const [open, setOpen] = useState(false)
@@ -90,6 +121,7 @@ export function Shell({ me, children }: { me: any; children: React.ReactNode }) 
         <QuickSummary />
       </div>
       <div className="border-t border-line p-2.5 space-y-0.5">
+        <DesktopConnection />
         <button onClick={() => setDark(!dark)} className="w-full flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[14px] text-ink2 hover:bg-sunken">
           {dark ? <Sun size={17} /> : <Moon size={17} />}{dark ? 'Light mode' : 'Dark mode'}
         </button>

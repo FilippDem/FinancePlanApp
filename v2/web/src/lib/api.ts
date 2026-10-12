@@ -93,7 +93,7 @@ export const api = {
     a.href = URL.createObjectURL(blob)
     a.download = `financial-plan-${new Date().toISOString().slice(0, 10)}.pdf`
     a.click()
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000)
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000)  // long enough for a desktop Save dialog
   },
   householdDetails: () => req('GET', '/api/household'),
   renameHousehold: (name: string) => req('PUT', '/api/household', { name }),

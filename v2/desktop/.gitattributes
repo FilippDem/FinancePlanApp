@@ -1,0 +1,5 @@
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+root/README.txt text eol=crlf
+*.ico binary
+*.whl binary
