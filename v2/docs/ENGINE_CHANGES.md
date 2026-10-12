@@ -64,12 +64,14 @@ The six demo households were tuned against the v0.8 engine, which never charged 
 
 | Demo | v0.8 data | Re-tuned | Story kept |
 |---|---|---|---|
-| Tech Couple | 68% | 86% | SF → Austin → Seattle, retire at 50/51 |
-| 3-Kid Family | 9% | 69% | Seattle → Portland → Denver, work to 63 |
-| Executives | 3% | 76% | NYC → Miami → Portugal, retire at 55 |
-| Single Mom | 0% | 64% | Sacramento → San Diego, teacher → principal |
-| Empty Nesters | 41% | 82% | Portland → Arizona → Montana (RV), retire at 60 |
-| Budget Family | 0% | 71% | Houston → Austin, careful savers |
+| Tech Couple | 68% | 87% | SF → Austin → Seattle, retire at 50/51 |
+| 3-Kid Family | 9% | 70% | Seattle → Portland → Denver, work to 63 |
+| Executives | 3% | 74% | NYC → Miami → Portugal, retire at 55 |
+| Single Mom | 0% | 61% | Sacramento → San Diego, teacher → principal |
+| Empty Nesters | 41% | 80% | Portland → Arizona → Montana (RV), retire at 60 |
+| Budget Family | 0% | 72% | Houston → Austin, careful savers |
+
+Re-tuned again on 2026-10-12 after two engine changes: real 2025 state income-tax brackets (lower taxes for the CA/NY/OR demos) and health premiums before Medicare. Each demo now enters its own health plans instead of relying on the automatic estimate: the average worker share of an employer plan while working ($6,850 family / $1,440 single a year, KFF 2025 [22]) and, after an early retirement, a marketplace silver plan priced from the 2026 benchmark ($625/month at 40 [23]) on the federal age curve [24] ($980 / $1,205 / $1,410 a month per person at 50–54 / 55–59 / 60–64), with the premium tax credit. To keep the spread, Single Mom earns $115k (was $118k), the 3-Kid Family $125k + $102k (was $115k + $95k), the Budget Family $72k + $60k (was $66k + $55k), and the Executives start with $6.2M (was $5.6M). Tech Couple and Empty Nesters needed no change. With 600 runs and seed 1 the results are 85 / 70 / 71 / 58 / 78 / 67%.
 
 `demo_plans()` and `default_plan()` now return fresh copies. They used to return the cached object itself, so any caller that edited a demo changed it for every later caller (a test caught this).
 
