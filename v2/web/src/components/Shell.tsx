@@ -3,8 +3,9 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { HELP } from '../lib/help'
 import {
   LayoutDashboard, Users, Wallet, Baby, Home, HeartPulse, SlidersHorizontal, LineChart, CalendarRange, Layers,
-  Moon, Sun, LogOut, Check, Loader2, AlertCircle, ArrowLeftRight, Menu, X, ClipboardCheck, Wand2, Receipt, Palmtree, ShieldAlert, MapPin, UserCog, FlaskConical, Scale, Link2, ChevronDown, ChevronUp, HelpCircle, Target, Calculator, Monitor, Server,
+  Moon, Sun, LogOut, Check, Loader2, AlertCircle, ArrowLeftRight, Menu, X, ClipboardCheck, Wand2, Receipt, Palmtree, ShieldAlert, MapPin, UserCog, FlaskConical, Scale, Link2, ChevronDown, ChevronUp, HelpCircle, Target, Calculator, Monitor, Server, Sparkles,
 } from 'lucide-react'
+import { fiYear } from '../lib/whatifs'
 import { usePlan } from '../lib/store'
 import { api } from '../lib/api'
 import { clsx, money } from '../lib/format'
@@ -12,6 +13,7 @@ import { buildAlerts } from '../pages/Dashboard'
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/decisions', label: 'Decision playground', icon: Sparkles },
   { to: '/goals', label: 'Goals', icon: Target },
   { to: '/checkins', label: 'Check-ins', icon: ClipboardCheck, badge: true },
   { to: '/actuals', label: 'Actuals', icon: Receipt },
@@ -46,14 +48,14 @@ export function useDarkMode(): [boolean, (v: boolean) => void] {
   return [dark, setDark]
 }
 
-function SaveIndicator() {
+function SaveIndicator({ onDark }: { onDark?: boolean }) {
   const { saveState, lastSaved } = usePlan()
   const time = lastSaved ? new Date(lastSaved).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''
   return (
-    <span className="flex items-center gap-1.5 text-[12.5px] text-muted">
-      {saveState === 'saved' && <><Check size={14} className="text-good" /> Saved {time && `· ${time}`}</>}
+    <span className={clsx('flex items-center gap-1.5 text-[12.5px]', onDark ? 'text-white/85' : 'text-muted')}>
+      {saveState === 'saved' && <><Check size={14} className={onDark ? 'text-emerald-300' : 'text-good'} /> Saved {time && `· ${time}`}</>}
       {(saveState === 'dirty' || saveState === 'saving') && <><Loader2 size={14} className="animate-spin" /> Saving…</>}
-      {saveState === 'error' && <><AlertCircle size={14} className="text-bad" /> Not saved — retrying on next change</>}
+      {saveState === 'error' && <><AlertCircle size={14} className={onDark ? 'text-red-200' : 'text-bad'} /> Not saved — retrying on next change</>}
     </span>
   )
 }
@@ -108,6 +110,7 @@ export function Shell({ me, children }: { me: any; children: React.ReactNode }) 
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-2.5 pb-4">
+        <FICard onOpen={() => { nav('/decisions'); setOpen(false) }} />
         {NAV.map((n: any, i) => n.group
           ? <div key={i} className="px-2.5 pt-5 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted">{n.group}</div>
           : (
@@ -155,14 +158,20 @@ export function Shell({ me, children }: { me: any; children: React.ReactNode }) 
         </div>
       )}
       <div className="flex-1 lg:ml-[232px] min-w-0">
-        <header className="sticky top-0 z-30 h-14 flex items-center justify-between gap-3 px-4 sm:px-8 bg-bg/85 backdrop-blur border-b border-line/60">
-          <button className="lg:hidden p-2 -ml-2 rounded-md hover:bg-sunken" onClick={() => setOpen(true)}>{open ? <X size={18} /> : <Menu size={18} />}</button>
+        <header className="sticky top-0 z-30 h-14 flex items-center justify-between gap-3 px-4 sm:px-8 text-white shadow-md bg-gradient-to-r from-[#1d4ed8] via-[#2563eb] to-[#4f46e5]">
+          <button className="lg:hidden p-2 -ml-2 rounded-md hover:bg-white/15" onClick={() => setOpen(true)}>{open ? <X size={18} /> : <Menu size={18} />}</button>
+          <div className="min-w-0 leading-tight">
+            <div className="font-semibold text-[15px] truncate">{household?.name || 'Financial Planner'}</div>
+            <div className="text-[11.5px] text-white/75 truncate hidden sm:block">Weigh your options · stack decisions · see your future</div>
+          </div>
+          <NavLink to="/decisions" className={({ isActive }) => clsx('hidden sm:inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-[12.5px] font-semibold shadow-sm transition-colors',
+            isActive ? 'bg-white text-[#1d4ed8]' : 'bg-amber-400 text-amber-950 hover:bg-amber-300')}><Sparkles size={13} />Decision playground</NavLink>
           <div className="flex-1" />
-          {household?.is_test && <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-warn bg-warn/10 rounded-md px-2 h-7">
+          {household?.is_test && <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-amber-950 bg-amber-300 rounded-md px-2 h-7">
             <FlaskConical size={14} />Test mode<button className="underline ml-1" title="Delete this test household and go back to your own"
               onClick={async () => { try { const r = await api.exitTest(); location.href = r.id ? '/' : '/households' } catch { nav('/households') } }}>Exit</button></span>}
-          <HelpButton />
-          <SaveIndicator />
+          <HelpButton onDark />
+          <SaveIndicator onDark />
         </header>
         <main className="px-4 sm:px-8 py-6 max-w-[1280px] mx-auto">{children}</main>
       </div>
@@ -200,7 +209,7 @@ function QuickSummary() {
 }
 
 
-function HelpButton() {
+function HelpButton({ onDark }: { onDark?: boolean }) {
   const loc = useLocation()
   const [open, setOpen] = useState(false)
   const h = HELP[loc.pathname]
@@ -208,11 +217,11 @@ function HelpButton() {
   if (!h) return null
   return (
     <div className="relative">
-      <button onClick={() => setOpen(!open)} className="flex items-center gap-1 text-[12.5px] text-ink2 hover:text-ink px-2 h-8 rounded-md hover:bg-sunken" aria-label="Help for this page">
+      <button onClick={() => setOpen(!open)} className={clsx('flex items-center gap-1 text-[12.5px] px-2 h-8 rounded-md', onDark ? 'text-white/90 hover:bg-white/15' : 'text-ink2 hover:text-ink hover:bg-sunken')} aria-label="Help for this page">
         <HelpCircle size={15} />Help</button>
       {open && <>
         <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-        <div className="absolute right-0 top-9 z-50 w-[340px] rounded-xl border border-line bg-surface shadow-2xl p-4 text-sm">
+        <div className="absolute right-0 top-9 z-50 w-[340px] rounded-xl border border-line bg-surface text-ink shadow-2xl p-4 text-sm">
           <div className="font-semibold mb-1">About this page</div>
           <p className="text-ink2">{h.what}</p>
           {h.tips.length > 0 && <ul className="mt-2 space-y-1 list-disc pl-4 text-ink2">{h.tips.map(t => <li key={t}>{t}</li>)}</ul>}
@@ -220,4 +229,29 @@ function HelpButton() {
       </>}
     </div>
   )
+}
+
+
+/** FinP4l-style "FI age" card: when work becomes optional, plus today's net worth, assets and debts. */
+function FICard({ onOpen }: { onOpen: () => void }) {
+  const { plan, proj } = usePlan()
+  if (!proj) return null
+  const fi = fiYear(proj.rows)
+  const r0 = proj.rows[0]
+  const age = fi != null ? plan.parentX_age + (fi - plan.current_year) : null
+  const debts = (r0.mortgage_balance || 0) + (r0.consumer_debt || 0) + (r0.debt_balance || 0)
+  return (
+    <button onClick={onOpen} title="When your savings could cover 25× a year of spending. Open the decision playground to change it."
+      className="w-full mt-1 mb-3 rounded-xl border border-line bg-gradient-to-br from-accentSoft to-surface px-3 py-2.5 text-left hover:border-accent/50">
+      <div className="text-[10.5px] font-semibold uppercase tracking-wider text-muted">Work optional at</div>
+      <div className="flex items-baseline gap-1.5">
+        <span className={clsx('text-[26px] font-bold tnum leading-tight', age == null ? 'text-muted' : 'text-accent')}>{age ?? '—'}</span>
+        <span className="text-[12px] text-ink2">{fi != null ? (fi <= plan.current_year ? 'already there' : `in ${fi}`) : 'not reached'}</span>
+      </div>
+      <div className="grid grid-cols-3 gap-1 mt-1.5 text-[11px]">
+        <div><div className="text-muted">Net worth</div><div className="tnum font-semibold">{money(proj.summary.net_worth_now)}</div></div>
+        <div><div className="text-muted">Investable</div><div className="tnum font-semibold text-good">{money(r0.investable)}</div></div>
+        <div><div className="text-muted">Debts</div><div className="tnum font-semibold text-bad">{money(debts)}</div></div>
+      </div>
+    </button>)
 }

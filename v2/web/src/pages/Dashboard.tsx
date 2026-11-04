@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { DecisionsStrip } from '../components/DecisionsStrip'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, CheckCircle2, Info, Sparkles, ArrowRight, TrendingUp, CalendarClock } from 'lucide-react'
 import { useCites } from '../components/Cite'
@@ -214,6 +215,7 @@ export default function Dashboard({ isNew }: { isNew: boolean }) {
         </div>
       )}
 
+      <DecisionsStrip />
       <SpendingPower />
 
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">

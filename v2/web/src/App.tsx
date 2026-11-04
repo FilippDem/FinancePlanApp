@@ -27,6 +27,7 @@ const Household = lazy(() => import('./pages/Household'))
 const Ownership = lazy(() => import('./pages/Ownership'))
 const Goals = lazy(() => import('./pages/Goals'))
 const Taxes = lazy(() => import('./pages/Taxes'))
+const Decisions = lazy(() => import('./pages/Decisions'))
 
 function skipSetup() {
   try { if (sessionStorage.getItem('fp_setup_seen')) return true; sessionStorage.setItem('fp_setup_seen', '1') } catch { /* */ }
@@ -90,6 +91,7 @@ function Gate() {
                   <Route path="/accounts" element={<Linked />} />
                   <Route path="/goals" element={<Goals />} />
                   <Route path="/taxes" element={<Taxes />} />
+                  <Route path="/decisions" element={<Decisions />} />
                   <Route path="*" element={<Dashboard isNew={false} />} />
                 </Routes>
               </Suspense>
